@@ -28,7 +28,10 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.Consistency;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -59,6 +62,9 @@ public class RepairLog
 
     // The HSID of this initiator, for logging purposes
     long m_HSId = Long.MIN_VALUE;
+
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     // want voltmessage as payload with message-independent metadata.
     static class Item
@@ -120,6 +126,8 @@ public class RepairLog
     {
         m_logSP = new ArrayDeque<Item>();
         m_logMP = new ArrayDeque<Item>();
+
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     // get the HSID for dump logging
@@ -144,18 +152,30 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
+        /**
+         * Note: A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            // We can't repair read-only SP transactions due to their short-circuited nature.
+
+            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            // We can't repair shortcut-read SP transactions due to their short-circuited nature.
             // Just don't log them to the repair log.
-            if (!m.isReadOnly()) {
+            if (!shortcutRead) {
                 m_lastSpHandle = m.getSpHandle();
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;
-            if (!m.isReadOnly()) {
+
+            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            if (!shortcutRead) {
                 truncate(m.getTruncationHandle(), IS_MP);
                 // only log the first fragment of a procedure (and handle 1st case)
                 if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
@@ -169,7 +189,10 @@ public class RepairLog
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
-            if (!ctm.isReadOnly() && !ctm.isRestart()) {
+
+            boolean shortcutRead = ctm.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            if (!shortcutRead && !ctm.isRestart()) {
                 truncate(ctm.getTruncationHandle(), IS_MP);
                 m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
                 //Restore will send a complete transaction message with a lower mp transaction id because

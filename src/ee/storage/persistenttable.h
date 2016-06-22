@@ -82,6 +82,7 @@ class MaterializedViewInfo;
 namespace voltdb {
 
 class CoveringCellIndexTest_TableCompaction;
+class MaterializedViewTriggerForWrite;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -100,7 +101,13 @@ public:
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
                             bool revertIndexes);
-    bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    // The fallible flag is used to denote a change to a persistent table
+    // which is part of a long transaction that has been vetted and can
+    // never fail (e.g. violate a constraint).
+    // The initial use case is a live catalog update that changes table schema and migrates tuples
+    // and/or adds a materialized view.
+    // Constraint checks are bypassed and the change does not make use of "undo" support.
+    void deleteTuple(TableTuple &tuple, bool fallible=true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
@@ -149,7 +156,7 @@ private:
     /**
      * Only PersistentTable can call the destructor.
      */
-    virtual ~PersistentTableSurgeon();
+    ~PersistentTableSurgeon() { }
 
     PersistentTable &m_table;
 
@@ -200,21 +207,22 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
 
-  private:
+private:
     // no default ctor, no copy, no assignment
     PersistentTable();
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
 
-    // default iterator
     TableIterator m_iter;
-
- protected:
 
     virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
-  public:
+public:
     virtual ~PersistentTable();
+
+    int64_t occupiedTupleMemory() const {
+        return m_tupleCount * m_tempTuple.tupleLength();
+    }
 
     void notifyQuantumRelease() {
         if (compactionPredicate()) {
@@ -226,10 +234,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     TableIterator& iterator() {
         m_iter.reset(m_data.begin());
         return m_iter;
-    }
-
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
     }
 
     JumpingTableIterator* makeJumpingIterator() {
@@ -255,8 +259,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // The initial use case is a live catalog update that changes table schema and migrates tuples
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    void deleteTuple(TableTuple &tuple, bool fallible=true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool insertTuple(TableTuple &tuple);
     // Optimized version of update that only updates specific indexes.
@@ -278,17 +281,30 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                         bool fallible=true,
                                         bool updateDRTimestamp=true);
 
-    virtual void addIndex(TableIndex *index) {
-        Table::addIndex(index);
-        m_noAvailableUniqueIndex = false;
-        m_smallestUniqueIndex = NULL;
-        m_smallestUniqueIndexCrc = 0;
+    // ------------------------------------------------------------------
+    // INDEXES
+    // ------------------------------------------------------------------
+    int indexCount() const {
+        return static_cast<int>(m_indexes.size());
     }
-    virtual void removeIndex(TableIndex *index) {
-        Table::removeIndex(index);
-        m_smallestUniqueIndex = NULL;
-        m_smallestUniqueIndexCrc = 0;
+
+    int uniqueIndexCount() const {
+        return static_cast<int>(m_uniqueIndexes.size());
     }
+
+    // returned via shallow vector copy -- seems good enough.
+    const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
+
+    TableIndex *index(std::string name) const;
+
+    TableIndex *primaryKeyIndex() const { return m_pkeyIndex; }
+
+    void configureIndexStats(CatalogId databaseId);
+
+    // mutating indexes
+    void addIndex(TableIndex *index);
+    void removeIndex(TableIndex *index);
+    void setPrimaryKeyIndex(TableIndex *index);
 
     // ------------------------------------------------------------------
     // PERSISTENT TABLE OPERATIONS
@@ -298,8 +314,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
-    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
-    {
+    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
         updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
         return true;
     }
@@ -327,6 +342,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // UTILITY
     // ------------------------------------------------------------------
     std::string tableType() const;
+    bool equals(PersistentTable* other);
     virtual std::string debug();
 
     /*
@@ -336,19 +352,25 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     int partitionColumn() const { return m_partitionColumn; }
 
-    std::vector<MaterializedViewMetadata *> views() const {
-        return m_views;
-    }
-    bool isMaterialized() { return m_isMaterialized; };
+    // The MatViewType typedef is required to satisfy initMaterializedViews
+    // template code that needs to identify
+    // "whatever MaterializedView*Trigger class is used by this *Table class".
+    // There's no reason to actually use MatViewType in the class definition.
+    // That would just make the code a little harder to analyze.
+    typedef MaterializedViewTriggerForWrite MatViewType;
+
+    /** Add/drop/list materialized views to this table */
+    void addMaterializedView(MaterializedViewTriggerForWrite* view);
+
+    void dropMaterializedView(MaterializedViewTriggerForWrite* targetView);
+
+    std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple &source) {
         assert (m_tempTuple.m_data);
         m_tempTuple.copy(source);
         return m_tempTuple;
     }
-
-    /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MaterializedViewMetadata *view);
 
     /**
      * Prepare table for streaming from serialized data.
@@ -359,14 +381,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         int32_t partitionId,
                         CatalogId tableId,
                         ReferenceSerializeInputBE &serializeIn);
-
-    void dropMaterializedView(MaterializedViewMetadata *targetView);
-    void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
-                                    std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
-                                    std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
-                                    std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                    std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
-    void updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo);
 
     /**
      * Attempt to stream more tuples from the table to the provided
@@ -393,14 +407,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     void doIdleCompaction();
+
     void printBucketInfo();
 
-    void increaseStringMemCount(size_t bytes)
-    {
+    void increaseStringMemCount(size_t bytes) {
         m_nonInlinedMemorySize += bytes;
     }
-    void decreaseStringMemCount(size_t bytes)
-    {
+
+    void decreaseStringMemCount(size_t bytes) {
         m_nonInlinedMemorySize -= bytes;
     }
 
@@ -434,12 +448,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // for test purpose
     void setDR(bool flag) { m_drEnabled = flag; }
 
-    void setTupleLimit(int32_t newLimit) {
-        m_tupleLimit = newLimit;
-    }
+    void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
 
-    bool isPersistentTableEmpty() const
-    {
+    bool isPersistentTableEmpty() const {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
         // So, it's OK and possibly MORE correct to count active tuples and ignore the effect of
@@ -454,9 +465,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() const {
-        return m_preTruncateTable;
-    }
+    PersistentTable * getPreTruncateTable() const { return m_preTruncateTable; }
 
     PersistentTable * currentPreTruncateTable() {
         if (m_preTruncateTable != NULL) {
@@ -512,8 +521,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
-  private:
 
+private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 
@@ -572,8 +581,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<TableIndex*> const &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
-
-    void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
@@ -646,11 +653,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewMetadata *> m_views;
+    std::vector<MaterializedViewTriggerForWrite*> m_views;
 
     // STATS
-    voltdb::PersistentTableStats stats_;
-    voltdb::TableStats* getTableStats();
+    PersistentTableStats m_stats;
+    TableStats* getTableStats();
 
     // STORAGE TRACKING
 
@@ -697,15 +704,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     TableIndex* m_smallestUniqueIndex;
     uint32_t m_smallestUniqueIndexCrc;
     int m_drTimestampColumnIndex;
+
+    // indexes
+    std::vector<TableIndex*> m_indexes;
+    std::vector<TableIndex*> m_uniqueIndexes;
+    TableIndex *m_pkeyIndex;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
     m_table(table),
     m_indexingComplete(false)
-{}
-
-inline PersistentTableSurgeon::~PersistentTableSurgeon()
-{}
+{ }
 
 inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
@@ -725,8 +734,8 @@ inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate
     m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
 }
 
-inline bool PersistentTableSurgeon::deleteTuple(TableTuple &tuple, bool fallible) {
-    return m_table.deleteTuple(tuple, fallible);
+inline void PersistentTableSurgeon::deleteTuple(TableTuple &tuple, bool fallible) {
+    m_table.deleteTuple(tuple, fallible);
 }
 
 inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {
@@ -885,8 +894,8 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
-{
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block,
+                                                bool deleteLastEmptyBlock) {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
 
@@ -971,8 +980,7 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock()
-{
+inline TBPtr PersistentTable::allocateNextBlock() {
     TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
     m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
@@ -992,7 +1000,5 @@ inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
 }
 
 }
-
-
 
 #endif

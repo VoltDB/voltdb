@@ -19,14 +19,13 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -35,12 +34,14 @@ import org.voltdb.types.SortDirectionType;
  * The only one we implement now is windowed RANK.  But more
  * could be possible.
  */
-public class PartitionByPlanNode extends HashAggregatePlanNode {
+public class PartitionByPlanNode extends AbstractPlanNode {
     public enum Members {
-        SORT_COLUMNS,
-        SORT_EXPRESSION,
-        SORT_DIRECTION
+        WINDOWED_COLUMN
     };
+
+    public PartitionByPlanNode() {
+        m_outputSchema = new NodeSchema();
+    }
 
     @Override
     public PlanNodeType getPlanNodeType() {
@@ -48,110 +49,187 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
-        super.validate();
+    public void resolveColumnIndexes() {
+        /*
+         * We need to resolve all the tves in the partition by and
+         * order by expressions of the windowed expression.
+         */
+        assert (m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
 
-        for (AbstractExpression expr : m_sortExpressions) {
-            expr.validate();
+        List<AbstractExpression> tves = getAllTVEs();
+        // Resolve all of them.
+        for (AbstractExpression ae : tves) {
+            TupleValueExpression tve = (TupleValueExpression)ae;
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
+            if (index == -1) {
+                // check to see if this TVE is the aggregate output
+                // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
+                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
+                    throw new RuntimeException("Unable to find index for column: " +
+                                               tve.getColumnName());
+                }
+            } else {
+                tve.setColumnIndex(index);
+            }
         }
     }
 
-    @Override
-    public void resolveColumnIndexes() {
-        super.resolveColumnIndexes();
-        assert(m_children.size() > 0);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        // get all the TVEs in the output columns
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
-        for (AbstractExpression expr : m_sortExpressions) {
-            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
+    /**
+     * This is used to get all the TVEs in the partition by plan node.  It's
+     * only used for resolution of TVE indices.  But it may be useful in
+     * testing that the TVEs are properly resolved,
+     *
+     * @return All the TVEs in expressions in this plan node.
+     */
+    public List<AbstractExpression> getAllTVEs() {
+        List<AbstractExpression> tves =  new ArrayList<AbstractExpression>();
+        // Get all the partition by expressions.
+        for (AbstractExpression ae : getWindowedExpression().getPartitionByExpressions()) {
+            tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
         }
-        // and update their indexes against the table schema
-        for (TupleValueExpression tve : sort_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+        // Get all the order by expressions.
+        for (AbstractExpression ae : getWindowedExpression().getOrderByExpressions()) {
+            tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
+        }
+        // Get everything else.
+        for (SchemaColumn col : getOutputSchema().getColumns()) {
+            AbstractExpression expr = col.getExpression();
+            if (col != null) {
+                tves.addAll(expr.findAllSubexpressionsOfClass(TupleValueExpression.class));
+            }
+        }
+        return tves;
+    }
+
+    /**
+     * Generate the output schema.  This node will already have
+     * an output schema with one column, which is a windowed aggregate
+     * expression.  But we need to add the output schema of the one
+     * child node.
+     */
+    @Override
+    public void generateOutputSchema(Database db) {
+        assert(getChildCount() == 1);
+
+        // Do the children's generation.
+        m_children.get(0).generateOutputSchema(db);
+
+        // Now, generate the output columns for this plan node.  First
+        // add the windowed column, and then add the input columns.
+        // The output schema must have one column, which
+        // is an windowed expression.
+        assert(m_outputSchema != null);
+        assert(0 == m_outputSchema.getColumns().size());
+        m_outputSchema.addColumn(m_windowedSchemaColumn);
+        m_hasSignificantOutputSchema = true;
+        NodeSchema inputSchema = getChild(0).getOutputSchema();
+        assert(inputSchema != null);
+        for (SchemaColumn schemaCol : inputSchema.getColumns()) {
+            // We have to clone this because we will be
+            // horsing around with the indices of TVEs.  However,
+            // we don't need to resolve anything here, because
+            // the default column index algorithm will work quite
+            // nicely for us.
+            SchemaColumn newCol = schemaCol.clone();
+            m_outputSchema.addColumn(newCol);
         }
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        StringBuilder sb = new StringBuilder(" PARTIION PLAN: " + super.explainPlanForNode(indent));
-        sb.append(indent).append("SORT BY: \n");
-        for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-            AbstractExpression ae = m_sortExpressions.get(idx);
-            SortDirectionType dir = m_sortDirections.get(idx);
-            sb.append(indent)
-               .append(ae.explain(optionalTableName))
-               .append(": ")
-               .append(dir.name())
-               .append("\n");
+        String newIndent = "  " + indent;
+        StringBuilder sb = new StringBuilder(indent + "PARTITION BY PLAN\n");
+        sb.append(newIndent + "PARTITION BY:\n");
+        int numExprs = getNumberOfPartitionByExpressions();
+        for (int idx = 0; idx < numExprs; idx += 1) {
+            AbstractExpression ae = getPartitionByExpression(idx);
+            // Apparently ae.toString() adds a trailing newline.  That's
+            // unfortunate, but it works out ok here.
+            sb.append("  ")
+              .append(newIndent)
+              .append(idx).append(": ")
+              .append(ae.toString());
         }
-        sb.append(indent).append("PARTITION BY:\n");
+        String sep = "";
+        sb.append(newIndent).append("SORT BY:\n");
+        numExprs = numberSortExpressions();
+        for (int idx = 0; idx < numExprs; idx += 1) {
+            AbstractExpression ae = getSortExpression(idx);
+            SortDirectionType dir = getSortDirection(idx);
+            sb.append(sep).append("  ")
+              .append(newIndent)
+              .append(idx).append(":")
+              .append(ae.explain(optionalTableName))
+              .append(" ")
+              .append(dir.name());
+            sep = "\n";
+        }
         return sb.toString();
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        assert (m_sortExpressions.size() == m_sortDirections.size());
-        /*
-         * Serialize the sort columns.
-         */
-        stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_sortExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
-            stringer.endObject();
+        if (m_windowedSchemaColumn != null) {
+            stringer.key(Members.WINDOWED_COLUMN.name());
+            m_windowedSchemaColumn.toJSONString(stringer, true);
         }
-        stringer.endArray();
     }
 
     @Override
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
-        m_sortExpressions.clear();
-        m_sortDirections.clear();
-
-        /*
-         * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
-         * as we need to get a sort expression and a sort order for each column.
-         */
-        if (jobj.has(Members.SORT_COLUMNS.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.SORT_COLUMNS.name());
-            int size = jarray.length();
-            for (int ii = 0; ii < size; ii += 1) {
-                JSONObject tempObj = jarray.getJSONObject(ii);
-                m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-                m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
-            }
+        JSONObject windowedColumn = (JSONObject) jobj.get(Members.WINDOWED_COLUMN.name());
+        if (windowedColumn != null) {
+            m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
         }
     }
 
-    public void addSortExpression(AbstractExpression ae,
-                                  SortDirectionType  dir) {
-        m_sortExpressions.add(ae);
-        m_sortDirections.add(dir);
+    private WindowedExpression getWindowedExpression() {
+        assert(m_windowedSchemaColumn != null);
+        AbstractExpression abstractSE = m_windowedSchemaColumn.getExpression();
+        assert(abstractSE instanceof WindowedExpression);
+        return (WindowedExpression)abstractSE;
+    }
+
+    public AbstractExpression getPartitionByExpression(int idx) {
+        WindowedExpression we = getWindowedExpression();
+        return we.getPartitionByExpressions().get(idx);
+    }
+
+    public int getNumberOfPartitionByExpressions() {
+        return getWindowedExpression().getPartitionbySize();
     }
 
     public AbstractExpression getSortExpression(int idx) {
-        return m_sortExpressions.get(idx);
+        WindowedExpression we = getWindowedExpression();
+        return we.getOrderByExpressions().get(idx);
     }
 
     public SortDirectionType getSortDirection(int idx) {
-        return m_sortDirections.get(idx);
+        WindowedExpression we = getWindowedExpression();
+        return (we.getOrderByDirections().get(idx));
     }
 
     public int numberSortExpressions() {
-        return m_sortExpressions.size();
+        WindowedExpression we = getWindowedExpression();
+        return we.getOrderbySize();
     }
-    private List<AbstractExpression> m_sortExpressions = new ArrayList<AbstractExpression>();
-    private List<SortDirectionType>  m_sortDirections = new ArrayList<SortDirectionType>();
+
+    public void setWindowedColumn(SchemaColumn col) {
+        m_windowedSchemaColumn = col;
+    }
+
+    @Override
+    /**
+     * This is an AggregatePlanNode.  Normally these don't need projection
+     * nodes, but this one does.
+     */
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
+
+    private SchemaColumn       m_windowedSchemaColumn = null;
 }

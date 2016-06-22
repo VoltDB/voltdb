@@ -226,6 +226,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "order by T.T_D0;");
     }
 
+    public void testOrderByBooleanConstants()
+    {
+        String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
+        for (String condition : conditions) {
+            failToCompile(String.format("SELECT * FROM T WHERE T_D0 = 2 ORDER BY %s", condition),
+                          "invalid ORDER BY expression");
+        }
+    }
+
     public void testOrderDescWithEquality() {
         validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
         // See ENG-5084 to optimize this query to use inverse scan in future.

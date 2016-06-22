@@ -33,8 +33,6 @@ using namespace std;
 
 namespace voltdb {
 
-const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
-
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 

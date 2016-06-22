@@ -46,6 +46,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -67,6 +68,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -91,6 +93,7 @@ import org.voltdb.utils.CatalogUtil;
  *
  */
 public class PlanAssembler {
+    public static boolean HANDLE_WINDOWED_OPERATORS = Boolean.valueOf(System.getProperty("org.voltdb.handlewindowedfunctions", "False"));
 
     // The convenience struct to accumulate results after parsing multiple statements
     private static class ParsedResultAccumulator {
@@ -1044,6 +1047,12 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
+        // If we have a windowed expression in the display list we want to
+        // add a PartitionByPlanNode here.
+        if (m_parsedSelect.hasWindowedExpression()) {
+            root = handleWindowedOperators(root);
+        }
+
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
@@ -1079,6 +1088,9 @@ public class PlanAssembler {
             }
         }
 
+        // Add a project node if we need one.  Some types of nodes can have their
+        // own inline projection nodes, while others need an out-of-line projection
+        // node.
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
@@ -1115,8 +1127,7 @@ public class PlanAssembler {
      * @return true if a project node is required
      */
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( root instanceof AggregatePlanNode ||
-             root.getPlanNodeType() == PlanNodeType.PROJECTION) {
+        if (!root.planNodeClassNeedsProjectionNode()) {
             return false;
         }
         // If there is a complexGroupby at his point, it means that
@@ -1679,7 +1690,10 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
-        // if the projection can be done inline...
+        // If the projection can be done inline. then add the
+        // projection node inline.  Even if the rootNode is a
+        // scan, if we have a windowed expression we need to
+        // add it out of line.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;
@@ -2091,6 +2105,67 @@ public class PlanAssembler {
 
         // parent is null and switched to index scan from sequential scan
         return true;
+    }
+
+    /**
+     * Create nodes for windowed operations.
+     *
+     * @param root
+     * @return
+     */
+    private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
+        if ( ! HANDLE_WINDOWED_OPERATORS ) {
+            throw new PlanningErrorException("Windowed operators are not supported in this version of VoltDB.");
+        }
+        // Get the windowed expression.  We need to set its output
+        // schema from the display list.
+        ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
+        assert(colInfo != null);
+        SchemaColumn windowedSchemaColumn = colInfo.asSchemaColumn();
+
+        // This will set the output schema to contain the
+        // windowed schema column only.  In generateOutputSchema
+        // we will add the input columns.
+        PartitionByPlanNode pnode = new PartitionByPlanNode();
+        pnode.setWindowedColumn(windowedSchemaColumn);
+        OrderByPlanNode onode = new OrderByPlanNode();
+        // We need to extract more information from the windowed expression.
+        // to construct the output schema.
+        WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
+        List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
+        // If the order by expression list contains a partition by expression then
+        // we won't have to sort by it twice.  We sort by the partition by expressions
+        // first, and we don't care what order we sort by them.  So, find the
+        // sort direction in the order by list and use that in the partition by
+        // list, and then mark that it was deleted in the order by
+        // list.
+        //
+        // We choose to make this dontsort rather than dosort because the
+        // Java default value for boolean is false, and we want to sort by
+        // default.
+        boolean dontsort[] = new boolean[windowedExpression.getOrderbySize()];
+        List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
+        List<SortDirectionType>  orderByDirections  = windowedExpression.getOrderByDirections();
+        for (int idx = 0; idx < windowedExpression.getPartitionbySize(); idx += 1) {
+            SortDirectionType pdir = SortDirectionType.ASC;
+            AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
+            int sidx = windowedExpression.getSortIndexOfOrderByExpression(partitionByExpression);
+            if (0 <= sidx) {
+                pdir = orderByDirections.get(sidx);
+                dontsort[sidx] = true;
+            }
+            onode.addSort(partitionByExpression, pdir);
+        }
+        for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
+            if (!dontsort[idx]) {
+                AbstractExpression orderByExpr = orderByExpressions.get(idx);
+                SortDirectionType  orderByDir  = orderByDirections.get(idx);
+                onode.addSort(orderByExpr, orderByDir);
+            }
+        }
+        onode.addAndLinkChild(root);
+        pnode.addAndLinkChild(onode);
+        return pnode;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

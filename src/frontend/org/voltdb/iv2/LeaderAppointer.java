@@ -506,7 +506,7 @@ public class LeaderAppointer implements Promotable
         return masterHSId;
     }
 
-    private boolean isClusterKSafe(Set<Integer> hostsOnRing)
+    public boolean isClusterKSafe(Set<Integer> hostsOnRing)
     {
         boolean retval = true;
         List<String> partitionDirs = null;
