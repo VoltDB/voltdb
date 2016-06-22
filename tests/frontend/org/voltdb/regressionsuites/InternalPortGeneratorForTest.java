@@ -38,7 +38,7 @@ public class InternalPortGeneratorForTest implements Iterable<Integer>{
     final PortGeneratorForTest generator;
 
     public InternalPortGeneratorForTest(PortGeneratorForTest generator, int seedCount) {
-        checkArgument(seedCount > 0, "clusterSize %s in less then one", seedCount);
+        checkArgument(seedCount >= 0, "clusterSize %s in less then zero", seedCount);
         ImmutableList.Builder<Integer> lb = ImmutableList.builder();
         ImmutableSortedSet.Builder<String> sb = ImmutableSortedSet.naturalOrder();
         for (int i = 0; i < seedCount; ++i) {
@@ -54,10 +54,6 @@ public class InternalPortGeneratorForTest implements Iterable<Integer>{
     @Override
     public Iterator<Integer> iterator() {
         return ports.iterator();
-    }
-
-    public String getLeader() {
-        return coordinators.first();
     }
 
     public List<Integer> getPorts() {

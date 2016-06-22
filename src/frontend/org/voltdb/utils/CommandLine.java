@@ -631,7 +631,12 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("org.voltdb.VoltDB");
         cmdline.add(m_startAction.verb());
 
-        cmdline.add("host"); cmdline.add(m_leader);
+        cmdline.add("host");
+        if (!m_coordinators.isEmpty()) {
+            cmdline.add(m_coordinators.first());
+        } else {
+            cmdline.add(m_leader);
+        }
         if (jarFileName() != null) {
             cmdline.add("catalog"); cmdline.add(jarFileName());
         }
