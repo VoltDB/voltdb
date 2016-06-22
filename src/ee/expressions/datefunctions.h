@@ -863,4 +863,28 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
     }
 }
 
+const int64_t MIN_VALID_TIMESTAMP_VALUE = GREGORIAN_EPOCH;
+const int64_t MAX_VALID_TIMESTAMP_VALUE = NYE9999;
+
+inline bool timestampIsValid(int64_t ts) {
+    return (MIN_VALID_TIMESTAMP_VALUE <= ts) && (ts <= MAX_VALID_TIMESTAMP_VALUE);
+}
+
+template<> inline NValue NValue::callConstant<FUNC_VOLT_MIN_VALID_TIMESTAMP>() {
+    return getTimestampValue(MIN_VALID_TIMESTAMP_VALUE);
+}
+
+template<> inline NValue NValue::callConstant<FUNC_VOLT_MAX_VALID_TIMESTAMP>() {
+    return getTimestampValue(MAX_VALID_TIMESTAMP_VALUE);
+}
+
+template<> inline NValue NValue::callUnary<FUNC_VOLT_IS_VALID_TIMESTAMP>() const {
+    if (isNull()) {
+        return getNullValue();
+    }
+    int64_t timestamp_number = castAsBigIntAndGetValue();
+    return getBooleanValue(timestampIsValid(timestamp_number));
+}
+
+
 }

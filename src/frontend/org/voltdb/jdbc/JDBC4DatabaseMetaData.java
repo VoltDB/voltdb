@@ -883,7 +883,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     {
         checkClosed();
         return "CURRENT_TIMESTAMP,DATEADD,DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,EXTRACT,FROM_UNIXTIME,HOUR," +
-               "MINUT,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR,"+
+               "IS_VALID_TIMESTAMP,MAX_VALID_TIMESTAMP,MIN_VALID_TIMESTAMP," +
+               "MINUTE,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR,"+
                "WEEKDAY,YEAR";
     }
 
@@ -1721,6 +1722,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         }
     }
 
+    @Override
     public ResultSet getPseudoColumns(String catalog, String schemaPattern,
             String tableNamePattern, String columnNamePattern)
             throws SQLException {
@@ -1728,6 +1730,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         throw SQLError.noSupport();
     }
 
+    @Override
     public boolean generatedKeyAlwaysReturned() throws SQLException {
         throw SQLError.noSupport();
     }

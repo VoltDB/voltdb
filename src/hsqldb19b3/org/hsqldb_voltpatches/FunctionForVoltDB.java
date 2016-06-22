@@ -167,6 +167,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DWITHIN_POINT_POINT          = 21018;    // if two points are within certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
         static final int FUNC_VOLT_VALIDPOLYGONFROMTEXT         = 21020;    // list polygonFromText, but validates after construction
+        static final int FUNC_VOLT_MIN_VALID_TIMESTAMP          = 21021;    // Minimum valid timestamp.
+        static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
+        static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
 
 
         /*
@@ -357,6 +360,16 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("validpolygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_VALIDPOLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("min_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MIN_VALID_TIMESTAMP, -1,
+            		new Type[] {},
+            		new short[] { Tokens.OPENBRACKET, Tokens.CLOSEBRACKET }),
+            new FunctionId("max_valid_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_MAX_VALID_TIMESTAMP, -1,
+            		new Type[] {},
+            		new short[] { Tokens.OPENBRACKET, Tokens.CLOSEBRACKET }),
+            new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
+            		new Type[] { Type.SQL_TIMESTAMP },
+            		new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -708,7 +721,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         }
         default:
-            sb.append(nodes[0].getSQL());
+        	// If this is a nullary function, we don't want to
+        	// crash here.
+        	if (0 < nodes.length) {
+        		sb.append(nodes[0].getSQL());
+        	}
             break;
         }
         for (int ii = 1; ii < nodes.length; ii++) {
