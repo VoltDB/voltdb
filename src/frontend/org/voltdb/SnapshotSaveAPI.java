@@ -471,7 +471,7 @@ public class SnapshotSaveAPI
     }
 
     private void createSetupIv2(
-            final String file_path, final String pathType, final String file_nonce, SnapshotFormat format,
+            String file_path, final String pathType, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -496,6 +496,15 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
+        SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(pathType);
+        if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+            file_path = VoltDB.instance().getSnapshotPath();
+            SNAP_LOG.info("Using local auto snapshot path: " + file_path);
+        } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+            file_path = VoltDB.instance().getCommandLogSnapshotPath();
+            SNAP_LOG.info("Using local CL snapshot path: " + file_path);
+        }
+
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,
                 tracker, hashinatorData, timestamp);
