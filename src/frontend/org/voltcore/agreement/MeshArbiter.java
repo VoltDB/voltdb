@@ -27,7 +27,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
@@ -82,6 +84,7 @@ public class MeshArbiter {
             Maps.newHashMap();
 
     protected final Map<Long, SiteFailureMessage> m_decidedSurvivors = Maps.newHashMap();
+    protected final List<SiteFailureMessage> m_localHistoricDecisions = Lists.newLinkedList();
 
     /**
      * Historic list of failed sites
@@ -359,6 +362,21 @@ public class MeshArbiter {
         m_recoveryLog.info("Agreement, Sending ["
                 + CoreUtils.hsIdCollectionToString(dests) + "]  " + sfm);
 
+        // Check to see we've made the same decision before, if so, it's likely
+        // that we've entered a loop, exit here.
+        if (m_localHistoricDecisions.size() >= 100) {
+            // Too many decisions have been made without converging
+            m_recoveryLog.warn("Agreement, " + m_localHistoricDecisions.size() +
+                               " local decisions have been made without converging");
+        }
+        for (SiteFailureMessage lhd : m_localHistoricDecisions) {
+            if (lhd.m_survivors.equals(sfm.m_survivors)) {
+                m_recoveryLog.info("Agreement, detected decision loop. Exiting");
+                return true;
+            }
+        }
+        m_localHistoricDecisions.add(sfm);
+
         // Wait for all survivors in the local decision to send their decisions over.
         // If one of the host's decision conflicts with ours, remove that host's link
         // and repeat the decision process.
@@ -390,23 +408,21 @@ public class MeshArbiter {
             if (msg == null) {
                 // Send a heartbeat to keep the dead host timeout active.
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
-                if (System.currentTimeMillis() - start > 20000) {
-                    m_recoveryLog.error("Agreement, still waiting for " +
-                    CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
-                    " expected " + CoreUtils.hsIdCollectionToString(expectedSurvivors) + " decided " +
-                    CoreUtils.hsIdCollectionToString(m_decidedSurvivors.keySet()));
+                final long duration = System.currentTimeMillis() - start;
+                if (duration > 20000) {
+                    m_recoveryLog.error("Agreement, Still waiting for decisions from " +
+                                        CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
+                                        " after " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds");
                     start = System.currentTimeMillis();
                 }
                 continue;
             }
 
             if (m_hsId != msg.m_sourceHSId && !expectedSurvivors.contains(msg.m_sourceHSId)) {
-                m_recoveryLog.info("Received message from failed site " + CoreUtils.hsIdToString(msg.m_sourceHSId) + " " + msg);
                 // Ignore messages from failed sites
                 continue;
             }
 
-            m_recoveryLog.info("Agreement, received message " + msg);
             if (msg.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
                 final SiteFailureMessage fm = (SiteFailureMessage) msg;
                 if (!fm.m_decision.isEmpty()) {
@@ -443,6 +459,7 @@ public class MeshArbiter {
         m_forwardCandidates.clear();
         m_failedSitesLedger.clear();
         m_decidedSurvivors.clear();
+        m_localHistoricDecisions.clear();
         m_inTrouble.clear();
         m_inTroubleCount = 0;
     }
