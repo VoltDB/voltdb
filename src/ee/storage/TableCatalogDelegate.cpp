@@ -615,6 +615,7 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
     MaterializedViewTriggerForWrite::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
+    assert(obsoleteViews.size() == 0);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
@@ -661,6 +662,7 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
     MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
+    assert(obsoleteViews.size() == 0);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
