@@ -1747,7 +1747,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         try (FileInputStream is = new FileInputStream(depFH)) {
             consoleLog.info("Loading Path configuration from " + depFH.getAbsolutePath());
             m_pathList.load(is);
-            System.out.println("Paths are: " + m_pathList.toString());
             is.close();
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to read configuratio path designtion", false, e);
