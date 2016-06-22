@@ -367,23 +367,29 @@ public class MeshArbiter {
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
-                // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
-                // generate its own heartbeats to keep this running.
+                // Send a heartbeat to keep the dead host timeout active.
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
-            } else if (msg.getSubject() == Subject.FAILURE.getId()) {
-                final FaultMessage fm = (FaultMessage) msg;
-                if (fm.decided && expectedSurvivors.contains(fm.reportingSite)) {
-                    decidedSurvivors.add(fm.reportingSite);
-                    if (!sfm.m_survivors.equals(fm.survivors)) {
+                continue;
+            }
+
+            if (!expectedSurvivors.contains(msg.m_sourceHSId)) {
+                // Ignore messages from failed sites
+                continue;
+            }
+
+            m_recoveryLog.info("Agreement, received message " + msg);
+            if (msg.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
+                final SiteFailureMessage fm = (SiteFailureMessage) msg;
+                if (!fm.m_decision.isEmpty()) {
+                    decidedSurvivors.add(fm.m_sourceHSId);
+                    if (!sfm.m_survivors.equals(fm.m_survivors)) {
                         m_recoveryLog.info("Agreement, Received inconsistent decision from " +
-                                           CoreUtils.hsIdToString(fm.reportingSite) + ", " + fm);
-                        final FaultMessage localFault = new FaultMessage(m_hsId, fm.reportingSite);
+                                           CoreUtils.hsIdToString(fm.m_sourceHSId) + ", " + fm);
+                        final FaultMessage localFault = new FaultMessage(m_hsId, fm.m_sourceHSId);
                         localFault.m_sourceHSId = m_hsId;
                         m_mailbox.deliverFront(localFault);
                         return false;
                     }
-                } else if (sfm.m_decision.contains(fm.reportingSite)) {
-                    // Ignore messages from failed sites
                 } else {
                     m_mailbox.deliverFront(fm);
                     return false;
