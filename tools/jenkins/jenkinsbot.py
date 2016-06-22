@@ -6,6 +6,7 @@ import os
 import sys
 import time
 
+
 tl_query = ("""
 SELECT t.name AS 'Test name', COUNT(*) AS 'Failures'
 FROM `junit-test-failures` AS t
@@ -15,7 +16,7 @@ ORDER BY COUNT(*) DESC
 """)
 
 br_query = ("""
-SELECT t.name AS 'Test name', t.job AS 'Job name', COUNT(*) AS 'Number of failures in this build range'
+SELECT t.name AS 'Test name', COUNT(*) AS 'Number of failures in this build range'
 FROM `junit-test-failures` AS t
 INNER JOIN `junit-job-results` AS j
 ON NOT t.status='FIXED' AND j.name=t.job AND j.build=t.build AND j.name=%(job)s AND %(build_low)s <= j.build AND j.build <= %(build_high)s
@@ -46,8 +47,8 @@ def jenkins_session():
         print('Could not retrieve token for jenkinsbot')
         return
 
-    sc = SlackClient(token)
     try:
+        sc = SlackClient(token)
         db = mysql.connector.connect(host='volt2.voltdb.lan', user='oolukoya', password='oolukoya', database='qa')
         cursor = db.cursor()
 
@@ -56,6 +57,7 @@ def jenkins_session():
             while True:
                 # Wait for and respond to commands.
                 incoming = list(sc.rtm_read())
+                print incoming
                 if len(incoming) > 0 and incoming[0].get('text', None) is not None and incoming[0].get('bot_id', None) is None:
                     text = incoming[0]['text']
                     channel = incoming[0]['channel']
@@ -76,9 +78,8 @@ def jenkins_session():
                         cursor.execute(tl_query, params)
                         headers = list(cursor.column_names)
                         table = list(cursor.fetchall())
-                        print tabulate(table, headers)
                         print sc.api_call(
-                            'chat.postMessage', channel=channel, text=tabulate(table, headers), as_user=True
+                            'files.upload', channels=[channel], content=tabulate(table, headers), filetype='text', filename='testleaderboard.txt'
                         )
                     elif 'build-range' in text:
                         args = text.split(' ')
@@ -92,7 +93,7 @@ def jenkins_session():
                         headers = list(cursor.column_names)
                         table = list(cursor.fetchall())
                         print sc.api_call(
-                            'chat.postMessage', channel=channel, text=tabulate(table, headers), as_user=True
+                            'files.upload', channels=[channel], content=tabulate(table, headers), filetype='text', filename='buildrange.txt'
                         )
                     elif 'test-on-master' in text:
                         params = {
@@ -102,11 +103,7 @@ def jenkins_session():
                         headers = list(cursor.column_names)
                         table = list(cursor.fetchall())
                         print sc.api_call(
-                            'chat.postMessage', channel=channel, text=tabulate(table, headers), as_user=True
-                        )
-                    else:
-                        print sc.api_call(
-                            'chat.postMessage', channel=channel, text=help_text, as_user=True
+                            'files.upload', channels=[channel], content=tabulate(table, headers), filetype='text', filename='testonmaster.txt'
                         )
                 time.sleep(1)
         else:
