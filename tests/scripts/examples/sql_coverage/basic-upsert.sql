@@ -27,7 +27,7 @@
 UPSERT INTO @dmltable               VALUES (@insertvals)
 UPSERT INTO @dmltable (@insertcols) VALUES (@insertvals)
 -- Confirm the values that were "upserted"
-SELECT * FROM @dmltable
+SELECT @star FROM @dmltable
 
 -- ... using a subset of columns
 UPSERT INTO @dmltable (_variable[id], _variable[@comparabletype])                             VALUES (_value[byte], @updatevalue)
@@ -36,7 +36,7 @@ UPSERT INTO @dmltable (_variable[id], _variable[@comparabletype], _variable[@com
 UPSERT INTO @dmltable (_variable[@comparabletype], _variable[id], _variable[@comparabletype]) VALUES (@updatevalue, _value[byte], @updatevalue)
 UPSERT INTO @dmltable (_variable[@comparabletype], _variable[@comparabletype], _variable[id]) VALUES (@updatevalue, @updatevalue, _value[byte])
 -- Confirm the values that were "upserted"
-SELECT * FROM @dmltable
+SELECT @star FROM @dmltable
 
 -- Tests of UPSERT INTO SELECT, using all columns (with and without a column list)
 UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables ORDER BY @idcol
@@ -46,29 +46,25 @@ UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables ORDER BY
 UPSERT INTO @dmltable               SELECT @star       FROM @fromtables ORDER BY @idcol
 UPSERT INTO @dmltable (@insertcols) SELECT @star       FROM @fromtables ORDER BY @idcol
 -- Confirm the values that were "upserted"
-SELECT * FROM @dmltable
+SELECT @star FROM @dmltable
 
 -- ... using a WHERE clause, with comparison ops (<, <=, =, >=, >)
 UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables WHERE @columnpredicate ORDER BY @idcol
 UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables WHERE @columnpredicate ORDER BY @idcol
 --- ... with logic operators (AND, OR) and comparison ops
--- Commenting these out, because they yield too many statements, which is slow,
--- and they don't add that much value:
---UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables WHERE (@updatecolumn @cmp @comparablevalue) _logicop @columnpredicate  ORDER BY @idcol
---UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables WHERE (@updatecolumn @cmp @comparablevalue) _logicop @columnpredicate  ORDER BY @idcol
+UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables WHERE (@updatecolumn @somecmp @comparablevalue) _logicop (@updatesource @somecmp @comparablevalue)  ORDER BY @idcol
+UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables WHERE (@updatecolumn @somecmp @comparablevalue) _logicop (@updatesource @somecmp @comparablevalue)  ORDER BY @idcol
 --- ... with arithmetic operators (+, -, *, /) and comparison ops
 UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant ORDER BY @idcol
 UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant ORDER BY @idcol
 -- Confirm the values that were "upserted"
-SELECT * FROM @dmltable
+SELECT @star FROM @dmltable
 
 -- ... using arithmetic (+, -, *, /) ops in the SELECT clause
-UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype])                                 SELECT @idcol + 100, __[#c2] @plus10                   FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id])                                 SELECT __[#c2] @plus10, @idcol + 200                   FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype], _variable[#c3 @comparabletype]) SELECT @idcol + 1000, __[#c2] @plus10, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
--- TODO, see ENG-10458: Commenting these out, because they cause
--- "timeout: procedure call took longer than 5 seconds" errors:
---UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id], _variable[#c3 @comparabletype]) SELECT __[#c2] @plus10, @idcol + 2000, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
---UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[#c3 @comparabletype], _variable[id]) SELECT __[#c2] @plus10, __[#c3] @plus10, @idcol + 3000 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype])                                 SELECT @idcol + 20, __[#c2] @plus10                  FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id])                                 SELECT __[#c2] @plus10, @idcol + 30                  FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype], _variable[#c3 @comparabletype]) SELECT @idcol + 40, __[#c2] @plus10, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id], _variable[#c3 @comparabletype]) SELECT __[#c2] @plus10, @idcol + 50, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[#c3 @comparabletype], _variable[id]) SELECT __[#c2] @plus10, __[#c3] @plus10, @idcol + 60 FROM @fromtables ORDER BY @idcol
 -- Confirm the values that were "upserted"
-SELECT * FROM @dmltable
+SELECT @star FROM @dmltable
