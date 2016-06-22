@@ -24,7 +24,6 @@
 package org.voltdb.client;
 
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -108,33 +107,30 @@ public class TestClientClose extends TestCase {
         assertEquals(preNumClientReaper, postNumClientReaper);
     }
 
-    public void testThreadsKilledOneOfClientClose() {
+    public void testThreadsKilledOneOfClientClose() throws Exception {
         ClientConfig config = new ClientConfig();
         Client client1 = ClientFactory.createClient(config);
         Client client2 = ClientFactory.createClient(config);
+
         try {
             client1.createConnection("localhost");
             client2.createConnection("localhost");
-        } catch (UnknownHostException ue) {
-            fail("Something failed in connecting to localhost, io exception");
         } catch (IOException ioe) {
-            fail("Something failed in connecting to localhost, unknow exception");
+            fail("Something failed in connecting to localhost");
+        } finally {
+            client1.close();
+            client2.close();
         }
-        //String m_procName = "@LoadSinglepartitionTable";
+
         try {
             VoltTable configData1 = client1.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
-        } catch (IOException | ProcCallException e) {
-            fail("Something failed in call procedure for client1.");
-        }
-        try {
             client1.close();
-        } catch (InterruptedException e1) {
-            fail("Something failed in closing client.");
-        }
-        try {
             VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
         } catch (IOException | ProcCallException e) {
-            fail("Something failed in call procedure for client1.");
+            fail("Something failed in call procedure for a client after close another one.");
+        } finally {
+            client2.close();
         }
+
     }
 }
