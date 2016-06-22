@@ -18,8 +18,10 @@ from six.moves.urllib.request import urlopen
 
 class Stats():
     def __init__(self):
-        self.jhost='http://ci.voltdb.lan'
-        self.dbhost='volt2.voltdb.lan'
+        self.jhost = 'http://ci.voltdb.lan'
+        self.dbhost = 'volt2.voltdb.lan'
+        self.dbuser = os.environ.get('dbuser', None)
+        self.dbpass = os.environ.get('dbpass', None)
         self.cmdHelp = """
         usage: junit-stats <job> <range>
         ex: junit-stats branch-2-pro-junit-master 800-802
@@ -28,7 +30,7 @@ class Stats():
 
     def read_url(self, url):
         """
-        Open a url and evaluate it. Return it as (hopefully) as JSON.
+        Download (hopefully) a json object from a url and evaluate it.
         """
 
         data = None
@@ -40,6 +42,9 @@ class Stats():
         except IOError as e:
             print(e)
             print('Could not read data from url: %s. The data at the url may not be readable.\n' % url)
+        except:
+            print('Something unexpected went wrong.\n')
+            print(sys.exc_info())
         return data
 
     def build_history(self, job, build_range):
@@ -51,30 +56,36 @@ class Stats():
         if job is None or build_range is None:
             print(self.cmdHelp)
             return
-        else:
-            try:
-                builds = build_range.split('-')
-                build_low = int(builds[0])
-                build_high = int(builds[1])
-                if build_high < build_low:
-                    raise Exception('Error: Left number must be lesser than or equal to right')
-            except:
-                print(sys.exc_info()[1])
-                print(self.cmdHelp)
-                return
+
+        try:
+            builds = build_range.split('-')
+            build_low = int(builds[0])
+            build_high = int(builds[1])
+            if build_high < build_low:
+                raise Exception('Error: Left number must be lesser than or equal to right')
+        except:
+            print(sys.exc_info())
+            print(self.cmdHelp)
+            return
 
         url = self.jhost + '/job/' + job + '/lastCompletedBuild/api/python'
         build = self.read_url(url)
         if build is None:
+            print('Could not retrieve last completed build build. Job: %s' % job)
             return
 
         latestBuild = build['number']
         host = build['builtOn']
 
-        db = mysql.connector.connect(host=self.dbhost, user='oolukoya', password='oolukoya', database='qa')
-        cursor = db.cursor()
+        try:
+            db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
+            cursor = db.cursor()
+        except:
+            print('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
+            print(sys.exc_info())
+            return
 
-        for build in range(build_low, build_high+1):
+        for build in range(build_low, build_high + 1):
             test_url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             test_report = self.read_url(test_url)
             if test_report is None:
@@ -101,6 +112,7 @@ class Stats():
                 if job_report is None:
                     print('Could not retrieve report because url is invalid. This may be because the build %d might not '
                     'exist on Jenkins' % build)
+                    print('Last completed build for this job is %d\n' % latestBuild)
                     continue
                 job_stamp = datetime.fromtimestamp(job_report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -146,27 +158,30 @@ class Stats():
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            test_data = {
-                                'name': name,
-                                'job': job,
-                                'status': status,
-                                'timestamp': timestamp,
-                                'url': report_url,
-                                'build': build,
-                                'host': host
-                            }
 
+                            # Record tests that don't pass.
                             if status != 'PASSED':
+                                test_data = {
+                                    'name': name,
+                                    'job': job,
+                                    'status': status,
+                                    'timestamp': timestamp,
+                                    'url': report_url,
+                                    'build': build,
+                                    'host': host
+                                }
                                 add_test = ('INSERT INTO `junit-test-failures` '
                                             '(name, job, status, stamp, url, build, host) '
                                             'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, %(url)s, %(build)s, %(host)s)')
                                 cursor.execute(add_test, test_data)
                                 db.commit()
+
             except KeyError as e:
                 print(e)
                 print('Error retrieving test data for this particular build: %d\n' % build)
             except:
-                print(sys.exc_info()[1])
+                # Catch all errors to avoid causing a failing build for the upstream project
+                print(sys.exc_info())
 
         cursor.close()
         db.close()
