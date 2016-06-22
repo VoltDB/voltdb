@@ -387,7 +387,7 @@ public class HTTPAdminListener {
         @JsonIgnore abstract Boolean isEnabled();
     }
     abstract class IgnoreNodePathKeyMixIn {
-        @JsonIgnore abstract String getNodePath();
+        @JsonProperty("path") abstract String getNodePath();
         @JsonIgnore abstract String getKey();
     }
 
