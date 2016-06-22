@@ -138,10 +138,6 @@ public class TestClientClose extends TestCase {
         } catch (InterruptedException e1) {
             fail("Something failed in closing client.");
         }
-        Map<Thread, StackTraceElement[]> preStMap = Thread.getAllStackTraces();
-        for (Thread t : preStMap.keySet()) {
-            System.out.println("Thread After Close client1: " + t.getName());
-        }
         try {
             VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
         } catch (IOException | ProcCallException e) {
