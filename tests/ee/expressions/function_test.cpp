@@ -88,6 +88,12 @@ struct FunctionTest : public Test {
                                   (AbstractDRTupleStream *)0,
                                   (AbstractDRTupleStream *)0,
                                   0) {}
+
+        /**
+         * A template for calling nullary function call expressions.
+         */
+        template <typename OUTPUT_TYPE>
+        int testNullary(int operation, OUTPUT_TYPE, bool expect_null = false);
         /**
          * A template for calling unary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to
@@ -154,6 +160,22 @@ static NValue getSomeValue(const TTInt &val)
     return ValueFactory::getDecimalValueFromString(val.ToString());
 }
 
+/**
+ * C++ thinks bool is a kind of integer.  This means we can't really
+ * force it to disambiguate between "getSomeValue(False)" and
+ * "getSomeValue(100)" using only types.  This is logically unneeded,
+ * but it's pretty useful.
+ */
+enum Boolean {
+    False = 0,
+    True  = 1
+};
+
+static NValue getSomeValue(const Boolean value)
+{
+    return ValueFactory::getBooleanValue(static_cast<bool>(value));
+}
+
 static NValue& getSomeValue(NValue &val)
 {
     return val;
@@ -165,6 +187,51 @@ std::ostream& operator<<(std::ostream& os, const NValue& val)
 {
     os << val.debug();
     return os;
+}
+
+/**
+ * Test a nullary function call.
+ * @returns: -1 if the result of the function evaluation is less than the expected result.
+ *            0 if the result of the function evaluation is as expected.
+ *            1 if the result of the function evaluation is greater than the expected result.
+ * Note that this function may throw an exception from the call to AbstractExpression::eval().
+ */
+template <typename OUTPUT_TYPE>
+int FunctionTest::testNullary(int operation,
+                              OUTPUT_TYPE output,
+                              bool expect_null) {
+    if (staticVerboseFlag) {
+        std::cout << "\n *** *** ***\n";
+        std::cout << "operation:     " << operation << std::endl;
+        std::cout << "Expected out:  " << output << std::endl;
+    }
+    // This is an empty vector, but functionFactory wants it.
+    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    AbstractExpression* const_exp = ExpressionUtil::functionFactory(operation, argument);
+    int cmpout;
+    NValue expected = getSomeValue(output);
+    NValue answer;
+    try {
+        answer = const_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        delete const_exp;
+        expected.free();
+        throw;
+    }
+    if (staticVerboseFlag) {
+        std::cout << ", answer: \"" << answer.debug() << "\""
+                  << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
+                  << ", comp:     " << std::dec << cmpout << std::endl;
+    }
+    delete const_exp;
+    expected.free();
+    return cmpout;
 }
 
 /**
@@ -185,12 +252,12 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
     argument->push_back(const_val_exp);
-    AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression* unary_exp = ExpressionUtil::functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
     try {
-        answer = bin_exp->eval();
+        answer = unary_exp->eval();
         if (expect_null) {
             // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
             cmpout = answer.isNull() ? 0 : 1;
@@ -198,7 +265,7 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
             cmpout = answer.compare(expected);
         }
     } catch (SQLException &ex) {
-        delete bin_exp;
+        delete unary_exp;
         expected.free();
         throw;
     }
@@ -208,7 +275,7 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
                   << ", comp:     " << std::dec << cmpout << std::endl;
     }
-    delete bin_exp;
+    delete unary_exp;
     expected.free();
     return cmpout;
 }
@@ -955,6 +1022,38 @@ TEST_F(FunctionTest, DateFunctionsToTimestamp) {
 
         ++i;
     }
+}
+
+TEST_F(FunctionTest, TestTimestampValidity)
+{
+    // Test the two constant functions.
+    ASSERT_EQ(0, testNullary(FUNC_VOLT_MIN_VALID_TIMESTAMP,
+                             ValueFactory::getTimestampValue(GREGORIAN_EPOCH)));
+    ASSERT_EQ(0, testNullary(FUNC_VOLT_MAX_VALID_TIMESTAMP,
+                             ValueFactory::getTimestampValue(NYE9999)));
+    // Test of of range below.
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(GREGORIAN_EPOCH - 1000),
+                           False));
+    // Test out of range above.
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(NYE9999 + 1000),
+                           False));
+    // Test in range, including the endpoints
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(0),
+                           True));
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(GREGORIAN_EPOCH),
+                           True));
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(NYE9999),
+                           True));
+    // Test null input
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
+                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
+                           True));
 }
 
 int main(int argc, char **argv) {

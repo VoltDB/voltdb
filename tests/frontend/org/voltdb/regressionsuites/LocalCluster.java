@@ -22,6 +22,8 @@
  */
 package org.voltdb.regressionsuites;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -126,6 +128,7 @@ public class LocalCluster implements VoltServerConfig {
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private InternalPortGeneratorForTest internalPortGenerator;
+    private int numberOfCoordinators = 1;
     private String m_voltdbroot = "";
     private VoltFile m_filePrefix;
 
@@ -228,8 +231,8 @@ public class LocalCluster implements VoltServerConfig {
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
-        int coordinatorsSize = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
-        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, coordinatorsSize);
+        numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
         if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
@@ -616,8 +619,7 @@ public class LocalCluster implements VoltServerConfig {
         // reset the port generator. RegressionSuite always expects
         // to find ClientInterface and Admin mode on known ports.
         portGenerator.reset();
-        int coordinatorsSize = m_hostCount <= 2 ? m_hostCount : m_hostCount <= 4 ? 2 : 3;
-        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, coordinatorsSize);
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
@@ -882,6 +884,13 @@ public class LocalCluster implements VoltServerConfig {
             m_hostCount++;
             this.m_compiled = false; //Host count changed, should recompile
         }
+    }
+
+    public void setNumberOfCoordinators(int i) {
+        checkArgument(i > 0 && i <= m_hostCount,
+                "coordinators count %s must be greater than 0, and less or equal to host count %s",
+                i, m_hostCount);
+        numberOfCoordinators = i;
     }
 
     /**
