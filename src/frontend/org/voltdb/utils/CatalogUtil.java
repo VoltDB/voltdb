@@ -2302,14 +2302,8 @@ public abstract class CatalogUtil {
      * @return true if proc is durable for non sys procs return true (durable)
      */
     public static boolean isDurableProc(String procName) {
-        //For sysprocs look at sysproc catalog.
-        if (procName.charAt(0) == '@') {
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
-            if (sysProc != null) {
-                return sysProc.isDurable();
-            }
-        }
-        return true;
+        SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+        return sysProc == null || sysProc.isDurable();
     }
 
     /**

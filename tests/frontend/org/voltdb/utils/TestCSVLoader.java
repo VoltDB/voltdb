@@ -1089,6 +1089,210 @@ public class TestCSVLoader {
 
     }
 
+    @Test
+    public void testHeaderCommon() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderDiffOrder() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "clm_string,clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_decimal,clm_float,clm_timestamp,clm_geography,clm_point",
+                "first,1 ,1,1,11111111,1.10,1.11,"+currentTime+",\"POLYGON((0 0, 1 0, 0 1, 0 0))\",POINT(1 1)",
+                "second,2,2,2,222222,3.30,NULL,"+currentTime+",\"POLYGON((0 0, 2 0, 0 2, 0 0))\",POINT(2 2)",
+                " third ,3,3,3,333333,NULL, 3.33,"+currentTime+",\"POLYGON((0 0, 3 0, 0 3, 0 0))\",POINT(3 3)",
+                " NULL ,4,4,4,444444,4.40 ,4.44,"+currentTime+",\"POLYGON((0 0, 4 0, 0 4, 0 0))\",POINT(4 4)",
+                "  \"abcde\"g,5,5,5,5555555, 5.50, 5.55,"+currentTime+",\"POLYGON((0 0, 5 0, 0 5, 0 0))\",POINT(5 5)",
+                " sixth,6,6,NULL,666666, 6.60, 6.66,"+currentTime+",\"POLYGON((0 0, 6 0, 0 6, 0 0))\",POINT(6 6)",
+                " seventh,7,NULL,7,7777777, 7.70, 7.77,"+currentTime+",\"POLYGON((0 0, 7 0, 0 7, 0 0))\",POINT(7 7)",
+                "first,11, 1,1,\"1,000\",1.10,1.11,"+currentTime+",\"POLYGON((0 0, 8 0, 0 8, 0 0))\",POINT(7 7)",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderSkip() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--skip=2",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 6;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderNULL() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--header",
+                "BLAH"
+        };
+        //Both \N and \\N as csv input are treated as NULL
+        String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography",
+                "1,\\" + Constants.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "2," + Constants.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "3," + Constants.CSV_NULL        + ",1,11111111,  \\" + Constants.CSV_NULL        + "  ,1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "4," + Constants.CSV_NULL        + ",1,11111111,  " + Constants.QUOTED_CSV_NULL + "  ,1.10,1.11,\"7777-12-25 14:35:26\"," + Constants.QUOTED_CSV_NULL + "," + Constants.QUOTED_CSV_NULL,
+                "5,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL   + "  \",1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "6,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL  + " L \",1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "7,\\" + Constants.CSV_NULL        + ",1,11111111,  \"abc\\" + Constants.CSV_NULL + "\"  ,1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt - 1;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderSuperSetHeader() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography,clm_other",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\",other1",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\",other2",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\",other3",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\",other4",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\",other5",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\",other6",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\",other7",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\",other8",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testHeaderColumnNumNotSame() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--limitrows=100",
+                "--header",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography,clm_other",
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime+",POINT(6 6),\"POLYGON((0 0, 6 0, 0 6, 0 0))\"",
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime+",POINT(7 7),\"POLYGON((0 0, 7 0, 0 7, 0 0))\"",
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 8 0, 0 8, 0 0))\"",
+        };
+        int invalidLineCnt = 8;
+        int validLineCnt = 0;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
         test_Interface(my_options, my_data, invalidLineCnt, validLineCnt, 0, new String[0]);

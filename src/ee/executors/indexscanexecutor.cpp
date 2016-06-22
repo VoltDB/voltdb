@@ -124,9 +124,9 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
 
-    Table* targetTable = m_node->getTargetTable();
-    //target table should be persistent table
-    assert(dynamic_cast<PersistentTable*>(targetTable));
+    // The target table should be a persistent table.
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
@@ -151,7 +151,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
     // update local target table with its most recent reference
-    Table* targetTable = m_node->getTargetTable();
+    // The target table should be a persistent table.
+    assert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
+    PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     IndexCursor indexCursor(tableIndex->getTupleSchema());
 

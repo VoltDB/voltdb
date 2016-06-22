@@ -126,11 +126,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!targetTable->deleteTuple(targetTuple, true)) {
-                VOLT_ERROR("Failed to delete tuple from table '%s'",
-                           targetTable->name().c_str());
-                return false;
-            }
+            targetTable->deleteTuple(targetTuple, true);
         }
         modified_tuples = m_inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
