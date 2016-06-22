@@ -46,8 +46,6 @@ public interface VoltDBInterface
 
     public String getCommandLogSnapshotPath();
 
-    public String getCommandLogPath();
-
     public String getSnapshotPath();
 
     public boolean isLegacy();
