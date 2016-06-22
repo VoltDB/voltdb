@@ -121,7 +121,6 @@ public class TestClientClose extends TestCase {
         } catch (IOException | ProcCallException e) {
             fail("Something failed in call procedure for a client after close another one.");
         } finally {
-            client1.close();
             client2.close();
         }
 
