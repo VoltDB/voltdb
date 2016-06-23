@@ -1822,7 +1822,7 @@ ul.topRightList li a {
 
 .btnStudio {
     background: #AA1F2F;
-    padding: 5px 10px;
+    padding: 5px 10px 4px 10px;
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
@@ -1907,7 +1907,7 @@ ul.topRightList li a {
 
     .btnList li {
         margin: 0;
-        padding: 0 10px 0 0;
+        padding: 0 10px 1px 0;
         float: left;
     }
 
