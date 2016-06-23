@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.google_voltpatches.common.collect.Lists;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
@@ -39,6 +40,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -366,8 +368,12 @@ public class MeshArbiter {
         // that we've entered a loop, exit here.
         if (m_localHistoricDecisions.size() >= 100) {
             // Too many decisions have been made without converging
-            m_recoveryLog.warn("Agreement, " + m_localHistoricDecisions.size() +
-                               " local decisions have been made without converging");
+            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                                               10, TimeUnit.SECONDS,
+                                               m_recoveryLog,
+                                               Level.WARN,
+                                               "Agreement, %d local decisions have been made without converging",
+                                               m_localHistoricDecisions.size());
         }
         for (SiteFailureMessage lhd : m_localHistoricDecisions) {
             if (lhd.m_survivors.equals(sfm.m_survivors)) {
@@ -384,9 +390,7 @@ public class MeshArbiter {
         m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
                            CoreUtils.hsIdCollectionToString(expectedSurvivors));
 
-        final Iterator<SiteFailureMessage> iter = m_decidedSurvivors.values().iterator();
-        while (iter.hasNext()) {
-            final SiteFailureMessage remoteDecision = iter.next();
+        for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
             if (expectedSurvivors.contains(remoteDecision.m_sourceHSId)) {
                 if (remoteDecision.m_decision.contains(m_hsId)) {
                     m_decidedSurvivors.clear();
@@ -396,13 +400,12 @@ public class MeshArbiter {
                     localFault.m_sourceHSId = m_hsId;
                     m_mailbox.deliverFront(localFault);
                     return false;
-                } else if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
-                    iter.remove();
                 }
             }
         }
 
         long start = System.currentTimeMillis();
+        boolean allDecisionsMatch = true;
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
@@ -434,7 +437,7 @@ public class MeshArbiter {
                             localFault.m_sourceHSId = m_hsId;
                             m_mailbox.deliverFront(localFault);
                             return false;
-                        } else if (sfm.m_survivors.equals(fm.m_survivors)) {
+                        } else {
                             m_decidedSurvivors.put(fm.m_sourceHSId, fm);
                         }
                     }
@@ -450,7 +453,13 @@ public class MeshArbiter {
                     return false;
                 }
             }
-        } while (!m_decidedSurvivors.keySet().containsAll(expectedSurvivors));
+
+            for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
+                if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
+                    allDecisionsMatch = false;
+                }
+            }
+        } while (!m_decidedSurvivors.keySet().containsAll(expectedSurvivors) && allDecisionsMatch);
 
         return true;
     }
