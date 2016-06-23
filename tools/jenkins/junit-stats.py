@@ -42,9 +42,9 @@ class Stats():
         except IOError as e:
             print(e)
             print('Could not read data from url: %s. The data at the url may not be readable.\n' % url)
-        except:
+        except Exception as e:
             print('Something unexpected went wrong.\n')
-            print(sys.exc_info())
+            print(e)
         return data
 
     def build_history(self, job, build_range):
@@ -63,8 +63,8 @@ class Stats():
             build_high = int(builds[1])
             if build_high < build_low:
                 raise Exception('Error: Left number must be lesser than or equal to right')
-        except:
-            print(sys.exc_info())
+        except Exception as e:
+            print(e)
             print(self.cmdHelp)
             return
 
@@ -80,9 +80,9 @@ class Stats():
         try:
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
-        except:
+        except Exception as e:
             print('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
-            print(sys.exc_info())
+            print(e)
             return
 
         for build in range(build_low, build_high + 1):
@@ -179,9 +179,9 @@ class Stats():
             except KeyError as e:
                 print(e)
                 print('Error retrieving test data for this particular build: %d\n' % build)
-            except:
+            except Exception as e:
                 # Catch all errors to avoid causing a failing build for the upstream project
-                print(sys.exc_info())
+                print(e)
 
         cursor.close()
         db.close()
