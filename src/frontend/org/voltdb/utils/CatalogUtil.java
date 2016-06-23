@@ -1859,8 +1859,7 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                hostLog.fatal("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
-                System.exit(-1);
+                hostLog.warn("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
