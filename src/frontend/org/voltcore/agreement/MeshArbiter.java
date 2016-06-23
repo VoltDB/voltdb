@@ -453,6 +453,9 @@ public class MeshArbiter {
                     // In case of concurrent fault, handle it
                     m_mailbox.deliverFront(msg);
                     return false;
+                } else if (mayIgnore(hsIds, fm) == Discard.DoNot) {
+                    m_mailbox.deliverFront(msg);
+                    return false;
                 }
             }
 
