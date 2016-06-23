@@ -36,11 +36,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
@@ -65,7 +68,7 @@ public class TestInitStartAction {
     static File legacyDeploymentFH;
 
     @BeforeClass
-    public static void setup() throws Exception {
+    public static void setupClass() throws Exception {
         rootDH = Files.createTempDirectory("voltdb-test-").toFile();
         legacyDeploymentFH = new File(rootDH, "deployment.xml");
         try (FileWriter fw = new FileWriter(legacyDeploymentFH)) {
@@ -78,9 +81,20 @@ public class TestInitStartAction {
     }
 
     @AfterClass
-    public static void teardown() throws Exception {
+    public static void teardownClass() throws Exception {
         MiscUtils.deleteRecursively(rootDH);
     }
+
+    @Before
+    public void setup() throws Exception {
+        VoltFile.initNewSubrootForThisProcess();
+    }
+
+    @After
+    public void teardown() throws Exception {
+        VoltFile.resetSubrootForThisProcess();
+    }
+
 
     AtomicReference<Throwable> serverException = new AtomicReference<>(null);
 
@@ -94,7 +108,7 @@ public class TestInitStartAction {
     @Test
     public void testInitStartAction() throws Exception {
 
-        File deplFH = new File(new File(new File(rootDH, "voltdbroot"), "config"), "deployment.xml");
+        File deplFH = new VoltFile(new VoltFile(new VoltFile(rootDH, "voltdbroot"), "config"), "deployment.xml");
         Configuration c1 = new Configuration(new String[]{"initialize", "voltdbroot", rootDH.getPath()});
         ServerThread server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
@@ -107,7 +121,11 @@ public class TestInitStartAction {
         if (!(serverException.get() instanceof VoltDB.SimulatedExitException)) {
             System.err.println("got an unexpected exception");
             serverException.get().printStackTrace(System.err);
+            if (VoltDB.wasCrashCalled) {
+                System.err.println("Crash message is:\n  "+ VoltDB.crashMessage);
+            }
         }
+
         assertTrue(serverException.get() instanceof VoltDB.SimulatedExitException);
         VoltDB.SimulatedExitException exitex = (VoltDB.SimulatedExitException)serverException.get();
         assertEquals(0, exitex.getStatus());
