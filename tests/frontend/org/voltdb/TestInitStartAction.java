@@ -77,6 +77,10 @@ public class TestInitStartAction {
         server.join();
 
         assertNotNull(serverException.get());
+        if (!(serverException.get() instanceof VoltDB.SimulatedExitException)) {
+            System.err.println("got an unexpected exception");
+            serverException.get().printStackTrace(System.err);
+        }
         assertTrue(serverException.get() instanceof VoltDB.SimulatedExitException);
         VoltDB.SimulatedExitException exitex = (VoltDB.SimulatedExitException)serverException.get();
         assertEquals(0, exitex.getStatus());
