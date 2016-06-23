@@ -5,24 +5,26 @@
 
 # A command line tool for getting junit job statistics from Jenkins CI
 
-import mysql.connector
 import os
 import sys
 import time
 
 from datetime import datetime
+from mysql.connector.errors import Error as MySQLError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
 from six.moves.urllib.request import urlopen
 
+import mysql.connector
 
-class Stats():
+
+class Stats(object):
     def __init__(self):
         self.jhost = 'http://ci.voltdb.lan'
         self.dbhost = 'volt2.voltdb.lan'
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
-        self.cmdHelp = """
+        self.cmdhelp = """
         usage: junit-stats <job> <range>
         ex: junit-stats branch-2-pro-junit-master 800-802
         ex: junit-stats branch-2-community-junit-master 550-550
@@ -36,15 +38,15 @@ class Stats():
         data = None
         try:
             data = eval(urlopen(url).read())
-        except (HTTPError, URLError) as e:
-            print(e)
+        except (HTTPError, URLError) as error:
+            print(error)
             print('Could not open data from url: %s. The url may not be formed correctly.\n' % url)
-        except IOError as e:
-            print(e)
+        except IOError as error:
+            print(error)
             print('Could not read data from url: %s. The data at the url may not be readable.\n' % url)
-        except Exception as e:
+        except Exception as error:
             print('Something unexpected went wrong.\n')
-            print(e)
+            print(error)
         return data
 
     def build_history(self, job, build_range):
@@ -54,7 +56,7 @@ class Stats():
         """
 
         if job is None or build_range is None:
-            print(self.cmdHelp)
+            print(self.cmdhelp)
             return
 
         try:
@@ -63,9 +65,9 @@ class Stats():
             build_high = int(builds[1])
             if build_high < build_low:
                 raise Exception('Error: Left number must be lesser than or equal to right')
-        except Exception as e:
-            print(e)
-            print(self.cmdHelp)
+        except Exception as error:
+            print(error)
+            print(self.cmdhelp)
             return
 
         url = self.jhost + '/job/' + job + '/lastCompletedBuild/api/python'
@@ -80,9 +82,9 @@ class Stats():
         try:
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
-        except Exception as e:
+        except MySQLError as error:
             print('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
-            print(e)
+            print(error)
             return
 
         for build in range(build_low, build_high + 1):
@@ -90,7 +92,7 @@ class Stats():
             test_report = self.read_url(test_url)
             if test_report is None:
                 print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                'exist on Jenkins' % build)
+                      'exist on Jenkins' % build)
                 print('Last completed build for this job is %d\n' % latestBuild)
                 continue
 
@@ -111,7 +113,7 @@ class Stats():
                 job_report = self.read_url(job_url)
                 if job_report is None:
                     print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                    'exist on Jenkins' % build)
+                          'exist on Jenkins' % build)
                     print('Last completed build for this job is %d\n' % latestBuild)
                     continue
                 job_stamp = datetime.fromtimestamp(job_report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
@@ -127,10 +129,13 @@ class Stats():
                     'percent': percent
                 }
                 add_job = ('INSERT INTO `junit-job-results` '
-                            '(name, stamp, url, build, fails, total, percent) '
-                            'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
-                cursor.execute(add_job, job_data)
-                db.commit()
+                           '(name, stamp, url, build, fails, total, percent) '
+                           'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
+                try:
+                    cursor.execute(add_job, job_data)
+                    db.commit()
+                except MySQLError as error:
+                    print(error)
 
                 # Some of the test results are structured differently, depending on the matrix configurations.
                 childReports = test_report.get('childReports', None)
@@ -139,7 +144,7 @@ class Stats():
                         {
                             'result': test_report,
                             'child': {
-                                'url': test_url.replace('testReport/api/python','')
+                                'url': test_url.replace('testReport/api/python', '')
                             }
                         }
                     ]
@@ -173,15 +178,18 @@ class Stats():
                                 add_test = ('INSERT INTO `junit-test-failures` '
                                             '(name, job, status, stamp, url, build, host) '
                                             'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, %(url)s, %(build)s, %(host)s)')
-                                cursor.execute(add_test, test_data)
-                                db.commit()
+                                try:
+                                    cursor.execute(add_test, test_data)
+                                    db.commit()
+                                except MySQLError as error:
+                                    print(error)
 
-            except KeyError as e:
-                print(e)
+            except KeyError as error:
+                print(error)
                 print('Error retrieving test data for this particular build: %d\n' % build)
-            except Exception as e:
+            except Exception as error:
                 # Catch all errors to avoid causing a failing build for the upstream project
-                print(e)
+                print(error)
 
         cursor.close()
         db.close()
