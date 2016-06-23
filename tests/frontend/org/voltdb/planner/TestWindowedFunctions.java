@@ -160,6 +160,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     }
 
+    // This is not actually a test.  This is here just to generate a
+    // catalog and a plan for the PartitionByExecutor test.  It doesn't really
+    // test anything at all.
+    public void testRankTestGen() throws Exception {
+        compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
+    }
     @Override
     protected void setUp() throws Exception {
         setupSchema(true, TestWindowedFunctions.class.getResource("testwindowingfunctions-ddl.sql"), "testwindowfunctions");

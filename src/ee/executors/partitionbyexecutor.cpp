@@ -22,13 +22,12 @@
 
 namespace voltdb {
 
+PartitionByExecutor::~PartitionByExecutor() {
+}
+
 // The PartitionByExecutor wants one row for each input row.
 bool PartitionByExecutor::outputForEachInputRow() const {
     return true;
-}
-
-PartitionByExecutor::~PartitionByExecutor() {
-    // TODO Auto-generated destructor stub
 }
 
 } /* namespace voltdb */
