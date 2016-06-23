@@ -57,17 +57,17 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         allStoredProcs  { storedProcs.find('h3') }
 
         // Query elements
-        queryInput  { $('#theQueryText') }
-        runButton   { $('#runBTn') }
-        clearButton { $('#clearQuery') }
-        qrFormatDropDown    { $('#exportType') }
+        queryInput  { $('#querybox-1') }
+        runButton   { $('#runBTn-1') }
+        clearButton { $('#clearQuery-1') }
+        qrFormatDropDown    { $('#exportType-1') }
         qrfddOptions    { qrFormatDropDown.find('option') }
         qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
-        queryRes        { $('.queryResult') }
-        queryResHtml    { queryRes.find('#resultHtml') }
+        queryRes        { $('.queryResult-1') }
+        queryResHtml    { queryRes.find('#resultHtml-1') }
         queryTables     (required: false) { queryResHtml.find('table') }
         queryErrHtml    (required: false) { queryResHtml.find('.errorValue') }
-        queryDur        { $('#queryResults') }
+        queryDur        { $('#queryResults-1') }
 
 
         //popup query ok and cancel
@@ -78,7 +78,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}
 
         htmltableresult         { $("#table_r0_html_0")}
-        createerrorresult       { $("#resultHtml > span")}
+        createerrorresult       { $("#resultHtml-1 > span")}
         htmlresultallcolumns    { $("#table_r0_html_0 > thead")}
 
         htmlresultselect        { $("#table_r0_html_0 > thead > tr")}
@@ -93,9 +93,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         checkview       { $("#tabMain > ul > li.active > a")}
 
         //result
-        resultHtml      { $("#resultHtml") }
-        resultCsv       { $("#resultCsv") }
-        resultMonospace { $("#resultMonospace") }
+        resultHtml      { $("#resultHtml-1") }
+        resultCsv       { $("#resultCsv-1") }
+        resultMonospace { $("#resultMonospace-1") }
 
         errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
     }

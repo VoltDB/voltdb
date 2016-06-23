@@ -2,6 +2,8 @@ var sqlPortForPausedDB = {
     UseAdminPort: 'UseAdminPort',
     UseNormalPort: 'UseNormalPort'
 };
+var $tabs = null;
+var tab_counter = 1;
 var INT_MAX_VALUE = 2147483647;
 $(document).ready(function () {
     var sqlValidationRule = {
@@ -17,7 +19,35 @@ $(document).ready(function () {
         }
     }
 
+    var fixWidth= function(){
+        var totalWidth = $(window).width()
+        if(totalWidth > 981){
+            var queryWidth = totalWidth - 290
+            var percentWidth = (parseInt(queryWidth)/parseInt(totalWidth)) * 100 - 4
+            $("#inputQuery").width(percentWidth + "%")
+        } else {
+            $("#inputQuery").width("100%")
+        }
 
+    }
+
+    var addEvent = function(object, type, callback) {
+        if (object == null || typeof(object) == 'undefined') return;
+        if (object.addEventListener) {
+            object.addEventListener(type, callback, false);
+        } else if (object.attachEvent) {
+            object.attachEvent("on" + type, callback);
+        } else {
+            object["on"+type] = callback;
+        }
+    };
+
+    addEvent(window, "resize", function() {
+        fixWidth()
+    });
+
+    fixWidth()
+    
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
             $("#errorQueryTimeoutConfig").hide();
@@ -227,6 +257,10 @@ $(document).ready(function () {
     //    railVisible: true,
     //    height: '225px'
     //});
+    $tabs = $("#worktabs").tabs();
+
+
+    SQLQueryRender.createQueryTab()
 });
 
 (function (window) {
@@ -236,6 +270,185 @@ $(document).ready(function () {
         this.server = null;
         this.userName = null;
         this.useAdminPortCancelled = false;
+        this.sqlValidationRule = {
+            numericRules: {
+                min: 1,
+                max: INT_MAX_VALUE,
+                digits: true
+            },
+            numericMessages: {
+                min: "Please enter a positive number. Its minimum value should be 1.",
+                max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
+                digits: "Please enter a positive number without any decimal."
+            }
+        }
+        this.createQueryTab = function(){
+            if($('#worktabs ul li').length == 0 || $('#worktabs ul li').length == 1)
+                queryId = 1
+            else{
+                var last_tab_txt = $($('#worktabs ul li')[$('#worktabs ul li').length -2]).find('a').text()
+                queryId = parseInt(last_tab_txt.replace(/[^0-9]/gi, '')) + 1
+            }
+            var ul = $tabs.find( "ul" );
+            var html = ''
+            if($('#new-query').length == 0)
+                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery" title="New Query Tab"><a class="btnStudio plusBtn" id="new-query"><span>+</span></a></li>'
+            else
+               html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
+            var html_body = '<div class="querybar"><div class="wrapper"><textarea id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
+            var html_query = '<div class="blockWrapper" id="blockContainer02">' +
+                             '   <div class="exportType">' +
+                             '<form name="" id="queryResult-'+tab_counter+'">' +
+                             '<select id="exportType-'+tab_counter+'">' +
+                             '   <option selected="selected">HTML</option>' +
+                             '   <option>CSV</option>' +
+                             '   <option>Monospace</option>' +
+                             '</select>' +
+                             '</form>' +
+                             '</div>' +
+                             '<h1 class="theHeading icon-queryResult">Query Result</h1>' +
+                             '<div class="queryResult-'+tab_counter+'">' +
+                             '<div id="resultHtml-'+tab_counter+'" style="display: none;" class="resultHtml"></div>' +
+                             '<div id="resultCsv-'+tab_counter+'" style="display: none;" class="resultCsv"></div>' +
+                             '<div id="resultMonospace-'+tab_counter+'" style="display: block;" class="resultMonospace">' +
+                             '<pre>                    </pre>' +
+                             '</div>' +
+                             '</div>' +
+                             '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div>' +
+                            '</div>' ;
+            $(html).appendTo( ul );
+            $('#ulTabList').append($('#liNewQuery'))
+            $('#worktabs').append('<div id="q-'+tab_counter+'" >' + html_body + html_query + '</div>')
+            SQLQueryRender.addQueryBtn(tab_counter)
+            $('#exportType-' + tab_counter).change(function () {
+                var tab_id = $(this).attr('id').split('-')[1]
+                if ($('#exportType-'+ tab_id).val() == 'HTML') {
+                    $('#resultHtml-'+ tab_id).css('display', 'block');
+                    $('#resultCsv-'+ tab_id).css('display', 'none');
+                    $('#resultMonospace-'+ tab_id).css('display', 'none');
+
+                } else if ($('#exportType-'+ tab_id).val() == 'CSV') {
+                    $('#resultCsv-'+ tab_id).css('display', 'block');
+                    $('#resultHtml-'+ tab_id).css('display', 'none');
+                    $('#resultMonospace-'+ tab_id).css('display', 'none');
+
+                } else if ($('#exportType-'+ tab_id).val() == 'Monospace') {
+                    $('#resultMonospace-'+ tab_id).css('display', 'block');
+                    $('#resultHtml-'+ tab_id).css('display', 'none');
+                    $('#resultCsv-'+ tab_id).css('display', 'none');
+                }
+            });
+            $('#resultHtml-'+ tab_counter).css('display', 'block');
+            $('#resultCsv-'+ tab_counter).css('display', 'none');
+            $('#resultMonospace-'+ tab_counter).css('display', 'none');
+
+            $("#new-query").unbind('click')
+            $("#new-query").on('click', function() {
+                SQLQueryRender.createQueryTab()
+            });
+            $('#close-tab-' + tab_counter).unbind('click')
+            $('#close-tab-' + tab_counter).click(function() {
+                var element_id = $(this.parentElement).attr('id')
+                $('#closeTabConfirmation').data('id' , element_id )
+            });
+            $('#close-tab-' + tab_counter).popup({
+                afterOpen: function () {
+                    var popup = $(this)[0];
+                    $('#btnCloseTabOk').unbind('click');
+                    $('#btnCloseTabOk').on('click', function (e) {
+                        var element_id = $('#closeTabConfirmation').data('id')
+                        var id = element_id.split('-')[1]
+                        tablist = []
+                        $('#worktabs ul li').each(function(){
+                            tablist.push($(this).attr('id').split('-')[1])
+                        })
+                        $tabs.tabs( "refresh");
+                        var active_id = $tabs.tabs( "option", "active")
+                        var current_position = $.inArray(id, tablist)
+                        if(current_position == active_id){
+                            if (current_position > 0)
+                                $tabs.tabs( "option", "active", active_id - 1)
+                            else if (current_position == 0 && tablist.length > 0)
+                                $tabs.tabs( "option", "active", active_id + 1)
+                        } else if (active_id >= tablist.length){
+                            //$tabs.tabs( "option", "active", tablist.length - 3)
+                        }
+                        $('#'+ element_id).remove();
+                        $('#q-' + id).remove()
+                        $('#queryBtnList-' + id).remove()
+                        SQLQueryRender.showHideNewTab()
+                        popup.close()
+                    });
+
+                    $('#btnCloseTabCancel').unbind('click');
+                    $('#btnCloseTabCancel').on('click', function (e) {
+                        popup.close()
+                    });
+                }
+            })
+            $tabs.tabs( "refresh");
+            $tabs.tabs( "option", "active", $('#worktabs ul li').length - 2);
+            $tabs.tabs({
+              activate: function( event, ui ) {
+                tab_id = ui.newTab.attr('id').split('-')[1]
+                SQLQueryRender.ShowQueryBtnById(tab_id)
+              }
+            });
+            tab_counter++
+            this.showHideNewTab()
+        }
+
+        this.addQueryBtn = function(tab_id){
+            var htmlBtn = '<ul class="btnList clsQueryBtnList" id="queryBtnList-'+ tab_id+'"> ' +
+                          ' <li> ' +
+                          '     <button class="btnStudio" id="runBTn-'+ tab_id+'">Run</button> ' +
+                          ' </li> ' +
+                          ' <li> ' +
+                          '     <button class="btnStudio" id="clearQuery-'+ tab_id+'">Clear</button> ' +
+                          ' </li> ' +
+                          '</ul>';
+            $('#divQueryBtns').append(htmlBtn)
+
+            $('#runBTn-' + tab_id).unbind('click')
+            $('#runBTn-' + tab_id).click(function () {
+                var queryTab = $($('#worktabs div.ui-tabs-panel')[$tabs.tabs('option','active')]);
+
+                if (queryTab.length == 1){
+                    var queryUI = new QueryUI($($('#worktabs div.ui-tabs-panel')[$tabs.tabs('option','active')]))
+                    queryUI.execute();
+                }
+
+            });
+
+            $('#clearQuery-' + tab_id).unbind('click')
+            $('#clearQuery-' + tab_id).click(function () {
+                query_id = $(this).attr('id').split('-')[1]
+                $('#querybox-' + query_id).val('')
+            });
+
+            SQLQueryRender.ShowQueryBtnById(tab_id)
+        }
+
+        this.ShowQueryBtnById = function(tab_id){
+            $('#divQueryBtns ul').each(function(){
+                var ul_id = $(this).attr('id')
+                if(ul_id == 'queryBtnList-' + tab_id)
+                    $('#' + ul_id).show()
+                else
+                    $('#' + ul_id).hide()
+            })
+        }
+
+        this.showHideNewTab = function(){
+            var count = 0
+            $('#worktabs ul li').each(function(){
+                count++
+            })
+            if(count == 11)
+                $('#liNewQuery').hide()
+            else
+                $('#liNewQuery').show()
+        }
 
         this.saveConnectionKey = function (useAdminPort) {
             var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
@@ -520,7 +733,7 @@ $(document).ready(function () {
         var toggleSpinner = function (show) {
             if (!show) {
                 $("#sqlQueryOverlay").hide();
-                $("#tabScroller").css("height", 225);
+                $("#tabScroller").css("height", 556);
                 $(".slimScrollBar").css('z-index', '99');
             }
             else if (show) {
@@ -569,7 +782,10 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 SQLQueryRender.saveConnectionKey(true);
                 popup.close();
                 //Rerun the query
-                $("#runBTn").button().click();
+                var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                var element_id = element.split('-')[1]
+                var btn_id = "#runBTn-" + element_id
+                $(btn_id).button().click();
             });
 
             $("#btnQueryDatabasePausedErrorCancel").unbind("click");
@@ -582,7 +798,10 @@ function loadSQLQueryPage(serverName, portid, userName) {
             if (VoltDbUI.getCookie(sqlChangePortName) != sqlPortForPausedDB.UseAdminPort) {
                 saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseNormalPort);
                 //Rerun the query
-                $("#runBTn").button().click();
+                var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                var element_id = element.split('-')[1]
+                var btn_id = "#runBTn-" + element_id
+                $(btn_id).button().click();
             }
         },
         closeContent: '',
@@ -845,22 +1064,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
     };
     populateTablesAndViews();
 
-    $('#runBTn').click(function () {
-        var queryString = $('#theQueryText').getSelectedText();
-        if (queryString != null) {
-            queryString = queryString.replace(/^\s+|\s+$/g, '');
-            if (queryString == '')
-                queryString = $('#theQueryText').val();
-        }
-        else
-            queryString = $('#theQueryText').val();
 
-        new QueryUI(queryString, userName).execute();
-
-    });
-    $('#clearQuery').click(function () {
-        $('#theQueryText').val('');
-    });
 
     $("#overlay").hide();
 }
