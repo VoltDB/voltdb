@@ -82,7 +82,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 AbstractDRTupleStream *drStream,
                 AbstractDRTupleStream *drReplicatedStream,
                 CatalogId drClusterId,
-                std::string pathName) :
+                std::string highVolumeDirPath) :
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
@@ -93,7 +93,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
-    m_pathName(pathName),
+    m_highVolumeDirPath(highVolumeDirPath),
     m_outFileName(""),
     m_outFileCount(0),
     m_lastCommittedSpHandle(0),
@@ -102,8 +102,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_hostname(hostname),
     m_hostId(hostId),
     m_drClusterId(drClusterId)
-
-
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();

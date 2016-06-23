@@ -207,7 +207,8 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
-    CopySerializeOutput serialize_out;
+    CopySerializeOutput serializer;
+    SerializeOutput<CopySerializeOutput> serialize_out(&serializer);
     m_table->serializeTo(serialize_out);
 
     m_engine->setUndoToken(INT64_MIN + 2);
@@ -222,14 +223,14 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
 
     initTable();
 
-    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
@@ -252,7 +253,8 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
-    CopySerializeOutput serialize_out;
+    CopySerializeOutput serializer;
+    SerializeOutput<CopySerializeOutput> serialize_out(&serializer);
     m_table->serializeTo(serialize_out);
 
     m_engine->setUndoToken(INT64_MIN + 2);
@@ -267,14 +269,14 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
 
     initTable();
 
-    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serializer.data() + sizeof(int32_t), serializer.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);

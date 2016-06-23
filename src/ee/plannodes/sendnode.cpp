@@ -61,9 +61,10 @@ std::string SendPlanNode::debugInfo(const std::string &spacer) const
 }
 
 void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    if(obj.hasKey("HIGH_VOLUME")) {
+    if (obj.hasKey("HIGH_VOLUME")) {
         m_highVolume = obj.valueForKey("HIGH_VOLUME").asBool();
-    } else {
+    }
+    else {
         m_highVolume = false;
     }
 }

@@ -1217,7 +1217,23 @@ std::string PersistentTable::debug() {
  * memory tracking
  */
 void PersistentTable::processLoadedTuple(TableTuple &tuple,
-                                         ReferenceSerializeOutput *uniqueViolationOutput,
+                                         SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows) {
+    processLoadedTupleShared(tuple, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows);
+}
+
+void PersistentTable::processLoadedTuple(TableTuple &tuple,
+                                         SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows) {
+    processLoadedTupleShared(tuple, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows);
+}
+
+template <class T> void PersistentTable::processLoadedTupleShared(TableTuple &tuple,
+                                         SerializeOutput<T> *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
@@ -1237,6 +1253,16 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
         deleteTupleStorage(tuple);
     }
 }
+template void PersistentTable::processLoadedTupleShared <ReferenceSerializeOutput> (TableTuple &tuple,
+                                         SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows);
+template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput> (TableTuple &tuple,
+                                         SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows);
 
 TableStats* PersistentTable::getTableStats() {
     return &m_stats;
@@ -1330,7 +1356,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
                 index->ensureCapacity(tupleCount);
             }
         }
-        loadTuplesFromNoHeader(*message->stream(), pool);
+        loadTuplesFromNoHeader<ReferenceSerializeOutput>(*message->stream(), pool);
         break;
     }
     default:

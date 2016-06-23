@@ -62,6 +62,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
         catch (IOException e) {};
     }
 
+    public void setup() {
+
+    }
+
     @Test
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();

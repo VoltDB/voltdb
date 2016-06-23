@@ -170,10 +170,11 @@ TEST_F(TableTest, ValueTypes) {
 TEST_F(TableTest, TableSerialize) {
     size_t serializeSize = m_table->getAccurateSizeToSerialize(true);
     char* backingCharArray = new char[serializeSize];
-    ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+    ReferenceSerializeOutput conflictSerializer(backingCharArray, serializeSize);
+    SerializeOutput<ReferenceSerializeOutput> conflictSerializeOutput(&conflictSerializer);
     m_table->serializeTo(conflictSerializeOutput);
 
-    EXPECT_EQ(serializeSize, conflictSerializeOutput.size());
+    EXPECT_EQ(serializeSize, conflictSerializer.size());
 
     delete[] backingCharArray;
 }
@@ -181,10 +182,11 @@ TEST_F(TableTest, TableSerialize) {
 TEST_F(TableTest, TableSerializeWithoutTotalSize) {
     size_t serializeSize = m_table->getAccurateSizeToSerialize(false);
     char* backingCharArray = new char[serializeSize];
-    ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+    ReferenceSerializeOutput conflictSerializer(backingCharArray, serializeSize);
+    SerializeOutput<ReferenceSerializeOutput> conflictSerializeOutput(&conflictSerializer);
     m_table->serializeToWithoutTotalSize(conflictSerializeOutput);
 
-    EXPECT_EQ(serializeSize, conflictSerializeOutput.size());
+    EXPECT_EQ(serializeSize, conflictSerializer.size());
 
     delete[] backingCharArray;
 }

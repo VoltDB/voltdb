@@ -262,7 +262,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
         ReferenceSerializeInputBE serialize_in(bytes, length);
-        destination->loadTuplesFrom(serialize_in, stringPool);
+        destination->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, stringPool);
         return 1;
     }
     else {
@@ -481,7 +481,8 @@ static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, 
     if (table) {
         size_t serializeSize = table->getAccurateSizeToSerialize(false);
         boost::shared_array<char> backingArray(new char[serializeSize]);
-        ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
+        ReferenceSerializeOutput conflictReferenceSerializeOutput(backingArray.get(), serializeSize);
+        SerializeOutput<ReferenceSerializeOutput> conflictSerializeOutput(&conflictReferenceSerializeOutput);
         table->serializeToWithoutTotalSize(conflictSerializeOutput);
         byteBuffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingArray.get()),
                                                             static_cast<int32_t>(serializeSize));

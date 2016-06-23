@@ -915,7 +915,8 @@ public:
     }
 
     boost::shared_ptr<ReferenceSerializeInputBE> getPredicateSerializeInput(const std::vector<std::string> &predicateStrings) {
-        ReferenceSerializeOutput predicateOutput(m_predicateBuffer, 1024 * 256);
+        ReferenceSerializeOutput predicateOutputSerializer(m_predicateBuffer, 1024 * 256);
+        SerializeOutput<ReferenceSerializeOutput> predicateOutput(&predicateOutputSerializer);
         predicateOutput.writeInt(1);
         for (std::vector<std::string>::const_iterator i = predicateStrings.begin();
              i != predicateStrings.end(); i++) {
@@ -1025,7 +1026,8 @@ public:
 
     boost::shared_ptr<ReferenceSerializeInputBE> getHashRangePredicateInput(const T_HashRange &testRange) {
         // Set up the hash range predicate.
-        ReferenceSerializeOutput hashRangeOutput(m_hashRangeBuffer, 1024 * 256);
+        ReferenceSerializeOutput hashRangeOutputSerializer(m_hashRangeBuffer, 1024 * 256);
+        SerializeOutput<ReferenceSerializeOutput> hashRangeOutput(&hashRangeOutputSerializer);
         std::ostringstream hashRangeString;
         hashRangeString << testRange.first << ':' << testRange.second;
         hashRangeOutput.writeInt(1);
@@ -1455,7 +1457,8 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         }
 
         char buffer[1024 * 256];
-        ReferenceSerializeOutput output(buffer, 1024 * 256);
+        ReferenceSerializeOutput outputSerializer(buffer, 1024 * 256);
+        SerializeOutput<ReferenceSerializeOutput> output(&outputSerializer);
         output.writeInt(npartitions);
         for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
             output.writeTextString(*i);

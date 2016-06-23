@@ -2423,7 +2423,8 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
 {
     char serial_buffer[1024];
     // This requires intimate knowledge of ARRAY wire protocol
-    ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeOutput setup_serializer(serial_buffer, sizeof(serial_buffer));
+    SerializeOutput<ReferenceSerializeOutput> setup(&setup_serializer);
     ReferenceSerializeInputBE input(serial_buffer, sizeof(serial_buffer));
     setup.writeByte(VALUE_TYPE_ARRAY);
     setup.writeByte(vt);

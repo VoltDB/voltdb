@@ -647,7 +647,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE()
     {
         String hostname = CoreUtils.getHostnameOrAddress();
-        String pathName = m_context.cluster.getHighvolumeoutput();
+        String highVolumeDirPath = m_context.cluster.getHighvolumeoutput();
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
@@ -666,7 +666,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null,
-                        pathName);
+                        highVolumeDirPath);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -683,7 +683,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null,
-                        pathName);
+                        highVolumeDirPath);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {

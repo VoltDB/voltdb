@@ -105,14 +105,14 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         }
         this.readOnly = allReadOnly;
 
-        boolean highVolume = false;
+        boolean anyHighVolume = false;
         for (AdHocPlannedStatement plannedStmt : stmts) {
             if (plannedStmt.core.highVolume) {
-                highVolume = true;
+                anyHighVolume = true;
                 break;
             }
         }
-        this.highVolume = highVolume;
+        this.highVolume = anyHighVolume;
         this.partitionParamIndex = partitionParamIndex;
         this.partitionParamType = partitionParamType;
         this.partitionParamValue = partitionParamValue;

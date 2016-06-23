@@ -424,8 +424,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
-    void serializeToFile(voltdb::SerializeOutputFile &output, bool includeHiddenColumns = false);
+    template<class T> void serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -962,26 +961,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-inline void TableTuple::serializeToFile(voltdb::SerializeOutputFile &output, bool includeHiddenColumns) {
-    // TODO This is small enough that it seems worthwhile to just allocate a temp buffer
-    output.writeInt(serializationSizeNoHeader());
-
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
-        //int fieldStart = output.position();
-        NValue value = getNValue(j);
-        value.serializeToFile(output);
-    }
-
-    if (includeHiddenColumns) {
-        for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
-            NValue value = getHiddenNValue(j);
-            value.serializeToFile(output);
-        }
-    }
-
-}
-
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) {
+template<class T> inline void TableTuple::serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns) {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {

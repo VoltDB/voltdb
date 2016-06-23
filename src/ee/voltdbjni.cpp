@@ -269,7 +269,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jbyteArray pathName,
+    jbyteArray highVolumeDirPath,
     jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
@@ -285,9 +285,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
         std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
         env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
-        jbyte *pathChars = env->GetByteArrayElements( pathName, NULL);
-        std::string pathString(reinterpret_cast<char*>(pathChars), env->GetArrayLength(pathName));
-        env->ReleaseByteArrayElements( pathName, pathChars, JNI_ABORT);
+        jbyte *pathChars = env->GetByteArrayElements( highVolumeDirPath, NULL);
+        std::string pathString(reinterpret_cast<char*>(pathChars), env->GetArrayLength(highVolumeDirPath));
+        env->ReleaseByteArrayElements( highVolumeDirPath, pathChars, JNI_ABORT);
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
@@ -637,7 +637,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         void* data = env->GetDirectBufferAddress(output_buffer);
-        ReferenceSerializeOutput out(data, output_capacity);
+        ReferenceSerializeOutput outSerializer(data, output_capacity);
+        SerializeOutput<ReferenceSerializeOutput> out(&outSerializer);
         engine->serializeTable(table_id, out);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const FatalException &e) {

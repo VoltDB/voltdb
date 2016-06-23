@@ -58,11 +58,11 @@ class SendPlanNode;
 class SendExecutor : public AbstractExecutor
 {
 public:
-    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode)
-    {
-        m_engine = engine;
-        m_highVolume = false;
+    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode) :
+        AbstractExecutor(engine, abstractNode),
+        m_engine(engine),
+        m_highVolume(false){
+
     }
 
 protected:
