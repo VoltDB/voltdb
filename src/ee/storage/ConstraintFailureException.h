@@ -59,7 +59,7 @@ public:
     const TableTuple* getConflictTuple() const { return &m_tuple; }
     const TableTuple* getOriginalTuple() const { return &m_otherTuple; }
 protected:
-    void p_serialize(ReferenceSerializeOutput *output) const;
+    void p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const;
 
     Table *m_table;
     TableTuple m_tuple;

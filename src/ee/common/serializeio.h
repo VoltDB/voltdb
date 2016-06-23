@@ -247,9 +247,9 @@ private:
 };
 
 /** Abstract class for writing to memory buffers. Subclasses may optionally support resizing. */
-class SerializeOutput {
+class SerializeOutputBuffer {
 protected:
-    SerializeOutput() : buffer_(NULL), position_(0), capacity_(0) {}
+    SerializeOutputBuffer() : buffer_(NULL), position_(0), capacity_(0) {}
 
     /** Set the buffer to buffer with capacity. Note this does not change the position. */
     void initialize(void* buffer, size_t capacity) {
@@ -260,8 +260,9 @@ protected:
     void setPosition(size_t position) {
         this->position_ = position;
     }
+
 public:
-    virtual ~SerializeOutput() {};
+    virtual ~SerializeOutputBuffer() {};
 
     /** Returns a pointer to the beginning of the buffer, for reading the serialized data. */
     const char* data() const { return buffer_; }
@@ -269,108 +270,6 @@ public:
     /** Returns the number of bytes written in to the buffer. */
     size_t size() const { return position_; }
 
-    // functions for serialization
-    inline void writeChar(char value) {
-        writePrimitive(value);
-    }
-
-    inline void writeByte(int8_t value) {
-        writePrimitive(value);
-    }
-
-    inline void writeShort(int16_t value) {
-        writePrimitive(static_cast<uint16_t>(htons(value)));
-    }
-
-    inline void writeInt(int32_t value) {
-        writePrimitive(htonl(value));
-    }
-
-    inline void writeBool(bool value) {
-        writeByte(value ? int8_t(1) : int8_t(0));
-    };
-
-    inline void writeLong(int64_t value) {
-        writePrimitive(htonll(value));
-    }
-
-    inline void writeFloat(float value) {
-        int32_t data;
-        memcpy(&data, &value, sizeof(data));
-        writePrimitive(htonl(data));
-    }
-
-    inline void writeDouble(double value) {
-        int64_t data;
-        memcpy(&data, &value, sizeof(data));
-        writePrimitive(htonll(data));
-    }
-
-    inline void writeEnumInSingleByte(int value) {
-        assert(std::numeric_limits<int8_t>::min() <= value &&
-                value <= std::numeric_limits<int8_t>::max());
-        writeByte(static_cast<int8_t>(value));
-    }
-
-    inline size_t writeCharAt(size_t position, char value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeByteAt(size_t position, int8_t value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeShortAt(size_t position, int16_t value) {
-        return writePrimitiveAt(position, htons(value));
-    }
-
-    inline size_t writeIntAt(size_t position, int32_t value) {
-        return writePrimitiveAt(position, htonl(value));
-    }
-
-    inline size_t writeBoolAt(size_t position, bool value) {
-        return writePrimitiveAt(position, value ? int8_t(1) : int8_t(0));
-    }
-
-    inline size_t writeLongAt(size_t position, int64_t value) {
-        return writePrimitiveAt(position, htonll(value));
-    }
-
-    inline size_t writeFloatAt(size_t position, float value) {
-        int32_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonl(data));
-    }
-
-    inline size_t writeDoubleAt(size_t position, double value) {
-        int64_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonll(data));
-    }
-
-    // this explicitly accepts char* and length (or ByteArray)
-    // as std::string's implicit construction is unsafe!
-    inline void writeBinaryString(const void* value, size_t length) {
-        int32_t stringLength = static_cast<int32_t>(length);
-        assureExpand(length + sizeof(stringLength));
-
-        // do a newtork order conversion
-        int32_t networkOrderLen = htonl(stringLength);
-
-        char* current = buffer_ + position_;
-        memcpy(current, &networkOrderLen, sizeof(networkOrderLen));
-        current += sizeof(stringLength);
-        memcpy(current, value, length);
-        position_ += sizeof(stringLength) + length;
-    }
-
-    inline void writeBinaryString(const ByteArray &value) {
-        writeBinaryString(value.data(), value.length());
-    }
-
-    inline void writeTextString(const std::string &value) {
-        writeBinaryString(value.data(), value.size());
-    }
 
     inline void writeBytes(const void *value, size_t length) {
         assureExpand(length);
@@ -402,15 +301,31 @@ public:
         return offset + length;
     }
 
-    static bool isLittleEndian() {
-        static const uint16_t s = 0x0001;
-        uint8_t byte;
-        memcpy(&byte, &s, 1);
-        return byte != 0;
+    // this explicitly accepts char* and length (or ByteArray)
+    // as std::string's implicit construction is unsafe!
+    inline void writeBinaryString(const void* value, size_t length) {
+        int32_t stringLength = static_cast<int32_t>(length);
+        assureExpand(length + sizeof(stringLength));
+
+        // do a newtork order conversion
+        int32_t networkOrderLen = htonl(stringLength);
+
+        char* current = buffer_ + position_;
+        memcpy(current, &networkOrderLen, sizeof(networkOrderLen));
+        current += sizeof(stringLength);
+        memcpy(current, value, length);
+        position_ += sizeof(stringLength) + length;
     }
 
     std::size_t position() const {
         return position_;
+    }
+
+    template <typename T>
+    void writePrimitive(T value) {
+        assureExpand(sizeof(value));
+        memcpy(buffer_ + position_, &value, sizeof(value));
+        position_ += sizeof(value);
     }
 
 protected:
@@ -423,17 +338,6 @@ protected:
     virtual void expand(size_t minimum_desired) = 0;
 
 private:
-    template <typename T>
-    void writePrimitive(T value) {
-        assureExpand(sizeof(value));
-        memcpy(buffer_ + position_, &value, sizeof(value));
-        position_ += sizeof(value);
-    }
-
-    template <typename T>
-    size_t writePrimitiveAt(size_t position, T value) {
-        return writeBytesAt(position, &value, sizeof(value));
-    }
 
     inline void assureExpand(size_t next_write) {
         size_t minimum_desired = position_ + next_write;
@@ -447,8 +351,8 @@ private:
     char* buffer_;
 
     // No implicit copies
-    SerializeOutput(const SerializeOutput&);
-    SerializeOutput& operator=(const SerializeOutput&);
+    SerializeOutputBuffer(const SerializeOutputBuffer&);
+    SerializeOutputBuffer& operator=(const SerializeOutputBuffer&);
 
 protected:
     // Current write position in the buffer.
@@ -496,11 +400,11 @@ typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
 #endif
 
 /** Implementation of SerializeOutput that references an existing buffer. */
-class ReferenceSerializeOutput : public SerializeOutput {
+class ReferenceSerializeOutput : public SerializeOutputBuffer {
 public:
-    ReferenceSerializeOutput() : SerializeOutput() {
+    ReferenceSerializeOutput() : SerializeOutputBuffer() {
     }
-    ReferenceSerializeOutput(void* data, size_t length) : SerializeOutput() {
+    ReferenceSerializeOutput(void* data, size_t length) : SerializeOutputBuffer() {
         initialize(data, length);
     }
 
@@ -559,7 +463,7 @@ private:
 };
 
 /** Implementation of SerializeOutput that makes a copy of the buffer. */
-class CopySerializeOutput : public SerializeOutput {
+class CopySerializeOutput : public SerializeOutputBuffer {
 public:
     // Start with something sizeable so we avoid a ton of initial
     // allocations.
@@ -613,6 +517,98 @@ private:
 public:
     virtual ~SerializeOutputFile() {};
 
+    const char* data() const { return NULL;}
+
+    /** Returns the number of bytes written. */
+    size_t size() { return ofile.tellp(); }
+
+    std::size_t position() {
+        return ofile.tellp();
+    }
+
+    inline void writeZeros(size_t length) {
+    }
+    // this explicitly accepts char* and length (or ByteArray)
+    // as std::string's implicit construction is unsafe!
+    inline void writeBinaryString(const void* value, size_t length) {
+        int32_t stringLength = static_cast<int32_t>(length);
+
+        // do a network order conversion
+        int32_t networkOrderLen = htonl(stringLength);
+        ofile.write((char*)&networkOrderLen, sizeof(networkOrderLen));
+        ofile.write((char*)&value,length);
+    }
+
+    inline void writeBytes(const void *value, size_t length) {
+        ofile.write((const char*)value,length);
+    }
+
+    /** Copies length bytes from value to this buffer, starting at
+    offset. Offset should have been obtained from reserveBytes. This
+    does not affect the current write position.  * @return offset +
+    length */
+    inline size_t writeBytesAt(size_t offset, const void *value, size_t length) {
+        size_t position = ofile.tellp();
+        assert(offset + length <= position);
+        ofile.seekp(offset);
+        ofile.write((const char*)value,length);
+        ofile.seekp(position);
+        return offset + length;
+    }
+
+    /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
+    size_t reserveBytes(size_t length) {
+        size_t offset = ofile.tellp();
+        ofile.seekp(offset + length);
+        return offset;
+    }
+
+    template <typename T>
+    void writePrimitive(T value) {
+        ofile.write((char*)&value,sizeof(value));
+    }
+
+    template <typename T>
+    void writePrimitiveAt(T value) {
+        ofile.write((char*)&value,sizeof(value));
+    }
+
+private:
+
+    // No implicit copies
+    SerializeOutputFile(const SerializeOutputFile&);
+    SerializeOutputFile& operator=(const SerializeOutputFile&);
+
+};
+
+/** Template class for serializing output. */
+template <class SO> class SerializeOutput {
+public:
+    SerializeOutput() : serialize_output_(NULL) { };
+    SerializeOutput(SO * serializer) : serialize_output_(serializer) { };
+private:
+    SO * serialize_output_;
+public:
+    void setSerializer(SO * serializer) {
+        serialize_output_ = serializer;
+    }
+
+    SO * getSerializer() {
+        return serialize_output_;
+    }
+
+    /** Returns the number of bytes written. */
+    size_t size() { return serialize_output_->size(); }
+
+    std::size_t position() {
+        return serialize_output_->position();
+    }
+
+    /** Reserves length bytes of space for writing. Returns the offset to the bytes. */
+    size_t reserveBytes(size_t length) {
+        return serialize_output_->reserveBytes(length);
+    }
+
     // functions for serialization
     inline void writeChar(char value) {
         writePrimitive(value);
@@ -659,12 +655,7 @@ public:
     // this explicitly accepts char* and length (or ByteArray)
     // as std::string's implicit construction is unsafe!
     inline void writeBinaryString(const void* value, size_t length) {
-        int32_t stringLength = static_cast<int32_t>(length);
-
-        // do a network order conversion
-        int32_t networkOrderLen = htonl(stringLength);
-        ofile.write((char*)&networkOrderLen, sizeof(networkOrderLen));
-        ofile.write((char*)&value,length);
+        serialize_output_->writeBinaryString(value,length);
     }
 
     inline void writeBinaryString(const ByteArray &value) {
@@ -676,21 +667,71 @@ public:
     }
 
     inline void writeBytes(const void *value, size_t length) {
-        ofile.write((const char*)value,length);
+        serialize_output_->writeBytes(value,length);
+    }
+
+    inline size_t writeCharAt(size_t position, char value) {
+        return writePrimitiveAt(position, value);
+    }
+
+    inline size_t writeByteAt(size_t position, int8_t value) {
+        return writePrimitiveAt(position, value);
+    }
+
+    inline size_t writeShortAt(size_t position, int16_t value) {
+        return writePrimitiveAt(position, htons(value));
+    }
+
+    inline size_t writeIntAt(size_t position, int32_t value) {
+        return writePrimitiveAt(position, htonl(value));
+    }
+
+    inline size_t writeBoolAt(size_t position, bool value) {
+        return writePrimitiveAt(position, value ? int8_t(1) : int8_t(0));
+    }
+
+    inline size_t writeLongAt(size_t position, int64_t value) {
+        return writePrimitiveAt(position, htonll(value));
+    }
+
+    inline size_t writeFloatAt(size_t position, float value) {
+        int32_t data;
+        memcpy(&data, &value, sizeof(data));
+        return writePrimitiveAt(position, htonl(data));
+    }
+
+    inline size_t writeDoubleAt(size_t position, double value) {
+        int64_t data;
+        memcpy(&data, &value, sizeof(data));
+        return writePrimitiveAt(position, htonll(data));
+    }
+
+    inline void writeZeros(size_t length) {
+        serialize_output_->writeZeros(length);
+    }
+
+    static bool isLittleEndian() {
+        static const uint16_t s = 0x0001;
+        uint8_t byte;
+        memcpy(&byte, &s, 1);
+        return byte != 0;
+    }
+
+    inline size_t writeBytesAt(size_t offset, const void *value, size_t length) {
+        return serialize_output_->writeBytesAt(offset, value, length);
     }
 
 private:
     template <typename T>
     void writePrimitive(T value) {
-        ofile.write((char*)&value,sizeof(value));
+        serialize_output_->writePrimitive(value);
     }
 
-    // No implicit copies
-    SerializeOutputFile(const SerializeOutputFile&);
-    SerializeOutputFile& operator=(const SerializeOutputFile&);
+    template <typename T>
+    size_t writePrimitiveAt(size_t position, T value) {
+        return writeBytesAt(position, &value, sizeof(value));
+    }
 
 };
-
-
 }
 #endif

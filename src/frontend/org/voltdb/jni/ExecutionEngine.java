@@ -781,7 +781,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int defaultDrBufferSize,
             long tempTableMemory,
             boolean createDrReplicatedStream,
-            byte pathName[],
+            byte highVolumeDirPath[],
             int compactionThreshold);
 
     /**

@@ -36,7 +36,8 @@ class ElasticHashinatorTest : public Test {
 TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
-    ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
+    ReferenceSerializeOutput serializer(config.get(), 4 + (12 * 3));
+    SerializeOutput<ReferenceSerializeOutput> output(&serializer);
 
     output.writeInt(3);
     output.writeInt(std::numeric_limits<int32_t>::min());
@@ -56,7 +57,7 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max()));
     EXPECT_EQ( 1, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 
-    output.initializeWithPosition(config.get(), 4 + (12 * 3), 0);
+    serializer.initializeWithPosition(config.get(), 4 + (12 * 3), 0);
 
     output.writeInt(3);
     //output.writeInt(std::numeric_limits<int32_t>::min() + 1);
@@ -84,7 +85,8 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 TEST_F(ElasticHashinatorTest, TestNValueHashToken)
 {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
-    ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
+    ReferenceSerializeOutput serializer(config.get(), 4 + (12 * 3));
+    SerializeOutput<ReferenceSerializeOutput> output(&serializer);
 
     output.writeInt(3);
     output.writeInt(std::numeric_limits<int32_t>::min());

@@ -60,7 +60,8 @@ class PersistentTableUndoDeleteAction;
 class PersistentTableUndoTruncateTableAction;
 class ReadWriteSet;
 class RecoveryProtoMsg;
-class SerializeOutput;
+class SerializeOutputBuffer;
+class SerializeOutputFile;
 class StatsSource;
 class StreamBlock;
 class TableCatalogDelegate;
@@ -78,6 +79,8 @@ class UndoLog;
 
 #ifndef SERIALIZE_IO_DECLARATIONS
 #define SERIALIZE_IO_DECLARATIONS
+template <class SO> class SerializeOutput;
+
 template <Endianess E> class SerializeInput;
 typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
 typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;

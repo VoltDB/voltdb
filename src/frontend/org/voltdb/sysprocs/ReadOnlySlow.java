@@ -65,7 +65,6 @@ public class ReadOnlySlow extends VoltSystemProcedure {
      * batch passed to an ad-hoc query. Used for debugging and logging.
      */
     public static String adHocSQLFromInvocationForDebug(StoredProcedureInvocation invocation) {
-        assert(invocation.getProcName().startsWith("@AdHoc"));
         ParameterSet params = invocation.getParams();
         assert(params.size() == 2 || params.size() == 3);
         // the final param is the byte array we need
@@ -77,7 +76,7 @@ public class ReadOnlySlow extends VoltSystemProcedure {
 
         StringBuilder sb = new StringBuilder();
         if (statements.length == 0) {
-            sb.append("ONLYSLOW INVOCATION HAS NO SQL");
+            sb.append("READONLYSLOW INVOCATION HAS NO SQL");
         }
         else if (statements.length == 1) {
             sb.append(adHocSQLStringFromPlannedStatement(statements[0], userparams));

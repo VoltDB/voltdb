@@ -367,6 +367,16 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         String payloadString = captor.getValue().payload.toString();
         assertTrue(payloadString.contains("user partitioning: none"));
+
+        reset(m_messenger);
+        msg = createMsg("@ReadOnlySlow", "select * from a where i = 3", 3);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
+        payloadString = captor.getValue().payload.toString();
+        assertTrue(payloadString.contains("user param[1]: 3"));
+        assertTrue(payloadString.contains("user partitioning: none"));
     }
 
     @Test

@@ -21,6 +21,7 @@
 #include "common/SerializableEEException.h"
 
 namespace voltdb {
+template <class SO> class SerializeOutput;
 class ReferenceSerializeOutput;
 
 /**
@@ -34,7 +35,7 @@ public:
     virtual ~InterruptException() {}
 
 protected:
-    void p_serialize(ReferenceSerializeOutput *output) const;
+    void p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const;
 private:
 };
 }

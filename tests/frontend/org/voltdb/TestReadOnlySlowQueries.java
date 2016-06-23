@@ -26,15 +26,7 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -43,14 +35,11 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
-// XXX Once ReadOnlySlow support MP queries, can extend from AdHocQueryTester again
 public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
 
     Client m_client;
@@ -81,8 +70,6 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
             m_client = ClientFactory.createClient();
             m_client.createConnection("localhost", config.m_port);
 
-            VoltTable modCount;
-
             //Hashes to partition 0
             int hashableA;
             //Hashes to partition 1
@@ -108,30 +95,29 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
 //                System.out.println("Partition " + TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), ii) + " param " + ii);
 //            }
 
-            // Unlike TestAdHocPlans, TestAdHocQueries runs the queries against actual (minimal) data.
-            // Load that, here.
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            // Load data here.
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableA, hashableA));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED1 VALUES (%d, %d);", hashableB, hashableB));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableA, hashableA));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED2 VALUES (%d, %d);", hashableC, hashableC));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableA, hashableA));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableD, hashableD)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO PARTED3 VALUES (%d, %d);", hashableD, hashableD));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableA, hashableA));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableB, hashableB)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED1 VALUES (%d, %d);", hashableB, hashableB));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableA, hashableA)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableA, hashableA));
 
-            modCount = m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableC, hashableC)).getResults()[0];
+            m_client.callProcedure("@AdHoc", String.format("INSERT INTO REPPED2 VALUES (%d, %d);", hashableC, hashableC));
 
 
-            runAllAdHocSPtests(hashableA, hashableB, hashableC, hashableD);
+            runAllReadOnlySlowSPtests(hashableA, hashableB, hashableC, hashableD);
         }
         finally {
             if (m_client != null) m_client.close();
@@ -149,10 +135,15 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
         }
     }
 
+
+    @Override
+    public int runQueryTest(String query, int hashable, int spPartialSoFar, int expected, int validatingSPresult)
+            throws IOException, NoConnectionsException, ProcCallException {
+        return 0;
+    }
     /**
      * @param query
      * @param hashable - used to pick a single partition for running the query
-     * @param spPartialSoFar - counts from prior SP queries to compensate for unpredictable hashing
      * @param expected - expected value of MP query (and of SP query, adjusting by spPartialSoFar, and only if validatingSPresult).
      * @param validatingSPresult - disables validation for non-deterministic SP results (so we don't have to second-guess the hashinator)
      * @return
@@ -161,7 +152,7 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
      * @throws ProcCallException
      */
     @Override
-    public void runQueryTest(String query, int hashable, int spPartialSoFar, int expected, boolean validateResult)
+    public void runQueryTest(String query, int expected, boolean validateResult)
             throws IOException, NoConnectionsException, ProcCallException {
 
         //System.out.println("@ReadOnlySlow:");
@@ -383,15 +374,6 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
             System.gc();
         }
 
-        boolean isValgrind() {
-            if (m_cluster != null)
-                return m_cluster.isValgrind();
-            return true;
-        }
-
-        boolean isMemcheckDefined() {
-            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
-        }
     }
 
 }

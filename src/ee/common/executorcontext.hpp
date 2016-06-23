@@ -62,7 +62,7 @@ class ExecutorContext {
                     AbstractDRTupleStream *drTupleStream,
                     AbstractDRTupleStream *drReplicatedStream,
                     CatalogId drClusterId,
-                    std::string pathName);
+                    std::string highVolumeDirPath);
 
     ~ExecutorContext();
 
@@ -152,19 +152,16 @@ class ExecutorContext {
         return m_topEnd;
     }
 
-    std::string getPathName() {
-        return m_pathName;
+    std::string getHighVolumeDirPath() {
+        return m_highVolumeDirPath;
     }
 
-    std::string nextOutFileName() {
-        // 255 is typical system limit on file name size
-        char outFileChars[255];
-        snprintf(outFileChars,255,"%s/%ld_%d.vtbl",m_pathName.c_str(),m_uniqueId,m_outFileCount);
+    std::string nextHighVolumeFileName() {
+        std::stringstream outFileName;
+        outFileName << m_highVolumeDirPath << "/" << m_uniqueId << "_" << m_outFileCount << ".vtbl";
         ++m_outFileCount;
-        string outFileName;
-        outFileName.assign(outFileChars);
-        m_outFileName = outFileName;
-        return outFileName;
+        m_outFileName = outFileName.str();
+        return m_outFileName;
     }
 
     std::string lastOutFileName() {
@@ -298,7 +295,7 @@ class ExecutorContext {
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
 
-    std::string m_pathName;
+    std::string m_highVolumeDirPath;
     std::string m_outFileName;
     int m_outFileCount;
 

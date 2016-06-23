@@ -206,34 +206,31 @@ class Table {
     size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
     size_t getAccurateSizeToSerialize(bool includeTotalSize);
 
-    bool serializeTo(SerializeOutput &serialize_out);
-    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
-    bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
-
-    bool serializeToFile(SerializeOutputFile &serialize_iof);
-    bool serializeColumnHeaderToFile(SerializeOutputFile &serialize_iof);
+    template<class T> bool serializeTo(SerializeOutput<T> &serialize_out);
+    bool serializeToWithoutTotalSize(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
+    template<class T> bool serializeColumnHeaderTo(SerializeOutput<T> &serialize_io);
 
     /*
      * Serialize a single tuple as a table so it can be sent to Java.
      */
-    bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
+    bool serializeTupleTo(SerializeOutput<ReferenceSerializeOutput> &serialize_out, TableTuple *tuples, int numTuples);
 
     /**
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
+    template <class T> void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
                                 Pool *stringPool = NULL,
-                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                                SerializeOutput<T> *uniqueViolationOutput = NULL,
                                 bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInputBE &serialize_in,
+    template <class T> void loadTuplesFrom(SerializeInputBE &serialize_in,
                         Pool *stringPool = NULL,
-                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                        SerializeOutput<T> *uniqueViolationOutput = NULL,
                         bool shouldDRStreamRows = false);
 
 
@@ -306,7 +303,14 @@ protected:
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(TableTuple &tuple,
-                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRow) {
+    };
+
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRow) {
