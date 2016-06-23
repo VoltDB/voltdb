@@ -52,7 +52,7 @@ RIGHT JOIN `junit-job-results` AS jr
            tf.name=%(test)s
 """)
 
-JL_QUERY = ("""
+PL_QUERY = ("""
   SELECT job,
          name,
          fails,
@@ -69,7 +69,8 @@ JL_QUERY = ("""
                   ) AS total,
                   COUNT(*) AS fails
              FROM `junit-test-failures` AS tf
-            WHERE job='%(job)s' AND
+            WHERE NOT status='FIXED' AND
+                  job=%(job)s AND
                   %(build_low)s <= build AND
                   build <= %(build_high)s
          GROUP BY job,
@@ -77,6 +78,16 @@ JL_QUERY = ("""
                   total
         ) AS intermediate
 ORDER BY 5 DESC
+""")
+
+AF_QUERY = ("""
+  SELECT tf.name AS 'Test name',
+         tf.build as 'Build',
+         tf.stamp AS 'Time'
+    FROM `junit-test-failures` AS tf
+   WHERE NOT STATUS='FIXED' AND
+         tf.job=%(job)s
+ORDER BY 2 DESC
 """)
 
 class JenkinsBot(object):
@@ -89,20 +100,24 @@ class JenkinsBot(object):
         token = os.environ.get('token', None)
         if token is None:
             print('Could not retrieve token for jenkinsbot')
-            return
+            return False
         self.client = SlackClient(token)
+        return True
 
     def jenkins_session(self):
         """
         Establishes session and responds to commands
         """
 
-        help_text = ['test-leaderboard <job> <build>\n',
-                     'build-range <job> <build #>-<build #>\n',
-                     'test-on-master <test>\n',
+        help_text = ['See which tests are failing the most since this build: test-leaderboard <job> <build>\n',
+                     'Failing the most in this build range: build-range <job> <build #>-<build #>\n',
+                     'Most recent failure on master: test-on-master <test>\n',
+                     'See failure percentages per test: percent-leaderboard <job> <build #>-<build #>\n',
+                     'All failures for a job: all-failures <job>\n'
                      'help\n']
 
-        self.connect()
+        if not self.connect():
+            return
 
         try:
             database = mysql.connector.connect(host=os.environ.get('dbhost', None),
@@ -152,7 +167,7 @@ class JenkinsBot(object):
                             'test': text.split(' ')[1]
                         }
                         self.query_and_response(TOM_QUERY, params, [channel], 'testonmaster.txt')
-                    elif 'junit-leaderboard' in text:
+                    elif 'percent-leaderboard' in text:
                         args = text.split(' ')
                         builds = args[2]
                         params = {
@@ -160,7 +175,12 @@ class JenkinsBot(object):
                             'build_low': builds.split('-')[0],
                             'build_high': builds.split('-')[1]
                         }
-                        self.query_and_response(JL_QUERY, params, [channel], 'junitleaderboard.txt')
+                        self.query_and_response(PL_QUERY, params, [channel], 'percentleaderboard.txt')
+                    elif 'all-failures' in text:
+                        params = {
+                            'job': text.split(' ')[1]
+                        }
+                        self.query_and_response(AF_QUERY, params, [channel], 'allfailures.txt')
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 # Turning off the bot
@@ -172,7 +192,7 @@ class JenkinsBot(object):
                 self.post_message(channel, 'Hint: Incorrect number of arguments\n\n' + ''.join(help_text))
             except MySQLError as error:
                 print(error)
-                self.post_message(channel, 'Something went wrong with the query. Please try again.')
+                self.post_message(channel, 'Something went wrong with the query.')
             except Exception as error:
                 # Something unexpected went wrong
                 print(error)
