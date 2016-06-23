@@ -446,6 +446,9 @@ public class LocalCluster implements VoltServerConfig {
     public void setHostCount(int hostCount)
     {
         m_hostCount = hostCount;
+        if (hostCount < numberOfCoordinators) {
+            numberOfCoordinators = hostCount;
+        }
         // Force recompilation
         m_compiled = false;
     }
