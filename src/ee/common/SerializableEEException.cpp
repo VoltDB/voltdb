@@ -52,7 +52,7 @@ SerializableEEException::SerializableEEException(std::string message) :
                message.c_str());
 }
 
-void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
+void SerializableEEException::serialize(SerializeOutput<ReferenceSerializeOutput> *output) const {
     const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();

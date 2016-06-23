@@ -1559,19 +1559,6 @@ public final class InvocationDispatcher {
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         ClientResponseImpl error = null;
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED &&
-                !plannedStmtBatch.isReadOnly() && !plannedStmtBatch.adminConnection) {
-            error = new ClientResponseImpl(
-                    ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
-                    "Server is paused and is available in read-only mode - please try again later",
-                    plannedStmtBatch.clientHandle);
-            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
-            buffer.putInt(buffer.capacity() - 4);
-            error.flattenToBuffer(buffer).flip();
-            c.writeStream().enqueue(buffer);
-        }
-        else
         if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
                 SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
             ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);

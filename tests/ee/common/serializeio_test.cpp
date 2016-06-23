@@ -61,7 +61,7 @@ public:
     SerializeIOTest() : TEXT("hello world") {}
 protected:
     const string TEXT;
-    void writeTestSuite(SerializeOutput* out) {
+    void writeTestSuite(SerializeOutput<CopySerializeOutput>* out) {
         out->writeBool(true);
         out->writeBool(false);
         out->writeByte(numeric_limits<int8_t>::min());
@@ -99,14 +99,15 @@ protected:
 };
 
 TEST_F(SerializeIOTest, ReadWrite) {
-    CopySerializeOutput out;
+    CopySerializeOutput serializer;
+    SerializeOutput<CopySerializeOutput> out(&serializer);
     writeTestSuite(&out);
 
-    ReferenceSerializeInputBE in(out.data(), out.size());
+    ReferenceSerializeInputBE in(serializer.data(), serializer.size());
     readTestSuite(&in);
 
-    CopySerializeInputBE in2(out.data(), out.size());
-    memset(const_cast<char*>(out.data()), 0, out.size());
+    CopySerializeInputBE in2(serializer.data(), serializer.size());
+    memset(const_cast<char*>(serializer.data()), 0, serializer.size());
     readTestSuite(&in2);
 }
 
@@ -120,10 +121,11 @@ TEST_F(SerializeIOTest, Unread) {
 }
 
 TEST(SerializeOutput, ReserveBytes) {
-    CopySerializeOutput out;
+    CopySerializeOutput serializer;
+    SerializeOutput<CopySerializeOutput> out(&serializer);
     size_t offset = out.reserveBytes(4);
     EXPECT_EQ(0, offset);
-    EXPECT_EQ(4, out.size());
+    EXPECT_EQ(4, serializer.size());
 
     static const uint32_t DATA = 0x01020304;
     // Writing past the end = bad
@@ -131,11 +133,11 @@ TEST(SerializeOutput, ReserveBytes) {
 
     size_t offset2 = out.reserveBytes(5);
     EXPECT_EQ(4, offset2);
-    EXPECT_EQ(9, out.size());
+    EXPECT_EQ(9, serializer.size());
 
     size_t nextOffset = out.writeBytesAt(1, &DATA, sizeof(DATA));
     EXPECT_EQ(1+sizeof(DATA), nextOffset);
-    EXPECT_EQ(0, memcmp(static_cast<const char*>(out.data()) + 1, &DATA, sizeof(DATA)));
+    EXPECT_EQ(0, memcmp(static_cast<const char*>(serializer.data()) + 1, &DATA, sizeof(DATA)));
 }
 
 int main() {

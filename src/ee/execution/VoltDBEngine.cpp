@@ -179,7 +179,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
-                         std::string pathName,
+                         std::string highVolumeDirPath,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
@@ -243,7 +243,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId,
-                                            pathName);
+                                            highVolumeDirPath);
     return true;
 }
 
@@ -324,7 +324,7 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
     return NULL;
 }
 
-void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
+template<class T> void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput<T> &out) const
 {
     // Just look in our list of tables
     Table* table = getTable(tableId);
@@ -333,6 +333,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
     }
     table->serializeTo(out);
 }
+template void VoltDBEngine::serializeTable <ReferenceSerializeOutput> (int32_t tableId, SerializeOutput<ReferenceSerializeOutput> &out) const;
 
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
@@ -565,10 +566,11 @@ bool VoltDBEngine::writeToDisk(Table* dependency) {
     VOLT_DEBUG("Writing Dependency from C++");
 
     SerializeOutputFile serialize_iof;
-    string outFileName = m_executorContext->nextOutFileName();
-
+    string outFileName = m_executorContext->nextHighVolumeFileName();
     serialize_iof.initialize(outFileName);
-    if (!dependency->serializeToFile(serialize_iof))
+
+    SerializeOutput<SerializeOutputFile> serialize_io(&serialize_iof);
+    if (!dependency->serializeTo(serialize_io))
             return false;
     serialize_iof.close();
 
@@ -1405,7 +1407,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
 }
 
 int VoltDBEngine::getResultsSize() const {
-    return static_cast<int>(m_resultOutput.size());
+    return static_cast<int>(m_resultOutputSerializer.size());
 }
 
 void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity,
@@ -1562,7 +1564,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     if (resultTable != NULL) {
         resultTable->serializeTo(m_resultOutput);
         m_resultOutput.writeIntAt(lengthPosition,
-                                  static_cast<int32_t>(m_resultOutput.size()
+                                  static_cast<int32_t>(m_resultOutputSerializer.size()
                                                        - sizeof(int32_t)));
         return 1;
     }
@@ -1650,7 +1652,8 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             if (resultBufferCapacity < sizeof(jint) * positions.size()) {
                 throwFatalException("tableStreamSerializeMore: result buffer not large enough");
             }
-            ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
+            ReferenceSerializeOutput resultsSerializer(resultBuffer, resultBufferCapacity);
+            SerializeOutput<ReferenceSerializeOutput> results(&resultsSerializer);
             // Write the array size as a regular integer.
             assert(positions.size() <= std::numeric_limits<int32_t>::max());
             results.writeInt((int32_t)positions.size());

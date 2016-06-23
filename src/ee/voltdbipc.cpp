@@ -791,7 +791,7 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
 
     const void* exceptionData =
-      m_engine->getExceptionOutputSerializer()->data();
+      m_engine->getExceptionOutputSerializer()->getSerializer()->data();
     int32_t exceptionLength =
       static_cast<int32_t>(ntohl(*reinterpret_cast<const int32_t*>(exceptionData)));
     printf("Sending exception length %d\n", exceptionLength);
@@ -865,7 +865,7 @@ int VoltDBIPC::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 
     if (dependencySz > 0) {
         ReferenceSerializeInputBE serialize_in(buf, dependencySz);
-        destination->loadTuplesFrom(serialize_in, stringPool);
+        destination->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, stringPool);
         delete [] origBuf;
         return 1;
     }
@@ -1264,7 +1264,8 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeInputBE in2(inptr, sz);
         // 1 byte status and 4 byte count
         size_t offset = 5;
-        ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
+        ReferenceSerializeOutput out1Serializer(m_reusedResultBuffer, MAX_MSG_SZ);
+        SerializeOutput<ReferenceSerializeOutput> out1(&out1Serializer);
         out1.writeInt(bufferCount);
         for (size_t i = 0; i < bufferCount; i++) {
             in2.readLong(); in2.readInt(); // skip address and offset, used for jni only

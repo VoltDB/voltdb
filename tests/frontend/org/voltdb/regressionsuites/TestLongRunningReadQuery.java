@@ -48,8 +48,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         VoltTable vt;
 
         vt = client.callProcedure("@Statistics", "PROCEDUREPROFILE", 1).getResults()[0];
-
-        System.out.println(vt.toString());
+        //System.out.println(vt.toString());
 
     }
 
@@ -58,8 +57,6 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         for (int i = 1; i <= tableSize; i++) {
             sql = "INSERT INTO R1 VALUES (" + i + ");";
             client.callProcedure("@AdHoc", sql);
-            if (i % 100000 == 0)
-                System.out.println("Progress: Inserted " + i + " rows.");
         }
 
     }
@@ -98,9 +95,6 @@ public class TestLongRunningReadQuery extends RegressionSuite {
     public TestLongRunningReadQuery(String name) {
         super(name);
     }
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -120,7 +114,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
 
         boolean success;
 
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("longreads-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

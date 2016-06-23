@@ -618,11 +618,20 @@ private:
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(TableTuple &tuple,
-                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);
-
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                        SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                                        int32_t &serializedTupleCount,
+                                        size_t &tupleCountPosition,
+                                        bool shouldDRStreamRows);
+    template <class T> void processLoadedTupleShared(TableTuple &tuple,
+                                        SerializeOutput<T> *uniqueViolationOutput,
+                                        int32_t &serializedTupleCount,
+                                        size_t &tupleCountPosition,
+                                        bool shouldDRStreamRows);
     enum LookupType {
         LOOKUP_BY_VALUES,
         LOOKUP_FOR_DR,

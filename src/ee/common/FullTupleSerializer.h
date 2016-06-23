@@ -21,6 +21,7 @@
 #include "common/tabletuple.h"
 
 namespace voltdb {
+template <class SO> class SerializeOutput;
 class ReferenceSerializeOutput;
 class TupleSchema;
 
@@ -33,7 +34,7 @@ public:
     /**
      * Serialize the provided tuple to the provide serialize output
      */
-    void serializeTo(TableTuple tuple, ReferenceSerializeOutput *out);
+    void serializeTo(TableTuple tuple, SerializeOutput<ReferenceSerializeOutput> *out);
 
     /**
      * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple

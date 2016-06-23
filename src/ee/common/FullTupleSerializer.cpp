@@ -22,7 +22,7 @@ namespace voltdb {
 /**
  * Serialize the provided tuple to the provide serialize output
  */
-void FullTupleSerializer::serializeTo(TableTuple tuple, ReferenceSerializeOutput *out) {
+void FullTupleSerializer::serializeTo(TableTuple tuple, SerializeOutput<ReferenceSerializeOutput> *out) {
     tuple.serializeTo(*out, true);
 }
 

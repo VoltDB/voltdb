@@ -1764,8 +1764,7 @@ public abstract class CatalogUtil {
     public static File getHighVolumeOutput(PathsType.Highvolumeoutput paths, File voltDbRoot) {
         File highVolumeOutputPath;
         highVolumeOutputPath = new File(paths.getPath());;
-        if (!highVolumeOutputPath.isAbsolute())
-        {
+        if (!highVolumeOutputPath.isAbsolute()){
             highVolumeOutputPath = new VoltFile(voltDbRoot, paths.getPath());
         }
 

@@ -29,7 +29,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         const RecoveryMsgType type,
         CatalogId tableId,
         uint32_t totalTupleCount,
-        ReferenceSerializeOutput *out,
+        SerializeOutput<ReferenceSerializeOutput> *out,
         TupleSerializer *serializer,
         const TupleSchema *schema) :
     m_out(out),
@@ -61,7 +61,7 @@ void RecoveryProtoMsgBuilder::finalize() {
 }
 
 bool RecoveryProtoMsgBuilder::canAddMoreTuples() {
-    if (m_out->remaining() >= m_maxSerializedSize) {
+    if (m_out->getSerializer()->remaining() >= m_maxSerializedSize) {
         return true;
     }
     return false;
