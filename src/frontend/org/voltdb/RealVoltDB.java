@@ -1576,7 +1576,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    //This will make all deployment path elements as fake and real one will be saved in config file.
+    //This will make all deployment path elements as null and real paths will be saved in .paths config file.
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
@@ -1694,14 +1694,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Save .paths
         stagePathConfiguration(config);
 
-        //Now that we are done with deployment configuration set all path to fake ones.
-        dt.getPaths().getVoltdbroot().setPath("");
+        //Now that we are done with deployment configuration set all path null.
+        dt.getPaths().getVoltdbroot().setPath(null);
         if (config.m_isEnterprise) {
-            dt.getPaths().getCommandlog().setPath("");
-            dt.getPaths().getCommandlogsnapshot().setPath("");
-            dt.getPaths().getSnapshots().setPath("");
-            dt.getPaths().getExportoverflow().setPath("");
-            dt.getPaths().getDroverflow().setPath("");
+            dt.getPaths().getCommandlog().setPath(null);
+            dt.getPaths().getCommandlogsnapshot().setPath(null);
+            dt.getPaths().getSnapshots().setPath(null);
+            dt.getPaths().getExportoverflow().setPath(null);
+            dt.getPaths().getDroverflow().setPath(null);
         }
 
         //After deployment is emptied out of path now write it.
