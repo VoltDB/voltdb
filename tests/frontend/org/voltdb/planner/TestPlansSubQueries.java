@@ -2310,6 +2310,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
         String sql;
         String equivalentSql;
 
+        // Ambiguous column differentiator test
+        sql = "select * from (select D, C as D from R1) T;";
+        equivalentSql = "select D, C as D from R1 T";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // More ambiguous column differentiator test
+        sql = "select * from (select D, C as D, A as C from R1) T where C = 1;";
+        equivalentSql = "select D, C as D, A as C from R1 T where T.A = 1";
+        checkSubquerySimplification(sql, equivalentSql);
+
         // Subquery SELECT *
         sql = "select * from (select * from R1) T1";
         equivalentSql = "select * from R1 T1";
