@@ -390,10 +390,12 @@ public class MeshArbiter {
         m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
                            CoreUtils.hsIdCollectionToString(expectedSurvivors));
 
-        for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
+        final Iterator<SiteFailureMessage> iter = m_decidedSurvivors.values().iterator();
+        while (iter.hasNext()) {
+            final SiteFailureMessage remoteDecision = iter.next();
             if (expectedSurvivors.contains(remoteDecision.m_sourceHSId)) {
                 if (remoteDecision.m_decision.contains(m_hsId)) {
-                    m_decidedSurvivors.clear();
+                    iter.remove();
                     m_recoveryLog.info("Agreement, Received inconsistent decision from " +
                                        CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
                     final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
@@ -431,7 +433,7 @@ public class MeshArbiter {
                 if (!fm.m_decision.isEmpty()) {
                     if (expectedSurvivors.contains(fm.m_sourceHSId)) {
                         if (fm.m_decision.contains(m_hsId)) {
-                            m_decidedSurvivors.clear();
+                            m_decidedSurvivors.remove(fm.m_sourceHSId);
                             // The remote host has decided that we are gone, remove the remote host
                             final FaultMessage localFault = new FaultMessage(m_hsId, fm.m_sourceHSId);
                             localFault.m_sourceHSId = m_hsId;
