@@ -1640,14 +1640,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         if (config.m_isEnterprise) {
             List<String> failed = new ArrayList<>();
-            Map<String, File> paths = ImmutableMap.<String, File>builder()
-                    .put(dt.getPaths().getCommandlog().getKey(), new VoltFile(dt.getPaths().getCommandlog().getPath()))
-                    .put(dt.getPaths().getCommandlogsnapshot().getKey(), new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath()))
-                    .put(dt.getPaths().getSnapshots().getKey(), new VoltFile(dt.getPaths().getSnapshots().getPath()))
-                    .put(dt.getPaths().getExportoverflow().getKey(), new VoltFile(dt.getPaths().getExportoverflow().getPath()))
-                    .put(dt.getPaths().getDroverflow().getKey(), new VoltFile(dt.getPaths().getDroverflow().getPath()))
+            List<File> paths = ImmutableList.<File>builder()
+                    .add(new VoltFile(dt.getPaths().getCommandlog().getPath()))
+                    .add(new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath()))
+                    .add(new VoltFile(dt.getPaths().getSnapshots().getPath()))
+                    .add(new VoltFile(dt.getPaths().getExportoverflow().getPath()))
+                    .add(new VoltFile(dt.getPaths().getDroverflow().getPath()))
                     .build();
-            for (File path: paths.values()) {
+            for (File path: paths) {
                 if (!path.isAbsolute()) {
                     path = new VoltFile(config.m_voltdbRoot, path.getPath());
                 }
@@ -1672,35 +1672,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
                     (new VoltFile(dt.getPaths().getVoltdbroot().getPath())).getCanonicalPath());
 
-            File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
-            if (!path.isAbsolute()) {
-                path = new VoltFile(config.m_voltdbRoot, path.getPath());
-            }
-            m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
+            if (config.m_isEnterprise) {
+                File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
 
-            path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
-            if (!path.isAbsolute()) {
-                path = new VoltFile(config.m_voltdbRoot, path.getPath());
-            }
-            m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
+                path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
 
-            path = new VoltFile(dt.getPaths().getSnapshots().getPath());
-            if (!path.isAbsolute()) {
-                path = new VoltFile(config.m_voltdbRoot, path.getPath());
-            }
-            m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
+                path = new VoltFile(dt.getPaths().getSnapshots().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
 
-            path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
-            if (!path.isAbsolute()) {
-                path = new VoltFile(config.m_voltdbRoot, path.getPath());
-            }
-            m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
+                path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
 
-            path = new VoltFile(dt.getPaths().getDroverflow().getPath());
-            if (!path.isAbsolute()) {
-                path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                path = new VoltFile(dt.getPaths().getDroverflow().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
             }
-            m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
         }
@@ -1760,7 +1762,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             pw.flush();
             pw.close();
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to stage configuratio path designtion", false, e);
+            VoltDB.crashLocalVoltDB("Unable to stage configuration path designtion", false, e);
         }
     }
 

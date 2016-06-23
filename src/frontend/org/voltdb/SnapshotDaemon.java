@@ -317,7 +317,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final long endTime = System.currentTimeMillis() + timeoutMs;
                 SnapshotCheckResponseMessage response;
                 while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
-                    // ignore responses to previous requests
+                    // ignore responses to previous requests we only check for nonce and not path here.
                     if (jsObj.getString("nonce").equals(response.getNonce())) {
                         responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                     }
@@ -1346,9 +1346,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final String nonce = m_prefix + dateString;
         JSONObject jsObj = new JSONObject();
         try {
-            jsObj.put("path", m_path);
-            jsObj.put("pathType", SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString());
-            jsObj.put("nonce", nonce);
+            jsObj.put(SnapshotUtil.JSON_PATH, m_path);
+            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString());
+            jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             m_snapshots.offer(new Snapshot(m_path, nonce, now));
             long handle = m_nextCallbackHandle++;

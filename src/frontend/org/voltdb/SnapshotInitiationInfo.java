@@ -254,9 +254,9 @@ public class SnapshotInitiationInfo
     public JSONObject getJSONObjectForZK() throws JSONException
     {
         final JSONObject jsObj = new JSONObject();
-        jsObj.put("path", m_path);
-        jsObj.put("pathType", m_stype.toString());
-        jsObj.put("nonce", m_nonce);
+        jsObj.put(SnapshotUtil.JSON_PATH, m_path);
+        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_stype.toString());
+        jsObj.put(SnapshotUtil.JSON_NONCE, m_nonce);
         jsObj.put("block", m_blocking);
         jsObj.put("format", m_format.toString());
         jsObj.putOpt("data", m_data);
