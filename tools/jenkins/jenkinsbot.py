@@ -16,27 +16,67 @@ from slackclient import SlackClient
 from tabulate import tabulate
 
 TL_QUERY = ("""
-SELECT t.name AS 'Test name', COUNT(*) AS 'Failures'
-FROM `junit-test-failures` AS t
-WHERE NOT t.status='FIXED' AND t.build >= %(beginning)s AND t.job=%(job)s
-GROUP BY t.name
-ORDER BY COUNT(*) DESC
+  SELECT tf.name AS 'Test name',
+         COUNT(*) AS 'Failures'
+    FROM `junit-test-failures` AS tf
+   WHERE NOT tf.status='FIXED' AND
+         tf.build >= %(beginning)s AND
+         tf.job=%(job)s
+GROUP BY tf.name
+ORDER BY 2 DESC
 """)
 
 BR_QUERY = ("""
-SELECT t.name AS 'Test name', COUNT(*) AS 'Number of failures in this build range'
-FROM `junit-test-failures` AS t
-INNER JOIN `junit-job-results` AS j
-ON NOT t.status='FIXED' AND j.name=t.job AND j.build=t.build AND j.name=%(job)s AND %(build_low)s <= j.build AND j.build <= %(build_high)s
-GROUP by t.name, t.job
-ORDER BY COUNT(*) DESC
+    SELECT tf.name AS 'Test name',
+           COUNT(*) AS 'Number of failures in this build range'
+      FROM `junit-test-failures` AS tf
+INNER JOIN `junit-job-results` AS jr
+        ON NOT tf.status='FIXED' AND
+           jr.name=tf.job AND
+           jr.build=tf.build AND
+           jr.name=%(job)s AND
+           %(build_low)s <= jr.build AND
+           jr.build <= %(build_high)s
+  GROUP BY tf.name,
+           tf.job
+  ORDER BY 2 DESC
 """)
 
 TOM_QUERY = ("""
-SELECT MAX(t.build) AS 'Most recent failure on master', MAX(j.build) AS 'Most recent build on master'
-FROM `junit-test-failures` AS t
-RIGHT JOIN `junit-job-results` AS j
-ON j.name=t.job AND t.name=%(test)s
+    SELECT MAX(t.build) AS 'Most recent failure on master',
+           MAX(j.build) AS 'Most recent build on master'
+      FROM `junit-test-failures` AS tf
+RIGHT JOIN `junit-job-results` AS jr
+        ON NOT tf.status='FIXED' AND
+           jr.name=tf.job AND
+           tf.name=%(test)s
+""")
+
+JL_QUERY = ("""
+  SELECT job,
+         name,
+         fails,
+         total,
+         fails/total*100. AS "Percent failure"
+    FROM
+        (
+           SELECT job,
+                  name,
+                  (
+                   SELECT COUNT(*)
+                     FROM `junit-job-results` jr
+                    WHERE jr.name = tf.job
+                  ) AS total,
+                  COUNT(*) AS fails
+             FROM `junit-test-failures` AS tf
+            WHERE job='%(job)s' AND
+                  %(build_low)s <= build AND
+                  build <= %(build_high)s
+         GROUP BY job,
+                  name,
+                  total
+        ) AS intermediate
+ORDER BY 5 DESC
 """)
 
 class JenkinsBot(object):
@@ -44,6 +84,13 @@ class JenkinsBot(object):
     def __init__(self):
         self.cursor = None
         self.client = None
+
+    def connect(self):
+        token = os.environ.get('token', None)
+        if token is None:
+            print('Could not retrieve token for jenkinsbot')
+            return
+        self.client = SlackClient(token)
 
     def jenkins_session(self):
         """
@@ -55,12 +102,7 @@ class JenkinsBot(object):
                      'test-on-master <test>\n',
                      'help\n']
 
-        token = os.environ.get('token', None)
-        if token is None:
-            print('Could not retrieve token for jenkinsbot')
-            return
-
-        self.client = SlackClient(token)
+        self.connect()
 
         try:
             database = mysql.connector.connect(host=os.environ.get('dbhost', None),
@@ -95,7 +137,7 @@ class JenkinsBot(object):
                             'job': text.split(' ')[1],
                             'beginning': text.split(' ')[2]
                         }
-                        self.make_query(TL_QUERY, params, [channel], 'testleaderboard.txt')
+                        self.query_and_response(TL_QUERY, params, [channel], 'testleaderboard.txt')
                     elif 'build-range' in text:
                         args = text.split(' ')
                         builds = args[2]
@@ -104,18 +146,30 @@ class JenkinsBot(object):
                             'build_low': builds.split('-')[0],
                             'build_high': builds.split('-')[1]
                         }
-                        self.make_query(BR_QUERY, params, [channel], 'buildrange.txt')
+                        self.query_and_response(BR_QUERY, params, [channel], 'buildrange.txt')
                     elif 'test-on-master' in text:
                         params = {
                             'test': text.split(' ')[1]
                         }
-                        self.make_query(TOM_QUERY, params, [channel], 'testonmaster.txt')
+                        self.query_and_response(TOM_QUERY, params, [channel], 'testonmaster.txt')
+                    elif 'junit-leaderboard' in text:
+                        args = text.split(' ')
+                        builds = args[2]
+                        params = {
+                            'job': args[1],
+                            'build_low': builds.split('-')[0],
+                            'build_high': builds.split('-')[1]
+                        }
+                        self.query_and_response(JL_QUERY, params, [channel], 'junitleaderboard.txt')
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 # Turning off the bot
                 self.cursor.close()
                 database.close()
                 break
+            except IndexError as error:
+                print(error)
+                self.post_message(channel, 'Hint: Incorrect number of arguments\n\n' + ''.join(help_text))
             except MySQLError as error:
                 print(error)
                 self.post_message(channel, 'Something went wrong with the query. Please try again.')
@@ -124,7 +178,7 @@ class JenkinsBot(object):
                 print(error)
 
 
-    def make_query(self, query, params, channels, filename):
+    def query_and_response(self, query, params, channels, filename):
         """
         Make a query then upload a text file with tables to the channels.
         """
