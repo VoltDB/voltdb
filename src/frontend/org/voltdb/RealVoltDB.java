@@ -174,13 +174,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "<!-- This file is an auto-generated default deployment configuration. -->",
         "<deployment>",
         "    <cluster hostcount=\"1\" />",
-        /* this is where paths would be added at line 4 (starting from 0) */
         "    <httpd enabled=\"true\">",
         "        <jsonapi enabled=\"true\" />",
         "    </httpd>",
         "</deployment>"
     };
-    private static final int insertPathsAtLine = 4;
 
     private final Properties m_pathList = new Properties();
 
@@ -3586,19 +3584,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             logger.info("Generating default deployment file \"" + depFH.getAbsolutePath() + "\"");
 
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(depFH))) {
-                int atline = 0;
                 for (String line : defaultDeploymentXML) {
-                    if (atline == insertPathsAtLine && !VoltDB.DBROOT.equals(voltdbroot.getPath())) {
-                        bw.write("    <paths>");
-                        bw.newLine();
-                        bw.write("        <voltdbroot path=\"" + voltdbroot.getPath() + "\"/>");
-                        bw.newLine();
-                        bw.write("    </paths>");
-                        bw.newLine();
-                    }
                     bw.write(line);
                     bw.newLine();
-                    atline += 1;
                 }
             } finally {
             }
