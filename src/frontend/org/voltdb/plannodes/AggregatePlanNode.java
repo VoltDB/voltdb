@@ -376,7 +376,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add(0);
         }
         m_aggregateOutputColumns.add(aggOutputColumn);
-        if (aggType == ExpressionType.AGGREGATE_COUNT_STAR) {
+        if (aggType.isNullary()) {
             assert(aggInputExpr == null);
             m_aggregateExpressions.add(null);
         } else {
@@ -482,6 +482,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
             sep = ", ";
             if (e == ExpressionType.AGGREGATE_COUNT_STAR) {
                 sb.append("(*)");
+            }
+            else if (e == ExpressionType.AGGREGATE_WINDOWED_RANK) {
+                sb.append("()");
             }
             else {
                 if (m_aggregateDistinct.get(ii) == 1) {

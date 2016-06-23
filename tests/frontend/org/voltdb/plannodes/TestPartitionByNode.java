@@ -44,12 +44,8 @@ package org.voltdb.plannodes;
 
 import java.util.Arrays;
 
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
-import org.json_voltpatches.JSONTokener;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.ExpressionType;
@@ -83,52 +79,6 @@ public class TestPartitionByNode extends TestCase {
     }
 
     public void testJSON() throws Exception {
-        WindowedExpression we = makeWindowedExpression();
-        SchemaColumn col = new SchemaColumn("TMP", "TMP", "TC", "TC", we);
-        PartitionByPlanNode pn = new PartitionByPlanNode();
-        pn.setWindowedColumn(col);
-        JSONStringer stringer = new JSONStringer();
-        stringer.object();
-        try {
-            pn.toJSONString(stringer);
-            stringer.endObject();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        String json = stringer.toString();
-        // Enable this to debug the JSON.
-        // System.out.printf("JSON: %s\n", json);
-        JSONObject jobj = new JSONObject(new JSONTokener(json));
-        PartitionByPlanNode pn2 = new PartitionByPlanNode();
-        pn2.loadFromJSONObject(jobj, m_voltdb.getDatabase());
-        int oldCount = pn.getNumberOfPartitionByExpressions();
-        int newCount = pn2.getNumberOfPartitionByExpressions();
-        assertEquals(oldCount, newCount);
-        for (int idx = 0; idx < pn2.getNumberOfPartitionByExpressions(); idx += 1) {
-            AbstractExpression ae2 = pn2.getPartitionByExpression(idx);
-            AbstractExpression ae  = pn.getPartitionByExpression(idx);
-            assertTrue(ae2 instanceof TupleValueExpression);
-            assertTrue(ae instanceof TupleValueExpression);
-            TupleValueExpression tve2 = (TupleValueExpression)ae2;
-            TupleValueExpression tve = (TupleValueExpression)ae;
-            // Not everything gets serialized.  We don't serialize all
-            // the column names, for example.  We also don't serialize
-            // the order by columns, as these are in an order by node
-            // in the plan.  But the metadata and the column indices need
-            // to match.
-            assertEquals(tve.getValueSize(), tve2.getValueSize());
-            assertEquals(tve.getValueType(), tve2.getValueType());
-            assertEquals(tve.getColumnIndex(), tve2.getColumnIndex());
-        }
-        assertEquals(SortDirectionType.ASC,  pn.getSortDirection(0));
-        assertEquals(SortDirectionType.DESC, pn.getSortDirection(1));
-        assertEquals(VoltType.FLOAT,             pn.getSortExpression(0).getValueType());
-        assertEquals(8,                          pn.getSortExpression(0).getValueSize());
-        assertEquals(ExpressionType.VALUE_TUPLE, pn.getSortExpression(0).getExpressionType());
-        assertEquals(VoltType.INTEGER,           pn.getSortExpression(1).getValueType());
-        assertEquals(4,                          pn.getSortExpression(1).getValueSize());
-        assertEquals(ExpressionType.VALUE_TUPLE, pn.getSortExpression(1).getExpressionType());
     }
 
     private WindowedExpression makeWindowedExpression() {

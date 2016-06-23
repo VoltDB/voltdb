@@ -226,4 +226,8 @@ public enum ExpressionType {
         return getExpressionClass() == AggregateExpression.class;
     }
 
+    public boolean isNullary() {
+        return this == ExpressionType.AGGREGATE_COUNT_STAR || this == ExpressionType.AGGREGATE_WINDOWED_RANK;
+    }
+
 }

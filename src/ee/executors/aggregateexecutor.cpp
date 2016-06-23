@@ -505,7 +505,35 @@ public:
     }
 };
 
-/*
+/**
+ * An Agg for windowed rank.
+ */
+class WindowedRankAgg : public Agg
+{
+public:
+    WindowedRankAgg() : m_count(0) {}
+
+    virtual void advance(const NValue& val)
+    {
+        ++m_count;
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
+    }
+
+    virtual void resetAgg()
+    {
+        m_haveAdvanced = false;
+        m_count = 0;
+    }
+
+private:
+    int64_t m_count;
+};
+
+/**
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
@@ -539,6 +567,8 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
+        return new (memoryPool) WindowedRankAgg();
     default:
     {
         char message[128];
@@ -787,6 +817,11 @@ void AggregateExecutorBase::p_execute_finish()
     m_memoryPool.purge();
 }
 
+// By default, we output one row per group.
+bool AggregateExecutorBase::outputForEachInputRow() const {
+    return false;
+}
+
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
@@ -954,19 +989,30 @@ bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
     initGroupByKeyTuple(nextTuple);
 
+    // We may want to output a row even if the group
+    // does not change.  This may happen for windowed operations.
+    // So, remember this here.
+    bool outputRow = outputForEachInputRow();
+    bool resetAggs = false;
+
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
         if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
             VOLT_TRACE("new group!");
             // Output old row.
-            if (insertOutputTuple(m_aggregateRow)) {
-                m_pmp->countdownProgress();
-            }
-            m_aggregateRow->resetAggs();
-
-            // record the new group scanned tuple
-            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
+            outputRow = true;
+            resetAggs = true;
             break;
         }
+    }
+
+    if (outputRow) {
+        if (insertOutputTuple(m_aggregateRow)) {
+            m_pmp->countdownProgress();
+        }
+        m_aggregateRow->resetAggs();
+
+        // record the new group scanned tuple
+        m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
     }
 
     // update the aggregation calculation.

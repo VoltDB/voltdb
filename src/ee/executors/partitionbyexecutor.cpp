@@ -15,31 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
- * partitionbynode.cpp
+ * partitionbyexecutor.cpp
  */
-#include <sstream>
-#include "partitionbynode.h"
-#include "common/SerializableEEException.h"
+
+#include "partitionbyexecutor.h"
 
 namespace voltdb {
-PartitionByPlanNode::~PartitionByPlanNode()
-{
 
-}
-
-PlanNodeType PartitionByPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_PARTITIONBY;
+// The PartitionByExecutor wants one row for each input row.
+bool PartitionByExecutor::outputForEachInputRow() const {
+    return true;
 }
 
-std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
-{
-    std::ostringstream buffer;
-    buffer << "PartitionByPlanNode: ";
-    buffer << AggregatePlanNode::debugInfo(spacer);
-    for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-        buffer << m_sortExpressions[idx]->debug(spacer);
-    }
-    return buffer.str();
+PartitionByExecutor::~PartitionByExecutor() {
+    // TODO Auto-generated destructor stub
 }
-}
+
+} /* namespace voltdb */

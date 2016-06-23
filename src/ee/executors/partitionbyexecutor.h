@@ -14,32 +14,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-/*
- * partitionbynode.cpp
- */
-#include <sstream>
-#include "partitionbynode.h"
-#include "common/SerializableEEException.h"
+#ifndef SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
+#define SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
+
+#include "aggregateexecutor.h"
 
 namespace voltdb {
-PartitionByPlanNode::~PartitionByPlanNode()
-{
 
-}
-
-PlanNodeType PartitionByPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_PARTITIONBY;
-}
-
-std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
-{
-    std::ostringstream buffer;
-    buffer << "PartitionByPlanNode: ";
-    buffer << AggregatePlanNode::debugInfo(spacer);
-    for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-        buffer << m_sortExpressions[idx]->debug(spacer);
+/*
+ *
+ */
+class PartitionByExecutor: public AggregateSerialExecutor {
+public:
+    PartitionByExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
+      : AggregateSerialExecutor(engine, abstract_node) {
     }
-    return buffer.str();
-}
-}
+    virtual ~PartitionByExecutor();
+    bool outputForEachInputRow() const;
+};
+
+} /* namespace voltdb */
+
+#endif /* SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_ */

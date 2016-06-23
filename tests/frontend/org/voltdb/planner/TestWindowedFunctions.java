@@ -44,9 +44,6 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -103,29 +100,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
             // Then check that the TVEs all make sense.
             //
             SchemaColumn column = schema.getColumns().get(0);
-            assertTrue(column.getExpression() instanceof WindowedExpression);
             assertEquals("ARANK", column.getColumnAlias());
-            assertEquals(2, pbPlanNode.getNumberOfPartitionByExpressions());
-            validateTVEs(input_schema, pbPlanNode);
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
-        }
-    }
-
-    public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
-        List<AbstractExpression> tves = pbPlanNode.getAllTVEs();
-        List<SchemaColumn> columns = input_schema.getColumns();
-        for (AbstractExpression ae : tves) {
-            TupleValueExpression tve = (TupleValueExpression)ae;
-            assertTrue(0 <= tve.getColumnIndex() && tve.getColumnIndex() < columns.size());
-            SchemaColumn col = columns.get(tve.getColumnIndex());
-            String msg = String.format("TVE %d, COL %s: ",
-                                       tve.getColumnIndex(),
-                                       col.getColumnName() + ":" + col.getColumnAlias());
-            assertEquals(msg, col.getTableName(), tve.getTableName());
-            assertEquals(msg, col.getTableAlias(), tve.getTableAlias());
-            assertEquals(msg, col.getColumnName(), tve.getColumnName());
-            assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
         }
     }
 
@@ -167,10 +144,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
             NodeSchema  schema = partitionByPlanNode.getOutputSchema();
             SchemaColumn column = schema.getColumns().get(0);
-            assertTrue(column.getExpression() instanceof WindowedExpression);
             assertEquals("ARANK", column.getColumnAlias());
-
-            validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
         }
