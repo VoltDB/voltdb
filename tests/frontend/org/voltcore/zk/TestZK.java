@@ -28,7 +28,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
@@ -50,14 +50,27 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.JoinerCriteria;
+import org.voltdb.StartAction;
+import org.voltdb.VoltDB;
 
 public class TestZK extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 8;
+    private String [] coordinators;
+    private JoinerCriteria criteria;
 
     @Before
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
+        coordinators = IntStream.range(0, NUM_AGREEMENT_SITES)
+                .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
+                .toArray(s -> new String[s]);
+        criteria = JoinerCriteria.builder()
+                .coordinators(coordinators)
+                .startAction(StartAction.PROBE)
+                .hostCount(NUM_AGREEMENT_SITES)
+                .build();
     }
 
     @After
@@ -72,15 +85,15 @@ public class TestZK extends ZKTestBase {
 
     public void recoverSite(int site) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
-        int recoverPort = config.internalPort + NUM_AGREEMENT_SITES - 1;
         config.internalPort += site;
+        config.criteria = criteria;
         int clientPort = m_ports.next();
         config.zkInterface = "127.0.0.1:" + clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
-        config.coordinatorIp = new InetSocketAddress( recoverPort );
-        HostMessenger hm = new HostMessenger(config, null, null);
-        hm.start(null);
+        HostMessenger hm = new HostMessenger(config, null);
+        hm.start();
+        hm.waitForDetermination();
         m_messengers.set(site, hm);
     }
 
@@ -150,14 +163,13 @@ public class TestZK extends ZKTestBase {
     public void testRecovery() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        failSite(0);
         zk.close();
+        failSite(0);
+        recoverSite(0);
         for (int ii = 1; ii < NUM_AGREEMENT_SITES; ii++) {
             zk = getClient(ii);
             assertEquals(zk.getData("/foo", false, null).length, 0);
         }
-        recoverSite(0);
-        assertEquals(zk.getData("/foo", false, null).length, 0);
         zk = getClient(0);
         assertEquals(zk.getData("/foo", false, null).length, 0);
     }

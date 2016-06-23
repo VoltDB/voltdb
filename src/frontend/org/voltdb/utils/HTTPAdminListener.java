@@ -38,10 +38,13 @@ import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.entity.ContentType;
+import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.annotate.JsonPropertyOrder;
+import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
@@ -52,6 +55,7 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
@@ -85,12 +89,12 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
 
 public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
+    static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
 
     Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -99,6 +103,24 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+
+    // ObjectMapper is thread safe, and uses a lot of memory to cache
+    // class specific serializers and deserializers. Use JSR-133
+    // initialization on demand holder to hold a sole instance
+    public final static class MapperHolder {
+        final static public ObjectMapper mapper;
+        final static public JsonFactory factory = new JsonFactory();
+        static {
+            ObjectMapper configurable = new ObjectMapper();
+            // configurable.setSerializationInclusion(Inclusion.NON_NULL);
+            configurable.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            configurable.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            configurable.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+
+            mapper = configurable;
+        }
+    }
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
@@ -140,15 +162,12 @@ public class HTTPAdminListener {
             response.setHeader("Host", getHostHeader());
         }
 
-        //Build a client response based json response
-        protected String buildClientResponse(String jsonp, byte code, String msg) {
-            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-            if (jsonp != null) {
-                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
-            }
-            return rimpl.toJSONString();
-        }
+    }
 
+        //Build a client response based json response
+    private static String buildClientResponse(String jsonp, byte code, String msg) {
+        ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+        return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -158,6 +177,7 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try{
 
                 // if this is an internal jetty retry, then just tell
@@ -259,6 +279,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             handleReportPage(baseRequest, response);
         }
 
@@ -274,6 +295,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
@@ -304,12 +326,9 @@ public class HTTPAdminListener {
 
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
-        private final ObjectMapper m_mapper;
+        private final ObjectMapper m_mapper = MapperHolder.mapper;
 
         public UserProfileHandler() {
-            m_mapper = new ObjectMapper();
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
         // GET on /profile resources.
@@ -319,11 +338,13 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
+            super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -380,16 +401,10 @@ public class HTTPAdminListener {
 
     class DeploymentRequestHandler extends VoltRequestHandler {
 
-        final ObjectMapper m_mapper;
+        final ObjectMapper m_mapper = MapperHolder.mapper;
         String m_schema = "";
 
         public DeploymentRequestHandler() {
-            m_mapper = new ObjectMapper();
-            //Mixin for to not output passwords.
-            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
@@ -442,12 +457,13 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
@@ -803,9 +819,10 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
@@ -1058,7 +1075,9 @@ public class HTTPAdminListener {
     }
 
     public void stop() {
-        httpClientInterface.stop();
+        if (httpClientInterface != null) {
+            httpClientInterface.stop();
+        }
 
         try {
             m_server.stop();
@@ -1070,6 +1089,8 @@ public class HTTPAdminListener {
     }
 
     public void notifyOfCatalogUpdate() {
-        httpClientInterface.notifyOfCatalogUpdate();
+        if (httpClientInterface != null) {
+            httpClientInterface.notifyOfCatalogUpdate();
+        }
     }
 }
