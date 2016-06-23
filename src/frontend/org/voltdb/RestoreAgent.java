@@ -22,6 +22,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,6 +57,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -1293,6 +1295,24 @@ SnapshotCompletionInterest, Promotable
         }
 
         changeState();
+
+        // ENG-10651: if the cluster is recovering and has completed replaying
+        // command log, check if it is recovered as a producer cluster for
+        // active-passive DR. If it is, the DR applied trackers in sites should
+        // be reset and cleared as they are no longer valid.
+        if (m_isLeader && m_action.doesRecover()) {
+            VoltDBInterface instance = VoltDB.instance();
+            if (!instance.getCatalogContext().database.getIsactiveactivedred() &&
+                instance.getReplicationRole() == ReplicationRole.NONE) {
+                ByteBuffer params = ByteBuffer.allocate(4);
+                params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
+                try {
+                    instance.getClientInterface().callExecuteTask(30000, params.array());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
 
         /*
          * ENG-1516: Use truncation snapshot to save the catalog if CL is
