@@ -88,26 +88,19 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
-<<<<<<< e08f435a78e514befcfa21ba5cf22bb2db86f485
         if (columns.length > 0) {
             checkOutputSchema(planNode, null, columns);
         }
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String tableAlias, String[] columns) {
-=======
->>>>>>> tweak tests and typos in subquqery simplification
         NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
 
         for (int i = 0; i < schemaColumn.size(); ++i) {
             SchemaColumn col = schemaColumn.get(i);
-            checkOutputColumn(null, columns[i], col);
-<<<<<<< e08f435a78e514befcfa21ba5cf22bb2db86f485
             checkOutputColumn(tableAlias, columns[i], col);
-=======
->>>>>>> tweak tests and typos in subquqery simplification
         }
     }
 
@@ -235,7 +228,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // LIMIT in sub selects
         checkSimple("select COL1 FROM (SELECT A+3, C COL1 FROM R1  LIMIT 10) T1 WHERE T1.COL1 < 0",
                 tbName, new String[]{"COL1"}, "R1", new String[]{"C1", "C"}, true);
-
 
         // Complex columns in sub selects
         checkSimple("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) T1 WHERE T1.A1 < 0",
@@ -2341,6 +2333,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         sql = "select C + 1 from (select D, C as D, A as C from R1) T where C = 1;";
         equivalentSql = "select A + 1 from R1 T where T.A = 1";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // Ambiguous column differentiator test
+        sql = "select * from (select D, C as D from R1) T;";
+        equivalentSql = "select D, C as D from R1 T";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // More ambiguous column differentiator test
+        sql = "select * from (select D, C as D, A as C from R1) T where C = 1;";
+        equivalentSql = "select D, C as D, A as C from R1 T where T.A = 1";
         checkSubquerySimplification(sql, equivalentSql);
 
         // Subquery SELECT *

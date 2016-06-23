@@ -520,11 +520,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // In this case, the subquery MERGERECEIVE node is technically redundant but at the moment,
             // the subquery post-processing still keeps it.
             // The subquery LIMIT clause is required to suppress the
-<<<<<<< e08f435a78e514befcfa21ba5cf22bb2db86f485
-            // optimization that replaces the suquery with a simple select.
-=======
             // optimization that replaces the subquery with a simple select.
->>>>>>> tweak tests and typos in subquqery simplification
             failToCompile(
                     "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1 limit 10) P_T, P where P.P_D0 = P_T.PT_D0;",
                     "This query is not plannable.  It has a subquery which needs cross-partition access.");
