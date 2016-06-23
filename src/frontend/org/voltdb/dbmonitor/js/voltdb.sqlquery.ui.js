@@ -19,7 +19,35 @@ $(document).ready(function () {
         }
     }
 
+    var fixWidth= function(){
+        var totalWidth = $(window).width()
+        if(totalWidth > 981){
+            var queryWidth = totalWidth - 290
+            var percentWidth = (parseInt(queryWidth)/parseInt(totalWidth)) * 100 - 4
+            $("#inputQuery").width(percentWidth + "%")
+        } else {
+            $("#inputQuery").width("100%")
+        }
 
+    }
+
+    var addEvent = function(object, type, callback) {
+        if (object == null || typeof(object) == 'undefined') return;
+        if (object.addEventListener) {
+            object.addEventListener(type, callback, false);
+        } else if (object.attachEvent) {
+            object.attachEvent("on" + type, callback);
+        } else {
+            object["on"+type] = callback;
+        }
+    };
+
+    addEvent(window, "resize", function() {
+        fixWidth()
+    });
+
+    fixWidth()
+    
     $("#bntTimeoutSetting").popup({
         open: function (event, ui, ele) {
             $("#errorQueryTimeoutConfig").hide();

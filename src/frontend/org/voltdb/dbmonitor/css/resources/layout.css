@@ -1865,7 +1865,8 @@ ul.topRightList li a {
 
 .objectExplorer {
     float: left;
-    width: 28%;
+    /*width: 28%;*/
+    width:300px;
     padding: 13px 1%;
     background: #fff;
     position: relative;
