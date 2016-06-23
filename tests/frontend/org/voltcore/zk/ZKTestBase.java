@@ -27,15 +27,20 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Semaphore;
+import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.utils.PortGenerator;
+import org.voltdb.StartAction;
+import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  *
@@ -51,16 +56,69 @@ public class ZKTestBase {
         m_siteIdToZKPort = new TreeMap<Integer, Integer>();
         m_clients = new ArrayList<ZooKeeper>();
         m_messengers = new ArrayList<HostMessenger>();
+        String [] coordinators = IntStream.range(0, sites)
+                .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
+                .toArray(s -> new String[s]);
         for (int ii = 0; ii < sites; ii++) {
             HostMessenger.Config config = new HostMessenger.Config();
             config.internalPort += ii;
+            config.criteria = JoinerCriteria.builder()
+                    .coordinators(coordinators)
+                    .startAction(StartAction.PROBE)
+                    .hostCount(sites)
+                    .build();
             int externalPort = m_ports.next();
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
-            hm.start(null);
+            HostMessenger hm = new HostMessenger(config, null);
+            hm.start();
             m_messengers.add(hm);
+        }
+        for (HostMessenger hm: m_messengers) {
+            hm.waitForDetermination();
+        }
+    }
+
+    protected void setUpZK(JoinerCriteria criteria, boolean waitForDetermination) throws Exception {
+        m_siteIdToZKPort = new TreeMap<Integer, Integer>();
+        m_clients = new ArrayList<ZooKeeper>();
+        m_messengers = new ArrayList<HostMessenger>();
+        int i = 0;
+
+        for (String coord: criteria.getCoordinators()) {
+            HostAndPort hp = HostAndPort.fromString(coord).withDefaultPort(VoltDB.DEFAULT_INTERNAL_PORT);
+            HostMessenger.Config config = new HostMessenger.Config();
+            config.criteria = criteria;
+            assert config.internalPort + i == hp.getPort() : "coordinator port mismatches internal port";
+            config.internalPort = hp.getPort();
+            int externalPort = m_ports.next();
+            config.zkInterface = "127.0.0.1:" + externalPort;
+            m_siteIdToZKPort.put(i, externalPort);
+            config.networkThreads = 1;
+            HostMessenger hm = new HostMessenger(config, null);
+            hm.start();
+            m_messengers.add(hm);
+            ++i;
+        }
+
+        for (; i < criteria.getHostCount(); ++i) {
+            HostMessenger.Config config = new HostMessenger.Config();
+            config.criteria = criteria;
+            config.internalPort += i;
+            int externalPort = m_ports.next();
+            config.zkInterface = "127.0.0.1:" + externalPort;
+            m_siteIdToZKPort.put(i, externalPort);
+            config.networkThreads = 1;
+            HostMessenger hm = new HostMessenger(config, null);
+            hm.start();
+            m_messengers.add(hm);
+        }
+
+        if (waitForDetermination) {
+            for (HostMessenger hm: m_messengers) {
+                hm.waitForDetermination();
+            }
         }
     }
 

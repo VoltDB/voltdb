@@ -169,6 +169,7 @@ public class MiscUtils {
                     return false;
                 }
 
+                @Override
                 public boolean isDrActiveActiveAllowed() {
                     return false;
                 }
@@ -526,7 +527,12 @@ public class MiscUtils {
     // check if we're running pro code
     public static boolean isPro() {
         if (m_isPro == null) {
-            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+            //Allow running pro kit as community.
+            if (!Boolean.parseBoolean(System.getProperty("community", "false"))) {
+                m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+            } else {
+                m_isPro = false;
+            }
         }
         return m_isPro.booleanValue();
     }
