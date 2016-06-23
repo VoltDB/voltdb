@@ -174,11 +174,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "<!-- This file is an auto-generated default deployment configuration. -->",
         "<deployment>",
         "    <cluster hostcount=\"1\" />",
+        /* this is where paths would be added at line 4 (starting from 0) */
         "    <httpd enabled=\"true\">",
         "        <jsonapi enabled=\"true\" />",
         "    </httpd>",
         "</deployment>"
     };
+    private static final int insertPathsAtLine = 4;
 
     private final Properties m_pathList = new Properties();
 
@@ -2107,17 +2109,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
                     config.m_voltdbRoot = dplrootFH;
                 }
-            } else if (config.m_startAction == StartAction.PROBE) {
-                if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
+            } else if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
+                if (config.m_startAction == StartAction.PROBE) {
                     String msg = "VoltDB root specified in the command line \"" + optrootFH
                             + "\" diverges from the one specified at initialization \""
                             + dplrootFH + "\"";
                     hostLog.fatal(msg);
                     VoltDB.crashLocalVoltDB(msg);
                     return new ReadDeploymentResults(deploymentBytes, deployment);
+                } else if (config.m_startAction == StartAction.INITIALIZE) {
+                    // override it so it can be properly staged
+                    deployment.getPaths().getVoltdbroot().setPath(config.m_voltdbRoot.getPath());
                 }
             }
-
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
              * Trick here is to print out all applicable problems and then stop, rather than stopping
@@ -3582,9 +3586,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             logger.info("Generating default deployment file \"" + depFH.getAbsolutePath() + "\"");
 
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(depFH))) {
+                int atline = 0;
                 for (String line : defaultDeploymentXML) {
+                    if (atline == insertPathsAtLine && !VoltDB.DBROOT.equals(voltdbroot.getPath())) {
+                        bw.write("    <paths>");
+                        bw.newLine();
+                        bw.write("        <voltdbroot path=\"" + voltdbroot.getPath() + "\"/>");
+                        bw.newLine();
+                        bw.write("    </paths>");
+                        bw.newLine();
+                    }
                     bw.write(line);
                     bw.newLine();
+                    atline += 1;
                 }
             } finally {
             }

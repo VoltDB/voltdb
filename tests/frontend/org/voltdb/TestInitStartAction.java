@@ -29,9 +29,12 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -39,13 +42,37 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Joiner;
+
 public class TestInitStartAction {
 
     static File rootDH;
+    private static final String[] deploymentXML = {
+            "<?xml version=\"1.0\"?>",
+            "<deployment>",
+            "    <cluster hostcount=\"1\"/>",
+            "    <paths>",
+            "        <voltdbroot path=\"_REPLACE_ME_\"/>",
+            "    </paths>",
+            "    <httpd enabled=\"true\">",
+            "        <jsonapi enabled=\"true\"/>",
+            "    </httpd>",
+            "    <commandlog enabled=\"false\"/>",
+            "</deployment>"
+        };
+
+    static final Pattern replaceRE = Pattern.compile("_REPLACE_ME_");
+    static File legacyDeploymentFH;
 
     @BeforeClass
     public static void setup() throws Exception {
         rootDH = Files.createTempDirectory("voltdb-test-").toFile();
+        legacyDeploymentFH = new File(rootDH, "deployment.xml");
+        try (FileWriter fw = new FileWriter(legacyDeploymentFH)) {
+            Matcher mtc = replaceRE.matcher(Joiner.on('\n').join(deploymentXML));
+            fw.write(mtc.replaceAll(new File(rootDH, "voltdbroot").getPath()));
+        } finally {
+        }
         System.setProperty("VOLT_JUSTATEST", "YESYESYES");
         VoltDB.ignoreCrash = true;
     }
@@ -115,7 +142,7 @@ public class TestInitStartAction {
         VoltDB.crashMessage = null;
         serverException.set(null);
 
-        c1 = new Configuration(new String[]{"create", "deployment", deplFH.getPath(), "host", "localhost"});
+        c1 = new Configuration(new String[]{"create", "deployment", legacyDeploymentFH.getPath(), "host", "localhost"});
         server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
 
@@ -133,7 +160,7 @@ public class TestInitStartAction {
         VoltDB.crashMessage = null;
         serverException.set(null);
 
-        c1 = new Configuration(new String[]{"recover", "deployment", deplFH.getPath(), "host", "localhost"});
+        c1 = new Configuration(new String[]{"recover", "deployment", legacyDeploymentFH.getPath(), "host", "localhost"});
         server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
 
