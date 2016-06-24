@@ -153,22 +153,16 @@ class ClusterSettingsTest extends TestBase {
 
         when: 'Click on the server name'
         $("#dropdownMenu1 > a > span.clsServerList").click()
-        report "1"
         and: 'Click on edit button'
         $("#btnUpdateServer > a").click()
-        report "2"
         then: 'Wait for the popup to be displayed'
         waitFor { popupAddServer.isDisplayed() }
-        report "3"
 
-
-        report '4'
         when: 'provide value for edit'
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_edited_server") }
                 // waitFor { popupAddServerHostNameField.value("new_edited_host") }
-                report "5"
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to text fields - Retrying")
@@ -176,7 +170,6 @@ class ClusterSettingsTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        report "5"
         then: 'Click ok and confirm the edit'
         for(count=1; count<numberOfTrials; count++) {
             try {
@@ -200,7 +193,34 @@ class ClusterSettingsTest extends TestBase {
                 }
             }
         }
-        report "hello1"
+        when: 'Click on the server name'
+        $("#dropdownMenu1 > a > span.clsServerList").click()
+        then: 'Click on edit button'
+        $("#btnDeleteServer > a").click()
+        println($("#btnDeleteServer > a").text())
+
+        when: 'Wait for the popup to be displayed'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupDeleteServerButtonOk.isDisplayed() }
+                popupDeleteServerButtonOk.click()
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+
+            }
+        }
+        report "1"
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { !popupDeleteServerButtonOk.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+
+            }
+        }
+
+        report "2"
     }
 
     def ensureServerNameAndHostNameIsEmpty() {
@@ -843,11 +863,11 @@ class ClusterSettingsTest extends TestBase {
         page.logPopupOk.click()
     }
 
-    def cleanup() {
+    /*def cleanup() {
         to ClusterSettingsPage
         int indexToDelete = 2
         indexOfNewDatabase = 1
         chooseDatabase(indexOfNewDatabase, "Database")
         deleteNewDatabase(indexToDelete, "name_src")
-    }
+    }*/
 }
