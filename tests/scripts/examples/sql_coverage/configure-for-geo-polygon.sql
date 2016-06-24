@@ -31,6 +31,8 @@
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
+
+{@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
 {@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], null"}
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions
 {@optionalfn = "_geofun"}
