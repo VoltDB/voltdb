@@ -88,8 +88,8 @@ public class SnapshotDeleteAgent extends OpsAgent
     // return null.  Yes, ugly.  Bang it out, then refactor later.
     private String parseParams(ParameterSet params, JSONObject obj) throws Exception
     {
-        if (params.size() != 2) {
-            return "@SnapshotDelete expects 2 arguments, received " + params.size();
+        if (params.size() != 3) {
+            return "@SnapshotDelete expects 3 arguments, received " + params.size();
         }
         String[] paths = null;
         try {
@@ -134,11 +134,14 @@ public class SnapshotDeleteAgent extends OpsAgent
         if (paths.length != nonces.length) {
             return "A path must be provided for every nonce";
         }
-
+        String stype = (String )(ParameterConverter.tryToMakeCompatible(
+                    String.class,
+                    params.toArray()[2]));
         // Dupe SNAPSHOTSCAN as the subselector in case we consolidate later
         obj.put("subselector", "SNAPSHOTDELETE");
         obj.put("interval", false);
         obj.put("paths", paths);
+        obj.put(SnapshotUtil.JSON_PATH_TYPE, stype);
         obj.put("nonces", nonces);
 
         return null;
@@ -172,6 +175,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         for (int i = 0; i < length; i++) {
             nonces[i] = obj.getJSONArray("nonces").getString(i);
         }
+        final SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(obj.getString(SnapshotUtil.JSON_PATH_TYPE));
 
         new Thread("Async snapshot deletion thread") {
             @Override
@@ -179,7 +183,11 @@ public class SnapshotDeleteAgent extends OpsAgent
                 StringBuilder sb = new StringBuilder();
                 sb.append("Deleting files: ");
                 for (int ii = 0; ii < paths.length; ii++) {
-                    List<File> relevantFiles = retrieveRelevantFiles(paths[ii], nonces[ii]);
+                    String path = paths[ii];
+                    if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+                        path = VoltDB.instance().getSnapshotPath();
+                    }
+                    List<File> relevantFiles = retrieveRelevantFiles(path, nonces[ii]);
                     if (relevantFiles != null) {
                         for (final File f : relevantFiles) {
                             sb.append(f.getPath());
@@ -255,11 +263,12 @@ public class SnapshotDeleteAgent extends OpsAgent
     }
 
     private VoltTable constructFragmentResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[9];
+        ColumnInfo[] result_columns = new ColumnInfo[10];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PATHTYPE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);

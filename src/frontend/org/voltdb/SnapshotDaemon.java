@@ -1256,9 +1256,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String path;
         private final String nonce;
         private final Long txnId;
+        private final SnapshotUtil.SnapthotPathType stype;
 
-        private Snapshot (String path, String nonce, Long txnId) {
+        private Snapshot(String path, SnapshotUtil.SnapthotPathType stype, String nonce, Long txnId) {
             this.path = path;
+            this.stype = stype;
             this.nonce = nonce;
             this.txnId = txnId;
         }
@@ -1350,7 +1352,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString());
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            m_snapshots.offer(new Snapshot(m_path, nonce, now));
+            m_snapshots.offer(new Snapshot(m_path, SnapshotUtil.SnapthotPathType.SNAP_AUTO, nonce, now));
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1545,7 +1547,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
                     final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, nonce, txnId));
+                    m_snapshots.add(new Snapshot(path, SnapshotUtil.SnapthotPathType.SNAP_AUTO, nonce, txnId));
                 }
             }
         }
@@ -1578,6 +1580,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 new Object[] {
                     pathsToDelete,
                     noncesToDelete,
+                    SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString()
                     };
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
