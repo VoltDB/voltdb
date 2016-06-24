@@ -590,7 +590,7 @@ public class SocketJoiner {
         SocketChannel socket = null;
         try {
             LOG.debug("Non-Primary Starting & Connecting to Primary");
-
+            int connectAttempts = 0;
             while (socket == null) {
                 try {
                     socket = SocketChannel.open(coordIp);
@@ -599,7 +599,9 @@ public class SocketJoiner {
                     if (mode == ConnectStrategy.PROBE) {
                         return;
                     }
-                    LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
+                    if (connectAttempts >= 8) {
+                        LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
+                    }
                     try {
                         Thread.sleep(250); //  milliseconds
                     }
@@ -607,6 +609,7 @@ public class SocketJoiner {
                         // don't really care.
                     }
                 }
+                ++connectAttempts;
             }
 
             if (!coordIp.equals(m_coordIp)) {

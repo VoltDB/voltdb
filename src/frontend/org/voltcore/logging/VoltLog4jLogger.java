@@ -17,15 +17,23 @@
 
 package org.voltcore.logging;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
+import java.io.File;
+import java.io.IOException;
 import java.io.StringReader;
+import java.util.Enumeration;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.voltcore.logging.VoltLogger.CoreVoltLogger;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Implements the core logging functionality for VoltLogger specific to
@@ -178,4 +186,58 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
 
+    /**
+     * Static mentod to change the log directory root
+     * @param logRootDH log directory root
+     */
+    public static void setFileLoggerRoot(File logRootDH) {
+        checkArgument(logRootDH != null, "log root directory is null");
+
+        File logDH = new VoltFile(logRootDH, "log");
+        File napFH = new VoltFile(logDH, "volt.log");
+
+        Logger rootLogger = LogManager.getRootLogger();
+        Appender current = rootLogger.getAppender("file");
+
+        checkArgument(current != null, "failed to locate the file appender");
+        checkArgument(current instanceof DailyRollingFileAppender, "file appender is not a DailyRollingFileAppender");
+
+        DailyRollingFileAppender oap = (DailyRollingFileAppender)current;
+        DailyRollingFileAppender nap = null;
+        try {
+            if (!logDH.exists() && !logDH.mkdirs()) {
+                throw new IllegalArgumentException("failed to create directory " + logDH);
+            }
+            if (!logDH.isDirectory() || !logDH.canRead() || !logDH.canWrite() || !logDH.canExecute()) {
+                throw new IllegalArgumentException("Cannot access " + logDH);
+            }
+            nap = new DailyRollingFileAppender(oap.getLayout(), napFH.getPath(), oap.getDatePattern());
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to instantiate a DailyRollingFileAppender for file " + napFH, e);
+        }
+        nap.setName(oap.getName());
+
+        rootLogger.removeAppender(oap.getName());
+        rootLogger.addAppender(nap);
+
+        File oldFH = new File(oap.getFile());
+        if (oldFH.length() == 0L) {
+            oldFH.delete();
+            File oldDH = oldFH.getParentFile();
+            if (oldDH.list().length == 0) {
+                oldDH.delete();
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        Enumeration<Logger> e = (Enumeration<Logger>)LogManager.getCurrentLoggers();
+        while (e.hasMoreElements()) {
+            Logger lgr = e.nextElement();
+            Appender apndr = lgr.getAppender(oap.getName());
+            if (apndr != null) {
+                lgr.removeAppender(oap.getName());
+                lgr.addAppender(nap);
+            }
+        }
+    }
 }
