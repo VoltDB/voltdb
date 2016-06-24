@@ -385,7 +385,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_licenseInformation;
     }
 
-    private Object m_null_arg[] = { null };
     @Override
     public String getPath(Object base, String name) {
         if (isLegacy()) {
@@ -398,6 +397,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
         return m_pathList.getProperty(name);
+    }
+
+    @Override
+    public String getCommandLogPath() {
+        if (isLegacy()) {
+            try {
+                return getCommandLogPath(getCatalogContext()).getCanonicalPath();
+            } catch (IOException ex) {
+                VoltDB.crashLocalVoltDB("Failed to get command log snapshot path.", false, ex);
+            }
+        }
+        return m_pathList.getProperty("org.voltdb.path.command_log");
     }
 
     @Override
@@ -3736,5 +3747,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         PathsType paths = catalogContext.getDeployment().getPaths();
         File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
         return CatalogUtil.getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
+    }
+
+    private File getCommandLogPath(CatalogContext catalogContext) {
+        PathsType paths = catalogContext.getDeployment().getPaths();
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
+        return CatalogUtil.getCommandLog(paths.getCommandlog(), voltDbRoot);
     }
 }

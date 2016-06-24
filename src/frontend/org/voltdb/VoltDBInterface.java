@@ -45,6 +45,7 @@ public interface VoltDBInterface
     public CommandLog getCommandLog();
 
     public String getCommandLogSnapshotPath();
+    public String getCommandLogPath();
 
     public String getSnapshotPath();
 

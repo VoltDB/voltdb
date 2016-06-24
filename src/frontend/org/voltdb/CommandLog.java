@@ -28,6 +28,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 public interface CommandLog {
     /**
      *
+     * @param logSize
      * @param context
      * @param txnId
      *            The txnId of the truncation snapshot at the end of restore, or

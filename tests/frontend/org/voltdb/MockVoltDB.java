@@ -498,6 +498,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getCommandLogPath() {
+        return "";
+    }
+
+    @Override
     public String getSnapshotPath() {
         return "";
     }

@@ -377,6 +377,7 @@ public class SnapshotSaveAPI
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static ZKUtil.StringCallback createSnapshotCompletionNode(String path,
+                                                                     String pathType,
                                                                      String nonce,
                                                                      long txnId,
                                                                      boolean isTruncation,
@@ -393,8 +394,9 @@ public class SnapshotSaveAPI
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("didSucceed").value(false);
             stringer.key("hostCount").value(-1);
-            stringer.key("path").value(path);
-            stringer.key("nonce").value(nonce);
+            stringer.key(SnapshotUtil.JSON_PATH).value(path);
+            stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType);
+            stringer.key(SnapshotUtil.JSON_NONCE).value(nonce);
             stringer.key("truncReqId").value(truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();

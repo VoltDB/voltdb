@@ -160,6 +160,7 @@ public class SnapshotCompletionMonitor {
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
         String path = jsonObj.getString(SnapshotUtil.JSON_PATH);
+        SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(jsonObj.getString(SnapshotUtil.JSON_PATH_TYPE));
         String nonce = jsonObj.getString(SnapshotUtil.JSON_NONCE);
         boolean truncation = jsonObj.getBoolean("isTruncation");
         boolean didSucceed = jsonObj.getBoolean("didSucceed");
@@ -239,6 +240,7 @@ public class SnapshotCompletionMonitor {
                     interest.snapshotCompleted(
                             new SnapshotCompletionEvent(
                                 path,
+                                stype,
                                 nonce,
                                 txnId,
                                 partitionTxnIdsMap,
