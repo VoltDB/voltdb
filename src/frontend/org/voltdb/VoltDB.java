@@ -599,8 +599,6 @@ public class VoltDB {
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             }
-            hostLog.error("vecchia prova");
-            new VoltLogger("UANA").error("nuova prova");
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {

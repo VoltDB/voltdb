@@ -187,7 +187,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
     }
 
     /**
-     * Static mentod to change the log directory root
+     * Static method to change the log directory root
      * @param logRootDH log directory root
      */
     public static void setFileLoggerRoot(File logRootDH) {
@@ -206,10 +206,6 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         checkArgument(current instanceof DailyRollingFileAppender, "file appender is not a DailyRollingFileAppender");
 
         DailyRollingFileAppender oap = (DailyRollingFileAppender)current;
-        File oldFH = new File(oap.getFile());
-        if (oldFH.getPath().toLowerCase().contains("junit")) {
-            return;
-        }
         DailyRollingFileAppender nap = null;
         try {
             if (!logDH.exists() && !logDH.mkdirs()) {
@@ -227,8 +223,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         rootLogger.removeAppender(oap.getName());
         rootLogger.addAppender(nap);
 
-        if (oldFH.length() == 0L) {
-            oldFH.delete();
+        File oldFH = new File(oap.getFile());
+        if (oldFH.exists() && oldFH.isFile() && oldFH.length() == 0L && oldFH.delete()) {
             File oldDH = oldFH.getParentFile();
             if (oldDH.list().length == 0) {
                 oldDH.delete();
@@ -236,7 +232,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         }
 
         @SuppressWarnings("unchecked")
-        Enumeration<Logger> e = (Enumeration<Logger>)LogManager.getCurrentLoggers();
+        Enumeration<Logger> e = LogManager.getCurrentLoggers();
         while (e.hasMoreElements()) {
             Logger lgr = e.nextElement();
             Appender apndr = lgr.getAppender(oap.getName());

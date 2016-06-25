@@ -193,7 +193,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     static final String m_defaultVersionString = "6.4";
     // by default set the version to only be compatible with itself
     static final String m_defaultHotfixableRegexPattern = "^\\Q6.4\\E\\z";
-    // these next two are non-static because they can be overrriden on the CLI for test
+    // these next two are non-static because they can be overridden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     HostMessenger m_messenger = null;
