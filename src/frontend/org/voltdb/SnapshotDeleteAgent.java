@@ -88,8 +88,8 @@ public class SnapshotDeleteAgent extends OpsAgent
     // return null.  Yes, ugly.  Bang it out, then refactor later.
     private String parseParams(ParameterSet params, JSONObject obj) throws Exception
     {
-        if (params.size() != 3) {
-            return "@SnapshotDelete expects 3 arguments, received " + params.size();
+        if (params.size() < 2) {
+            return "@SnapshotDelete expects 2 arguments, received " + params.size();
         }
         String[] paths = null;
         try {
@@ -134,9 +134,12 @@ public class SnapshotDeleteAgent extends OpsAgent
         if (paths.length != nonces.length) {
             return "A path must be provided for every nonce";
         }
-        String stype = (String )(ParameterConverter.tryToMakeCompatible(
-                    String.class,
-                    params.toArray()[2]));
+        String stype = SnapshotUtil.SnapthotPathType.SNAP_PATH.toString();
+        if (params.size() > 2) {
+            stype = (String )(ParameterConverter.tryToMakeCompatible(
+                        String.class,
+                        params.toArray()[2]));
+        }
         // Dupe SNAPSHOTSCAN as the subselector in case we consolidate later
         obj.put("subselector", "SNAPSHOTDELETE");
         obj.put("interval", false);

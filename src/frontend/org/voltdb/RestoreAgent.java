@@ -263,11 +263,7 @@ SnapshotCompletionInterest, Promotable
         {
             txnId = jo.getLong("txnId");
             path = jo.getString(SnapshotUtil.JSON_PATH);
-            if (!VoltDB.instance().isLegacy()) {
-                stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
-            } else {
-                stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
-            }
+            stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
             newPartitionCount = jo.getInt("newPartitionCount");

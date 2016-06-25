@@ -36,6 +36,7 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.JoinerCriteria;
@@ -575,18 +576,18 @@ public class VoltDB {
                         m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
-                        hostLog.fatal("Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
+                        System.err.println("FATAL: Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
                         referToDocAndExit();
                     }
                     try {
                         CatalogUtil.validateDirectory(DBROOT, m_voltdbRoot);
                     } catch (RuntimeException e) {
-                        hostLog.fatal(e.getMessage(),e);
+                        System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
                 }
                 else {
-                    hostLog.fatal("Unrecognized option to VoltDB: " + arg);
+                    System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
@@ -595,11 +596,17 @@ public class VoltDB {
                 m_httpPortInterface = m_publicInterface;
             }
 
+            // set file logger root file directory. From this point on you can use loggers
+            if (m_startAction != null && !m_startAction.isLegacy()) {
+                VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
+            }
+
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 hostLog.fatal("You must specify a startup action, either initialize, probe, create, recover, rejoin, collect, or compile.");
                 referToDocAndExit();
             }
+
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes

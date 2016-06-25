@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -538,7 +539,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
-                    MiscUtils.deleteRecursively(config.m_voltdbRoot);
+                    deleteEverythingButLogs(config.m_voltdbRoot);
                 }
             }
 
@@ -651,6 +652,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             HostMessenger.Determination determination = buildClusterMesh(readDepl);
+            if (m_config.m_startAction == StartAction.PROBE) {
+                String action = "Start is proceeding as " + determination.startAction.verb();
+                hostLog.info(action);
+                consoleLog.info(action);
+            }
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
@@ -1785,6 +1791,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             is.close();
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to read configuratio path designtion", false, e);
+        }
+    }
+
+    private void deleteEverythingButLogs(File rootDH) {
+        File [] allButLog = rootDH.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File p) {
+                return !p.isDirectory() || !"log".equals(p.getName());
+            }
+        });
+        for (File c: allButLog) {
+            MiscUtils.deleteRecursively(c);
         }
     }
 
