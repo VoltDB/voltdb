@@ -191,6 +191,9 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      * @param logRootDH log directory root
      */
     public static void setFileLoggerRoot(File logRootDH) {
+        if (System.getProperty("log4j.configuration", "").toLowerCase().contains("/voltdb/tests/")) {
+            return;
+        }
         checkArgument(logRootDH != null, "log root directory is null");
 
         File logDH = new VoltFile(logRootDH, "log");
@@ -203,6 +206,10 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         checkArgument(current instanceof DailyRollingFileAppender, "file appender is not a DailyRollingFileAppender");
 
         DailyRollingFileAppender oap = (DailyRollingFileAppender)current;
+        File oldFH = new File(oap.getFile());
+        if (oldFH.getPath().toLowerCase().contains("junit")) {
+            return;
+        }
         DailyRollingFileAppender nap = null;
         try {
             if (!logDH.exists() && !logDH.mkdirs()) {
@@ -220,7 +227,6 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         rootLogger.removeAppender(oap.getName());
         rootLogger.addAppender(nap);
 
-        File oldFH = new File(oap.getFile());
         if (oldFH.length() == 0L) {
             oldFH.delete();
             File oldDH = oldFH.getParentFile();
