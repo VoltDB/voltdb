@@ -83,6 +83,7 @@ namespace voltdb {
 
 class CoveringCellIndexTest_TableCompaction;
 class MaterializedViewTriggerForWrite;
+class MaterializedViewHandler;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -206,6 +207,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
+    friend class MaterializedViewHandler;
 
 private:
     // no default ctor, no copy, no assignment
@@ -709,6 +711,16 @@ private:
     std::vector<TableIndex*> m_indexes;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
+
+    // If I myself am a view table, I need to maintain a handler to handle the view update work.
+    MaterializedViewHandler *m_mvHandler;
+    // If I am a source table of a view, I will notify all the relevant view handlers
+    // when an update is needed.
+    std::vector<MaterializedViewHandler*> m_viewsToTrigger;
+    void addViewToTrigger(MaterializedViewHandler *viewToTrigger) {
+        m_viewsToTrigger.push_back(viewToTrigger);
+    }
+    void dropViewToTrigger(MaterializedViewHandler *viewToTrigger);
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

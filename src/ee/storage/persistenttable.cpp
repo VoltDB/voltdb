@@ -49,6 +49,7 @@
 #include "ConstraintFailureException.h"
 #include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
+#include "MaterializedViewHandler.h"
 #include "MaterializedViewTriggerForWrite.h"
 #include "PersistentTableStats.h"
 #include "PersistentTableUndoInsertAction.h"
@@ -129,7 +130,8 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_smallestUniqueIndex(NULL),
     m_smallestUniqueIndexCrc(0),
     m_drTimestampColumnIndex(-1),
-    m_pkeyIndex(NULL)
+    m_pkeyIndex(NULL),
+    m_mvHandler(NULL)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -201,6 +203,9 @@ PersistentTable::~PersistentTable() {
     BOOST_FOREACH(TableIndex *index, m_indexes) {
         delete index;
     }
+
+    // free up the materialized view handler.
+    delete m_mvHandler;
 }
 
 // ------------------------------------------------------------------
@@ -1799,6 +1804,22 @@ void PersistentTable::configureIndexStats(CatalogId databaseId) {
                                           databaseId);
     }
 
+}
+
+void PersistentTable::dropViewToTrigger(MaterializedViewHandler *viewToTrigger) {
+    assert( ! m_viewsToTrigger.empty());
+    MaterializedViewHandler* lastHandler = m_viewsToTrigger.back();
+    if (viewToTrigger != lastHandler) {
+        // iterator to vector element:
+        std::vector<MaterializedViewHandler*>::iterator it = find(m_viewsToTrigger.begin(),
+                                                                  m_viewsToTrigger.end(),
+                                                                  viewToTrigger);
+        assert(it != m_viewsToTrigger.end());
+        // Use the last view to patch the potential hole.
+        *it = lastHandler;
+    }
+    // The last element is now excess.
+    m_viewsToTrigger.pop_back();
 }
 
 } // namespace voltdb

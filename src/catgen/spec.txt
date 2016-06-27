@@ -134,7 +134,6 @@ begin Table                                  "A table (relation) in the database
   int estimatedtuplecount                    "A rough estimate of the number of tuples in the table; used for planning"
   MaterializedViewInfo* views                "Information about materialized views based on this table's content"
   MaterializedViewHandlerInfo* mvHandlerInfo "Only on result table of a materialized view"
-  TableRef* affectedViewTables               "Only on the source table of a materialized view"
   Table? materializer                        "If this is a materialized view, this field stores the source table"
   string signature                           "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                             "A maximum number of rows in a table"
@@ -143,9 +142,10 @@ begin Table                                  "A table (relation) in the database
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
-  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
-  Statement* createQuery            "The SELECT statement that defines the view"
-  bool isJoinedTableView             "May be removed after the feature is finished."
+  Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
+  Statement* createQuery                "The SELECT statement that defines the view"
+  bool isJoinedTableView                "May be removed after the feature is finished."
+  TableRef* sourceTables                "Source table(s) of this materialized view"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"

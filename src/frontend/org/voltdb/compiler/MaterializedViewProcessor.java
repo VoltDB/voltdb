@@ -138,9 +138,9 @@ public class MaterializedViewProcessor {
                                                viewName, srcTable.getTypeName());
                     throw m_compiler.new VoltCompilerException(msg);
                 }
-                // Add the reference to destTable to the affectedViewTables of each source table.
-                TableRef tableRef = srcTable.getAffectedviewtables().add(destTable.getTypeName());
-                tableRef.setTable(destTable);
+                // Add the reference to source tables.
+                TableRef tableRef = mvHandlerInfo.getSourcetables().add(srcTable.getTypeName());
+                tableRef.setTable(srcTable);
             }
 
             // create the materializedviewinfo catalog node for the source table
