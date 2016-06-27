@@ -82,7 +82,7 @@ public class DuplicateCounter
         String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
-                + "CURR REsPONSE MESSAGE: %s\n",
+                + "CURR RESPONSE MESSAGE: %s\n",
                 hash,
                 m_responseHash,
                 m_openMessage.toString(),
