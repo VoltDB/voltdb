@@ -307,8 +307,8 @@ public class SnapshotSaveAPI
             earlyResultTable = result;
         }
 
-        // If earlyResultTable is set, return here
-        if (earlyResultTable != null) {
+        // If earlyResultTable is set and result table is empty, return here
+        if (earlyResultTable != null && result.getRowCount() == 0) {
             if (runPostTasks) {
                 // Need to run post-snapshot tasks before finishing
                 SnapshotSiteProcessor.runPostSnapshotTasks(context);
