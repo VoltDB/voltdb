@@ -1110,11 +1110,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     Procedure procedure = null;
 
                     if (invocation != null) {
-                        procedure = catalogContext.procedures.get(invocation.getProcName());
-                        if (procedure == null) {
-                            procedure = SystemProcedureCatalog.listing.get(invocation.getProcName())
-                                                              .asCatalogProcedure();
-                        }
+                        procedure = getProcedureFromName(invocation.getProcName(), catalogContext);
+                        assert (procedure != null);
                     }
 
                     //Can be null on hangup

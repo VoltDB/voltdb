@@ -685,8 +685,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // limit and offset can't have both value and parameter
-        if (limitOffset.m_limit != -1) assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
-        if (limitOffset.m_offset != 0) assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        if (limitOffset.m_limit != -1) {
+            assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
+        }
+        if (limitOffset.m_offset != 0) {
+            assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        }
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
