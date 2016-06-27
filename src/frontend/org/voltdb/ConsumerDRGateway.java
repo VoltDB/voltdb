@@ -57,6 +57,8 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract Map<Integer, Map<Integer, DRLogSegmentId>> getLastReceivedBinaryLogIds();
 
+    public abstract boolean isLeader();
+
     public static class DummyConsumerDRGateway implements ConsumerDRGateway {
         @Override
         public void initialize(boolean resumeReplication) {}
@@ -91,5 +93,8 @@ public interface ConsumerDRGateway extends Promotable {
 
         @Override
         public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, DRLogSegmentId>> lastAppliedIds) {}
+
+        @Override
+        public boolean isLeader() { return false; }
     }
 }
