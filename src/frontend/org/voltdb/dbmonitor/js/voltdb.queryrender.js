@@ -336,6 +336,9 @@ function QueryUI(queryTab) {
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
                 }
+                else if(typ == 22){
+                    val = parseFloat(val).toFixed(12)
+                }
                 if (isExplainQuery == true) {
                     val = applyFormat(val);
                 }
