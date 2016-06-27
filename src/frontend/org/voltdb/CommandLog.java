@@ -90,13 +90,13 @@ public interface CommandLog {
          * @param startSize - pre-allocated size of the next empty transaction list
          * @return the newly created CompletionChecks object
          */
-        public CompletionChecks startNewCheckList(int startSize);
+        CompletionChecks startNewCheckList(int startSize);
 
         /**
          * Add a new transaction to the per-scheduler durable transaction tracker
          * @param task
          */
-        public void addTask(TransactionTask task);
+        void addTask(TransactionTask task);
 
         /**
          * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
@@ -105,10 +105,17 @@ public interface CommandLog {
         void setLastDurableUniqueId(long uniqueId);
 
         /**
+         * Returns <tt>true</tt> if this instance contains update of durable unique ID.
+         *
+         * @return <tt>true</tt> if this instance contains update of durable unique ID.
+         */
+        boolean isChanged();
+
+        /**
          * Get the number of TransactionTasks tracked by this instance of CompletionChecks
          * @return
          */
-        public int getTaskListSize();
+        int getTaskListSize();
 
         /**
          * Perform all class-specific processing for this batch of transactions including
