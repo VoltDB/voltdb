@@ -51,15 +51,9 @@ function jars-ifneeded() {
     fi
 }
 
-# Init to directory voltdbroot
-function voltinit-ifneeded() {
-    voltdb init --force
-}
-
 # run the voltdb server locally
 function server() {
-    voltinit-ifneeded
-    voltdb start -H $STARTUPLEADERHOST
+    voltdb create -H $STARTUPLEADERHOST --force
 }
 
 # load schema and procedures
