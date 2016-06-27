@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+
 import sys
 from datetime import datetime
 import traceback
@@ -9,7 +12,6 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as dt
 import matplotlib.ticker as ticker
 import matplotlib.dates as md
-from matplotlib.colors import ListedColormap
 
 def plot_graph(table_name):
     try:

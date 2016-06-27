@@ -108,9 +108,9 @@ function pr() {
     ./plot.py replicated
 }
 
-# Asynchronous benchmark sample
+# Benchmark sample
 # Use this target for argument help
-function help() {
+function benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj xdcrSelfCheck.Benchmark --help
 }
@@ -135,7 +135,7 @@ function async-xdcr-bench() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|xdcr1|xdcr2|client|pp|pr|help}"
+    echo "Usage: ./run.sh {clean|catalog|xdcr1|xdcr2|client|pp|pr|help|benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
