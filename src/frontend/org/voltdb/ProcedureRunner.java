@@ -56,6 +56,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
@@ -469,6 +470,11 @@ public class ProcedureRunner {
                 return true;
             }
 
+            if (m_site.getCorrespondingPartitionId() == MpInitiator.MP_INIT_PID) {
+                // SP txn misrouted to MPI, possible to happen during catalog update
+                throw new ExpectedProcedureException("Single-partition procedure routed to multi-partition initiator");
+            }
+
             StoredProcedureInvocation invocation = txnState.getInvocation();
             VoltType parameterType;
             Object parameterAtIndex;
@@ -505,6 +511,11 @@ public class ProcedureRunner {
             }
             return false;
         } else {
+            if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
+                // MP txn misrouted to SPI, possible to happen during catalog update
+                throw new ExpectedProcedureException("Multi-partition procedure routed to single-partition initiator");
+            }
+
             // For n-partition transactions, we need to rehash the partitioning values and check
             // if they still hash to the assigned partitions.
             //
