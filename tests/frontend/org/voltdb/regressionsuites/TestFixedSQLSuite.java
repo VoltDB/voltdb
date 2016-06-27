@@ -2615,43 +2615,48 @@ public class TestFixedSQLSuite extends RegressionSuite {
         });
     }
 
-    /**
-     * For ENG-9796.
-     *
-     * This locks down a temporary fix for an undefined behavior bug
-     * that needs a more permanent solution.  Currently we guard
-     * against SQL statements that would produce incorrect behavior.
-     *
-     * In its current state, this test might be more appropriate as a
-     * planner test, but with any luck we'll be able to process these
-     * queries soon and so we can lock down the correct answers here.
-     * So let's leave this test here for now.
-     */
     private void subTestENG9796() throws IOException, ProcCallException {
         Client client = getClient();
 
-        client.callProcedure("@AdHoc", "insert into r1 values (1, '50', 200, 300.0)");
-        client.callProcedure("@AdHoc", "insert into r1 values (2, '90', 700, 900.0)");
-        client.callProcedure("@AdHoc", "insert into r2 values (1, '50', 200, 300.0)");
-        client.callProcedure("@AdHoc", "insert into r2 values (2, '90', 700, 900.0)");
+        // In this bug, result tables that had duplicate column names
+        // (not possible for a persistent DB table, but is possible
+        // for the output of a join or a subquery), produced wrong
+        // answers.
 
-        String sqlStmt;
+        //                                id, desc,  num, ratio
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("r1.Insert", 11, "bar", 20,  99.0);
+        client.callProcedure("r2.Insert", 12, "baz", 20,  111.0);
 
-        sqlStmt = "select S1.* from (R1 join R2 using(num)) as S1, (R1 join R2 using(num)) as S2";
-        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
-                    + "and subqueries is not supported.");
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id as zzz, num as zzz from p1) as derived")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{10, 20}}, vt);
 
-        sqlStmt = "select * from (select id as z, num as z from r1) as foo";
-        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
-                + "and subqueries is not supported.");
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id  * 5 as zzz, num * 10 as zzz from p1) as derived")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{50, 200}}, vt);
 
-        sqlStmt = "select * from (select id as z, num as z from r1) as foo order by 1";
-        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
-                + "and subqueries is not supported.");
+        vt = client.callProcedure("@AdHoc",
+                "select S1.* "
+                + "from (R1 join R2 using(num)) as S1,"
+                + "     (R1 join R2 using(num)) as S2")
+                .getResults()[0];
+        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{20, 11, "bar", 99.0, 12, "baz", 111.0}}, vt);
 
-        sqlStmt = "select * from (select id * 2 as z, num * 2 as z from r1) as foo order by 1";
-        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
-                + "and subqueries is not supported.");
+        vt = client.callProcedure("@AdHoc",
+                "select * "
+                + "from (R1 join R2 using(num)) as S1,"
+                + "     (R1 join R2 using(num)) as S2")
+                .getResults()[0];
+        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{
+            20, 11, "bar", 99.0, 12, "baz", 111.0,
+            20, 11, "bar", 99.0, 12, "baz", 111.0
+            }}, vt);
     }
 
     //

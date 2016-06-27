@@ -618,10 +618,14 @@ public class ExpressionLogical extends Expression {
         }
 
         if (nodes[LEFT].opType == OpTypes.ROW
-                || nodes[RIGHT].opType == OpTypes.ROW
-                || Type.SQL_BOOLEAN != nodes[LEFT].dataType
-                || Type.SQL_BOOLEAN != nodes[RIGHT].dataType) {
+                || nodes[RIGHT].opType == OpTypes.ROW) {
             throw Error.error(ErrorCode.X_42564);
+        }
+
+        if (Type.SQL_BOOLEAN != nodes[LEFT].dataType
+                || Type.SQL_BOOLEAN != nodes[RIGHT].dataType) {
+            // Expression is not boolean.
+            throw Error.error(ErrorCode.X_42568);
         }
     }
 

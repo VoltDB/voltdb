@@ -29,7 +29,7 @@ import org.voltcore.messaging.VoltMessage;
 //
 //   it is important that repair work happens with the deliver lock held
 //   and that updatereplicas also holds this lock -- replica failure during
-//   repair must happen unambigously before or after each local repair action.
+//   repair must happen unambiguously before or after each local repair action.
 //
 //   A RepairAlgo can only be cancelled by initiator mailbox while the deliver
 //   lock is held. Repair work must check for cancellation before producing
@@ -37,7 +37,7 @@ import org.voltcore.messaging.VoltMessage;
 //
 //   Note that a RepairAlgo can not prevent messages being delivered post
 //   cancellation.  RepairLog requests therefore use a requestId to
-//   dis-ambiguate responses for cancelled requests that are filtering in late.
+//   disambiguate responses for cancelled requests that are filtering in late.
 
 
 /**

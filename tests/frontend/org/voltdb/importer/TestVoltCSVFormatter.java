@@ -230,7 +230,25 @@ public class TestVoltCSVFormatter extends TestCase {
     }
 
     @Test
-    public void testSurroundingSpacesNeedQuotes() throws Exception {
+    public void testTrimunquoted() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("trimunquoted", "false");
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
+
+        Object[] results = formatter.transform("12,10.05,  test");
+        assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05");
+        assertEquals(results[2], "  test");
+    }
+
+    @Test
+    public void testTrimunquotedTrim() throws Exception {
         ServiceReference refs[] = m_bundle.getRegisteredServices();
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);

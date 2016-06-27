@@ -129,6 +129,8 @@ public class LocalCluster implements VoltServerConfig {
     private String[] m_versionCheckRegexOverrides = null;
     private String[] m_buildStringOverrides = null;
 
+    private String[] m_modeOverrides = null;
+
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
@@ -136,6 +138,7 @@ public class LocalCluster implements VoltServerConfig {
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
     private String m_prefix = null;
+    private boolean m_isPaused = false;
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -325,6 +328,9 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
+    public void setToStartPaused() {
+       m_isPaused = true;
+    }
     /**
      * Override the Valgrind backend with a JNI backend.
      * Called after a constructor but before startup.
@@ -501,6 +507,10 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
             }
         }
+        if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+            assert(m_modeOverrides[hostId] != null);
+            cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+        }
 
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
@@ -576,6 +586,10 @@ public class LocalCluster implements VoltServerConfig {
 
         // set 'replica' option -- known here for the first time.
         templateCmdLine.replicaMode(role);
+        if (m_isPaused) {
+            // Set paused mode
+            templateCmdLine.startPaused();
+        }
 
         // set to true to spew startup timing data
         boolean logtime = false;
@@ -782,6 +796,11 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+                assert(m_modeOverrides[hostId] != null);
+                cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+            }
+
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -951,6 +970,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            //rejoin can hotfix
             if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
                 assert(m_versionOverrides[hostId] != null);
                 assert(m_versionCheckRegexOverrides[hostId] != null);
@@ -961,6 +981,7 @@ public class LocalCluster implements VoltServerConfig {
                     rejoinCmdLn.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
                 }
             }
+            //Rejoin does not do paused mode.
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
@@ -1373,6 +1394,12 @@ public class LocalCluster implements VoltServerConfig {
 
         m_versionOverrides = versions;
         m_versionCheckRegexOverrides = regexOverrides;
+    }
+
+    public void setOverridesForModes(String[] modes) {
+        assert(modes != null);
+
+        m_modeOverrides = modes;
     }
 
     @Override

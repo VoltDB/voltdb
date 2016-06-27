@@ -701,7 +701,8 @@ public class VoltCompiler {
                 fw.close();
                 m_reportPath = file.getAbsolutePath();
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return null;
         }
@@ -2279,10 +2280,16 @@ public class VoltCompiler {
             m_classLoader = originalClassLoader;
 
             if (canonicalDDLReader != null) {
-                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    canonicalDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
             if (newDDLReader != null) {
-                try { newDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    newDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
         }
     }

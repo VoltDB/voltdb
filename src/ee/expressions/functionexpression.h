@@ -281,6 +281,9 @@ static const int FUNC_VOLT_DWITHIN                     = 21017;     // wrapper i
 static const int FUNC_VOLT_DWITHIN_POINT_POINT         = 21018;     // if two points are within certain distance of each other
 static const int FUNC_VOLT_DWITHIN_POLYGON_POINT       = 21019;     // if a polygon and a point are within certain distance of each other
 static const int FUNC_VOLT_VALIDPOLYGONFROMTEXT        = 21020;     // like polygonfromtext, but also validates the result
+static const int FUNC_VOLT_MIN_VALID_TIMESTAMP         = 21021;     // minimum valid timestamp
+static const int FUNC_VOLT_MAX_VALID_TIMESTAMP         = 21022;     // maximum valid timestamp
+static const int FUNC_VOLT_IS_VALID_TIMESTAMP          = 21023;     // is a timestamp valid
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

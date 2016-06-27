@@ -121,7 +121,7 @@ public class PlannerTool {
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-            partitioning, m_hsql, estimates, true,
+            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
@@ -197,7 +197,7 @@ public class PlannerTool {
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-                    partitioning, m_hsql, estimates, true,
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
@@ -268,7 +268,8 @@ public class PlannerTool {
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 /*
                  * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
                  * they are at least somewhat expected.

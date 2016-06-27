@@ -49,30 +49,31 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <ctime>
-#include <unistd.h>
-#include <boost/shared_ptr.hpp>
 #include "harness.h"
-#include "common/common.h"
-#include "expressions/abstractexpression.h"
-#include "common/valuevector.h"
+
+#include "catalog/catalog.h"
+#include "catalog/cluster.h"
+#include "catalog/constraint.h"
+#include "catalog/database.h"
+#include "catalog/table.h"
 #include "common/tabletuple.h"
+#include "common/valuevector.h"
 #include "execution/VoltDBEngine.h"
-#include "plannodes/abstractplannode.h"
+#include "expressions/abstractexpression.h"
 #include "indexes/tableindex.h"
-#include "storage/table.h"
+#include "plannodes/abstractplannode.h"
+#include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/tableutil.h"
-#include "catalog/catalog.h"
-#include "catalog/cluster.h"
-#include "catalog/table.h"
-#include "catalog/database.h"
-#include "catalog/constraint.h"
 
 #include "test_utils/LoadTableFrom.hpp"
+
+#include <cstdlib>
+#include <ctime>
+#include <unistd.h>
+#include <boost/shared_ptr.hpp>
 
 using namespace std;
 using namespace voltdb;
@@ -431,7 +432,7 @@ public:
         m_database_id = m_database->relativeIndex();
         catalog::Table *partitioned_catalog_table_customer = m_database->tables().get("D_CUSTOMER");
         m_partitioned_customer_table_id = partitioned_catalog_table_customer->relativeIndex();
-        m_partitioned_customer_table = m_engine->getTable(m_partitioned_customer_table_id);
+        m_partitioned_customer_table = dynamic_cast<PersistentTable*>(m_engine->getTable(m_partitioned_customer_table_id));
         catalog::Table *replicated_catalog_table_customer = m_database->tables().get("R_CUSTOMER");
         m_replicated_customer_table_id = replicated_catalog_table_customer->relativeIndex();
         m_replicated_customer_table = m_engine->getTable(m_replicated_customer_table_id);
@@ -468,7 +469,7 @@ public:
         catalog::Constraint *m_constraint;
         boost::scoped_ptr<VoltDBEngine>     m_engine;
         boost::scoped_ptr<EngineTestTopend> m_topend;
-        Table* m_partitioned_customer_table;
+        PersistentTable* m_partitioned_customer_table;
         int m_partitioned_customer_table_id;
 
         Table* m_replicated_customer_table;

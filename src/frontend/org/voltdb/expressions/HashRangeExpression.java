@@ -46,7 +46,7 @@ public class HashRangeExpression extends AbstractValueExpression {
     public HashRangeExpression() {
         super(ExpressionType.HASH_RANGE);
         //See the comment in ConjunctionExpression
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
 
     @Override

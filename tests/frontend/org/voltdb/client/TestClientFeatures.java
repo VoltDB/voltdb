@@ -27,12 +27,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
@@ -42,6 +42,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestClientFeatures extends TestCase {
 
@@ -344,6 +346,8 @@ public class TestClientFeatures extends TestCase {
 
     /**
      * Verify a client can reconnect automatically if reconnect on connection loss feature is turned on
+     *
+     * Then verify that nothing is still going when all it shutdown
      */
     public void testAutoReconnect() throws Exception {
         ClientConfig config = new ClientConfig();
@@ -363,14 +367,45 @@ public class TestClientFeatures extends TestCase {
 
         setUp();
 
+        boolean failed = true;
         for (int i = 0; i < 40; i++) {
             if (client.getConnectedHostList().size() > 0) {
-                return;
+                failed = false;
+                break;
             }
             Thread.sleep(500);
         }
+        if (failed) {
+            fail("Client should have been reconnected");
+        }
 
-        fail("Client should have been reconnected");
+        tearDown();
+
+        for (int i = 0; (i < 40) && (client.getConnectedHostList().size() > 0); i++) {
+            Thread.sleep(500);
+        }
+        assertTrue(client.getConnectedHostList().isEmpty());
+
+        client.close();
+
+        // hunt for reconnect thread to make sure it's gone
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            StackTraceElement[] st = e.getValue();
+            Thread t = e.getKey();
+
+            // skip the current thread
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+
+            for (StackTraceElement ste : st) {
+                if (ste.getClassName().toLowerCase().contains("voltdb.client")) {
+                    System.err.println(ste.getClassName().toLowerCase());
+                    fail("Something failed to clean up.");
+                }
+            }
+        }
     }
 
     public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
