@@ -91,7 +91,6 @@ public class TestClientClose extends TestCase {
         for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
             // skip the current thread
             Thread t = e.getKey();
-            StackTraceElement[] st = e.getValue();
             if (t == Thread.currentThread()) {
                 continue;
             }
@@ -100,7 +99,8 @@ public class TestClientClose extends TestCase {
             if (threadName.contains("VoltDB Client Reaper Thread")) {
                 postNumClientReaper++;
             }
-            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger"));
+            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
+                    || threadName.contains("Estimated Time Updater"));
         }
         System.out.println("preNumClientReaper : " + preNumClientReaper);
         System.out.println("postNumClientReaper : " + postNumClientReaper);

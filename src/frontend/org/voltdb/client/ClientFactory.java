@@ -17,11 +17,15 @@
 
 package org.voltdb.client;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Factory for constructing instances of the {@link Client} interface
  *
  */
 public abstract class ClientFactory {
+
+    private static AtomicInteger CLIENT_NUM = new AtomicInteger(0);
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -31,6 +35,7 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
+        CLIENT_NUM.incrementAndGet();
         return new ClientImpl(new ClientConfig());
     }
 
@@ -44,6 +49,15 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
+        CLIENT_NUM.incrementAndGet();
         return new ClientImpl(config);
+    }
+
+    public static int getClientNum() {
+        return CLIENT_NUM.get();
+    }
+
+    public static void notifyClientClose() {
+        CLIENT_NUM.decrementAndGet();
     }
 }

@@ -31,6 +31,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.EstTimeUpdater;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -572,8 +573,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             m_reconnectStatusListener.close();
         }
 
-        m_distributer.shutdown();
-        VoltLogger.shutdownAsynchronousLogging();
+        // the client is the last alive client. Before exit, close all the static resources and threads.
+        if (ClientFactory.getClientNum() == 1) {
+            m_distributer.shutdown();
+            VoltLogger.shutdownAsynchronousLogging();
+            //Estimate Time Updater stop updates.
+            EstTimeUpdater.stop();
+        }
+        ClientFactory.notifyClientClose();
     }
 
     @Override
