@@ -26,15 +26,16 @@ package org.voltdb.iv2;
 import com.google_voltpatches.common.collect.Lists;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.voltdb.CommandLog.CompletionChecks;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 public class TestDurabilityListener {
     private SpScheduler m_sched;
@@ -151,50 +152,110 @@ public class TestDurabilityListener {
         }
     }
 
-    private List<Long> logSp(int...timestamps)
+    @Test
+    public void testProcessDurabilityChecks()
+    {
+        SiteTaskerQueue stq = mock(SiteTaskerQueue.class);
+        SnapshotCompletionMonitor scm = mock(SnapshotCompletionMonitor.class);
+        SpScheduler sched = spy(new SpScheduler(1, stq, scm));
+        sched.setLock(new Object());
+
+        TransactionTaskQueue taskQueue = mock(TransactionTaskQueue.class);
+        SimpleListener listener = new SimpleListener();
+        SpDurabilityListener dut = new SpDurabilityListener(sched, taskQueue);
+        dut.setUniqueIdListener(listener);
+
+        int cnt = 0;
+        ArgumentCaptor<SiteTasker.SiteTaskerRunnable> captor =
+                ArgumentCaptor.forClass(SiteTasker.SiteTaskerRunnable.class);
+        for (boolean isSync : new boolean[] {false, true}) {
+            dut.createFirstCompletionCheck(isSync, true);
+            CompletionChecks completionChecks = dut.startNewTaskList(dut.getNumberOfTasks());
+            dut.processDurabilityChecks(completionChecks);
+            verify(sched, never()).processDurabilityChecks(completionChecks);
+
+            final List<Long> spUniqIds = logSp(dut, taskQueue, 0, 1, 2);
+            completionChecks = dut.startNewTaskList(dut.getNumberOfTasks());
+            dut.processDurabilityChecks(completionChecks);
+            verify(sched).processDurabilityChecks(completionChecks);
+            cnt++;
+            verify(stq, times(cnt)).offer(captor.capture());
+            captor.getValue().run();
+
+            assertEquals(spUniqIds.get(2).longValue(), listener.m_spUniqueId);
+            assertEquals(Long.MIN_VALUE, listener.m_mpUniqueId);
+            assertTrue(listener.m_notified);
+
+            final List<Long> mpUniqIds = logMp(dut, taskQueue, 0, 1, 2);
+            completionChecks = dut.startNewTaskList(dut.getNumberOfTasks());
+            dut.processDurabilityChecks(completionChecks);
+            verify(sched).processDurabilityChecks(completionChecks);
+            cnt++;
+            verify(stq, times(cnt)).offer(captor.capture());
+            captor.getValue().run();
+
+            assertEquals(spUniqIds.get(2).longValue(), listener.m_spUniqueId);
+            assertEquals(mpUniqIds.get(2).longValue(), listener.m_mpUniqueId);
+            assertTrue(listener.m_notified);
+        }
+    }
+
+    private List<Long> logSp(int...timestamps) {
+        return logSp(dut, m_taskQueue, timestamps);
+    }
+
+    private static List<Long> logSp(SpDurabilityListener dut, TransactionTaskQueue taskQueue, int...timestamps)
     {
         List<Long> uniqIds = Lists.newArrayList();
 
         for (int ts : timestamps) {
             final long id = UniqueIdGenerator.makeIdFromComponents(ts, 0, 0);
             uniqIds.add(id);
-            dut.addTransaction(newInitMsg(true, id));
+            dut.addTransaction(newInitMsg(true, taskQueue, id));
         }
 
         return uniqIds;
     }
 
-    private List<Long> logMp(int... timestamps)
+    private List<Long> logMp(int... timestamps) {
+        return logMp(dut, m_taskQueue, timestamps);
+    }
+
+    private static List<Long> logMp(SpDurabilityListener dut, TransactionTaskQueue taskQueue, int... timestamps)
     {
         List<Long> uniqIds = Lists.newArrayList();
 
         for (int ts : timestamps) {
             final long id = UniqueIdGenerator.makeIdFromComponents(ts, 0, MpInitiator.MP_INIT_PID);
             uniqIds.add(id);
-            dut.addTransaction(newInitMsg(false, id));
+            dut.addTransaction(newInitMsg(false, taskQueue, id));
         }
 
         return uniqIds;
     }
 
-    private List<Long> logEverywhere(int... timestamps)
+    private List<Long> logEverywhere(int... timestamps) {
+        return logEverywhere(dut, m_taskQueue, timestamps);
+    }
+
+    private static List<Long> logEverywhere(SpDurabilityListener dut, TransactionTaskQueue taskQueue, int... timestamps)
     {
         List<Long> uniqIds = Lists.newArrayList();
 
         for (int ts : timestamps) {
             final long id = UniqueIdGenerator.makeIdFromComponents(ts, 0, MpInitiator.MP_INIT_PID);
             uniqIds.add(id);
-            dut.addTransaction(newInitMsg(true, id));
+            dut.addTransaction(newInitMsg(true, taskQueue, id));
         }
 
         return uniqIds;
     }
 
-    private SpProcedureTask newInitMsg(boolean isSp, long uniqId)
+    private static SpProcedureTask newInitMsg(boolean isSp, TransactionTaskQueue taskQueue, long uniqId)
     {
         final Iv2InitiateTaskMessage msg = new Iv2InitiateTaskMessage(0, 0, 0, 0, uniqId,
                                                                       false, isSp, new StoredProcedureInvocation(),
                                                                       0, 0, false);
-        return new SpProcedureTask(null, "Hello", m_taskQueue, msg, null);
+        return new SpProcedureTask(null, "Hello", taskQueue, msg, null);
     }
 }
