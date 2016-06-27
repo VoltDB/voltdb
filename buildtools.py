@@ -604,7 +604,7 @@ def buildMakefile(CTX):
     makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
     makefile.write("clean-3pty-install:\n")
-    makefile.write("\t${RM} -r \"${INSTALL_DIR}\"\n")
+    makefile.write("\t@${RM} -r \"${INSTALL_DIR}\"\n")
     makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
     makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
     makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
