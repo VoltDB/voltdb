@@ -120,12 +120,8 @@ const char *plan =
         "                {\n"
         "                    \"COLUMN_NAME\": \"C3\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"PARTITION_BY_EXPRESSIONS\": [{\n"
-        "                            \"COLUMN_IDX\": 1,\n"
-        "                            \"TYPE\": 32,\n"
-        "                            \"VALUE_TYPE\": 5\n"
-        "                        }],\n"
-        "                        \"TYPE\": 70,\n"
+        "                        \"COLUMN_IDX\": 0,\n"
+        "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 6\n"
         "                    }\n"
         "                }\n"
@@ -452,9 +448,9 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  2, 10}
     };
     initialize(catalog_string, random_seed);
-    initializeTableOfInt(m_AAA, 3, 3, (int32_t *)input);
+    initializeTableOfInt(m_AAA, 6, 2, (int32_t *)input);
     executeFragment(100, plan);
-    validateResult((int32_t *)output, 3, 3);
+    validateResult((int32_t *)output, 6, 3);
 }
 
 int main() {

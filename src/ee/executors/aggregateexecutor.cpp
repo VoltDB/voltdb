@@ -992,29 +992,36 @@ bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // We may want to output a row even if the group
     // does not change.  This may happen for windowed operations.
     // So, remember this here.
-    bool outputRow = outputForEachInputRow();
+    bool emitOnEachInput = outputForEachInputRow();
+    bool outputRow = emitOnEachInput;
     bool resetAggs = false;
 
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
         if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
             VOLT_TRACE("new group!");
-            // Output old row.
+            // Remember to output the old row.
             outputRow = true;
+            // We also want to reset the aggs.
             resetAggs = true;
             break;
         }
     }
-
     if (outputRow) {
         if (insertOutputTuple(m_aggregateRow)) {
             m_pmp->countdownProgress();
         }
+    }
+    if (resetAggs) {
         m_aggregateRow->resetAggs();
-
+    }
+    if (resetAggs || emitOnEachInput) {
         // record the new group scanned tuple
+        // We want to do this if we are emitting an
+        // output row for each input row, since the
+        // partition by expressions are not group by
+        // expressions.
         m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
     }
-
     // update the aggregation calculation.
     advanceAggs(m_aggregateRow, nextTuple);
 

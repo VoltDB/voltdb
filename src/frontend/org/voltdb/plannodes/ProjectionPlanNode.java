@@ -97,7 +97,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves =
-            new ArrayList<TupleValueExpression>();
+            new ArrayList<>();
         int i = 0;
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
@@ -128,7 +128,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         NodeSchema new_schema = new NodeSchema();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
-            if (col.getExpression().getExpressionType().isAggregateExpression()) {
+            if (col.getExpression().getExpressionType().isGeneratedAggregateExpression()) {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
                                                          col.getTableAlias(),

@@ -130,6 +130,11 @@ public:
         m_cluster = m_catalog->clusters().get("cluster");
         m_database = m_cluster->databases().get("database");
         m_database_id = m_database->relativeIndex();
+        ASSERT_NE(NULL, m_catalog);
+        ASSERT_NE(NULL, m_cluster);
+        ASSERT_NE(NULL, m_database);
+        ASSERT_LT(0,    m_database_id);
+
         m_isinitialized = true;
     }
     ~PlanTestingBaseClass() {
@@ -196,26 +201,39 @@ public:
 
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
-        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
-        if (!iter->hasNext()) {
+        voltdb::TableIterator &iter = result->iterator();
+        if (!iter.hasNext()) {
             printf("No results!!\n");
+            ASSERT_FALSE(true);
         }
         ASSERT_EQ(nCols, result->columnCount());
+        bool failed = false;
         for (int32_t row = 0; row < nRows; row += 1) {
-            ASSERT_TRUE(iter->next(tuple));
+            ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer[row * nCols + col];
-                int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(1));
-                ASSERT_EQ(expected, v1);
+                int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
+                VOLT_TRACE("Row %d, col %d: expected %d, got %d%s",
+                           row, col,
+                           expected, v1,
+                           (expected != v1) ? "failed" : "ok");
+                if (expected != v1) {
+                    failed = true;
+                }
             }
         }
-        ASSERT_FALSE(iter->next(tuple));
+        bool hasNext = iter.next(tuple);
+        if (!hasNext) {
+            VOLT_TRACE("Unexpected next element\n");
+        }
+        ASSERT_FALSE(hasNext);
+        ASSERT_FALSE(failed);
     }
     protected:
         voltdb::CatalogId m_cluster_id;
         voltdb::CatalogId m_database_id;
         voltdb::CatalogId m_site_id;
-        string m_catalog_string;
+        std::string m_catalog_string;
         catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
         catalog::Cluster *m_cluster;
         catalog::Database *m_database;
