@@ -105,6 +105,8 @@ SnapshotCompletionInterest, Promotable
     // Current state of the restore agent
     private volatile State m_state = State.RESTORE;
 
+    private static final int MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS = 30000;
+
     // Restore adapter needs a completion functor.
     // Runnable here preferable to exposing all of RestoreAgent to RestoreAdapater.
     private final Runnable m_changeStateFunctor = new Runnable() {
@@ -1307,9 +1309,11 @@ SnapshotCompletionInterest, Promotable
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {
-                    instance.getClientInterface().callExecuteTask(30000, params.array());
-                } catch (IOException | InterruptedException e) {
-                    e.printStackTrace();
+                    instance.getClientInterface().callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
+                } catch (IOException e) {
+                    LOG.warn("Failed to reset DR applied tracker due to an IOException", e);
+                } catch (InterruptedException e) {
+                    LOG.warn("Failed to reset DR applied tracker due to an InterruptedException", e);
                 }
             }
         }
