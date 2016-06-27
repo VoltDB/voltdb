@@ -192,10 +192,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "6.4";
+    static final String m_defaultVersionString = "6.5";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.4\\E\\z";
-    // these next two are non-static because they can be overridden on the CLI for test
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.5\\E\\z";
+    // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
     HostMessenger m_messenger = null;
@@ -1612,6 +1612,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
+        boolean differingRoots = false;
 
         if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the voltdbroot directory in " + cnfrootFH, false, null);
@@ -1624,11 +1625,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 depcanoFH = deprootFH;
             }
             File cnfcanoFH = cnfrootFH.getCanonicalFile();
-            if (!VoltDB.DBROOT.equals(deprootFN) && !cnfcanoFH.equals(depcanoFH)) {
-                VoltDB.crashLocalVoltDB(
-                        "voltdbroot specified in deployment file " + deprootFN
-                      + " does not match the one specified at command line " + config.m_voltdbRoot);
-                return;
+            if (!cnfcanoFH.equals(depcanoFH)) {
+                differingRoots = true;
+                dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
+            }
+            if (!VoltDB.DBROOT.equals(deprootFN) && differingRoots) {
+                consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
+                hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
             }
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(
@@ -1737,7 +1740,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //After deployment is emptied out of path now write it.
-        if (!deprootFH.equals(cnfrootFH)) {
+        if (differingRoots) {
             File depFH = getConfigLogDeployment(config);
             try (FileWriter fw = new FileWriter(depFH)) {
                 fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
@@ -1749,9 +1752,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File optFH = new VoltFile(config.m_pathToDeployment);
             File depFH = getConfigLogDeployment(config);
             try {
-                if (!depFH.exists()) {
-                    new FileOutputStream(depFH).close();
-                }
                 if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
                     Files.copy(optFH, depFH);
                 }
@@ -2144,9 +2144,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     hostLog.fatal(msg);
                     VoltDB.crashLocalVoltDB(msg);
                     return new ReadDeploymentResults(deploymentBytes, deployment);
-                } else if (config.m_startAction == StartAction.INITIALIZE) {
-                    // override it so it can be properly staged
-                    deployment.getPaths().getVoltdbroot().setPath(config.m_voltdbRoot.getPath());
                 }
             }
             /*

@@ -69,6 +69,24 @@ import com.google_voltpatches.common.net.HostAndPort;
  */
 public class SocketJoiner {
 
+    private static final String HOSTS = "hosts";
+    private static final String REPORTED_ADDRESS = "reportedAddress";
+    private static final String NEW_HOST_ID = "newHostId";
+    private static final String REASON = "reason";
+    private static final String MAY_RETRY = "mayRetry";
+    private static final String ACCEPTED = "accepted";
+    private static final String MAY_EXCHANGE_TS = "mayExchangeTs";
+    private static final String TYPE = "type";
+    private static final String PUBLISH_HOSTID = "PUBLISH_HOSTID";
+    private static final String REQUEST_HOSTID = "REQUEST_HOSTID";
+    private static final String HOST_ID = "hostId";
+    private static final String PORT = "port";
+    private static final String ADDRESS = "address";
+    private static final String NODE_STATE = "nodeState";
+    private static final String VERSION_COMPATIBLE = "versionCompatible";
+    private static final String BUILD_STRING = "buildString";
+    private static final String VERSION_STRING = "versionString";
+
     private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
@@ -418,19 +436,19 @@ public class SocketJoiner {
             LOG.info(jsObj.toString(2));
 
             // get the connecting node's version string
-            String remoteBuildString = jsObj.getString("versionString");
+            String remoteBuildString = jsObj.getString(VERSION_STRING);
 
             HostCriteria joinerCriteria = new HostCriteria(jsObj);
 
             VersionChecker versionChecker = m_criteria.getVersionChecker();
             // send a response with version/build data of this node
             JSONObject returnJs = new JSONObject();
-            returnJs.put("versionString", versionChecker.getVersionString());
-            returnJs.put("buildString", versionChecker.getBuildString());
-            returnJs.put("versionCompatible",
+            returnJs.put(VERSION_STRING, versionChecker.getVersionString());
+            returnJs.put(BUILD_STRING, versionChecker.getBuildString());
+            returnJs.put(VERSION_COMPATIBLE,
                     versionChecker.isCompatibleVersionString(remoteBuildString)
                     && !joinerCriteria.isUndefined());
-            returnJs.put("nodeState", m_criteria.getNodeState().name());
+            returnJs.put(NODE_STATE, m_criteria.getNodeState().name());
 
             // send host criteria
             m_criteria.asHostCriteria(m_paused.get()).appendTo(returnJs);
@@ -449,30 +467,30 @@ public class SocketJoiner {
              * or a node that is connecting to the rest of the cluster and publishing its
              * host id and such
              */
-            String type = jsObj.getString("type");
+            String type = jsObj.getString(TYPE);
 
             /*
              * The new connection may specify the address it is listening on,
              * or it can be derived from the connection itself
              */
             InetSocketAddress listeningAddress;
-            if (jsObj.has("address")) {
+            if (jsObj.has(ADDRESS)) {
                 listeningAddress = new InetSocketAddress(
-                        InetAddress.getByName(jsObj.getString("address")),
-                        jsObj.getInt("port"));
+                        InetAddress.getByName(jsObj.getString(ADDRESS)),
+                        jsObj.getInt(PORT));
             } else {
                 listeningAddress =
                     new InetSocketAddress(
                             ((InetSocketAddress)sc.socket().
                                     getRemoteSocketAddress()).getAddress().getHostAddress(),
-                                    jsObj.getInt("port"));
+                                    jsObj.getInt(PORT));
             }
 
             hostLog.info("Received request type " + type);
-            if (type.equals("REQUEST_HOSTID")) {
+            if (type.equals(REQUEST_HOSTID)) {
                 m_joinHandler.requestJoin( sc, listeningAddress, joinerCriteria);
-            } else if (type.equals("PUBLISH_HOSTID")){
-                m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress, joinerCriteria);
+            } else if (type.equals(PUBLISH_HOSTID)){
+                m_joinHandler.notifyOfJoin(jsObj.getInt(HOST_ID), sc, listeningAddress, joinerCriteria);
             } else {
                 throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
             }
@@ -538,9 +556,9 @@ public class SocketJoiner {
         JSONObject jsonCriteriaInfo = readJSONObjFromWire(sc, remoteAddress);
         VersionChecker versionChecker = m_criteria.getVersionChecker();
 
-        String remoteVersionString = jsonCriteriaInfo.getString("versionString");
-        String remoteBuildString = jsonCriteriaInfo.getString("buildString");
-        boolean remoteAcceptsLocalVersion = jsonCriteriaInfo.getBoolean("versionCompatible");
+        String remoteVersionString = jsonCriteriaInfo.getString(VERSION_STRING);
+        String remoteBuildString = jsonCriteriaInfo.getString(BUILD_STRING);
+        boolean remoteAcceptsLocalVersion = jsonCriteriaInfo.getBoolean(VERSION_COMPATIBLE);
         if (remoteVersionString.equals(versionChecker.getVersionString())) {
             if (!versionChecker.getBuildString().equals(remoteBuildString)) {
                 // ignore test/eclipse build string so tests still work
@@ -561,7 +579,7 @@ public class SocketJoiner {
                 return null;
             }
         }
-        String value = jsonCriteriaInfo.optString("nodeState");
+        String value = jsonCriteriaInfo.optString(NODE_STATE);
         HostCriteria hostCriteria = new HostCriteria(jsonCriteriaInfo);
         if (hostCriteria.isUndefined() || value.isEmpty()) {
             org.voltdb.VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
@@ -634,29 +652,29 @@ public class SocketJoiner {
             activeVersions.add(versionChecker.getVersionString());
 
             JSONObject jsObj = new JSONObject();
-            jsObj.put("type", "REQUEST_HOSTID");
+            jsObj.put(TYPE, REQUEST_HOSTID);
 
             // put the version compatibility status in the json
-            jsObj.put("versionString", versionChecker.getVersionString());
+            jsObj.put(VERSION_STRING, versionChecker.getVersionString());
 
             /*
              * Advertise the port we are going to listen on based on
              * config
              */
-            jsObj.put("port", m_internalPort);
+            jsObj.put(PORT, m_internalPort);
 
             /*
              * If config specified an internal interface use that.
              * Otherwise the leader will echo back what we connected on
              */
             if (!m_internalInterface.isEmpty()) {
-                jsObj.put("address", m_internalInterface);
+                jsObj.put(ADDRESS, m_internalInterface);
             }
             /*
              * communicate configuration and node state
              */
             m_criteria.asHostCriteria().appendTo(jsObj);
-            jsObj.put("mayExchangeTs", true);
+            jsObj.put(MAY_EXCHANGE_TS, true);
 
             byte jsBytes[] = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
             ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
@@ -675,22 +693,22 @@ public class SocketJoiner {
             JSONObject jsonObj = readJSONObjFromWire(socket, primaryAddress);
 
             // check if the membership request is accepted
-            if (!jsonObj.optBoolean("accepted", true)) {
+            if (!jsonObj.optBoolean(ACCEPTED, true)) {
                 socket.close();
-                if (!jsonObj.optBoolean("mayRetry", false)) {
+                if (!jsonObj.optBoolean(MAY_RETRY, false)) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
                             "Request to join cluster mesh is rejected: "
-                            + jsonObj.optString("reason", "rejection reason is not available"));
+                            + jsonObj.optString(REASON, "rejection reason is not available"));
                 }
-                throw new CoreUtils.RetryException(jsonObj.optString("reason", "rejection reason is not available"));
+                throw new CoreUtils.RetryException(jsonObj.optString(REASON, "rejection reason is not available"));
             }
 
             /*
              * Get the generated host id, and the interface we connected on
              * that was echoed back
              */
-            m_localHostId = jsonObj.getInt("newHostId");
-            m_reportedInternalInterface = jsonObj.getString("reportedAddress");
+            m_localHostId = jsonObj.getInt(NEW_HOST_ID);
+            m_reportedInternalInterface = jsonObj.getString(REPORTED_ADDRESS);
 
             cmbld.put(m_localHostId, m_criteria.asHostCriteria());
 
@@ -698,16 +716,16 @@ public class SocketJoiner {
              * Loop over all the hosts and create a connection (except for the first entry, that is the leader)
              * and publish the host id that was generated. This finishes creating the mesh
              */
-            JSONArray otherHosts = jsonObj.getJSONArray("hosts");
+            JSONArray otherHosts = jsonObj.getJSONArray(HOSTS);
             int hostIds[] = new int[otherHosts.length()];
             SocketChannel hostSockets[] = new SocketChannel[hostIds.length];
             InetSocketAddress listeningAddresses[] = new InetSocketAddress[hostIds.length];
 
             for (int ii = 0; ii < otherHosts.length(); ii++) {
                 JSONObject host = otherHosts.getJSONObject(ii);
-                String address = host.getString("address");
-                int port = host.getInt("port");
-                final int hostId = host.getInt("hostId");
+                String address = host.getString(ADDRESS);
+                int port = host.getInt(PORT);
+                final int hostId = host.getInt(HOST_ID);
 
 
                 LOG.info("Leader provided address " + address + ":" + port);
@@ -752,18 +770,18 @@ public class SocketJoiner {
                 skews.add(skew);
 
                 jsObj = new JSONObject();
-                jsObj.put("type", "PUBLISH_HOSTID");
-                jsObj.put("hostId", m_localHostId);
-                jsObj.put("port", m_internalPort);
+                jsObj.put(TYPE, PUBLISH_HOSTID);
+                jsObj.put(HOST_ID, m_localHostId);
+                jsObj.put(PORT, m_internalPort);
                 jsObj.put(
-                        "address",
+                        ADDRESS,
                         m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
-                jsObj.put("versionString", versionChecker.getVersionString());
+                jsObj.put(VERSION_STRING, versionChecker.getVersionString());
 
                 m_criteria.asHostCriteria().appendTo(jsObj);
-                jsObj.put("mayExchangeTs", true);
+                jsObj.put(MAY_EXCHANGE_TS, true);
 
-                jsBytes = jsObj.toString(4).getBytes("UTF-8");
+                jsBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
                 ByteBuffer pushHostId = ByteBuffer.allocate(4 + jsBytes.length);
                 pushHostId.putInt(jsBytes.length);
                 pushHostId.put(jsBytes).flip();

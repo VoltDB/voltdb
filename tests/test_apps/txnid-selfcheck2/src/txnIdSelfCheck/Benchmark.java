@@ -682,13 +682,13 @@ public class Benchmark {
         if (!config.disabledThreads.contains("partLoadlt")) {
             partLoadlt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-            partLoadlt.start();
+            // XXX temporary partLoadlt.start();
         }
         replLoadlt = null;
         if (config.mpratio > 0.0 && !config.disabledThreads.contains("replLoadlt")) {
             replLoadlt = new LoadTableLoader(client, "loadmp",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-            replLoadlt.start();
+            // XXX temporary replLoadlt.start();
         }
         if (!config.disabledThreads.contains("readThread")) {
             readThread = new ReadThread(client, config.threads, config.threadoffset,
