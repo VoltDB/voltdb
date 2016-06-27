@@ -121,16 +121,16 @@ class Stats(object):
                 # Compile job data to write to database
                 job_data = {
                     'name': job,
-                    'stamp': job_stamp,
+                    'timestamp': job_stamp,
                     'url': job_report['url'] + 'testReport',
                     'build': build,
                     'fails': fails,
                     'total': total,
                     'percent': percent
                 }
-                add_job = ('INSERT INTO `junit-job-results` '
+                add_job = ('INSERT INTO `junit-builds` '
                            '(name, stamp, url, build, fails, total, percent) '
-                           'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
+                           'VALUES (%(name)s, %(timestamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
                 try:
                     cursor.execute(add_job, job_data)
                     db.commit()
