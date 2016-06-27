@@ -532,7 +532,7 @@ public class SystemInformation extends VoltSystemProcedure
                 command_log_mode = "sync";
             }
             String command_log_path = command_log.getLogpath();
-            String command_log_snaps = command_log.getInternalsnapshotpath();
+            String command_log_snaps = VoltDB.instance().getCommandLogSnapshotPath();
             String command_log_fsync_interval =
                 Integer.toString(command_log.getFsyncinterval());
             String command_log_max_txns =

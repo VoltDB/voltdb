@@ -453,7 +453,7 @@ public class Inits {
                                                                                        logConfig.getFsyncinterval(),
                                                                                        logConfig.getMaxtxns(),
                                                                                        logConfig.getLogpath(),
-                                                                                       logConfig.getInternalsnapshotpath());
+                                                                                       VoltDB.instance().getCommandLogSnapshotPath());
                         }
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
@@ -733,8 +733,8 @@ public class Inits {
                                                       m_rvdb,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
-                                                      cl.getLogpath(),
-                                                      cl.getInternalsnapshotpath(),
+                                                      VoltDB.instance().getCommandLogPath(),
+                                                      VoltDB.instance().getCommandLogSnapshotPath(),
                                                       snapshotPath,
                                                       allPartitions,
                                                       CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());

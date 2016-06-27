@@ -988,7 +988,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
             String clSnapshotPath = null;
             if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
-                clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
+                clSnapshotPath = VoltDB.instance().getCommandLogSnapshotPath();
             }
 
             // DR overflow directory

@@ -209,9 +209,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus();
-        snapshotStatus.setSnapshotPath(
-                catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath(),
-                catalogContext.database.getSnapshotschedule().get("default").getPath());
+        snapshotStatus.setSnapshotPath(VoltDB.instance().getCommandLogSnapshotPath(),
+                VoltDB.instance().getSnapshotPath());
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);
