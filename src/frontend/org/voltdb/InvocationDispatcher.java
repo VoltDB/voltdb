@@ -454,7 +454,7 @@ public final class InvocationDispatcher {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
             // Return an error.
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0],
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "

@@ -1148,6 +1148,11 @@ CREATE INDEX ENG_8168_INDEX_USES_YEAR ON T55 (YEAR(TS) - 1900);
 -- Wrap up with a minor variant of an index already tried to show that
 -- the previous line didn't corrupt catalog replay.
 CREATE INDEX ENG_8168_INDEX_USES_ABS_AGAIN ON T55 (ABS(BIG - 1));
+-- Verify that we can use MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP in indices
+CREATE INDEX ENG_10490_INDEX_USES_MIN_VALID_TIMESTAMP ON T55 
+        (SINCE_EPOCH(MICROS, TS)                     - SINCE_EPOCH(MICROS, MIN_VALID_TIMESTAMP()),
+         SINCE_EPOCH(MICROS, MAX_VALID_TIMESTAMP())  - SINCE_EPOCH(MICROS, TS))
+     WHERE IS_VALID_TIMESTAMP(TS);
 
 
 -- Test for polygon validity.
