@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+
+    <dr id="2" listen="true" port="5556">
+        <connection source="localhost:5555" />
+    </dr>
+
+    <paths>
+        <voltdbroot path="./voltxdcr2" />
+    </paths>
+</deployment>
