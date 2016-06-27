@@ -178,6 +178,8 @@ public class TestClientInterface {
         when(m_handler.connectionId()).thenReturn(0L);
         when(m_handler.isAdmin()).thenReturn(false);
         when(m_volt.getSES(anyBoolean())).thenReturn(m_periodicWorkThread);
+        when(m_volt.getCommandLogSnapshotPath()).thenReturn("/tmp");
+        when(m_volt.getSnapshotPath()).thenReturn("/tmp");
 
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
