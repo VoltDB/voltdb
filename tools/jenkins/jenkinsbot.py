@@ -15,6 +15,9 @@ from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
 from tabulate import tabulate
 
+COMMUNITY = 'branch-2-community-junit-master'
+PRO = 'branch-2-pro-junit-master'
+
 TL_QUERY = ("""
   SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
@@ -30,7 +33,7 @@ BR_QUERY = ("""
     SELECT tf.name AS 'Test name',
            COUNT(*) AS 'Number of failures in this build range'
       FROM `junit-test-failures` AS tf
-INNER JOIN `junit-job-results` AS jr
+INNER JOIN `junit-builds` AS jr
         ON NOT tf.status='FIXED' AND
            jr.name=tf.job AND
            jr.build=tf.build AND
@@ -43,13 +46,14 @@ INNER JOIN `junit-job-results` AS jr
 """)
 
 TOM_QUERY = ("""
-    SELECT MAX(t.build) AS 'Most recent failure on master',
-           MAX(j.build) AS 'Most recent build on master'
+    SELECT MAX(tf.build) AS 'Most recent failure on master',
+           MAX(jr.build) AS 'Most recent build on master'
       FROM `junit-test-failures` AS tf
-RIGHT JOIN `junit-job-results` AS jr
+RIGHT JOIN `junit-builds` AS jr
         ON NOT tf.status='FIXED' AND
            jr.name=tf.job AND
-           tf.name=%(test)s
+           tf.name=%(test)s AND
+           jr.name=%(job)s
 """)
 
 PL_QUERY = ("""
@@ -64,7 +68,7 @@ PL_QUERY = ("""
                   name,
                   (
                    SELECT COUNT(*)
-                     FROM `junit-job-results` jr
+                     FROM `junit-builds` jr
                     WHERE jr.name = tf.job
                   ) AS total,
                   COUNT(*) AS fails
@@ -148,9 +152,10 @@ class JenkinsBot(object):
                     elif 'help' in text:
                         self.post_message(channel, ''.join(help_text))
                     elif 'test-leaderboard' in text:
+                        args = text.split(' ')
                         params = {
-                            'job': text.split(' ')[1],
-                            'beginning': text.split(' ')[2]
+                            'job': args[1],
+                            'beginning': args[2]
                         }
                         self.query_and_response(TL_QUERY, params, [channel], 'testleaderboard.txt')
                     elif 'build-range' in text:
@@ -158,27 +163,30 @@ class JenkinsBot(object):
                         builds = args[2]
                         params = {
                             'job': args[1],
-                            'build_low': builds.split('-')[0],
-                            'build_high': builds.split('-')[1]
+                            'build_low': builds[0],
+                            'build_high': builds[1]
                         }
                         self.query_and_response(BR_QUERY, params, [channel], 'buildrange.txt')
                     elif 'test-on-master' in text:
+                        args = text.split(' ')
                         params = {
-                            'test': text.split(' ')[1]
+                            'test': args[1],
+                            'job': args[2]
                         }
                         self.query_and_response(TOM_QUERY, params, [channel], 'testonmaster.txt')
                     elif 'percent-leaderboard' in text:
                         args = text.split(' ')
-                        builds = args[2]
+                        builds = args[2].split('-')
                         params = {
                             'job': args[1],
-                            'build_low': builds.split('-')[0],
-                            'build_high': builds.split('-')[1]
+                            'build_low': builds[0],
+                            'build_high': builds[1]
                         }
                         self.query_and_response(PL_QUERY, params, [channel], 'percentleaderboard.txt')
                     elif 'all-failures' in text:
+                        args = text.split(' ')
                         params = {
-                            'job': text.split(' ')[1]
+                            'job': args[1]
                         }
                         self.query_and_response(AF_QUERY, params, [channel], 'allfailures.txt')
                 time.sleep(1)
