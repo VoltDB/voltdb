@@ -572,7 +572,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
 
-            modifyIfNecessaryDeploymentHostCount(readDepl.deployment, determination.hostCount);
+            modifyIfNecessaryDeploymentHostCount(m_config, readDepl.deployment, determination.hostCount);
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = m_config.m_startAction.doesRejoin();
@@ -1887,7 +1887,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    Optional<byte []> modifyIfNecessaryDeploymentHostCount(DeploymentType depl, int hostCount) {
+    Optional<byte []> modifyIfNecessaryDeploymentHostCount(Configuration config, DeploymentType depl, int hostCount) {
         Optional<byte[]> deploymentBytes = Optional.empty();
 
         if ((depl.getCluster().getKfactor()+1) > hostCount) {
@@ -1907,7 +1907,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return Optional.empty();
             }
             deploymentBytes = Optional.of(remarshalled.getBytes(StandardCharsets.UTF_8));
-            try (FileWriter fw = new FileWriter(getConfigLogDeployment())) {
+            try (FileWriter fw = new FileWriter(getConfigLogDeployment(config))) {
                 fw.write(remarshalled);
             } catch (IOException|RuntimeException e) {
                 VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
@@ -1917,7 +1917,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return deploymentBytes;
     }
 
-    ReadDeploymentResults readPrimedDeployment(VoltDB.Configuration config) {
+    ReadDeploymentResults readPrimedDeployment(Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -1951,7 +1951,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     config.m_hostCount = 1;
                 }
                 Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(
-                        deployment, config.m_hostCount);
+                        config, deployment, config.m_hostCount);
                 if (changed.isPresent()) {
                     deploymentBytes = changed.get();
                 }

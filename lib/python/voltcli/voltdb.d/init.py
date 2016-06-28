@@ -14,26 +14,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+# Main Java Class
+VoltDB = 'org.voltdb.VoltDB'
+
 @VOLT.Command(
-    bundles = VOLT.ServerBundle('initialize',
-                                needs_catalog=False,
-                                supports_live=False,
-                                default_host=False,
-                                safemode_available=False,
-                                supports_daemon=False,
-                                supports_multiple_daemons=False,
-                                check_environment_config=True,
-                                force_voltdb_create=True,
-                                supports_paused=False,
-                                is_legacy_verb=False),
     options = (
         VOLT.StringOption('-C', '--config', 'configfile',
                          'specify the location of the deployment file',
-                          default = None)
+                          default = None),
+        VOLT.StringOption('-D', '--dbroot', 'voltdbroot',
+                          'specify the location of voltdbroot',
+                          default = None),
+        VOLT.BooleanOption('-f', '--force', 'force',
+                           'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.')
     ),
     description = 'Initializes a new, empty database.'
 )
 def init(runner):
+    runner.args.extend(['initialize'])
     if runner.opts.configfile:
         runner.args.extend(['deployment', runner.opts.configfile])
-    runner.go()
+    if runner.opts.voltdbroot:
+        runner.args.extend(['voltdbroot', runner.opts.voltdbroot])
+    if runner.opts.force:
+        runner.args.extend(['force'])
+    args = runner.args
+    runner.java_execute(VoltDB, None, *args)
