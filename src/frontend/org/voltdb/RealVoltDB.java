@@ -409,7 +409,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to get command log snapshot path.", false, ex);
             }
         }
-        return m_pathList.getProperty("org.voltdb.path.command_log");
+        return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
     }
 
     @Override
@@ -421,7 +421,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to get command log snapshot path.", false, ex);
             }
         }
-        return m_pathList.getProperty("org.voltdb.path.command_log_snapshot");
+        return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
     }
 
     @Override
@@ -433,7 +433,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to get snapshot path.", true, ex);
             }
         }
-        return m_pathList.getProperty("org.voltdb.path.snapshots");
+        return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -986,10 +986,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             boolean usingCommandLog = m_config.m_isEnterprise &&
                     m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-            String clSnapshotPath = null;
-            if (m_catalogContext.cluster.getLogconfig().get("log").getEnabled()) {
-                clSnapshotPath = VoltDB.instance().getCommandLogSnapshotPath();
-            }
 
             // DR overflow directory
             if (m_config.m_isEnterprise) {
@@ -1184,7 +1180,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 m_clientInterface,
                                 m_cartographer,
                                 rebalanceStats,
-                                clSnapshotPath,
+                                VoltDB.instance().getCommandLogSnapshotPath(),
                                 m_catalogContext.getDeployment().getCluster().getKfactor());
                     m_elasticJoinService.updateConfig(m_catalogContext);
                 }
@@ -1790,7 +1786,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_pathList.load(is);
             is.close();
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to read configuratio path designtion", false, e);
+            VoltDB.crashLocalVoltDB("Unable to read configuration path designtion", false, e);
         }
     }
 

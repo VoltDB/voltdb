@@ -187,6 +187,8 @@ public class SnapshotDeleteAgent extends OpsAgent
                 sb.append("Deleting files: ");
                 for (int ii = 0; ii < paths.length; ii++) {
                     String path = paths[ii];
+                    //When user calla @SnapshotDelete this will not be set to AUTO so we will delete what user requested.
+                    //If its SNAP_AUTO thenits coming from periodic delete task.
                     if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
                         path = VoltDB.instance().getSnapshotPath();
                     }

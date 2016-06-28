@@ -118,6 +118,7 @@ public class HTTPAdminListener {
             configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             configurable.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
             configurable.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+            //These mixins are to ignore the "key" and redirect "path" to getNodePath()
             configurable.getSerializationConfig().addMixInAnnotations(PathsType.Commandlog.class,
                     IgnoreNodePathKeyMixIn.class);
             configurable.getSerializationConfig().addMixInAnnotations(PathsType.Commandlogsnapshot.class,

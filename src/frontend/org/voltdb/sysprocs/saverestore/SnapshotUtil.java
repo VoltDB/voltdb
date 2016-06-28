@@ -1379,6 +1379,7 @@ public class SnapshotUtil {
      * @param nonce
      * @param blocking
      * @param format
+     * @param stype type of snapshot path SNAP_AUTO, SNAP_CL or SNAP_PATH
      * @param data Any data that needs to be passed to the snapshot target
      * @param handler
      */
@@ -1580,7 +1581,7 @@ public class SnapshotUtil {
             JSONObject jsObj = new JSONObject();
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
-                if (!VoltDB.instance().isLegacy()) {
+                if (VoltDB.instance().isLegacy()) {
                     jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_PATH);
                 }
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
