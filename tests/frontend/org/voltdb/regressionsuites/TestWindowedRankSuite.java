@@ -97,7 +97,7 @@ public class TestWindowedRankSuite extends RegressionSuite {
                 cr = client.callProcedure("T.insert", row[0], row[1]);
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             }
-            String sql = "select A, B, rank() over (partition by A sort by B) from T;";
+            String sql = "select A, B, rank() over (partition by A order by B) from T;";
             cr = client.callProcedure("@AdHoc", sql);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
