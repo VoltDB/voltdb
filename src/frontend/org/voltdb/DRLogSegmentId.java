@@ -73,8 +73,29 @@ public class DRLogSegmentId implements Serializable {
         return makeDRIdFromComponents(clusterId, 0L) - 1L;
     }
 
+    /*
+     * Empty DR Id is used as a sentinel
+     * 1) in EndOfSnapshotBuffer to indicate the partition doesn't have any snapshot buffer,
+     * 2) in registerLastAckedSegmentId() when the partition has no tracker to recover.
+     *
+     * Empty DR Id has the highest significant bit been set, but there is one exception that
+     * if all bits are set then it belongs to cluster 0's Initial Ack DR Id, not Empty DR Id
+     * for cluster 255.
+     */
     public static boolean isEmptyDRId (long drId) {
-        return (drId >>> 63) == 1L;
+        return ((drId >>> 63) == 1L) && !(drId == -1);
+    }
+
+    /*
+     * Initial Ack DR Id is used as initial value for DR Idempotency filter
+     */
+    public static boolean isInitialAckDRId(long drId) {
+        if (drId == -1) return true;
+        int clusterId = getClusterIdFromDRId(drId);
+        if (clusterId >= 0 && clusterId < MAX_CLUSTER_ID) {
+            return ((drId >>> 63) != 1L) && (getSequenceNumberFromDRId(drId) == MAX_SEQUENCE_NUMBER);
+        }
+        return false;
     }
 
     public static boolean seqIsBeforeZero(long drId) {
@@ -97,8 +118,14 @@ public class DRLogSegmentId implements Serializable {
         if (drId == Long.MAX_VALUE) {
             return "QUEUE EMPTY";
         }
-        if (drId < 0) {
-            return String.format("%d", drId);
+        if (isEmptyDRId(drId)) {
+            return String.format("%d:Empty DR ID", getClusterIdFromDRId(drId));
+        }
+        if (isInitialAckDRId(drId)) {
+            if (drId == -1) {
+                return "0:Init Ack ID";
+            }
+            return String.format("%d:Init Ack ID", getClusterIdFromDRId(drId) + 1);
         }
         return String.format("%d:%d", getClusterIdFromDRId(drId), getSequenceNumberFromDRId(drId));
     }
