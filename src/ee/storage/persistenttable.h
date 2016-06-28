@@ -523,6 +523,7 @@ public:
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
+    MaterializedViewHandler *materializedViewHandler() const { return m_mvHandler; }
 
 private:
     // Zero allocation size uses defaults.

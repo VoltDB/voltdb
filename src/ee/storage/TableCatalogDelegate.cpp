@@ -615,7 +615,6 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
     MaterializedViewTriggerForWrite::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
-    assert(obsoleteViews.size() == 0);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
@@ -732,6 +731,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processSchemaChanges() drop old table" << endl; }
     existingTable->decrementRefcount();
 
     ///////////////////////////////////////////////

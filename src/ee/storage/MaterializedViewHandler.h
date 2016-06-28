@@ -31,22 +31,27 @@
 
 namespace voltdb {
 
+class VoltDBEngine;
+
 class MaterializedViewHandler {
 public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
     MaterializedViewHandler(PersistentTable *targetTable,
                             catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                            std::map<CatalogId, Table*> &tables);
+                            VoltDBEngine *engine);
     ~MaterializedViewHandler();
     // We maintain the source table list here to register / de-register the view handler on the source tables.
     void addSourceTable(PersistentTable *sourceTable);
     void dropSourceTable(PersistentTable *sourceTable);
+    PersistentTable *destTable() const { return m_destTable; }
+    bool isDirty() { return m_dirty; }
 
 private:
     std::vector<PersistentTable*> m_sourceTables;
-    PersistentTable *m_targetTable;
+    PersistentTable *m_destTable;
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
+    bool m_dirty;
 };
 
 } // namespace voltdb

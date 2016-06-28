@@ -25,28 +25,32 @@
 #include "catalog/table.h"
 #include "catalog/tableref.h"
 #include "common/executorcontext.hpp"
+#include "TableCatalogDelegate.hpp"
+
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(TableRef);
 typedef std::pair<std::string, catalog::TableRef*> LabeledTableRef;
 
 namespace voltdb {
 
-    MaterializedViewHandler::MaterializedViewHandler(PersistentTable *targetTable,
+    MaterializedViewHandler::MaterializedViewHandler(PersistentTable *destTable,
                                                      catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                                                     std::map<CatalogId, Table*> &tables) :
-        m_targetTable(targetTable)
+                                                     VoltDBEngine *engine) :
+        m_destTable(destTable)
     {
-        delete m_targetTable->m_mvHandler;
-        m_targetTable->m_mvHandler = this;
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "View " << destTable->name() << ":\n"; }
+        delete m_destTable->m_mvHandler;
+        m_destTable->m_mvHandler = this;
         BOOST_FOREACH (LabeledTableRef labeledTableRef, mvHandlerInfo->sourceTables()) {
             catalog::TableRef *sourceTableRef = labeledTableRef.second;
-            int32_t catalogIndex = sourceTableRef->table()->relativeIndex();
-            PersistentTable *sourceTable = static_cast<PersistentTable*>(tables[catalogIndex]);
+            TableCatalogDelegate *sourceTcd =  engine->getTableDelegate(sourceTableRef->table()->name());
+            PersistentTable *sourceTable = sourceTcd->getPersistentTable();
             assert(sourceTable);
             addSourceTable(sourceTable);
         }
         // Handle the query plans for the create query and the query for min/max recalc.
         catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
+        m_dirty = false;
 // #ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             const std::string& hexString = createQueryStatement->explainplan();
@@ -61,17 +65,21 @@ namespace voltdb {
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::~MaterializedViewHandler() " << endl; }
         for (int i=m_sourceTables.size()-1; i>=0; i--) {
             dropSourceTable(m_sourceTables[i]);
         }
     }
 
     void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::addSourceTable() " << sourceTable->name()  << endl; }
         sourceTable->addViewToTrigger(this);
         m_sourceTables.push_back(sourceTable);
+        m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::dropSourceTable() " << sourceTable->name()  << endl; }
         assert( ! m_sourceTables.empty());
         sourceTable->dropViewToTrigger(this);
         PersistentTable* lastTable = m_sourceTables.back();
@@ -86,6 +94,7 @@ namespace voltdb {
         }
         // The last element is now excess.
         m_sourceTables.pop_back();
+        m_dirty = true;
     }
 
 } // namespace voltdb

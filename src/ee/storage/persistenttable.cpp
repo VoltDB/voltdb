@@ -204,8 +204,12 @@ PersistentTable::~PersistentTable() {
         delete index;
     }
 
-    // free up the materialized view handler.
+    // free up the materialized view handler if this is a view table.
     delete m_mvHandler;
+    // remove this table from the source table list of the views.
+    BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, m_viewsToTrigger) {
+        viewToTrigger->dropSourceTable(this);
+    }
 }
 
 // ------------------------------------------------------------------
@@ -367,12 +371,14 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     if (isPersistentTableEmpty() == true) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << " isPersistentTableEmpty\n"; }
         return;
     }
 
     // If the table has only one tuple-storage block, it may be better to truncate
     // table by iteratively deleting table rows. Evalute if this is the case
     // based on the block and tuple block load factor
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": m_data.size() = " << m_data.size() << endl; }
     if (m_data.size() == 1) {
         // threshold cutoff in terms of block load factor at which truncate is
         // better than tuple-by-tuple delete. Cut-off values are based on worst
@@ -419,15 +425,38 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->setPreTruncateTable(this);
     }
 
-    // add matView
-    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
-        PersistentTable * targetTable = originalView->targetTable();
-        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
-        catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
-        targetTcd->init(*engine->getDatabase(), *catalogViewTable);
-        PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
-        assert(targetEmptyTable);
-        MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+
+    if (m_viewsToTrigger.size() == 0) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": not a joined table view source.\n"; }
+        // add matView
+        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
+            PersistentTable * targetTable = originalView->targetTable();
+            TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+            catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+            targetTcd->init(*engine->getDatabase(), *catalogViewTable);
+            PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+            assert(targetEmptyTable);
+            MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+        }
+    }
+    else {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": a joined table view source.\n"; }
+        BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, m_viewsToTrigger) {
+            PersistentTable *destTable = viewToTrigger->destTable();
+            TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
+            catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
+            destTcd->init(*engine->getDatabase(), *catalogViewTable);
+            PersistentTable *destEmptyTable = destTcd->getPersistentTable();
+            assert(destEmptyTable);
+            new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+        }
+        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
+            PersistentTable * targetTable = originalView->targetTable();
+            TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+            PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+            assert(targetEmptyTable);
+            MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+        }
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one

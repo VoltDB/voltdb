@@ -78,6 +78,7 @@
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
+#include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/CompatibleDRTupleStream.h"
@@ -668,6 +669,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp)
 
     // delete tables in the set
     BOOST_FOREACH (std::string path, deletions) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processCatalogDeletes() " << path << endl; }
         VOLT_TRACE("delete path:");
 
         std::map<std::string, TableCatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
@@ -771,6 +773,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
         if (!tcd) {
             VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
+            if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processCatalogAdditions() completely new table " << catalogTable->name() << endl; }
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
@@ -1093,6 +1096,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "updateCatalog() " << endl; }
     processCatalogDeletes(timestamp);
 
     if (processCatalogAdditions(timestamp) == false) {
@@ -1318,18 +1322,17 @@ static bool updateMaterializedViewTargetTable(std::vector<MATVIEW*> & views,
 // their MatViewType member typedefs, but this may need to change
 // in the future if there are different view types with different
 // triggered behavior defined on the same class of table.
-template<class TABLE> static void initMaterializedViews(catalog::Table *catalogTable,
-                                                        TABLE* table,
-                                                        std::map<CatalogId, Table*> tables)
+template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *catalogTable,
+                                                                        TABLE *table)
 {
     // walk views
     BOOST_FOREACH (LabeledView labeledView, catalogTable->views()) {
         catalog::MaterializedViewInfo *catalogView = labeledView.second;
         const catalog::Table *destCatalogTable = catalogView->dest();
         int32_t catalogIndex = destCatalogTable->relativeIndex();
-        PersistentTable *destTable = static_cast<PersistentTable*>(tables[catalogIndex]);
+        PersistentTable *destTable = static_cast<PersistentTable*>(m_tables[catalogIndex]);
         assert(destTable);
-        assert(destTable == dynamic_cast<PersistentTable*>(tables[catalogIndex]));
+        assert(destTable == dynamic_cast<PersistentTable*>(m_tables[catalogIndex]));
         // Ensure that the materialized view controlling the existing
         // target table by the same name is using the latest version of
         // the table and view definition.
@@ -1345,19 +1348,15 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *catalogT
 
     catalog::MaterializedViewHandlerInfo *mvHandlerInfo = catalogTable->mvHandlerInfo().get("mvHandlerInfo");
     // If the table has a mvHandlerInfo, it means this table is a target table of materialized view.
+    // Now we only use the new view handler mechanism for joined table views.
+    // Further code refactoring saved for future.
     if (mvHandlerInfo && mvHandlerInfo->isJoinedTableView()) {
-        catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
-// #ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-            const string& hexString = createQueryStatement->explainplan();
-            assert(hexString.length() % 2 == 0);
-            int bufferLength = (int)hexString.size() / 2 + 1;
-            char* explanation = new char[bufferLength];
-            boost::shared_array<char> memoryGuard(explanation);
-            catalog::Catalog::hexDecodeString(hexString, explanation);
-            cout << "View: " << catalogTable->name() << endl << explanation << endl;
+        PersistentTable *destTable = static_cast<PersistentTable*>(m_tables[catalogTable->relativeIndex()]);
+        if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
+            // The newly-added handler will at the same time trigger
+            // the uninstallation of the previous (if exists) handler.
+            new MaterializedViewHandler(destTable, mvHandlerInfo, this);
         }
-// #endif
     }
 }
 
@@ -1376,7 +1375,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
         Table *table = m_tables[catalogTable->relativeIndex()];
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
-            initMaterializedViews(catalogTable, persistentTable, m_tables);
+            initMaterializedViews(catalogTable, persistentTable);
             if (catalogTable->tuplelimitDeleteStmt().size() > 0) {
                 catalog::Statement* stmt = catalogTable->tuplelimitDeleteStmt().begin()->second;
                 const std::string b64String = stmt->fragments().begin()->second->plannodetree();
@@ -1395,7 +1394,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
         else {
             StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(table);
             assert(streamedTable);
-            initMaterializedViews(catalogTable, streamedTable, m_tables);
+            initMaterializedViews(catalogTable, streamedTable);
         }
     }
 }
