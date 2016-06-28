@@ -359,11 +359,22 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
-    // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
-        PersistentTable * targetTable = originalView->targetTable();
-        targetTable->decrementRefcount();
+    if (originalTable->m_viewsToTrigger.size() == 0) {
+        // Single table view.
+        std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
+        // reset all view table pointers
+        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
+            PersistentTable * targetTable = originalView->targetTable();
+            targetTable->decrementRefcount();
+        }
+    }
+    else {
+        // Joined table view.
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTableRelease joined table " << originalTable->m_name << endl; }
+        BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, originalTable->m_viewsToTrigger) {
+            PersistentTable *destTable = viewToTrigger->destTable();
+            destTable->decrementRefcount();
+        }
     }
     originalTable->decrementRefcount();
 }
