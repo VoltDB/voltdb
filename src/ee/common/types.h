@@ -485,7 +485,8 @@ enum TaskType {
     TASK_TYPE_SET_DR_PROTOCOL_VERSION = 3,
     TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
     TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
-    TASK_TYPE_GENERATE_DR_EVENT = 6
+    TASK_TYPE_GENERATE_DR_EVENT = 6,
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7       // not supported in EE
 };
 
 // ------------------------------------------------------------------
