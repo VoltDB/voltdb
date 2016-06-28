@@ -53,10 +53,10 @@ private:
     void install(PersistentTable *destTable,
                  catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                  VoltDBEngine *engine);
-    void setUpForCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                             VoltDBEngine *engine);
-    void setUpForMinMax(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                        VoltDBEngine *engine);
+    void setUpCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+                          VoltDBEngine *engine);
+    void setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+                            VoltDBEngine *engine);
 };
 
 } // namespace voltdb

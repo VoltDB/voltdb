@@ -35,8 +35,8 @@ namespace voltdb {
                                                      VoltDBEngine *engine) {
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "View " << destTable->name() << ":\n"; }
         install(destTable, mvHandlerInfo, engine);
-        setUpForCreateQuery(mvHandlerInfo, engine);
-        setUpForMinMax(mvHandlerInfo, engine);
+        setUpCreateQuery(mvHandlerInfo, engine);
+        setUpMinMaxQueries(mvHandlerInfo, engine);
         m_dirty = false;
     }
 
@@ -91,7 +91,7 @@ namespace voltdb {
         }
     }
 
-    void MaterializedViewHandler::setUpForCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+    void MaterializedViewHandler::setUpCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                       VoltDBEngine *engine) {
         catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
         m_createQueryExecutorVector = ExecutorVector::fromCatalogStatement(engine, createQueryStatement);
@@ -109,7 +109,7 @@ namespace voltdb {
 // #endif
     }
 
-    void MaterializedViewHandler::setUpForMinMax(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+    void MaterializedViewHandler::setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                  VoltDBEngine *engine) {
         m_minMaxExecutorVectors.clear();
         BOOST_FOREACH (LabeledStatement labeledStatement, mvHandlerInfo->fallbackQueryStmts()) {
