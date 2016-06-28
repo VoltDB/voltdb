@@ -50,9 +50,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.planner.PlanAssembler;
 
-public class TestWindowedRankSuite extends RegressionSuite {
+public class TestWindowedAggregateSuite extends RegressionSuite {
 
-    public TestWindowedRankSuite(String name) {
+    public TestWindowedAggregateSuite(String name) {
         super(name);
         // TODO Auto-generated constructor stub
     }
@@ -110,7 +110,7 @@ public class TestWindowedRankSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestWindowedRankSuite.class);
+            new MultiConfigSuiteBuilder(TestWindowedAggregateSuite.class);
         boolean success = false;
 
 
