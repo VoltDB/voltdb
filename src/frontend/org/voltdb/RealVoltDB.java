@@ -2079,7 +2079,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return deploymentBytes;
     }
 
-    ReadDeploymentResults readPrimedDeployment(VoltDB.Configuration config) {
+    ReadDeploymentResults readPrimedDeployment(Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2113,8 +2113,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (config.m_hostCount == VoltDB.UNDEFINED) {
                     config.m_hostCount = 1;
                 }
-                Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(config,
-                        deployment, config.m_hostCount);
+                Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(
+                        config, deployment, config.m_hostCount);
                 if (changed.isPresent()) {
                     deploymentBytes = changed.get();
                 }
