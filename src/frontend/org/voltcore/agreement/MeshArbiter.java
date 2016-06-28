@@ -27,7 +27,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.collect.Lists;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
@@ -37,6 +40,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -80,6 +84,10 @@ public class MeshArbiter {
      */
     protected final HashMap<Pair<Long, Long>, Long> m_failedSitesLedger =
             Maps.newHashMap();
+
+    protected final Map<Long, SiteFailureMessage> m_decidedSurvivors = Maps.newHashMap();
+    protected final List<SiteFailureMessage> m_localHistoricDecisions = Lists.newLinkedList();
+
     /**
      * Historic list of failed sites
      */
@@ -295,7 +303,7 @@ public class MeshArbiter {
 
         discoverGlobalFaultData_send(hsIds);
 
-        if (discoverGlobalFaultData_rcv(hsIds)) {
+        while (discoverGlobalFaultData_rcv(hsIds)) {
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
                 return ImmutableMap.of();
@@ -309,7 +317,9 @@ public class MeshArbiter {
                         + "] seeker: " + m_seeker);
             }
 
-            notifyOnKill(hsIds, lastTxnIdByFailedSite);
+            if (!notifyOnKill(hsIds, lastTxnIdByFailedSite)) {
+                continue;
+            }
 
             m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
             m_failedSitesCount = m_failedSites.size();
@@ -323,17 +333,19 @@ public class MeshArbiter {
             m_seeker.clear();
 
             return lastTxnIdByFailedSite;
-        } else {
-            return ImmutableMap.of();
         }
+
+        return ImmutableMap.of();
     }
 
     /**
      * Notify all survivors when you are closing links to nodes
      * @param decision map where the keys contain the kill sites
      *   and its values are their last known safe transaction ids
+     * @return true if successfully confirmed that all survivors
+     * agree on the decision, false otherwise.
      */
-    protected void notifyOnKill(Set<Long> hsIds, Map<Long, Long> decision) {
+    protected boolean notifyOnKill(Set<Long> hsIds, Map<Long, Long> decision) {
 
         SiteFailureMessage.Builder sfmb = SiteFailureMessage.
                 builder()
@@ -341,7 +353,7 @@ public class MeshArbiter {
                 .failures(decision.keySet());
 
         Set<Long> dests = Sets.filter(m_seeker.getSurvivors(), not(equalTo(m_hsId)));
-        if (dests.isEmpty()) return;
+        if (dests.isEmpty()) return true;
 
         sfmb.survivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
         sfmb.safeTxnIds(getSafeTxnIdsForSites(hsIds));
@@ -351,11 +363,117 @@ public class MeshArbiter {
 
         m_recoveryLog.info("Agreement, Sending ["
                 + CoreUtils.hsIdCollectionToString(dests) + "]  " + sfm);
+
+        // Check to see we've made the same decision before, if so, it's likely
+        // that we've entered a loop, exit here.
+        if (m_localHistoricDecisions.size() >= 100) {
+            // Too many decisions have been made without converging
+            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                                               10, TimeUnit.SECONDS,
+                                               m_recoveryLog,
+                                               Level.WARN,
+                                               "Agreement, %d local decisions have been made without converging",
+                                               m_localHistoricDecisions.size());
+        }
+        for (SiteFailureMessage lhd : m_localHistoricDecisions) {
+            if (lhd.m_survivors.equals(sfm.m_survivors)) {
+                m_recoveryLog.info("Agreement, detected decision loop. Exiting");
+                return true;
+            }
+        }
+        m_localHistoricDecisions.add(sfm);
+
+        // Wait for all survivors in the local decision to send their decisions over.
+        // If one of the host's decision conflicts with ours, remove that host's link
+        // and repeat the decision process.
+        final Set<Long> expectedSurvivors = Sets.filter(sfm.m_survivors, not(equalTo(m_hsId)));
+        m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
+                           CoreUtils.hsIdCollectionToString(expectedSurvivors));
+
+        final Iterator<SiteFailureMessage> iter = m_decidedSurvivors.values().iterator();
+        while (iter.hasNext()) {
+            final SiteFailureMessage remoteDecision = iter.next();
+            if (expectedSurvivors.contains(remoteDecision.m_sourceHSId)) {
+                if (remoteDecision.m_decision.contains(m_hsId)) {
+                    iter.remove();
+                    m_recoveryLog.info("Agreement, Received inconsistent decision from " +
+                                       CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
+                    final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
+                    localFault.m_sourceHSId = m_hsId;
+                    m_mailbox.deliverFront(localFault);
+                    return false;
+                }
+            }
+        }
+
+        long start = System.currentTimeMillis();
+        boolean allDecisionsMatch = true;
+        do {
+            final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
+            if (msg == null) {
+                // Send a heartbeat to keep the dead host timeout active.
+                m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
+                final long duration = System.currentTimeMillis() - start;
+                if (duration > 20000) {
+                    m_recoveryLog.error("Agreement, Still waiting for decisions from " +
+                                        CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
+                                        " after " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds");
+                    start = System.currentTimeMillis();
+                }
+                continue;
+            }
+
+            if (m_hsId != msg.m_sourceHSId && !expectedSurvivors.contains(msg.m_sourceHSId)) {
+                // Ignore messages from failed sites
+                continue;
+            }
+
+            if (msg.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
+                final SiteFailureMessage fm = (SiteFailureMessage) msg;
+                if (!fm.m_decision.isEmpty()) {
+                    if (expectedSurvivors.contains(fm.m_sourceHSId)) {
+                        if (fm.m_decision.contains(m_hsId)) {
+                            m_decidedSurvivors.remove(fm.m_sourceHSId);
+                            // The remote host has decided that we are gone, remove the remote host
+                            final FaultMessage localFault = new FaultMessage(m_hsId, fm.m_sourceHSId);
+                            localFault.m_sourceHSId = m_hsId;
+                            m_mailbox.deliverFront(localFault);
+                            return false;
+                        } else {
+                            m_decidedSurvivors.put(fm.m_sourceHSId, fm);
+                        }
+                    }
+                } else {
+                    m_mailbox.deliverFront(fm);
+                    return false;
+                }
+            } else if (msg.getSubject() == Subject.FAILURE.getId()) {
+                final FaultMessage fm = (FaultMessage) msg;
+                if (!fm.decided) {
+                    // In case of concurrent fault, handle it
+                    m_mailbox.deliverFront(msg);
+                    return false;
+                } else if (mayIgnore(hsIds, fm) == Discard.DoNot) {
+                    m_mailbox.deliverFront(msg);
+                    return false;
+                }
+            }
+
+            for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
+                if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
+                    allDecisionsMatch = false;
+                }
+            }
+        } while (!m_decidedSurvivors.keySet().containsAll(expectedSurvivors) && allDecisionsMatch);
+
+        return true;
     }
 
     protected void clearInTrouble(Set<Long> decision) {
         m_forwardCandidates.clear();
         m_failedSitesLedger.clear();
+        m_decidedSurvivors.clear();
+        m_localHistoricDecisions.clear();
         m_inTrouble.clear();
         m_inTroubleCount = 0;
     }
@@ -457,6 +575,10 @@ public class MeshArbiter {
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)
                     || m_failedSites.containsAll(sfm.getFailedSites())) continue;
+
+                if (!sfm.m_decision.isEmpty()) {
+                    m_decidedSurvivors.put(sfm.m_sourceHSId, sfm);
+                }
 
                 updateFailedSitesLedger(hsIds, sfm);
 
