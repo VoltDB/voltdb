@@ -34,7 +34,7 @@ import com.google_voltpatches.common.cache.CacheBuilder;
  * to DNS lookups that will time out and works around the lack of async DNS lookups in Java
  */
 public class ReverseDNSCache {
-    public static final ThreadPoolExecutor m_es =
+    public static ThreadPoolExecutor m_es =
         new ThreadPoolExecutor(1, 16, 1, TimeUnit.SECONDS,
                                new SynchronousQueue<Runnable>(),
                                CoreUtils.getThreadFactory("Reverse DNS lookups"));
@@ -67,6 +67,18 @@ public class ReverseDNSCache {
     private final Cache<InetAddress, String> m_failures;
 
 
+    public static void start() {
+        if (m_es == null) {
+            m_es = new ThreadPoolExecutor(1, 16, 1, TimeUnit.SECONDS,
+                    new SynchronousQueue<Runnable>(),
+                    CoreUtils.getThreadFactory("Reverse DNS lookups"));
+        }
+    }
+
+    public static void close() {
+        m_es.shutdown();
+        m_es = null;
+    }
 
     /**
      * Passing in null for entries or timeout results in no limit being set

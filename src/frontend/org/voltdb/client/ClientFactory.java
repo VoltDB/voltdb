@@ -19,6 +19,10 @@ package org.voltdb.client;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.EstTimeUpdater;
+
 /**
  * Factory for constructing instances of the {@link Client} interface
  *
@@ -35,6 +39,9 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
+        VoltLogger.startAsynchronousLogging();
+        EstTimeUpdater.start();
+        ReverseDNSCache.start();
         CLIENT_NUM.incrementAndGet();
         return new ClientImpl(new ClientConfig());
     }
@@ -49,15 +56,22 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
+        VoltLogger.startAsynchronousLogging();
+        EstTimeUpdater.start();
+        ReverseDNSCache.start();
         CLIENT_NUM.incrementAndGet();
         return new ClientImpl(config);
     }
 
-    public static int getClientNum() {
-        return CLIENT_NUM.get();
-    }
-
     public static void notifyClientClose() {
-        CLIENT_NUM.decrementAndGet();
+        // the client is the last alive client. Before exit, close all the static resources and threads.
+        if (CLIENT_NUM.decrementAndGet() == 0) {
+            //Shut down the logger.
+            VoltLogger.shutdownAsynchronousLogging();
+            //Estimate Time Updater stop updates.
+            EstTimeUpdater.stop();
+            //stop ReverseDNSCache.
+            ReverseDNSCache.close();
+        }
     }
 }

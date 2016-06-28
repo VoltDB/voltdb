@@ -70,63 +70,6 @@ public class TestAdminMode extends RegressionSuite
         fail("Failed to find CLUSTERSTATE key in SystemInformation results");
     }
 
- // Somewhat hacky test of the LIVECLIENTS @Statistics selector
-    public void testBacklogAndPolling() throws Exception
-    {
-        if (isValgrind()) {
-            // no reasonable way to get the timing right in valgrind
-            // also, this test isn't really about c++ code
-            return;
-        }
-
-        ClientConfig config = new ClientConfig();
-        config.setProcedureCallTimeout(600000);
-        final Client adminclient = ClientFactory.createClient(config);
-        SocketChannel channel = getClientChannel();
-
-        try {
-            adminclient.createConnection("localhost", 32323);
-            VoltTable[] results = adminclient.callProcedure("@Statistics",
-                                                            "LIVECLIENTS",
-                                                            0).getResults();
-            System.out.println(results[0].toString());
-            results = adminclient.callProcedure("@Resume").getResults();
-            System.out.println(results[0].toString());
-            // queue up a bunch of invocations but don't read the responses
-            for (int i = 0; i < 10000; i++)
-            {
-                ConnectionUtil.sendInvocation(channel, "InsertA", i, 1000 + i);
-                ConnectionUtil.sendInvocation(channel, "SelectA");
-            }
-            results = adminclient.callProcedure("@Statistics",
-                                                "LIVECLIENTS",
-                                                0).getResults();
-            System.out.println(results[0].toString());
-            assertEquals(2, results[0].getRowCount());
-            results[0].advanceRow();
-            // After queuing 10000 invocations and not reading any,
-            // we should have some combination of outstanding work lingering around
-            assertTrue((results[0].getLong("OUTSTANDING_RESPONSE_MESSAGES") +
-                        results[0].getLong("OUTSTANDING_TRANSACTIONS")) > 0);
-            Thread.sleep(6000);
-            // ENG-998 - get rid of the channel.close() here and force
-            // Volt to kill the misbehaving connection itself.
-            // make sure there's only one connection in the list
-            // Check the proper results below
-            results = adminclient.callProcedure("@Statistics",
-                                                "LIVECLIENTS",
-                                                0).getResults();
-            System.out.println(results[0].toString());
-            assertEquals(1, results[0].getRowCount());
-            results[0].advanceRow();
-            assertEquals(1, results[0].getLong("ADMIN"));
-        }
-        finally {
-            channel.close();
-            adminclient.close();
-        }
-    }
-
     // Check that we can start in admin mode, access the DB only from the admin
     // port, then switch out of admin mode and access the DB from both ports,
     // then back in again
@@ -241,6 +184,63 @@ public class TestAdminMode extends RegressionSuite
         finally {
             adminclient.close();
             client.close();
+        }
+    }
+
+ // Somewhat hacky test of the LIVECLIENTS @Statistics selector
+    public void testBacklogAndPolling() throws Exception
+    {
+        if (isValgrind()) {
+            // no reasonable way to get the timing right in valgrind
+            // also, this test isn't really about c++ code
+            return;
+        }
+
+        ClientConfig config = new ClientConfig();
+        config.setProcedureCallTimeout(600000);
+        final Client adminclient = ClientFactory.createClient(config);
+        SocketChannel channel = getClientChannel();
+
+        try {
+            adminclient.createConnection("localhost", 32323);
+            VoltTable[] results = adminclient.callProcedure("@Statistics",
+                                                            "LIVECLIENTS",
+                                                            0).getResults();
+            System.out.println(results[0].toString());
+            results = adminclient.callProcedure("@Resume").getResults();
+            System.out.println(results[0].toString());
+            // queue up a bunch of invocations but don't read the responses
+            for (int i = 0; i < 10000; i++)
+            {
+                ConnectionUtil.sendInvocation(channel, "InsertA", i, 1000 + i);
+                ConnectionUtil.sendInvocation(channel, "SelectA");
+            }
+            results = adminclient.callProcedure("@Statistics",
+                                                "LIVECLIENTS",
+                                                0).getResults();
+            System.out.println(results[0].toString());
+            assertEquals(2, results[0].getRowCount());
+            results[0].advanceRow();
+            // After queuing 10000 invocations and not reading any,
+            // we should have some combination of outstanding work lingering around
+            assertTrue((results[0].getLong("OUTSTANDING_RESPONSE_MESSAGES") +
+                        results[0].getLong("OUTSTANDING_TRANSACTIONS")) > 0);
+            Thread.sleep(6000);
+            // ENG-998 - get rid of the channel.close() here and force
+            // Volt to kill the misbehaving connection itself.
+            // make sure there's only one connection in the list
+            // Check the proper results below
+            results = adminclient.callProcedure("@Statistics",
+                                                "LIVECLIENTS",
+                                                0).getResults();
+            System.out.println(results[0].toString());
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong("ADMIN"));
+        }
+        finally {
+            channel.close();
+            adminclient.close();
         }
     }
 

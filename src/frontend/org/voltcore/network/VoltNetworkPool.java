@@ -79,15 +79,8 @@ public class VoltNetworkPool {
     }
 
     public void shutdown() throws InterruptedException {
-        try {
-            for (VoltNetwork vn : m_networks) {
-                vn.shutdown();
-            }
-        } catch (InterruptedException e) {
-            throw e;
-        } finally {
-            // end "Reverse DNS lookups" thread before shutdown
-            ReverseDNSCache.m_es.shutdown();
+        for (VoltNetwork vn : m_networks) {
+            vn.shutdown();
         }
     }
 

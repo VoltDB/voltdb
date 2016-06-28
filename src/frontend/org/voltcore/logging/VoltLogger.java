@@ -94,6 +94,15 @@ public class VoltLogger {
         }
     }
 
+    public static void startAsynchronousLogging() {
+        if (m_asynchLoggerPool == null) {
+            m_asynchLoggerPool =
+                    Boolean.getBoolean("DISABLE_ASYNC_LOGGING") ?
+                            null :
+                            new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
+                                    new LoggerThreadFactory());
+        }
+    }
 
     /**
      * Abstraction of core functionality shared between Log4j and

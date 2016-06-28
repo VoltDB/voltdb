@@ -102,8 +102,6 @@ public class TestClientClose extends TestCase {
             assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
                     || threadName.contains("Estimated Time Updater"));
         }
-        System.out.println("preNumClientReaper : " + preNumClientReaper);
-        System.out.println("postNumClientReaper : " + postNumClientReaper);
         assertEquals(preNumClientReaper, postNumClientReaper);
     }
 

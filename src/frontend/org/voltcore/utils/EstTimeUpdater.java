@@ -32,7 +32,7 @@ public class EstTimeUpdater {
     public static volatile boolean pause = false;
     private static final AtomicBoolean UPDATER_CONTINUE = new AtomicBoolean(true);
 
-    private static final Thread updater = new Thread("Estimated Time Updater") {
+    private static Thread updater = new Thread("Estimated Time Updater") {
         @Override
         public void run() {
             while (UPDATER_CONTINUE.get()) {
@@ -53,8 +53,32 @@ public class EstTimeUpdater {
         updater.start();
     }
 
+    public static void start() {
+        if (updater == null) {
+            UPDATER_CONTINUE.set(true);
+            updater = new Thread("Estimated Time Updater") {
+                @Override
+                public void run() {
+                    while (UPDATER_CONTINUE.get()) {
+                        try {
+                            Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
+                        } catch (InterruptedException e) {}
+                        if (pause) continue;
+                        Long delta = EstTimeUpdater.update(System.currentTimeMillis());
+                        if ( delta != null ) {
+                            new VoltLogger("HOST").info(delta +" estimated time update.");
+                        }
+                    }
+                }
+            };
+            updater.setDaemon(true);
+            updater.start();
+        }
+    }
+
     public static void stop() {
         UPDATER_CONTINUE.set(false);
+        updater = null;
     }
 
     /**
