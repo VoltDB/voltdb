@@ -52,9 +52,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     };
 
     // Limit plan node information.
-    private LimitOffset m_limitOffset = new LimitOffset();
+    private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
@@ -166,20 +166,88 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isOrderDeterministic() {
-        ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
-        return orderByColumnsDetermineAllDisplayColumns(nonOrdered);
+        return isOrderDeterministicHelper(m_orderColumns);
+    }
+
+    private boolean isOrderDeterministicHelper(List<ParsedColInfo> orderColumns) {
+
+        switch (m_unionType) {
+        case EXCEPT:
+        case EXCEPT_ALL:
+        case INTERSECT:
+        case INTERSECT_ALL:
+            // In the back end, these set operators all use boost unordered containers
+            // to define the output table.  We're not sure that iterating over these
+            // containers will produce deterministic results, so we need to rely on
+            // the ORDER BY clause on the outermost set operator (if any) to determine
+            // if order is defined deterministically.
+            //
+            // Order by columns always refer to the leftmost select statement.
+            //
+            // If the ordering of the left child is deterministically defined by
+            // order by columns on the outermost set operator, then this is sufficient
+            // for the whole statement to be order deterministic since both EXCEPT and INTERSECT
+            // produce results that are subsets of rows produced by the left child of the
+            // set operator.
+            return orderIsDeterminedByOrderColumns(m_children.get(0), orderColumns);
+
+        case UNION:
+        case UNION_ALL:
+
+            // Check all but the left child of the union.
+            for (int i = 1; i < m_children.size(); ++i) {
+                if (! m_children.get(i).isOrderDeterministic()) {
+                    return false;
+                }
+            }
+
+            AbstractParsedStmt leftChild = m_children.get(0);
+            if (leftChild.isOrderDeterministic()) {
+                return true;
+            }
+
+            // Even if left child is not deterministic, it might be made so by
+            // an ORDER BY applied to the output of the union.  All the rows produced by
+            // the UNION are sorted of course, but the order by columns refer to columns in the
+            // leftmost select statement.  (The ORDER BY might also cause select statements that
+            // are not the leftmost to be deterministic, but this is tricky to ascertain.)
+            return orderIsDeterminedByOrderColumns(m_children.get(0), orderColumns);
+
+        default:
+            return false;
+        }
+    }
+
+    private static boolean orderIsDeterminedByOrderColumns(AbstractParsedStmt stmt, List<ParsedColInfo> orderColumns) {
+
+        if (orderColumns.isEmpty()) {
+            return false;
+        }
+
+        if (stmt instanceof ParsedSelectStmt) {
+            ParsedSelectStmt selectStmt = (ParsedSelectStmt) stmt;
+            ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+            return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
+        }
+        else {
+            ParsedUnionStmt setOpStmt = (ParsedUnionStmt) stmt;
+            switch (setOpStmt.m_unionType) {
+            case EXCEPT:
+            case EXCEPT_ALL:
+            case INTERSECT:
+            case INTERSECT_ALL:
+                return orderIsDeterminedByOrderColumns(setOpStmt.m_children.get(0), orderColumns);
+            default:
+                return false;
+
+            }
+        }
     }
 
     @Override
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
         // Set OP should not have its own subqueries
         return isOrderDeterministic();
-    }
-
-    private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
-    {
-        ParsedSelectStmt selectStmt = getLeftmostSelectStmt();
-        return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), m_orderColumns, nonOrdered);
     }
 
     @Override
