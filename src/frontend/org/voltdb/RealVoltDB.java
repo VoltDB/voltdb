@@ -653,7 +653,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             HostMessenger.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
-                String action = "Start is proceeding as " + determination.startAction.verb();
+                String action = "Starting a new database cluster";
+                if (determination.startAction.doesRejoin()) {
+                    action = "Rejoining a running cluster";
+                } else if (determination.startAction.doesRecover()) {
+                    action = "Restating the database cluster from the command logs";
+                }
                 hostLog.info(action);
                 consoleLog.info(action);
             }
