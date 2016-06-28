@@ -68,11 +68,12 @@ RIGHT JOIN `junit-builds` AS jr
 """)
 
 PL_QUERY = ("""
-  SELECT job,
-         name,
-         fails,
-         total,
-         fails/total*100. AS "Percent failure"
+  SELECT job AS 'Job name',
+         name AS 'Test name',
+         fails AS 'Fails',
+         total AS 'Total',
+         fails/total*100. AS "Fail %",
+         latest AS 'Latest Failure'
     FROM
         (
            SELECT job,
@@ -82,10 +83,41 @@ PL_QUERY = ("""
                      FROM `junit-builds` AS jr
                     WHERE jr.name = tf.job
                   ) AS total,
-                  COUNT(*) AS fails
+                  COUNT(*) AS fails,
+                  MAX(tf.stamp) AS latest
              FROM `junit-test-failures` AS tf
             WHERE NOT status='FIXED' AND
-                  job=%(job)s
+                  job=%(job)s AND
+                  NOW() - INTERVAL 30 DAY <= tf.stamp
+         GROUP BY job,
+                  name,
+                  total
+        ) AS intermediate
+ORDER BY 5 DESC
+""")
+
+L_QUERY = ("""
+  SELECT job AS 'Job name',
+         name AS 'Test name',
+         fails AS 'Fails',
+         total AS 'Total',
+         fails/total*100. AS "Fail %",
+         latest AS 'Latest Failure'
+    FROM
+        (
+           SELECT job,
+                  name,
+                  (
+                   SELECT COUNT(*)
+                     FROM `junit-builds` AS jr
+                    WHERE jr.name = tf.job
+                  ) AS total,
+                  COUNT(*) AS fails,
+                  MAX(tf.stamp) AS latest
+             FROM `junit-test-failures` AS tf
+            WHERE NOT status='FIXED' AND
+                  (job=%(jobA)s OR job=%(jobB)s) AND
+                  NOW() - INTERVAL 30 DAY <= tf.stamp
          GROUP BY job,
                   name,
                   total
@@ -224,7 +256,13 @@ class JenkinsBot(object):
 
         cursor.execute(query, params)
         headers = list(cursor.column_names)
-        table = list(cursor.fetchall())
+        table = cursor.fetchall()
+        if query == L_QUERY:
+        # Do some specific replacement for long rows in this query.
+            for i, row in enumerate(table):
+                table[i] = list(row)
+                table[i][0] = table[i][0].replace('branch-2-', '')
+                table[i][1] = table[i][1].replace('org.voltdb.', '')
         self.client.api_call(
             'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
         )
@@ -245,15 +283,9 @@ if __name__ == '__main__':
     if jenkinsbot.connect() and len(sys.argv) > 1:
         if sys.argv[1] == 'session':
             jenkinsbot.session()
-        elif sys.argv[1] == 'pro-leaderboard':
-            jenkinsbot.query_and_response(PL_QUERY,
-                                    {'job': PRO},
+        elif sys.argv[1] == 'leaderboard':
+            jenkinsbot.query_and_response(L_QUERY,
+                                    {'jobA': PRO, 'jobB': COMMUNITY},
                                     ['#junit'],
-                                    'pro-leaderboard.txt'
-            )
-        elif sys.argv[1] == 'community-leaderboard':
-            jenkinsbot.query_and_response(PL_QUERY,
-                                    {'job': COMMUNITY},
-                                    ['#junit'],
-                                    'community-leaderboard.txt'
+                                    'leaderboard.txt'
             )
