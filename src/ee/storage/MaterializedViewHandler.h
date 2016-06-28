@@ -47,7 +47,16 @@ private:
     PersistentTable *m_destTable;
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
+    std::vector<int32_t> m_columnTypes;
     bool m_dirty;
+
+    void install(PersistentTable *destTable,
+                 catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+                 VoltDBEngine *engine);
+    void setUpForCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+                             VoltDBEngine *engine);
+    void setUpForMinMax(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+                        VoltDBEngine *engine);
 };
 
 } // namespace voltdb
