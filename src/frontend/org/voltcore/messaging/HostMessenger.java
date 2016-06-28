@@ -1180,6 +1180,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         int unmeshed = 0;
         int operational = 0;
         boolean paused = false;
+        boolean safemode = false;
 
         for (HostCriteria c: m_hostCriteria.values()) {
             if (c.getNodeState().operational()) {
@@ -1191,11 +1192,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (c.isPaused()) {
                 m_paused.set(true);
             }
+            safemode = safemode || c.isSafeMode();
         }
 
         if (operational > 0 && m_paused.get() != paused) {
             m_paused.set(paused);
         }
+
+        safemode = safemode && operational == 0 && bare < ksafety;
 
         if (m_criteria.getStartAction() != StartAction.PROBE) {
             m_probedDetermination.set(new Determination(
@@ -1221,7 +1225,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } else if (operational == 0 && bare == unmeshed) {
             determination = StartAction.CREATE;
         } else if (operational == 0 && bare < ksafety) {
-            determination = StartAction.RECOVER;
+            determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
         } else if (operational == 0 && bare >= ksafety) {
             try { shutdown(); } catch (Exception ignoreIt) {}
             org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "

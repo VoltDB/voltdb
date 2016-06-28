@@ -231,6 +231,15 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine safeMode(boolean safeMode) {
+        m_safeMode = safeMode;
+        return this;
+    }
+
+    public boolean safeMode() {
+        return m_safeMode;
+    }
+
     public boolean enableAdd() {
         return m_enableAdd;
     }
@@ -630,6 +639,10 @@ public class CommandLine extends VoltDB.Configuration
         //
         cmdline.add("org.voltdb.VoltDB");
         cmdline.add(m_startAction.verb());
+
+        if (m_startAction == StartAction.PROBE && m_safeMode) {
+            cmdline.add("safemode");
+        }
 
         cmdline.add("host");
         if (!m_coordinators.isEmpty()) {

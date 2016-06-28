@@ -19,7 +19,7 @@
                                 needs_catalog=False,
                                 supports_live=False,
                                 default_host=False,
-                                safemode_available=False,
+                                safemode_available=True,
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True,

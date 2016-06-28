@@ -2172,6 +2172,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .paused(m_config.m_isPaused)
                 .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
                 .addAllowed(m_config.m_enableAdd)
+                .safeMode(m_config.m_safeMode)
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();

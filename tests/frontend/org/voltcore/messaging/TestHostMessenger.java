@@ -439,6 +439,58 @@ public class TestHostMessenger {
     }
 
     @Test
+    public void testSafeModePropagation() throws Exception {
+        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+                .coordinators(coordinators(3))
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .bare(false)
+                .kfactor(1);
+
+        JoinerCriteria safe  = jcb.safeMode(true).build();
+        JoinerCriteria unsafe = jcb.safeMode(false).build();
+
+        HostMessenger hm1 = createHostMessenger(0, unsafe, true);
+        HostMessenger hm2 = createHostMessenger(1, safe, false);
+        HostMessenger hm3 = createHostMessenger(2, unsafe, false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+        HostMessengerThread hm3Start = new HostMessengerThread(hm3, exception);
+
+        hm2Start.start();
+        hm3Start.start();
+
+        hm2Start.join();
+        hm3Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        Determination dtm = hm1.waitForDetermination();
+        assertEquals(StartAction.SAFE_RECOVER, dtm.startAction);
+        assertEquals(3, dtm.hostCount);
+
+        assertEquals(dtm, hm2.waitForDetermination());
+        assertEquals(dtm, hm3.waitForDetermination());
+
+        List<String> root1 = hm1.getZK().getChildren("/", false );
+        List<String> root2 = hm2.getZK().getChildren("/", false );
+        List<String> root3 = hm3.getZK().getChildren("/", false );
+
+        assertTrue(root1.equals(root2));
+        assertTrue(root2.equals(root3));
+
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
+
+        assertTrue(hostids1.equals(hostids2));
+        assertTrue(hostids2.equals(hostids3));
+    }
+
+    @Test
     public void testStaggeredStartsWithFewerCoordinators() throws Exception {
         JoinerCriteria.Builder jcb = JoinerCriteria.builder()
                 .coordinators(coordinators(2))
@@ -534,9 +586,11 @@ public class TestHostMessenger {
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
         hm1.shutdown();
 
+        // rejoining node cannot propagate its safe mode or paused demand
         jc = jcb.nodeState(NodeState.INITIALIZING)
                 .bare(false)
                 .paused(true)
+                .safeMode(true)
                 .build();
         hm1 = createHostMessenger(0, jc, true);
 
