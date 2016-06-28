@@ -449,6 +449,7 @@ if whichtests in ("${eetestsuite}", "common"):
      tupleschema_test
      undolog_test
      valuearray_test
+     uniqueid_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

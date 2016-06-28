@@ -1,10 +1,6 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -24,60 +20,97 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
+
 package benchmark;
 
 import java.util.Random;
+
 import org.voltdb.*;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.*;
 
 public class Benchmark {
 
+    protected final InsertDeleteConfig config;
     private Client client;
     private Random rand = new Random();
     private BenchmarkStats stats;
 
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class InsertDeleteConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        int displayinterval = 5;
 
-    public Benchmark(String servers) throws Exception {
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 10;
+
+        @Option(desc = "Comma-separated list of the form server[:port] to connect to database for queries.")
+        String servers = "localhost";
+
+        @Option(desc = "If true (default), leave the database empty; otherwise, seed it with data.")
+        boolean empty = true;
+
+        @Option(desc = "If true (default), test inline (int) data, stored inside the table.")
+        boolean inline = true;
+
+        @Option(desc = "If true (default), test non-inline (String) data, stored outside the table.")
+        boolean outline = true;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "insertdelete.csv";
+
+        @Override
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (servers.length() == 0) servers = "localhost";
+            if (statsfile.length() == 0) statsfile = "insertdelete.csv";
+        }
+    }
+
+    public Benchmark(String[] args, boolean emptyDefault) throws Exception {
+        config = new InsertDeleteConfig();
+        config.empty = emptyDefault;
+        config.parse(Benchmark.class.getName(), args);
+
         client = ClientFactory.createClient();
-        String[] serverArray = servers.split(",");
+        String[] serverArray = config.servers.split(",");
         for (String server : serverArray) {
             client.createConnection(server);
         }
+
         stats = new BenchmarkStats(client);
+    }
+
+    public Benchmark(String[] args) throws Exception {
+        this(args, true);
     }
 
 
     public void init() throws Exception {
 
-        // any initial setup can go here
+        if (!config.empty) {
+            SeedTables.seedTables(config.servers);
+        }
 
     }
 
 
-    public void runBenchmark(boolean inline, boolean outline, int numberIterations) throws Exception {
+    public void runBenchmark() throws Exception {
 
-        stats.startBenchmark();
+        stats.startBenchmark(config.displayinterval);
 
-        for (int i=0; i < numberIterations; i++) {
+        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        while (benchmarkEndTime > System.currentTimeMillis()) {
+
             int appid;
             int deviceid;
-            if (outline) {
+
+            if (config.outline) {
                 appid = rand.nextInt(50);
                 deviceid = rand.nextInt(1000000)+500; // add 500 to avoid low values that may be used for seed data
                 client.callProcedure(new BenchmarkCallback("InsertDeleteWithString"),
@@ -88,7 +121,8 @@ public class Benchmark {
                                      );
             }
 
-            if (inline) {
+
+            if (config.inline) {
                 appid = rand.nextInt(50);
                 deviceid = rand.nextInt(1000000)+500; // add 500 to avoid low values that may be used for seed data
                 client.callProcedure(new BenchmarkCallback("InsertDelete"),
@@ -99,7 +133,7 @@ public class Benchmark {
             }
         }
 
-        stats.endBenchmark();
+        stats.endBenchmark(config.statsfile);
 
         client.drain();
         BenchmarkCallback.printAllResults();
@@ -109,33 +143,10 @@ public class Benchmark {
 
 
     public static void main(String[] args) throws Exception {
-        boolean inline = true;
-        boolean outline = true;
-        String serverlist = "localhost";
-        int idx;
-        int numberIterations = 1000000;
-        for (idx = 0; idx < args.length && args[idx].startsWith("--"); idx += 1) {
-            String arg = args[idx];
-            if ("--inline".equals(arg)) {
-                inline = true;
-                outline = false;
-            } else if ("--outofline".equals(arg)) {
-                outline = true;
-                inline  = false;
-            } else if ("--numiters".equals(arg)) {
-                idx += 1;
-                arg = args[idx];
-                numberIterations = Integer.valueOf(arg);
-            } else {
-                System.err.printf("Benchmark: Unknown command line parameter %s\n", arg);
-                System.exit(100);
-            }
-        }
-        if (args.length > idx) {
-            serverlist = args[idx];
-        }
-        Benchmark benchmark = new Benchmark(serverlist);
+
+        Benchmark benchmark = new Benchmark(args);
         benchmark.init();
-        benchmark.runBenchmark(inline, outline, numberIterations);
+        benchmark.runBenchmark();
+
     }
 }
