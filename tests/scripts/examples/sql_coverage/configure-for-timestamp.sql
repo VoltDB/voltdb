@@ -16,7 +16,7 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 
-
+{@insertcols = "ID, PAST, PRESENT, FUTURE, RATIO"}
 {@insertvals = "_id, _value[timestamp], _value[timestamp], _value[timestamp], _value[int64]"}
 {@onefun = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@optionalfn = " "} -- There are no handy unary timestamp-to-timestamp functions.

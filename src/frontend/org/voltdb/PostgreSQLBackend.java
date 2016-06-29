@@ -408,6 +408,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return super.getColumnInfo(getVoltColumnTypeName(columnTypeName), colName);
     }
 
+    /**
+     * Returns true of the specified String contains an odd number of single
+     * quote (') characters; false otherwise. This is useful in determining
+     * whether commas are enclosed in single quotes, or not.
+     */
+    static private boolean hasOddNumberOfSingleQuotes(String str) {
+        boolean result = false;
+        for (int index = str.indexOf("'"); index > -1; index = str.indexOf("'", index+1)) {
+            result = !result;
+        }
+        return result;
+    }
+
     /** Returns the specified String, after replacing certain "variables", such
      *  as {table} or {column:pk} (the ":pk" means primary keys only; ":npk"
      *  means non-primary-keys), in a QueryTransformer's prefix, suffix, or
@@ -461,7 +474,32 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         List<String> columnValues = null;
         index = groupNames.indexOf("values");
         if (index > -1 && index < groupValues.size()) {
-            columnValues = new ArrayList<String>(Arrays.asList(groupValues.get(index).split(",")));
+            String columnValuesString = groupValues.get(index);
+            columnValues = new ArrayList<String>(Arrays.asList(columnValuesString.split(",")));
+
+            // Handle the case where one or more of the commas were enclosed in
+            // single quotes, so they should not have been used as separators
+            // between the column values, meaning that some of the initially
+            // defined column values need to be recombined
+            if (columnValuesString.contains("'")) {
+                List<Integer> indexesToDelete = new ArrayList<Integer>();
+                for (int i=0; i < columnValues.size(); i++) {
+                    if (hasOddNumberOfSingleQuotes(columnValues.get(i))) {
+                        int j;
+                        for (j=i+1; j < columnValues.size(); j++) {
+                            columnValues.set(i, columnValues.get(i) + "," + columnValues.get(j));
+                            indexesToDelete.add(j);
+                            if (hasOddNumberOfSingleQuotes(columnValues.get(j))) {
+                                break;
+                            }
+                        }
+                        i = j;
+                    }
+                }
+                for (int k=indexesToDelete.size() - 1; k >= 0; k--) {
+                    columnValues.remove(indexesToDelete.get(k).intValue());
+                }
+            }
         } else {
             return str;
         }
