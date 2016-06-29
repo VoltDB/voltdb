@@ -24,6 +24,8 @@ import java.util.Set;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -77,21 +79,25 @@ public abstract class StmtTableScan {
 
     abstract public String getColumnName(int m_columnIndex);
 
-    abstract public void processTVE(TupleValueExpression expr, String columnName);
+    abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
-    public void resolveTVE(TupleValueExpression expr) {
-        processTVE(expr, expr.getColumnName());
-        // The original column name may be changed by the processTVE in case of
-        // this TVE was originated in a subquery that was optimized out
-        String columnName = expr.getColumnName();
-        expr.setOrigStmtId(m_stmtId);
+    public AbstractExpression resolveTVE(TupleValueExpression expr) {
+        AbstractExpression resolvedExpr = processTVE(expr, expr.getColumnName());
 
-        Pair<String, Integer> setItem = Pair.of(columnName, expr.getDifferentiator());
-        if ( ! m_scanColumnNameSet.contains(setItem)) {
-            SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
-                    columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(setItem);
-            m_scanColumnsList.add(scol);
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(resolvedExpr);
+        for (TupleValueExpression tve : tves) {
+            // The original column name may be changed by the processTVE in case of
+            // this TVE was originated in a subquery that was optimized out
+            String columnName = tve.getColumnName();
+            tve.setOrigStmtId(m_stmtId);
+            Pair<String, Integer> setItem = Pair.of(columnName, tve.getDifferentiator());
+            if ( ! m_scanColumnNameSet.contains(setItem)) {
+                SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
+                        columnName, columnName, (TupleValueExpression) tve.clone());
+                m_scanColumnNameSet.add(setItem);
+                m_scanColumnsList.add(scol);
+            }
         }
+        return resolvedExpr;
     }
 }

@@ -2320,6 +2320,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         equivalentSql = "select D, C as D, A as C from R1 T where T.A = 1";
         checkSubquerySimplification(sql, equivalentSql);
 
+        sql = "select C + 1 from (select D, C as D, A as C from R1) T where C = 1;";
+        equivalentSql = "select A + 1 from R1 T where T.A = 1";
+        checkSubquerySimplification(sql, equivalentSql);
+
         // Subquery SELECT *
         sql = "select * from (select * from R1) T1";
         equivalentSql = "select * from R1 T1";

@@ -491,7 +491,7 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias,
+        TupleValueExpression tve = new TupleValueExpression(tableName, tableAlias,
                 columnName, columnAlias, -1, differentiator);
         // Collect the unique columns used in the plan for a given scan.
 
@@ -506,16 +506,16 @@ public abstract class AbstractParsedStmt {
             // from TestVoltCompler.testScalarSubqueriesExpectedFailures.
             throw new PlanningErrorException("Object not found: " + tableAlias);
         }
-        tableScan.resolveTVE(expr);
+        AbstractExpression resolvedExpr = tableScan.resolveTVE(tve);
 
         if (m_stmtId == tableScan.getStatementId()) {
-            return expr;
+            return resolvedExpr;
         }
 
         // This is a TVE from the correlated expression
         int paramIdx = NEXT_PARAMETER_ID++;
-        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
-        m_parameterTveMap.put(paramIdx, expr);
+        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, resolvedExpr);
+        m_parameterTveMap.put(paramIdx, resolvedExpr);
         return pve;
     }
 
