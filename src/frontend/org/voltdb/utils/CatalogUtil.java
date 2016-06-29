@@ -652,13 +652,6 @@ public abstract class CatalogUtil {
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
 
-            //set path and path overrides
-            // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
-            // because path locations for snapshots and partition detection don't
-            // exist in the catalog until after those portions of the deployment
-            // file are handled.
-            setPathsInfo(catalog, deployment.getPaths());
-
             // set the users info
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
@@ -675,9 +668,13 @@ public abstract class CatalogUtil {
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
-
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            //This is here so we can update our local list of paths.
+            //I would not have needed this if validateResourceMonitor didnt go through VoltDB
+            VoltDB.instance().loadLegacyPathProperties(deployment);
 
+            //Make sure directories are fine.
+            setupPaths(deployment.getPaths());
             validateResourceMonitorInfo(deployment);
         }
         catch (Exception e) {
@@ -694,7 +691,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings(), deployment.getPaths());
+        new ResourceUsageMonitor(deployment.getSystemsettings());
     }
 
 
@@ -704,7 +701,8 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+
         Frequency freq = commandlog.getFrequency();
         if (freq != null) {
             long maxTxnsBeforeFsyncTemp = freq.getTransactions();
@@ -1671,50 +1669,20 @@ public abstract class CatalogUtil {
 
     /**
      * Set voltroot path, and set the path overrides for export overflow, partition, etc.
-     * @param catalog The catalog to be updated.
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths) {
+    private static void setupPaths( PathsType paths) {
         File voltDbRoot;
-        final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
         //Snapshot
-        File snapshotPath = getSnapshot(paths.getSnapshots(), voltDbRoot);
+        setupSnapshotPaths(paths.getSnapshots(), voltDbRoot);
         //export overflow
-        File exportOverflowPath = getExportOverflow(paths.getExportoverflow(), voltDbRoot);
+        setupExportOverflow(paths.getExportoverflow(), voltDbRoot);
         // only use these directories in the enterprise version
-        File commandLogPath = null;
-        File commandLogSnapshotPath = null;
-        commandLogPath = getCommandLog(paths.getCommandlog(), voltDbRoot);
-        commandLogSnapshotPath = getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
-
-        //Set the volt root in the catalog
-        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
-
-        //Set the auto-snapshot schedule path if there are auto-snapshots
-        SnapshotSchedule schedule = cluster.getDatabases().
-            get("database").getSnapshotschedule().get("default");
-        if (schedule != null) {
-            schedule.setPath(snapshotPath.getPath());
-        }
-
-        //Update the path in the schedule for ppd
-        schedule = cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
-        if (schedule != null) {
-            schedule.setPath(snapshotPath.getPath());
-        }
-
-        //Also set the export overflow directory
-        cluster.setExportoverflow(exportOverflowPath.getPath());
-
-        cluster.setDroverflow(getDROverflow(paths.getDroverflow(), voltDbRoot).getPath());
-
-        //Set the command log paths, also creates the command log entry in the catalog
-        final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
-        commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
-        commandLogConfig.setLogpath(commandLogPath.getPath());
+        setupCommandLog(paths.getCommandlog(), voltDbRoot);
+        setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
     }
 
     /**
@@ -1748,7 +1716,7 @@ public abstract class CatalogUtil {
         return voltDbRoot;
     }
 
-    public static File getSnapshot(PathsType.Snapshots paths, File voltDbRoot) {
+    public static void setupSnapshotPaths(PathsType.Snapshots paths, File voltDbRoot) {
         File snapshotPath;
         snapshotPath = new File(paths.getNodePath());
         if (!snapshotPath.isAbsolute())
@@ -1765,16 +1733,13 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("snapshot path", snapshotPath);
-
-        return snapshotPath;
-
     }
 
-    public static File getCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
+    public static void setupCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
             File commandlogPath =  new VoltFile(voltDbRoot, "command_log");
-            return commandlogPath;
+            return;
         }
         File commandlogPath;
         commandlogPath = new File(paths.getNodePath());
@@ -1792,16 +1757,13 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("command log", commandlogPath);
-
-        return commandlogPath;
-
     }
 
-    public static File getCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
+    public static void setupCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
-            File commandlogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
-            return commandlogSnapshotPath;
+            new VoltFile(voltDbRoot, "command_log_snapshot");
+            return;
         }
 
         File commandlogSnapshotPath;
@@ -1820,12 +1782,9 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("command log snapshot", commandlogSnapshotPath);
-
-        return commandlogSnapshotPath;
-
     }
 
-    public static File getExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
+    public static void setupExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
         File exportOverflowPath;
         exportOverflowPath = new File(paths.getNodePath());
         if (!exportOverflowPath.isAbsolute())
@@ -1842,8 +1801,6 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("export overflow", exportOverflowPath);
-        return exportOverflowPath;
-
     }
 
     public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
@@ -2484,7 +2441,7 @@ public abstract class CatalogUtil {
             // outdir
             PropertyType outdir = new PropertyType();
             outdir.setName("outdir");
-            outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            outdir.setValue(VoltDB.instance().getVoltDBRootPath() + "/" + DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
             // k-safe file export

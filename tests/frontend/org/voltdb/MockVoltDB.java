@@ -62,7 +62,9 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -217,8 +219,6 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setSynchronous(sync);
         logConfig.setFsyncinterval(fsyncInterval);
         logConfig.setMaxtxns(maxTxns);
-        logConfig.setLogpath(logPath);
-        logConfig.setInternalsnapshotpath(snapshotPath);
     }
 
     public void configureSnapshotSchedulePath(String autoSnapshotPath) {
@@ -226,7 +226,6 @@ public class MockVoltDB implements VoltDBInterface
         if (scheduleConfig == null) {
             scheduleConfig = getDatabase().getSnapshotschedule().add("default");
         }
-        scheduleConfig.setPath(autoSnapshotPath);
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -504,6 +503,25 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public String getSnapshotPath() {
+        return "";
+    }
+
+    @Override
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
+    }
+
+    @Override
+    public String getVoltDBRootPath() {
+        return "voltdbroot";
+    }
+
+    @Override
+    public String getExportOverflowPath() {
+        return "";
+    }
+
+    @Override
+    public String getDROverflowPath() {
         return "";
     }
 

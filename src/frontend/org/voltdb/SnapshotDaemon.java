@@ -1193,7 +1193,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (schedule.getEnabled()) {
             m_frequency = schedule.getFrequencyvalue();
             m_retain = schedule.getRetain();
-            m_path = schedule.getPath();
+            m_path = VoltDB.instance().getSnapshotPath();
             m_prefix = schedule.getPrefix();
             m_prefixAndSeparator = m_prefix + "_";
             final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();

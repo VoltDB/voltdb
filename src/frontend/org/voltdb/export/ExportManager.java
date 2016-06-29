@@ -389,11 +389,11 @@ public class ExportManager
 
         updateProcessorConfig(connectors);
 
-        exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
+        exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
 
     private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
-        String overflowDir = catContext.catalog.getClusters().get("cluster").getExportoverflow();
+        String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
                 String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
@@ -435,7 +435,7 @@ public class ExportManager
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
 
-            File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
 
             /*
              * If this is a catalog update providing an existing generation,
@@ -607,7 +607,7 @@ public class ExportManager
             return;
         }
 
-        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+        File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;

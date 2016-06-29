@@ -25,10 +25,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
-import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -43,9 +41,9 @@ public class DiskResourceChecker
     static FileCheckForTest s_testFileCheck; // used only for testing
     private ImmutableMap<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits;
 
-    public DiskResourceChecker(SystemSettingsType systemSettings, PathsType pathsConfig)
+    public DiskResourceChecker(SystemSettingsType systemSettings)
     {
-        findDiskLimitConfiguration(systemSettings, pathsConfig);
+        findDiskLimitConfiguration(systemSettings);
     }
 
     public boolean hasLimitsConfigured()
@@ -99,7 +97,7 @@ public class DiskResourceChecker
         return false;
     }
 
-    private void findDiskLimitConfiguration(SystemSettingsType systemSettings, PathsType pathsConfig)
+    private void findDiskLimitConfiguration(SystemSettingsType systemSettings)
     {
         // By now we know that resource monitor is not null
         DiskLimitType diskLimitConfig = systemSettings.getResourcemonitor().getDisklimit();
@@ -119,7 +117,7 @@ public class DiskResourceChecker
             for (DiskLimitType.Feature feature : features) {
                 configuredFeatures.add(feature.getName());
                 FeatureDiskLimitConfig aConfig =
-                        new FeatureDiskLimitConfig(feature.getName(), pathsConfig, feature.getSize());
+                        new FeatureDiskLimitConfig(feature.getName(), feature.getSize());
                 if (!isSupportedFeature(feature.getName())) {
                     m_logger.warn("Ignoring unsupported feature " + feature.getName());
                     continue;
@@ -194,21 +192,19 @@ public class DiskResourceChecker
         }
     }
 
-    private static File getPathForFeature(FeatureNameType featureName, PathsType pathsConfig)
+    private static File getPathForFeature(FeatureNameType featureName)
     {
-        // pathsConfig will never be null or something is really wrong
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(pathsConfig).getAbsoluteFile();
         switch(featureName) {
         case COMMANDLOG :
-            return CatalogUtil.getCommandLog(pathsConfig.getCommandlog(), voltDbRoot);
+            return new File(VoltDB.instance().getCommandLogPath());
         case COMMANDLOGSNAPSHOT :
-            return CatalogUtil.getCommandLogSnapshot(pathsConfig.getCommandlogsnapshot(), voltDbRoot);
+            return new File(VoltDB.instance().getCommandLogSnapshotPath());
         case DROVERFLOW:
-            return CatalogUtil.getDROverflow(pathsConfig.getDroverflow(), voltDbRoot);
+            return new File(VoltDB.instance().getDROverflowPath());
         case EXPORTOVERFLOW:
-            return CatalogUtil.getExportOverflow(pathsConfig.getExportoverflow(), voltDbRoot);
+            return new File(VoltDB.instance().getExportOverflowPath());
         case SNAPSHOTS:
-            return CatalogUtil.getSnapshot(pathsConfig.getSnapshots(), voltDbRoot);
+            return new File(VoltDB.instance().getSnapshotPath());
         default: // Not a valid feature or one that is supported for disk limit monitoring.
                  // Should not happen unless we forget to add a newly supported feature here.
             return null;
@@ -223,10 +219,10 @@ public class DiskResourceChecker
         final double m_diskSizeLimit;
         final int m_diskSizeLimitPerc;
 
-        FeatureDiskLimitConfig(FeatureNameType featureName, PathsType pathsConfig, String sizeConfig)
+        FeatureDiskLimitConfig(FeatureNameType featureName, String sizeConfig)
         {
             m_featureName = featureName;
-            m_path = getPathForFeature(featureName, pathsConfig);
+            m_path = getPathForFeature(featureName);
             if (m_path==null) {
                 throw new IllegalArgumentException(
                         featureName + " is not a valid feature or not one supported for disk limit monitoring");

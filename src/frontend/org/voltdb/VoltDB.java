@@ -86,6 +86,7 @@ public class VoltDB {
     public static final String DBROOT = Constants.DBROOT;
 
     //These keys come from DeploymentFile xsd.
+    public static final String DBROOT_PATH_KEY = (new PathsType.Voltdbroot()).getKey();
     public static final String CL_SNAPSHOT_PATH_KEY = (new PathsType.Commandlogsnapshot()).getKey();
     public static final String CL_PATH_KEY = (new PathsType.Commandlog()).getKey();
     public static final String SNAPTHOT_PATH_KEY = (new PathsType.Snapshots()).getKey();
@@ -893,7 +894,7 @@ public class VoltDB {
         if (hm != null) {
             hostId = hm.getHostId();
         }
-        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
         try {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
             writer.println(message);
@@ -1025,7 +1026,7 @@ public class VoltDB {
                 {
                     TimestampType ts = new TimestampType(new java.util.Date());
                     CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
                     PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
                     writer.println("Time: " + ts);
                     writer.println("Message: " + errMsg);

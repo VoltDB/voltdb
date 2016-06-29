@@ -18,12 +18,14 @@ package org.voltdb;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
@@ -44,10 +46,13 @@ public interface VoltDBInterface
 
     public CommandLog getCommandLog();
 
+    public String getVoltDBRootPath();
     public String getCommandLogSnapshotPath();
     public String getCommandLogPath();
 
     public String getSnapshotPath();
+    public String getExportOverflowPath();
+    public String getDROverflowPath();
 
     public boolean isLegacy();
 
@@ -95,6 +100,8 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
+
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
      * Update the global logging context in the server.

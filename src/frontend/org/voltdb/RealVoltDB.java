@@ -401,39 +401,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public String getVoltDBRootPath() {
+        return m_pathList.getProperty(VoltDB.DBROOT_PATH_KEY);
+    }
+
+    @Override
     public String getCommandLogPath() {
-        if (isLegacy()) {
-            try {
-                return getCommandLogPath(getCatalogContext()).getCanonicalPath();
-            } catch (IOException ex) {
-                VoltDB.crashLocalVoltDB("Failed to get command log snapshot path.", false, ex);
-            }
-        }
         return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        if (isLegacy()) {
-            try {
-                return getCommandLogSnapshotPath(getCatalogContext()).getCanonicalPath();
-            } catch (IOException ex) {
-                VoltDB.crashLocalVoltDB("Failed to get command log snapshot path.", false, ex);
-            }
-        }
         return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
     }
 
     @Override
     public String getSnapshotPath() {
-        if (isLegacy()) {
-            try {
-                return getSnapshotPath(getCatalogContext()).getCanonicalPath();
-            } catch (IOException ex) {
-                VoltDB.crashLocalVoltDB("Failed to get snapshot path.", true, ex);
-            }
-        }
         return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
+    }
+
+    @Override
+    public String getExportOverflowPath() {
+        return m_pathList.getProperty(VoltDB.EXPORT_OVERFLOW_PATH_KEY);
+    }
+
+    @Override
+    public String getDROverflowPath() {
+        return m_pathList.getProperty(VoltDB.DR_OVERFLOW_PATH_KEY);
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -466,15 +460,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         PathsType paths = deployment.getPaths();
         String voltDbRoot = paths.getVoltdbroot().getPath();
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
             nonEmptyPaths.add(path);
         return nonEmptyPaths.build();
     }
@@ -692,13 +686,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             Map<Integer, String> hostGroups = null;
 
-            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories() && !config.m_forceVoltdbCreate) {
-                    managedPathsEmptyCheck();
-            }
+            try {
+                final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
+                if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
+                        && !config.m_forceVoltdbCreate) {
+                        managedPathsEmptyCheck();
+                }
 
-            if (!isRejoin && !m_joining) {
-                hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
+                if (!isRejoin && !m_joining) {
+                    hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
+                }
+            } catch (IOException ioe) {
+                //Crash
             }
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
@@ -776,7 +775,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, m_catalogContext.cluster.getVoltroot());
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
                 } catch (Exception e) {
@@ -850,14 +849,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
                     }
                 }
-                OnDemandBinaryLogger.path = m_catalogContext.cluster.getVoltroot();
+                OnDemandBinaryLogger.path = VoltDB.instance().getVoltDBRootPath();
                 if (isRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
                     m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger,
                             partsToHSIdsToRejoin.values(),
-                            m_catalogContext.cluster.getVoltroot(),
+                            VoltDB.instance().getVoltDBRootPath(),
                             m_config.m_startAction == StartAction.LIVE_REJOIN);
                     m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
                     m_messenger.registerMailbox(m_joinCoordinator);
@@ -989,8 +988,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            boolean usingCommandLog = m_config.m_isEnterprise &&
-                    m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
+            boolean usingCommandLog = m_config.m_isEnterprise
+                    && (m_catalogContext.cluster.getLogconfig() != null)
+                    && (m_catalogContext.cluster.getLogconfig() != null)
+                    && (m_catalogContext.cluster.getLogconfig().get("log") != null)
+                    && m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
 
             // DR overflow directory
             if (m_config.m_isEnterprise) {
@@ -998,11 +1000,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
-                    m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
-                                                                                   getSnapshotPath(m_catalogContext),
-                                                                                   m_replicationActive.get(),
-                                                                                   m_configuredNumberOfPartitions,
-                                                                                   m_catalogContext.getDeployment().getCluster().getHostcount());
+                    m_producerDRGateway =
+                            (ProducerDRGateway) ndrgwConstructor.newInstance(
+                                    new File(VoltDB.instance().getVoltDBRootPath()),
+                                    new File(VoltDB.instance().getSnapshotPath()),
+                                    m_replicationActive.get(),
+                                    m_configuredNumberOfPartitions,m_catalogContext.getDeployment().getCluster().getHostcount());
                     m_producerDRGateway.start();
                     m_producerDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
@@ -1598,8 +1601,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
             m_periodicWorks.remove(resMonitorWork);
         }
-        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(),
-                m_catalogContext.getDeployment().getPaths());
+        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings());
         resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
             resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
@@ -1817,7 +1819,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    int readDeploymentAndCreateStarterCatalogContext() {
+    int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) throws IOException {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2041,6 +2043,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return deployment.getCluster().getHostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
+        //Load deployment paths now if  Legacy so that we access through the interface all the time.
+        if (isLegacy()) {
+            String voltdbRoot = (new VoltFile(deployment.getPaths().getVoltdbroot().getPath())).getCanonicalPath();
+            m_pathList.put(deployment.getPaths().getVoltdbroot().getKey(), voltdbRoot);
+            File path = new VoltFile(deployment.getPaths().getCommandlog().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(voltdbRoot, path.getPath());
+            }
+            m_pathList.put(deployment.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(deployment.getPaths().getCommandlogsnapshot().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(voltdbRoot, path.getPath());
+            }
+            m_pathList.put(deployment.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(deployment.getPaths().getSnapshots().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(voltdbRoot, path.getPath());
+            }
+            m_pathList.put(deployment.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(deployment.getPaths().getExportoverflow().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(voltdbRoot, path.getPath());
+            }
+            m_pathList.put(deployment.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(deployment.getPaths().getDroverflow().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(voltdbRoot, path.getPath());
+            }
+            m_pathList.put(deployment.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
         }
     }
 
@@ -3751,23 +3791,5 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
-    }
-
-    private File getSnapshotPath(CatalogContext catalogContext) {
-        PathsType paths = catalogContext.getDeployment().getPaths();
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
-        return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
-    }
-
-    private File getCommandLogSnapshotPath(CatalogContext catalogContext) {
-        PathsType paths = catalogContext.getDeployment().getPaths();
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
-        return CatalogUtil.getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
-    }
-
-    private File getCommandLogPath(CatalogContext catalogContext) {
-        PathsType paths = catalogContext.getDeployment().getPaths();
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
-        return CatalogUtil.getCommandLog(paths.getCommandlog(), voltDbRoot);
     }
 }

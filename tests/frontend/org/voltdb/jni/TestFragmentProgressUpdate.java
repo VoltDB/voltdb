@@ -50,6 +50,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import static org.mockito.Mockito.verify;
 
 public class TestFragmentProgressUpdate extends TestCase {
 

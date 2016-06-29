@@ -65,8 +65,6 @@ public class TestEELibraryLoader
             .thenReturn(realvolt.getEELibraryVersionString());
         CatalogContext catContext = mock(CatalogContext.class);
         Cluster cluster = mock(Cluster.class);
-        when(cluster.getVoltroot())
-            .thenReturn(System.getProperty("java.io.tmpdir"));
         when(catContext.getCluster())
             .thenReturn(cluster);
         when(mockitovolt.getCatalogContext())
