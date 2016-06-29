@@ -648,6 +648,7 @@ private:
     void addViewToTrigger(MaterializedViewHandler *viewToTrigger);
     void dropViewToTrigger(MaterializedViewHandler *viewToTrigger);
     void polluteViews();
+    void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;

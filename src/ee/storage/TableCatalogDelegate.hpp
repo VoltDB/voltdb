@@ -131,7 +131,8 @@ class TableCatalogDelegate {
     bool materialized() { return m_materialized; }
   private:
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                     catalog::Table const &catalogTable);
+                                     catalog::Table const &catalogTable,
+                                     int tableAllocationTargetSize = 0);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;

@@ -536,6 +536,39 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
     }
 }
 
+void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallible) {
+    // If the current table does not have a delta table, return.
+    if (! m_deltaTable) {
+        return;
+    }
+
+    // If the delta table has data in it, delete the data first.
+    if (m_deltaTable->m_tupleCount > 0) {
+        TableIterator ti(m_deltaTable, m_deltaTable->m_data.begin());
+        TableTuple tuple(m_deltaTable->m_schema);
+        ti.next(tuple);
+        m_deltaTable->deleteTuple(tuple, fallible);
+    }
+
+    TableTuple targetForDelta(m_deltaTable->m_schema);
+    m_deltaTable->nextFreeTuple(&targetForDelta);
+    targetForDelta.copyForPersistentInsert(source);
+
+    try {
+        insertTupleCommon(source, targetForDelta, fallible);
+    }
+    catch (ConstraintFailureException &e) {
+        m_deltaTable->deleteTupleStorage(targetForDelta);
+        throw;
+    }
+    catch (TupleStreamException &e) {
+        m_deltaTable->deleteTupleStorage(targetForDelta);
+        throw;
+    }
+
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_name << " PersistentTable::insertTupleIntoDeltaTable() after insert:" << endl << m_deltaTable->debug() << endl; }
+}
+
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
@@ -559,12 +592,14 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     // grab a tuple at the end of our chunk of memory
     //
     TableTuple target(m_schema);
-    PersistentTable::nextFreeTuple(&target);
-
+    nextFreeTuple(&target);
     //
     // Then copy the source into the target
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
+
+    // Insert the tuple into the delta table first.
+    insertTupleIntoDeltaTable(source, fallible);
 
     try {
         insertTupleCommon(source, target, fallible);
@@ -650,6 +685,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
+    }
+
+    for (auto viewToTrigger : m_viewsToTrigger) {
+        viewToTrigger->handleTupleInsert(this);
     }
 
     // handle any materialized views
@@ -782,6 +821,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    for (auto viewToTrigger : m_viewsToTrigger) {
+        viewToTrigger->handleTupleDelete(this);
+    }
+
     // handle any materialized views, hide the tuple from the scan temporarily.
     SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
     for (int i = 0; i < m_views.size(); i++) {
@@ -851,6 +895,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
             throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
                                 m_name.c_str(), index->getName().c_str());
         }
+    }
+
+    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    for (auto viewToTrigger : m_viewsToTrigger) {
+        viewToTrigger->handleTupleInsert(this);
     }
 
     // handle any materialized views
@@ -947,6 +996,11 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
+
+    insertTupleIntoDeltaTable(target, fallible);
+    for (auto viewToTrigger : m_viewsToTrigger) {
+        viewToTrigger->handleTupleDelete(this);
+    }
 
     // handle any materialized views, hide the tuple from the scan temporarily.
     SetAndRestorePendingDeleteFlag setPending(target);
@@ -1883,6 +1937,7 @@ void PersistentTable::dropViewToTrigger(MaterializedViewHandler *viewToTrigger) 
     m_viewsToTrigger.pop_back();
     if (m_viewsToTrigger.size() == 0) {
         m_deltaTable->decrementRefcount();
+        m_deltaTable = NULL;
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Delta table for " << m_name << " is deleted.\n"; }
     }
 }

@@ -119,4 +119,12 @@ namespace voltdb {
         }
     }
 
+    void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable) {
+
+    }
+
+    void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable) {
+
+    }
+
 } // namespace voltdb

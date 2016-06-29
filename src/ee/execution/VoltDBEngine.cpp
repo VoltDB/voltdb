@@ -1096,7 +1096,6 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "updateCatalog() " << endl; }
     processCatalogDeletes(timestamp);
 
     if (processCatalogAdditions(timestamp) == false) {

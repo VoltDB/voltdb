@@ -272,7 +272,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable)
+                                                       catalog::Table const &catalogTable,
+                                                       int tableAllocationTargetSize)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -408,7 +409,6 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
     SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
     // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
-    int tableAllocationTargetSize = 0;
     if (m_materialized) {
       catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
       if (mvInfo->groupbycols().size() == 0) {
@@ -473,7 +473,10 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const &catalogDatabase,
         catalog::Table const &catalogTable)
 {
-    Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable);
+    // Delta table will only have one row (currently).
+    // Set the table block size to 64KB to achieve better space efficiency.
+    // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
+    Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
     deltaTable->incrementRefcount();
     return dynamic_cast<PersistentTable*>(deltaTable);
 }
