@@ -130,6 +130,13 @@ public class ExecuteTask extends VoltSystemProcedure {
                 }
                 break;
             }
+            case RESET_DR_APPLIED_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                result.addRow(STATUS_OK);
+                context.resetDrAppliedTracker();
+                break;
+            }
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
