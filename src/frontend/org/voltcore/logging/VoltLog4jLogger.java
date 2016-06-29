@@ -194,6 +194,9 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         if (System.getProperty("log4j.configuration", "").toLowerCase().contains("/voltdb/tests/")) {
             return;
         }
+        if (Boolean.parseBoolean(System.getProperty("DISABLE_LOG_RECONFIGURE", "false"))) {
+            return;
+        }
         checkArgument(logRootDH != null, "log root directory is null");
 
         File logDH = new VoltFile(logRootDH, "log");

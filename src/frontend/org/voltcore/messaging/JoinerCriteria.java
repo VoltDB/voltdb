@@ -45,6 +45,17 @@ import com.google_voltpatches.common.net.InternetDomainName;
 
 public class JoinerCriteria {
 
+    private static final String SAFE_MODE = "safeMode";
+    private static final String ADD_ALLOWED = "addAllowed";
+    private static final String PAUSED = "paused";
+    private static final String K_FACTOR = "kFactor";
+    private static final String HOST_COUNT = "hostCount";
+    private static final String MESH_HASH = "meshHash";
+    private static final String CONFIG_HASH = "configHash";
+    private static final String BARE = "bare";
+    private static final String START_ACTION = "startAction";
+    private static final String ENTERPRISE = "enterprise";
+
     public static ImmutableSortedSet<String> hosts(String option) {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
@@ -318,16 +329,16 @@ public class JoinerCriteria {
             js.value(coordinator);
         }
         js.endArray();
-        js.key("enterprise").value(m_enterprise);
-        js.key("startAction").value(m_startAction.name());
-        js.key("bare").value(m_bare);
-        js.key("configHash").value(m_configHash.toString());
-        js.key("meshHash").value(m_meshHash.toString());
-        js.key("hostCount").value(m_hostCount);
-        js.key("kFactor").value(m_kFactor);
-        js.key("paused").value(m_paused);
-        js.key("addAllowed").value(m_addAllowed);
-        js.key("safeMode").value(m_safeMode);
+        js.key(ENTERPRISE).value(m_enterprise);
+        js.key(START_ACTION).value(m_startAction.name());
+        js.key(BARE).value(m_bare);
+        js.key(CONFIG_HASH).value(m_configHash.toString());
+        js.key(MESH_HASH).value(m_meshHash.toString());
+        js.key(HOST_COUNT).value(m_hostCount);
+        js.key(K_FACTOR).value(m_kFactor);
+        js.key(PAUSED).value(m_paused);
+        js.key(ADD_ALLOWED).value(m_addAllowed);
+        js.key(SAFE_MODE).value(m_safeMode);
         js.endObject();
     }
 

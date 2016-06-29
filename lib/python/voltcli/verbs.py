@@ -416,6 +416,8 @@ class ServerBundle(JavaBundle):
         self.check_environment_config = check_environment_config
         self.force_voltdb_create = force_voltdb_create
         self.supports_paused = supports_paused
+        # this flag indicates whether or not the command is a
+        # legacy command: create, recover, rejoin, join
         self.is_legacy_verb= is_legacy_verb
 
     def initialize(self, verb):

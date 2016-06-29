@@ -147,6 +147,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     .build();
         }
 
+        /**
+         * This is for testing only. It aides test suites in the generation of
+         * configurations that share the same coordinators
+         * @param ports a port generator
+         * @param hostCount
+         * @return a list of {@link Config} that share the same coordinators
+         */
         public static List<Config> generate(PortGenerator ports, int hostCount) {
             checkArgument(ports != null, "port generator is null");
             checkArgument(hostCount > 0, "host count %s is not greater than 0", hostCount);
@@ -658,7 +665,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         zkInitBarrier.countDown();
     }
 
+    /**
+     * Given the {@link HostCriteria} of a connecting node, determine if it is
+     * compatible.
+     *
+     * @param hostId connecting node host id
+     * @param hc {@link HostCriteria} of a connecting node
+     * @return a {@link PleaDecision}
+     */
     private PleaDecision considerMeshPlea(int hostId, HostCriteria hc) {
+        // host criteria must be strictly compatible only if no node is operational (i.e.
+        // when the cluster is forming anew)
         if (   !m_criteria.getNodeState().operational()
             && !m_hostCriteria.values().stream().anyMatch(c->c.getNodeState().operational())) {
             List<String> incompatibilities = m_criteria
@@ -672,6 +689,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             return new PleaDecision(null, true, false);
         }
+        // how many hosts are already in the mesh?
         Stat stat = new Stat();
         try {
             m_zk.getChildren(CoreZK.hosts, false, stat);
@@ -691,11 +709,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 return new PleaDecision(msg, false, false);
             }
         }
+        // connecting to already wholly formed cluster
         if (stat.getNumChildren() >= m_criteria.getHostCount()) {
             return new PleaDecision(
                     hc.isAddAllowed()? null : "Cluster is already whole",
                     hc.isAddAllowed(), false);
         } else if (stat.getNumChildren() < m_criteria.getHostCount()) {
+            // check for concurrent rejoins
             final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_zk, hostId);
 
             if (rejoiningHost == -1) {
@@ -1158,32 +1178,50 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    /**
+     * Check to see if we have enough {@link HostCriteria} gathered to make a
+     * start action {@link Determination}
+     */
     private void determineStartActionIfNecessary() {
+        // already made a determination
         if (m_probedDetermination.isDone()) {
             return;
         }
-
+        // prefer host count from operational nodes
         int hostCount = m_hostCriteria.values().stream()
                 .filter(h -> h.getNodeState().operational())
                 .map(h -> h.getHostCount())
                 .findAny().orElse(m_criteria.getHostCount());
 
         final int ksafety = m_criteria.getkFactor() + 1;
+
+        // not enough host criteria to make a determination
         if (m_hostCriteria.size() < hostCount) {
+            m_networkLog.debug("have yet to receive all the required host criteria");
             return;
         }
+        // handle add (i.e. join) cases too
         if (hostCount < m_criteria.getHostCount() && m_hostCriteria.size() <= hostCount) {
+            m_networkLog.debug("have yet to receive all the required host criteria");
             return;
         }
+
+        m_networkLog.debug("Received all the required host criteria");
 
         int bare = 0;
         int unmeshed = 0;
         int operational = 0;
+
+        // both paused and safemode need to be specified on only one node to
+        // make them a cluster attribute. These are overridden if there are
+        // any nodes in operational state
         boolean paused = false;
         boolean safemode = false;
 
+
         for (HostCriteria c: m_hostCriteria.values()) {
             if (c.getNodeState().operational()) {
+                // pause state from operational nodes overrides yours
                 paused = operational == 0 ? c.isPaused() : paused;
                 operational += 1;
             }
@@ -1201,6 +1239,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         safemode = safemode && operational == 0 && bare < ksafety;
 
+        if (m_networkLog.isDebugEnabled()) {
+            m_networkLog.debug("We have "
+                    + operational + " operational nodes, "
+                    + bare + " bare nodes, and "
+                    + unmeshed + " unmeshed nodes");
+            m_networkLog.debug("cluster flag pause is " + m_paused.get()
+                    + ", and safe mode is " + safemode);
+        }
+
         if (m_criteria.getStartAction() != StartAction.PROBE) {
             m_probedDetermination.set(new Determination(
                     m_criteria.getStartAction(), m_criteria.getHostCount()));
@@ -1211,13 +1258,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                   StartAction.CREATE
                 : StartAction.RECOVER;
 
-        if (operational > 0 && operational < hostCount) {
+        if (operational > 0 && operational < hostCount) { // rejoin
             determination = StartAction.LIVE_REJOIN;
-        } else if (operational > 0 && operational == hostCount) {
+        } else if (operational > 0 && operational == hostCount) { // join
             if (m_criteria.isAddAllowed()) {
                 hostCount = hostCount + ksafety;
                 determination = StartAction.JOIN;
             } else {
+                // don't continue if you are an excess node
                 try { shutdown(); } catch (Exception ignoreIt) {}
                 org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
                 return;
@@ -1233,7 +1281,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     + (unmeshed - bare) + " nodes have them");
             return;
         }
-        m_probedDetermination.set(new Determination(determination, hostCount));
+        final Determination dtrm = new Determination(determination, hostCount);
+        if (m_networkLog.isDebugEnabled()) {
+            m_networkLog.debug("made the following " + dtrm);
+        }
+        m_probedDetermination.set(dtrm);
     }
 
     public Determination waitForDetermination() {
