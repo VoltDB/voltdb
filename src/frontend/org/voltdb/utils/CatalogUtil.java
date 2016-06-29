@@ -160,6 +160,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
+    public static String BAD_PASSWORD_WARN = null;
+
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
@@ -1859,7 +1861,8 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                hostLog.warn("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
+                BAD_PASSWORD_WARN = "Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.";
+                hostLog.warn(BAD_PASSWORD_WARN);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
