@@ -2026,7 +2026,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @SuppressWarnings("unused")
             Database db = cluster.getDatabases().add("database");
 
-            String result = CatalogUtil.compileDeployment(catalog, deployment, true);
+            String result = CatalogUtil.compileDeployment(catalog, deployment, true, true);
             if (result != null) {
                 // Any other non-enterprise deployment errors will be caught and handled here
                 // (such as <= 0 host count)
