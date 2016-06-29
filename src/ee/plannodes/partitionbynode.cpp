@@ -37,14 +37,19 @@ std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
     std::ostringstream buffer;
     buffer << "PartitionByPlanNode: ";
     buffer << AggregatePlanNode::debugInfo(spacer);
-    for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-        buffer << m_sortExpressions[idx]->debug(spacer);
-    }
     return buffer.str();
 }
 
 void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AggregatePlanNode::loadFromJSONObject(obj);
-    loadSortListFromJSONObject(obj, m_sortExpressions, m_sortDirections);
+    std::vector<AbstractExpression*>  orderByExpressions;
+    loadSortListFromJSONObject(obj, &orderByExpressions, NULL);
+    assert(orderByExpressions.size() == 1);
+    // We push the first sort expression here.  This is not
+    // actually right, but it all works out.  When we want to
+    // allow more sort expressions, say when we want to implement
+    // row units and not range units for windowed functions, we
+    // need to do a better job of this.
+    m_aggregateInputExpressions.push_back(orderByExpressions[0]);
 }
 }

@@ -31,6 +31,8 @@ public:
     }
     virtual ~PartitionByExecutor();
     bool outputForEachInputRow() const;
+protected:
+    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 };
 
 } /* namespace voltdb */

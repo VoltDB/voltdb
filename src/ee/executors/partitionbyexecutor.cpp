@@ -18,7 +18,8 @@
  * partitionbyexecutor.cpp
  */
 
-#include "partitionbyexecutor.h"
+#include "executors/partitionbyexecutor.h"
+#include "plannodes/partitionbynode.h"
 
 namespace voltdb {
 
@@ -27,6 +28,13 @@ PartitionByExecutor::~PartitionByExecutor() {
 
 // The PartitionByExecutor wants one row for each input row.
 bool PartitionByExecutor::outputForEachInputRow() const {
+    return true;
+}
+
+bool PartitionByExecutor::p_init(AbstractPlanNode *node, TempTableLimits *limits) {
+    if (!AggregateSerialExecutor::p_init(node, limits)) {
+        return false;
+    }
     return true;
 }
 

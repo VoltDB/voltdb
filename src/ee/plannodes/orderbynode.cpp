@@ -67,7 +67,7 @@ std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
 
 void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    loadSortListFromJSONObject(obj, m_sortExpressions, m_sortDirections);
+    loadSortListFromJSONObject(obj, &m_sortExpressions, &m_sortDirections);
 }
 
 } // namespace voltdb

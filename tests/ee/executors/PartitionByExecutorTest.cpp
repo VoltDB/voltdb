@@ -80,7 +80,7 @@ uint32_t random_seed = 0;
 /**
  * The plan below is for this sql query.
  *
- * select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;
+ * select A, B, ID, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;
  */
 const char *plan =
         "{\n"
@@ -104,7 +104,7 @@ const char *plan =
         "                {\n"
         "                    \"COLUMN_NAME\": \"A\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"COLUMN_IDX\": 2,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
@@ -112,13 +112,21 @@ const char *plan =
         "                {\n"
         "                    \"COLUMN_NAME\": \"B\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 3,\n"
+        "                        \"COLUMN_IDX\": 4,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
         "                },\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"C3\",\n"
+        "                    \"COLUMN_NAME\": \"ID\",\n"
+        "                    \"EXPRESSION\": {\n"
+        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 5\n"
+        "                    }\n"
+        "                },\n"
+        "                {\n"
+        "                    \"COLUMN_NAME\": \"C4\",\n"
         "                    \"EXPRESSION\": {\n"
         "                        \"COLUMN_IDX\": 0,\n"
         "                        \"TYPE\": 32,\n"
@@ -136,14 +144,14 @@ const char *plan =
         "            }],\n"
         "            \"CHILDREN_IDS\": [3],\n"
         "            \"GROUPBY_EXPRESSIONS\": [{\n"
-        "                \"COLUMN_IDX\": 1,\n"
+        "                \"COLUMN_IDX\": 2,\n"
         "                \"TYPE\": 32,\n"
         "                \"VALUE_TYPE\": 5\n"
         "            }],\n"
         "            \"ID\": 2,\n"
         "            \"OUTPUT_SCHEMA\": [\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"C3\",\n"
+        "                    \"COLUMN_NAME\": \"C4\",\n"
         "                    \"EXPRESSION\": {\n"
         "                        \"COLUMN_IDX\": 0,\n"
         "                        \"TYPE\": 32,\n"
@@ -151,7 +159,7 @@ const char *plan =
         "                    }\n"
         "                },\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"A\",\n"
+        "                    \"COLUMN_NAME\": \"ID\",\n"
         "                    \"EXPRESSION\": {\n"
         "                        \"COLUMN_IDX\": 0,\n"
         "                        \"TYPE\": 32,\n"
@@ -161,13 +169,13 @@ const char *plan =
         "                {\n"
         "                    \"COLUMN_NAME\": \"A\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"COLUMN_IDX\": 2,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
         "                },\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"B\",\n"
+        "                    \"COLUMN_NAME\": \"A\",\n"
         "                    \"EXPRESSION\": {\n"
         "                        \"COLUMN_IDX\": 2,\n"
         "                        \"TYPE\": 32,\n"
@@ -177,13 +185,29 @@ const char *plan =
         "                {\n"
         "                    \"COLUMN_NAME\": \"B\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 3,\n"
+        "                        \"COLUMN_IDX\": 4,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 5\n"
+        "                    }\n"
+        "                },\n"
+        "                {\n"
+        "                    \"COLUMN_NAME\": \"B\",\n"
+        "                    \"EXPRESSION\": {\n"
+        "                        \"COLUMN_IDX\": 4,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
         "                }\n"
         "            ],\n"
-        "            \"PLAN_NODE_TYPE\": \"PARTITIONBY\"\n"
+        "            \"PLAN_NODE_TYPE\": \"PARTITIONBY\",\n"
+        "            \"SORT_COLUMNS\": [{\n"
+        "                \"SORT_DIRECTION\": \"ASC\",\n"
+        "                \"SORT_EXPRESSION\": {\n"
+        "                    \"COLUMN_IDX\": 2,\n"
+        "                    \"TYPE\": 32,\n"
+        "                    \"VALUE_TYPE\": 5\n"
+        "                }\n"
+        "            }]\n"
         "        },\n"
         "        {\n"
         "            \"CHILDREN_IDS\": [1],\n"
@@ -193,7 +217,7 @@ const char *plan =
         "                {\n"
         "                    \"SORT_DIRECTION\": \"ASC\",\n"
         "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"COLUMN_IDX\": 2,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
@@ -201,7 +225,7 @@ const char *plan =
         "                {\n"
         "                    \"SORT_DIRECTION\": \"ASC\",\n"
         "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 3,\n"
+        "                        \"COLUMN_IDX\": 4,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
@@ -214,7 +238,7 @@ const char *plan =
         "                \"ID\": 6,\n"
         "                \"OUTPUT_SCHEMA\": [\n"
         "                    {\n"
-        "                        \"COLUMN_NAME\": \"A\",\n"
+        "                        \"COLUMN_NAME\": \"ID\",\n"
         "                        \"EXPRESSION\": {\n"
         "                            \"COLUMN_IDX\": 0,\n"
         "                            \"TYPE\": 32,\n"
@@ -224,13 +248,13 @@ const char *plan =
         "                    {\n"
         "                        \"COLUMN_NAME\": \"A\",\n"
         "                        \"EXPRESSION\": {\n"
-        "                            \"COLUMN_IDX\": 0,\n"
+        "                            \"COLUMN_IDX\": 1,\n"
         "                            \"TYPE\": 32,\n"
         "                            \"VALUE_TYPE\": 5\n"
         "                        }\n"
         "                    },\n"
         "                    {\n"
-        "                        \"COLUMN_NAME\": \"B\",\n"
+        "                        \"COLUMN_NAME\": \"A\",\n"
         "                        \"EXPRESSION\": {\n"
         "                            \"COLUMN_IDX\": 1,\n"
         "                            \"TYPE\": 32,\n"
@@ -240,7 +264,15 @@ const char *plan =
         "                    {\n"
         "                        \"COLUMN_NAME\": \"B\",\n"
         "                        \"EXPRESSION\": {\n"
-        "                            \"COLUMN_IDX\": 1,\n"
+        "                            \"COLUMN_IDX\": 2,\n"
+        "                            \"TYPE\": 32,\n"
+        "                            \"VALUE_TYPE\": 5\n"
+        "                        }\n"
+        "                    },\n"
+        "                    {\n"
+        "                        \"COLUMN_NAME\": \"B\",\n"
+        "                        \"EXPRESSION\": {\n"
+        "                            \"COLUMN_IDX\": 2,\n"
         "                            \"TYPE\": 32,\n"
         "                            \"VALUE_TYPE\": 5\n"
         "                        }\n"
@@ -258,143 +290,93 @@ const char *plan =
  * The catalog string below reflects this DDL.
  *
  * CREATE TABLE AAA (
- *    A INTEGER,
- *    B INTEGER,
- *    C INTEGER,
- * );
- *
- * CREATE TABLE BBB (
- *    A INTEGER,
- *    B INTEGER,
- *    C INTEGER,
+ *    ID INTEGER,
+ *    A  INTEGER,
+ *    B  INTEGER
  * );
  */
 const char *catalog_string =
-                "add / clusters cluster\n"
-                "set /clusters#cluster localepoch 1199145600\n"
-                "set $PREV securityEnabled false\n"
-                "set $PREV httpdportno 0\n"
-                "set $PREV jsonapi false\n"
-                "set $PREV networkpartition false\n"
-                "set $PREV voltRoot \"\"\n"
-                "set $PREV exportOverflow \"\"\n"
-                "set $PREV drOverflow \"\"\n"
-                "set $PREV adminport 0\n"
-                "set $PREV adminstartup false\n"
-                "set $PREV heartbeatTimeout 0\n"
-                "set $PREV useddlschema false\n"
-                "set $PREV drConsumerEnabled false\n"
-                "set $PREV drProducerEnabled false\n"
-                "set $PREV drClusterId 0\n"
-                "set $PREV drProducerPort 0\n"
-                "set $PREV drMasterHost \"\"\n"
-                "set $PREV drFlushInterval 0\n"
-                "add /clusters#cluster databases database\n"
-                "set /clusters#cluster/databases#database schema \"eJx9jlEKwDAIQ/93mi5GXX9Xev8rTVcYhW0lKJEnJBQFlbuSihJ7J9jShwuh4Ii5lZdV605Tc1MH2sOwYPJiBVXOjf/hSM3hI56VPb/pVJ0iRoEFlU+aJS58KjRJ\"\n"
-                "set $PREV isActiveActiveDRed false\n"
-                "set $PREV securityprovider \"\"\n"
-                "add /clusters#cluster/databases#database groups administrator\n"
-                "set /clusters#cluster/databases#database/groups#administrator admin true\n"
-                "set $PREV defaultproc true\n"
-                "set $PREV defaultprocread true\n"
-                "set $PREV sql true\n"
-                "set $PREV sqlread true\n"
-                "set $PREV allproc true\n"
-                "add /clusters#cluster/databases#database groups user\n"
-                "set /clusters#cluster/databases#database/groups#user admin false\n"
-                "set $PREV defaultproc true\n"
-                "set $PREV defaultprocread true\n"
-                "set $PREV sql true\n"
-                "set $PREV sqlread true\n"
-                "set $PREV allproc true\n"
-                "add /clusters#cluster/databases#database tables AAA\n"
-                "set /clusters#cluster/databases#database/tables#AAA isreplicated true\n"
-                "set $PREV partitioncolumn null\n"
-                "set $PREV estimatedtuplecount 0\n"
-                "set $PREV materializer null\n"
-                "set $PREV signature \"AAA|iii\"\n"
-                "set $PREV tuplelimit 2147483647\n"
-                "set $PREV isDRed false\n"
-                "add /clusters#cluster/databases#database/tables#AAA columns A\n"
-                "set /clusters#cluster/databases#database/tables#AAA/columns#A index 0\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"A\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n"
-                "add /clusters#cluster/databases#database/tables#AAA columns B\n"
-                "set /clusters#cluster/databases#database/tables#AAA/columns#B index 1\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"B\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n"
-                "add /clusters#cluster/databases#database/tables#AAA columns C\n"
-                "set /clusters#cluster/databases#database/tables#AAA/columns#C index 2\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"C\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n"
-                "add /clusters#cluster/databases#database tables BBB\n"
-                "set /clusters#cluster/databases#database/tables#BBB isreplicated true\n"
-                "set $PREV partitioncolumn null\n"
-                "set $PREV estimatedtuplecount 0\n"
-                "set $PREV materializer null\n"
-                "set $PREV signature \"BBB|iii\"\n"
-                "set $PREV tuplelimit 2147483647\n"
-                "set $PREV isDRed false\n"
-                "add /clusters#cluster/databases#database/tables#BBB columns A\n"
-                "set /clusters#cluster/databases#database/tables#BBB/columns#A index 0\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"A\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n"
-                "add /clusters#cluster/databases#database/tables#BBB columns B\n"
-                "set /clusters#cluster/databases#database/tables#BBB/columns#B index 1\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"B\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n"
-                "add /clusters#cluster/databases#database/tables#BBB columns C\n"
-                "set /clusters#cluster/databases#database/tables#BBB/columns#C index 2\n"
-                "set $PREV type 5\n"
-                "set $PREV size 4\n"
-                "set $PREV nullable true\n"
-                "set $PREV name \"C\"\n"
-                "set $PREV defaultvalue null\n"
-                "set $PREV defaulttype 0\n"
-                "set $PREV matview null\n"
-                "set $PREV aggregatetype 0\n"
-                "set $PREV matviewsource null\n"
-                "set $PREV inbytes false\n";
+        "add / clusters cluster\n"
+        "set /clusters#cluster localepoch 1199145600\n"
+        "set $PREV securityEnabled false\n"
+        "set $PREV httpdportno 0\n"
+        "set $PREV jsonapi false\n"
+        "set $PREV networkpartition false\n"
+        "set $PREV voltRoot \"\"\n"
+        "set $PREV exportOverflow \"\"\n"
+        "set $PREV drOverflow \"\"\n"
+        "set $PREV adminport 0\n"
+        "set $PREV adminstartup false\n"
+        "set $PREV heartbeatTimeout 0\n"
+        "set $PREV useddlschema false\n"
+        "set $PREV drConsumerEnabled false\n"
+        "set $PREV drProducerEnabled false\n"
+        "set $PREV drClusterId 0\n"
+        "set $PREV drProducerPort 0\n"
+        "set $PREV drMasterHost \"\"\n"
+        "set $PREV drFlushInterval 0\n"
+        "add /clusters#cluster databases database\n"
+        "set /clusters#cluster/databases#database schema \"eJx9ikEKgDAQA+++ZjedoL1a/P+X3BYPgiAhYWBCszBpsKI2EWNyUUWho/qEDmuv+WfHlsbL56/Vx4Z6O7cbCFYa1Q==\"\n"
+        "set $PREV isActiveActiveDRed false\n"
+        "set $PREV securityprovider \"\"\n"
+        "add /clusters#cluster/databases#database groups administrator\n"
+        "set /clusters#cluster/databases#database/groups#administrator admin true\n"
+        "set $PREV defaultproc true\n"
+        "set $PREV defaultprocread true\n"
+        "set $PREV sql true\n"
+        "set $PREV sqlread true\n"
+        "set $PREV allproc true\n"
+        "add /clusters#cluster/databases#database groups user\n"
+        "set /clusters#cluster/databases#database/groups#user admin false\n"
+        "set $PREV defaultproc true\n"
+        "set $PREV defaultprocread true\n"
+        "set $PREV sql true\n"
+        "set $PREV sqlread true\n"
+        "set $PREV allproc true\n"
+        "add /clusters#cluster/databases#database tables AAA\n"
+        "set /clusters#cluster/databases#database/tables#AAA isreplicated true\n"
+        "set $PREV partitioncolumn null\n"
+        "set $PREV estimatedtuplecount 0\n"
+        "set $PREV materializer null\n"
+        "set $PREV signature \"AAA|iii\"\n"
+        "set $PREV tuplelimit 2147483647\n"
+        "set $PREV isDRed false\n"
+        "add /clusters#cluster/databases#database/tables#AAA columns A\n"
+        "set /clusters#cluster/databases#database/tables#AAA/columns#A index 1\n"
+        "set $PREV type 5\n"
+        "set $PREV size 4\n"
+        "set $PREV nullable true\n"
+        "set $PREV name \"A\"\n"
+        "set $PREV defaultvalue null\n"
+        "set $PREV defaulttype 0\n"
+        "set $PREV matview null\n"
+        "set $PREV aggregatetype 0\n"
+        "set $PREV matviewsource null\n"
+        "set $PREV inbytes false\n"
+        "add /clusters#cluster/databases#database/tables#AAA columns B\n"
+        "set /clusters#cluster/databases#database/tables#AAA/columns#B index 2\n"
+        "set $PREV type 5\n"
+        "set $PREV size 4\n"
+        "set $PREV nullable true\n"
+        "set $PREV name \"B\"\n"
+        "set $PREV defaultvalue null\n"
+        "set $PREV defaulttype 0\n"
+        "set $PREV matview null\n"
+        "set $PREV aggregatetype 0\n"
+        "set $PREV matviewsource null\n"
+        "set $PREV inbytes false\n"
+        "add /clusters#cluster/databases#database/tables#AAA columns ID\n"
+        "set /clusters#cluster/databases#database/tables#AAA/columns#ID index 0\n"
+        "set $PREV type 5\n"
+        "set $PREV size 4\n"
+        "set $PREV nullable true\n"
+        "set $PREV name \"ID\"\n"
+        "set $PREV defaultvalue null\n"
+        "set $PREV defaulttype 0\n"
+        "set $PREV matview null\n"
+        "set $PREV aggregatetype 0\n"
+        "set $PREV matviewsource null\n"
+        "set $PREV inbytes false\n";
 }
 
 class PartitionByExecutorTest : public PlanTestingBaseClass<EngineTestTopend> {
@@ -406,9 +388,7 @@ public:
      */
     PartitionByExecutorTest(uint32_t random_seed = (unsigned int)time(NULL))
         : m_AAA(NULL),
-          m_AAA_id(-1),
-          m_BBB(NULL),
-          m_BBB_id(-1) {}
+          m_AAA_id(-1) {}
 
     void initialize(const char *catalog_string,
                     uint32_t    random_seed = (uint32_t)time(NULL)) {
@@ -417,40 +397,38 @@ public:
         // Get the tables we need.
         //
         m_AAA = getPersistentTableAndId("AAA", &m_AAA_id);
-        m_BBB = getPersistentTableAndId("BBB", &m_BBB_id);
         assert(m_AAA);
-        assert(m_BBB);
     }
 
     ~PartitionByExecutorTest() { }
 protected:
     voltdb::PersistentTable *m_AAA;
     int                      m_AAA_id;
-    voltdb::PersistentTable *m_BBB;
-    int                      m_BBB_id;
 };
 
 TEST_F(PartitionByExecutorTest, testPartitionBy) {
-    int32_t output[6][3] = {
-        {  1,  1, 1 },
-        {  1,  2, 2 },
-        {  2, 10, 1 },
-        {  2, 10, 2 },
-        {  2, 11, 3 },
-        {  3, 10, 1 }
+    const int NUM_ROWS = 5;
+    const int NUM_INPUT_COLS = 3;
+    const int NUM_OUTPUT_COLS = NUM_INPUT_COLS + 1;
+
+    int32_t input[NUM_ROWS][NUM_INPUT_COLS] = {
+            {1, 30, 301},
+            {1, 10, 101},
+            {1, 20, 202},
+            {1, 20, 201},
+            {1, 10, 102}
     };
-    int32_t input[6][2] = {
-            {  3, 10},
-            {  1,  2},
-            {  2, 11},
-            {  2, 10},
-            {  1,  1},
-            {  2, 10}
+    int32_t output[NUM_ROWS][NUM_OUTPUT_COLS] = {
+            {10, 101, 1, 1},
+            {10, 102, 1, 1},
+            {20, 201, 1, 3},
+            {20, 202, 1, 3},
+            {30, 301, 1, 5}
     };
     initialize(catalog_string, random_seed);
-    initializeTableOfInt(m_AAA, 6, 2, (int32_t *)input);
+    initializeTableOfInt(m_AAA, NUM_ROWS, NUM_INPUT_COLS, (int32_t *)input);
     executeFragment(100, plan);
-    validateResult((int32_t *)output, 6, 3);
+    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS);
 }
 
 int main() {

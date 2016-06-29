@@ -54,6 +54,7 @@
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
+#include "executors/partitionbyexecutor.h"
 
 #include "boost/foreach.hpp"
 #include "boost/unordered_map.hpp"
@@ -511,26 +512,68 @@ public:
 class WindowedRankAgg : public Agg
 {
 public:
-    WindowedRankAgg() : m_count(0) {}
+    WindowedRankAgg(ExpressionType aggType)
+        : m_rank(0),
+          m_peerCount(0),
+          m_isDenseRank(aggType == EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK)
+    {
+        ;
+    }
 
     virtual void advance(const NValue& val)
     {
-        ++m_count;
+        if (m_peerCount == 0) {
+            VOLT_TRACE("Start of partition by group: val == %s",
+                       val.debug().c_str());
+            m_lastOrderByValue = val;
+            m_peerCount = 1;
+            m_rank = 1;
+        } else if (m_lastOrderByValue.compare(val) != 0) {
+            VOLT_TRACE("Start of order by group: %s -> %s",
+                       m_lastOrderByValue.debug().c_str(),
+                       val.debug().c_str());
+            m_lastOrderByValue = val;
+            if (m_isDenseRank) {
+                m_rank += 1;
+            } else {
+                m_rank += m_peerCount;
+            }
+            m_peerCount = 1;
+        } else {
+            VOLT_TRACE("Old OrderBy Peer Group: %s", val.debug().c_str());
+            ++m_peerCount;
+        }
     }
 
     virtual NValue finalize(ValueType type)
     {
-        return ValueFactory::getBigIntValue(m_count).castAs(type);
+        return ValueFactory::getBigIntValue(m_rank).castAs(type);
     }
 
     virtual void resetAgg()
     {
         m_haveAdvanced = false;
-        m_count = 0;
+        m_rank = 0;
+        m_peerCount = 0;
+        m_lastOrderByValue.free();
     }
 
 private:
-    int64_t m_count;
+    // This is the actual rank answer.
+    int64_t                            m_rank;
+    // This is the peer count.  It counts the number of
+    // rows whose rank are equal to the last row.  When
+    // we see a row with a new order by expression value,
+    // we reset this to zero.
+    int64_t                            m_peerCount;
+    // This is the last value of the order by expression.  Since the
+    // default order by unit is RANGE, and we don't have any way to
+    // change that syntactically in HSQL, we only get one value for
+    // the order by.  So, we can save this in a single NValue.
+    NValue                             m_lastOrderByValue;
+    // We don't support dense rank now.  But we can easily.  So
+    // add support now.
+    bool                               m_isDenseRank;
 };
 
 /**
@@ -568,7 +611,9 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
-        return new (memoryPool) WindowedRankAgg();
+        {
+            return new (memoryPool) WindowedRankAgg(agg_type);
+        }
     default:
     {
         char message[128];

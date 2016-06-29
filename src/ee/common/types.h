@@ -317,6 +317,7 @@ enum ExpressionType {
     // Windowed Expression Aggregates.
     // -----------------------------
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK                   = 70,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK             = 71,
     // -----------------------------
     // Functions
     // -----------------------------

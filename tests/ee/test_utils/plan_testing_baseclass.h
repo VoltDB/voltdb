@@ -229,21 +229,21 @@ public:
         ASSERT_FALSE(hasNext);
         ASSERT_FALSE(failed);
     }
-    protected:
-        voltdb::CatalogId m_cluster_id;
-        voltdb::CatalogId m_database_id;
-        voltdb::CatalogId m_site_id;
-        std::string m_catalog_string;
-        catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
-        catalog::Cluster *m_cluster;
-        catalog::Database *m_database;
-        catalog::Constraint *m_constraint;
-        boost::scoped_ptr<voltdb::VoltDBEngine>     m_engine;
-        boost::scoped_ptr<TOPEND> m_topend;
-        boost::shared_array<char>m_result_buffer;
-        boost::shared_array<char>m_exception_buffer;
-        boost::shared_array<char>m_parameter_buffer;
-        bool                     m_isinitialized;
+protected:
+    voltdb::CatalogId m_cluster_id;
+    voltdb::CatalogId m_database_id;
+    voltdb::CatalogId m_site_id;
+    std::string m_catalog_string;
+    catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
+    catalog::Cluster *m_cluster;
+    catalog::Database *m_database;
+    catalog::Constraint *m_constraint;
+    boost::scoped_ptr<voltdb::VoltDBEngine>     m_engine;
+    boost::scoped_ptr<TOPEND> m_topend;
+    boost::shared_array<char>m_result_buffer;
+    boost::shared_array<char>m_exception_buffer;
+    boost::shared_array<char>m_parameter_buffer;
+    bool                     m_isinitialized;
 };
 
 

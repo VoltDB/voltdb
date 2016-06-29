@@ -147,8 +147,6 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         EXPECT_EQ(1, pn->getAggregates().size());
         EXPECT_EQ(EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, pn->getAggregates()[0]);
         EXPECT_EQ(1, pn->getGroupByExpressions().size());
-        EXPECT_EQ(1, pn->getSortExpressions().size());
-        EXPECT_EQ(1, pn->getSortDirections().size());
     }
 }
 
