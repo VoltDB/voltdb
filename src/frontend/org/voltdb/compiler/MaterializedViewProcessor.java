@@ -194,7 +194,7 @@ public class MaterializedViewProcessor {
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                    processMaterializedViewColumn(srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
                 }
             }
@@ -203,7 +203,7 @@ public class MaterializedViewProcessor {
             ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable,
+            processMaterializedViewColumn(srcTable,
                     destColumnArray.get(stmt.m_groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
@@ -285,7 +285,7 @@ public class MaterializedViewProcessor {
                 if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                     tve = (TupleValueExpression)colExpr;
                 }
-                processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                processMaterializedViewColumn(srcTable, destColumn,
                         col.expression.getExpressionType(), tve);
 
                 // Correctly set the type of the column so that it's consistent.
@@ -500,8 +500,8 @@ public class MaterializedViewProcessor {
         checkViewSources(stmt.m_tableList);
      }
 
-    private static void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
-            Column destColumn, ExpressionType type, TupleValueExpression colExpr) {
+    private static void processMaterializedViewColumn(Table srcTable, Column destColumn,
+                                                      ExpressionType type, TupleValueExpression colExpr) {
 
         if (colExpr != null) {
             // assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
