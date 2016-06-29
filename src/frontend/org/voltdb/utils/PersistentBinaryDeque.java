@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -72,6 +73,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
+    //TODO: javadoc. Make a real class etc.
+    static class ReadCursor {
+        String m_cursorId;
+        int m_segmentId;
+        int m_numObjects;
+        boolean m_closed;
+    }
+
     public static final OutputContainerFactory UNSAFE_CONTAINER_FACTORY = new UnsafeOutputContainerFactory();
 
     /**
@@ -88,6 +97,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private final TreeMap<Long, PBDSegment> m_segments = new TreeMap<>();
     private int m_numObjects = 0;
     private volatile boolean m_closed = false;
+    private final HashMap<Integer, ReadCursor> m_readCursors = new HashMap<>();
 
     /**
      * Create a persistent binary deque with the specified nonce and storage
@@ -248,17 +258,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
         m_segments.put(newSegment.segmentId(), newSegment);
     }
-    
+
     private PBDSegment peekFirstSegment() {
         Map.Entry<Long, PBDSegment> entry = m_segments.firstEntry();
         return (entry!=null) ? entry.getValue() : null;
     }
-    
+
     private PBDSegment peekLastSegment() {
         Map.Entry<Long, PBDSegment> entry = m_segments.lastEntry();
         return (entry!=null) ? entry.getValue() : null;
     }
-    
+
     private PBDSegment pollLastSegment() {
         Map.Entry<Long, PBDSegment> entry = m_segments.pollLastEntry();
         return (entry!=null) ? entry.getValue() : null;
@@ -395,6 +405,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
         assertions();
     }
 
+    //TODO: define in interface?
+    public synchronized BBContainer poll(String cursorId, OutputContainerFactory ocf) throws IOException {
+        if (!m_readCursors.containsKey(cursorId)) {
+
+        }
+    }
+
     @Override
     public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
         assertions();
@@ -445,7 +462,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     try {
                         if (segment.isEmpty()) {
                             if (segment != peekLastSegment()) {
-                                m_segments.remove(segment);
+                                m_segments.remove(segment.segmentId());
                                 if (m_usageSpecificLog.isDebugEnabled()) {
                                     m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted after discarding last buffer");
                                 }
