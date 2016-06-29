@@ -923,7 +923,7 @@ class DatabaseAPI(MethodView):
 
         databases = [v if type(v) is list else [v] for v in Global.DATABASES.values()]
         if request.json['name'] in [(d["name"]) for item in databases for d in item]:
-            return make_response(jsonify({'error': 'database name already exists'}), 404)
+            return make_response(jsonify({'status':400, 'error': 'database name already exists'}), 400)
 
         if not Global.DATABASES:
             database_id = 1
