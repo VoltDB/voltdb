@@ -299,6 +299,9 @@ public class VoltDB {
         /** allow elastic joins */
         public boolean m_enableAdd = false;
 
+        /** apply safe mode strategy when recovering */
+        public boolean m_safeMode = false;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -500,6 +503,11 @@ public class VoltDB {
                 }
                 else if (arg.equals("probe")) {
                     m_startAction = StartAction.PROBE;
+                    if (   args.length > i + 1
+                            && args[i+1].trim().equals("safemode")) {
+                            i += 1;
+                            m_safeMode = true;
+                        }
                 }
                 else if (arg.equals("create")) {
                     m_startAction = StartAction.CREATE;
@@ -510,6 +518,7 @@ public class VoltDB {
                         && args[i+1].trim().equals("safemode")) {
                         m_startAction = StartAction.SAFE_RECOVER;
                         i += 1;
+                        m_safeMode = true;
                     }
                 } else if (arg.equals("rejoin")) {
                     m_startAction = StartAction.REJOIN;

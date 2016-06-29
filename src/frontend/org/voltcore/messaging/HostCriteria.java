@@ -41,6 +41,7 @@ public class HostCriteria {
     public final static String HOST_COUNT = "hostCount";
     public final static String NODE_STATE = "nodeState";
     public final static String ADD_ALLOWED = "addAllowed";
+    public final static String SAFE_MODE = "safeMode";
 
     public final static UUID UNDEFINED = new UUID(0L,0L);
 
@@ -51,6 +52,7 @@ public class HostCriteria {
                 && jo.has(IS_BARE) && (jo.getBoolean(IS_BARE) ? true : true)
                 && jo.has(IS_ENTERPRISE) && (jo.getBoolean(IS_ENTERPRISE) ? true : true)
                 && jo.has(ADD_ALLOWED) && (jo.getBoolean(ADD_ALLOWED) ? true : true)
+                && jo.has(SAFE_MODE) && (jo.getBoolean(SAFE_MODE) ? true : true)
                 && jo.has(CONFIG_HASH) && jo.getString(CONFIG_HASH) != null && !jo.getString(CONFIG_HASH).trim().isEmpty()
                 && jo.has(MESH_HASH) && jo.getString(MESH_HASH) != null && !jo.getString(MESH_HASH).trim().isEmpty()
                 && jo.has(START_ACTION) && jo.getString(START_ACTION) != null && !jo.getString(START_ACTION).trim().isEmpty()
@@ -70,6 +72,7 @@ public class HostCriteria {
     protected final int hostCount;
     protected final NodeState nodeState;
     protected final boolean addAllowed;
+    protected final boolean safeMode;
 
     public HostCriteria(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
@@ -82,11 +85,12 @@ public class HostCriteria {
         hostCount = jo.optInt(HOST_COUNT,1);
         nodeState = NodeState.valueOf(jo.optString(NODE_STATE, NodeState.INITIALIZING.name()));
         addAllowed = jo.optBoolean(ADD_ALLOWED, false);
+        safeMode = jo.optBoolean(SAFE_MODE, false);
     }
 
     public HostCriteria(boolean paused, UUID configHash, UUID meshHash,
             boolean enterprise, StartAction startAction, boolean bare,
-            int hostCount, NodeState nodeState, boolean addAllowed) {
+            int hostCount, NodeState nodeState, boolean addAllowed, boolean safeMode) {
         checkArgument(configHash != null, "config hash is null");
         checkArgument(meshHash != null, "mesh hash is null");
         checkArgument(startAction != null, "start action is null");
@@ -101,6 +105,7 @@ public class HostCriteria {
         this.hostCount = hostCount;
         this.nodeState = nodeState;
         this.addAllowed = addAllowed;
+        this.safeMode = safeMode;
     }
 
     public boolean isPaused() {
@@ -139,6 +144,10 @@ public class HostCriteria {
         return addAllowed;
     }
 
+    public boolean isSafeMode() {
+        return safeMode;
+    }
+
     public JSONObject appendTo(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
         try {
@@ -151,6 +160,7 @@ public class HostCriteria {
             jo.put(HOST_COUNT, hostCount);
             jo.put(NODE_STATE, nodeState.name());
             jo.put(ADD_ALLOWED, addAllowed);
+            jo.put(SAFE_MODE, safeMode);
         } catch (JSONException e) {
             Throwables.propagate(e);
         }
@@ -170,6 +180,7 @@ public class HostCriteria {
                 + ((configHash == null) ? 0 : configHash.hashCode());
         result = prime * result + (enterprise ? 1231 : 1237);
         result = prime * result + (addAllowed ? 1231 : 1237);
+        result = prime * result + (safeMode ? 1231 : 1237);
         result = prime * result + hostCount;
         result = prime * result
                 + ((meshHash == null) ? 0 : meshHash.hashCode());
@@ -226,6 +237,8 @@ public class HostCriteria {
             return false;
         if (addAllowed != other.addAllowed)
             return false;
+        if (safeMode != other.safeMode)
+            return false;
         if (hostCount != other.hostCount)
             return false;
         if (meshHash == null) {
@@ -248,6 +261,6 @@ public class HostCriteria {
                 + ", meshHash=" + meshHash + ", enterprise=" + enterprise
                 + ", startAction=" + startAction + ", bare=" + bare
                 + ", hostCount=" + hostCount + ", nodeState=" + nodeState
-                + ", addAllowed=" + addAllowed+ "]";
+                + ", addAllowed=" + addAllowed + ", safeMode=" + safeMode + "]";
     }
 }

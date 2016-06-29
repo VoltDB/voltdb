@@ -119,11 +119,12 @@ public class JoinerCriteria {
     protected final boolean m_paused;
     protected final Supplier<NodeState> m_nodeStateSupplier;
     protected final boolean m_addAllowed;
+    protected final boolean m_safeMode;
 
     protected JoinerCriteria(NavigableSet<String> coordinators, VersionChecker versionChecker,
             boolean enterprise, StartAction startAction, boolean bare,
             UUID configHash,int hostCount, int kFactor, boolean paused,
-            Supplier<NodeState> nodeStateSupplier, boolean addAllowed) {
+            Supplier<NodeState> nodeStateSupplier, boolean addAllowed, boolean safeMode) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
@@ -146,6 +147,7 @@ public class JoinerCriteria {
         this.m_paused = paused;
         this.m_nodeStateSupplier = nodeStateSupplier;
         this.m_addAllowed = addAllowed;
+        this.m_safeMode = safeMode;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCount + '|' + this.m_coordinators.toString());
     }
@@ -202,6 +204,10 @@ public class JoinerCriteria {
         return m_addAllowed;
     }
 
+    public boolean isSafeMode() {
+        return m_safeMode;
+    }
+
     public HostCriteria asHostCriteria() {
         return new HostCriteria(
                 m_paused,
@@ -212,7 +218,8 @@ public class JoinerCriteria {
                 m_bare,
                 m_hostCount,
                 m_nodeStateSupplier.get(),
-                m_addAllowed
+                m_addAllowed,
+                m_safeMode
                 );
     }
 
@@ -226,7 +233,8 @@ public class JoinerCriteria {
                 m_bare,
                 m_hostCount,
                 m_nodeStateSupplier.get(),
-                m_addAllowed
+                m_addAllowed,
+                m_safeMode
                 );
     }
     @Override
@@ -236,6 +244,7 @@ public class JoinerCriteria {
         result = prime * result + (m_paused ? 1231 : 1237);
         result = prime * result + (m_bare ? 1231 : 1237);
         result = prime * result + (m_addAllowed ? 1231 : 1237);
+        result = prime * result + (m_safeMode ? 1231 : 1237);
         result = prime * result
                 + ((m_configHash == null) ? 0 : m_configHash.hashCode());
         result = prime * result + (m_enterprise ? 1231 : 1237);
@@ -263,6 +272,8 @@ public class JoinerCriteria {
         if (m_bare != other.m_bare)
             return false;
         if (m_addAllowed != other.m_addAllowed)
+            return false;
+        if (m_safeMode != other.m_safeMode)
             return false;
         if (m_configHash == null) {
             if (other.m_configHash != null)
@@ -297,7 +308,7 @@ public class JoinerCriteria {
                 + ", bare=" + m_bare + ", configHash=" + m_configHash
                 + ", meshHash=" + m_meshHash + ", hostCount=" + m_hostCount
                 + ", kFactor=" + m_kFactor + ", paused=" + m_paused
-                + ", addAllowed=" + m_addAllowed + "]";
+                + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode + "]";
     }
 
     public void appendTo(JSONStringer js) throws JSONException {
@@ -316,6 +327,7 @@ public class JoinerCriteria {
         js.key("kFactor").value(m_kFactor);
         js.key("paused").value(m_paused);
         js.key("addAllowed").value(m_addAllowed);
+        js.key("safeMode").value(m_safeMode);
         js.endObject();
     }
 
@@ -371,6 +383,7 @@ public class JoinerCriteria {
         protected Supplier<NodeState> m_nodeStateSupplier =
                 Suppliers.ofInstance(NodeState.INITIALIZING);
         protected boolean m_addAllowed = false;
+        protected boolean m_safeMode = false;
 
         protected Builder() {
         }
@@ -443,6 +456,11 @@ public class JoinerCriteria {
             return this;
         }
 
+        public Builder safeMode(boolean safeMode) {
+            m_safeMode = safeMode;
+            return this;
+        }
+
         public JoinerCriteria build() {
             return new JoinerCriteria(
                     m_coordinators,
@@ -455,7 +473,8 @@ public class JoinerCriteria {
                     m_kFactor,
                     m_paused,
                     m_nodeStateSupplier,
-                    m_addAllowed
+                    m_addAllowed,
+                    m_safeMode
                     );
         }
     }
