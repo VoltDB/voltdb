@@ -1643,6 +1643,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
+        //Get all paths and put it in properties build the list early so managed check and others can use it.
+        try {
+            m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
+                    (new VoltFile(dt.getPaths().getVoltdbroot().getPath())).getCanonicalPath());
+
+            if (config.m_isEnterprise) {
+                File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
+
+                path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
+
+                path = new VoltFile(dt.getPaths().getSnapshots().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
+
+                path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
+
+                path = new VoltFile(dt.getPaths().getDroverflow().getPath());
+                if (!path.isAbsolute()) {
+                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
+                }
+                m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
+            }
+        } catch (IOException ex) {
+            VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
+        }
+
         List<String> nonEmptyPaths = managedPathsWithFiles(dt);
         if (!nonEmptyPaths.isEmpty()) {
             StringBuilder crashMessage =
@@ -1690,46 +1730,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        //Get all paths and put it in properties
-        try {
-            m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
-                    (new VoltFile(dt.getPaths().getVoltdbroot().getPath())).getCanonicalPath());
-
-            if (config.m_isEnterprise) {
-                File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getSnapshots().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getDroverflow().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
-            }
-        } catch (IOException ex) {
-            VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
-        }
-        //Save .paths
+        //Now its safe to Save .paths
         stagePathConfiguration(config);
 
         //Now that we are done with deployment configuration set all path null.

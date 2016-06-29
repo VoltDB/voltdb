@@ -191,6 +191,8 @@ public class SnapshotDeleteAgent extends OpsAgent
                     //If its SNAP_AUTO thenits coming from periodic delete task.
                     if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
                         path = VoltDB.instance().getSnapshotPath();
+                    } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+                        path = VoltDB.instance().getCommandLogSnapshotPath();
                     }
                     List<File> relevantFiles = retrieveRelevantFiles(path, nonces[ii]);
                     if (relevantFiles != null) {

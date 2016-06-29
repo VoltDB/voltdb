@@ -91,6 +91,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private class TruncationSnapshotAttempt {
         private String path;
+        private String pathType;
         private String nonce;
         private boolean finished;
     }
@@ -417,10 +418,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     new TreeMap<Long, TruncationSnapshotAttempt>();
                 while (snapshots.advanceRow()) {
                     final String path = snapshots.getString("PATH");
+                    final String pathType = snapshots.getString("PATHTYPE");
                     final String nonce = snapshots.getString("NONCE");
                     final Long txnId = snapshots.getLong("TXNID");
                     TruncationSnapshotAttempt snapshotAttempt = new TruncationSnapshotAttempt();
                     snapshotAttempt.path = path;
+                    snapshotAttempt.pathType = pathType;
                     snapshotAttempt.nonce = nonce;
                     foundSnapshots.put(txnId, snapshotAttempt);
                 }
@@ -474,6 +477,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         int ii = 0;
         for (TruncationSnapshotAttempt attempt : toDelete) {
             paths[ii] = attempt.path;
+            SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(attempt.pathType);
+            if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+                paths[ii] = VoltDB.instance().getCommandLogSnapshotPath();
+            } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+                paths[ii] = VoltDB.instance().getSnapshotPath();
+            }
             nonces[ii++] = attempt.nonce;
         }
 
@@ -481,6 +490,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             new Object[] {
                 paths,
                 nonces,
+                SnapshotUtil.SnapthotPathType.SNAP_PATH.toString()
                 };
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -579,7 +589,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     loggingLog.error("Error during scan and group of truncation snapshots");
                 }
             }
-        }, 0, 1, TimeUnit.HOURS);
+        }, 0, 1, TimeUnit.MINUTES);
         try {
             // TRAIL [TruncSnap:1] elected as leader
             truncationRequestExistenceCheck();
@@ -1891,6 +1901,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         snapshotAttempt = new TruncationSnapshotAttempt();
                         snapshotAttempt.path = event.path;
                         snapshotAttempt.nonce = event.nonce;
+                        snapshotAttempt.pathType = SnapshotUtil.SnapthotPathType.SNAP_CL.toString();
                         m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;

@@ -159,13 +159,14 @@ public class SnapshotScanAgent extends OpsAgent
             clientResults.add(new ClientResultRow(
                     (String)s.asRow()[0],
                     (String)s.asRow()[1],
-                    (long)s.asRow()[2],
+                    (String)s.asRow()[2],
                     (long)s.asRow()[3],
                     (long)s.asRow()[4],
-                    (String)s.asRow()[5],
+                    (long)s.asRow()[5],
                     (String)s.asRow()[6],
                     (String)s.asRow()[7],
-                    (String)s.asRow()[8]
+                    (String)s.asRow()[8],
+                    (String)s.asRow()[9]
                     ));
         }
         Collections.sort(clientResults, new Comparator<ClientResultRow>() {
@@ -178,6 +179,7 @@ public class SnapshotScanAgent extends OpsAgent
         for (ClientResultRow row : clientResults) {
             clientSortedResults.addRow(
                     row.path,
+                    row.pathType,
                     row.nonce,
                     row.txnid,
                     row.created,
@@ -234,6 +236,7 @@ public class SnapshotScanAgent extends OpsAgent
                     m_messenger.getHostId(),
                     m_hostname,
                     "",
+                    SnapshotUtil.SnapthotPathType.SNAP_PATH.toString(),
                     "",
                     0,
                     0,
@@ -269,11 +272,17 @@ public class SnapshotScanAgent extends OpsAgent
                             if (partitions.startsWith(",")) {
                                 partitions = partitions.substring(1);
                             }
-
+                            SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+                            if (f.getParent().equalsIgnoreCase(VoltDB.instance().getCommandLogSnapshotPath())) {
+                                stype = SnapshotUtil.SnapthotPathType.SNAP_CL;
+                            } else if (f.getParent().equalsIgnoreCase(VoltDB.instance().getSnapshotPath())) {
+                                stype = SnapshotUtil.SnapthotPathType.SNAP_AUTO;
+                            }
                             results.add(new SnapshotResultRow(
                                     m_messenger.getHostId(),
                                     m_hostname,
                                     f.getParent(),
+                                    stype.toString(),
                                     f.getName(),
                                     savefile.getTxnId(),
                                     savefile.getTimestamp(),
@@ -296,10 +305,17 @@ public class SnapshotScanAgent extends OpsAgent
                         SNAP_LOG.warn(e);
                     }
                 } else {
+                    SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+                    if (f.getParent().equalsIgnoreCase(VoltDB.instance().getCommandLogSnapshotPath())) {
+                        stype = SnapshotUtil.SnapthotPathType.SNAP_CL;
+                    } else if (f.getParent().equalsIgnoreCase(VoltDB.instance().getSnapshotPath())) {
+                        stype = SnapshotUtil.SnapthotPathType.SNAP_AUTO;
+                    }
                     results.add(new SnapshotResultRow(
                             m_messenger.getHostId(),
                             m_hostname,
                             f.getParent(),
+                            stype.toString(),
                             f.getName(),
                             0L,
                             f.lastModified(),
@@ -328,6 +344,7 @@ public class SnapshotScanAgent extends OpsAgent
                     row.hostId,
                     row.hostName,
                     row.path,
+                    row.pathType,
                     row.name,
                     row.txnid,
                     row.created,
@@ -486,6 +503,7 @@ public class SnapshotScanAgent extends OpsAgent
     static class ClientResultRow implements Comparable<ClientResultRow>
     {
         String path;
+        String pathType;
         String nonce;
         long txnid;
         long created;
@@ -495,11 +513,12 @@ public class SnapshotScanAgent extends OpsAgent
         String tablesIncomplete;
         String complete;
 
-        public ClientResultRow(String path, String nonce, long txnid, long created,
+        public ClientResultRow(String path, String pathType, String nonce, long txnid, long created,
                 long size, String tablesRequired, String tablesMissing, String tablesIncomplete,
                 String complete)
         {
             this.path = path;
+            this.pathType = pathType;
             this.nonce = nonce;
             this.txnid = txnid;
             this.created = created;
@@ -529,6 +548,7 @@ public class SnapshotScanAgent extends OpsAgent
         int hostId;
         String hostName;
         String path;
+        String pathType;
         String name;
         long txnid;
         long created;
@@ -542,7 +562,7 @@ public class SnapshotScanAgent extends OpsAgent
         String result;
         String errMsg;
 
-        public SnapshotResultRow(int hostId, String hostName, String path, String name,
+        public SnapshotResultRow(int hostId, String hostName, String path, String pathType, String name,
                 long txnid, long created, String table, String completed, long size,
                 String isReplicated, String partitions, int totalPartitions, String readable,
                 String result, String errMsg)
@@ -550,6 +570,7 @@ public class SnapshotScanAgent extends OpsAgent
             this.hostId = hostId;
             this.hostName = hostName;
             this.path = path;
+            this.pathType = pathType;
             this.name = name;
             this.txnid = txnid;
             this.created = created;
@@ -579,11 +600,12 @@ public class SnapshotScanAgent extends OpsAgent
     }
 
     private VoltTable constructFragmentResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[15];
+        ColumnInfo[] result_columns = new ColumnInfo[16];
         int ii = 0;
         result_columns[ii++] = new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PATHTYPE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TXNID", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
@@ -630,6 +652,7 @@ public class SnapshotScanAgent extends OpsAgent
 
     public static final ColumnInfo clientColumnInfo[] = new ColumnInfo[] {
             new ColumnInfo("PATH", VoltType.STRING),
+            new ColumnInfo("PATHTYPE", VoltType.STRING),
             new ColumnInfo("NONCE", VoltType.STRING),
             new ColumnInfo("TXNID", VoltType.BIGINT),
             new ColumnInfo("CREATED", VoltType.BIGINT),
@@ -687,6 +710,7 @@ public class SnapshotScanAgent extends OpsAgent
         private final long m_txnId;
         private final long m_createTime;
         private final String m_path;
+        private final String m_pathType;
         private final String m_nonce;
         private final Map<String, Table> m_tables = new TreeMap<String, Table>();
         private final HashSet<String> m_tableDigest = new HashSet<String>();
@@ -701,6 +725,7 @@ public class SnapshotScanAgent extends OpsAgent
             m_tables.put( t.m_name, t);
             m_nonce = r.getString("NAME").substring(0, r.getString("NAME").indexOf('-'));
             m_path = r.getString("PATH");
+            m_pathType = r.getString("PATHTYPE");
         }
 
         private void processRow(VoltTableRow r) {
@@ -789,9 +814,10 @@ public class SnapshotScanAgent extends OpsAgent
         }
 
         private Object[] asRow() {
-            Object row[] = new Object[9];
+            Object row[] = new Object[10];
             int ii = 0;
             row[ii++] = m_path;
+            row[ii++] = m_pathType;
             row[ii++] = m_nonce;
             row[ii++] = m_txnId;
             row[ii++] = m_createTime;
