@@ -199,6 +199,9 @@ public:
 
     void setPlanNodeIdForTest(int32_t plannode_id) { m_planNodeId = plannode_id; }
 
+    static void loadSortListFromJSONObject(PlannerDomValue obj,
+                                           std::vector<AbstractExpression*> &sortExprs,
+                                           std::vector<SortDirectionType>   &sortDirs);
 
 protected:
     AbstractPlanNode();

@@ -62,22 +62,15 @@ const char *jsonStrings[] = {
         "        \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_RANK\"\n"
         "    }],\n"
         "    \"CHILDREN_IDS\": [3],\n"
-        "    \"GROUPBY_EXPRESSIONS\": [\n"
-        "        {\n"
-        "            \"COLUMN_IDX\": 1,\n"
-        "            \"TYPE\": 32,\n"
-        "            \"VALUE_TYPE\": 5\n"
-        "        },\n"
-        "        {\n"
-        "            \"COLUMN_IDX\": 3,\n"
-        "            \"TYPE\": 32,\n"
-        "            \"VALUE_TYPE\": 5\n"
-        "        }\n"
-        "    ],\n"
+        "    \"GROUPBY_EXPRESSIONS\": [{\n"
+        "        \"COLUMN_IDX\": 1,\n"
+        "        \"TYPE\": 32,\n"
+        "        \"VALUE_TYPE\": 5\n"
+        "    }],\n"
         "    \"ID\": 2,\n"
         "    \"OUTPUT_SCHEMA\": [\n"
         "        {\n"
-        "            \"COLUMN_NAME\": \"ARANK\",\n"
+        "            \"COLUMN_NAME\": \"C3\",\n"
         "            \"EXPRESSION\": {\n"
         "                \"COLUMN_IDX\": 0,\n"
         "                \"TYPE\": 32,\n"
@@ -117,7 +110,15 @@ const char *jsonStrings[] = {
         "            }\n"
         "        }\n"
         "    ],\n"
-        "    \"PLAN_NODE_TYPE\": \"PARTITIONBY\"\n"
+        "    \"PLAN_NODE_TYPE\": \"PARTITIONBY\",\n"
+        "    \"SORT_COLUMNS\": [{\n"
+        "        \"SORT_DIRECTION\": \"ASC\",\n"
+        "        \"SORT_EXPRESSION\": {\n"
+        "            \"COLUMN_IDX\": 1,\n"
+        "            \"TYPE\": 32,\n"
+        "            \"VALUE_TYPE\": 5\n"
+        "        }\n"
+        "    }]\n"
         "}\n",
         (const char *)0
 };
@@ -143,8 +144,11 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         EXPECT_FALSE(root.isNull());
         boost::shared_ptr<voltdb::PartitionByPlanNode> pn(dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
         EXPECT_TRUE(pn.get() != NULL);
-        std::string spacer("  ");
-        std::cout << pn->debugInfo(spacer);
+        EXPECT_EQ(1, pn->getAggregates().size());
+        EXPECT_EQ(EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, pn->getAggregates()[0]);
+        EXPECT_EQ(1, pn->getGroupByExpressions().size());
+        EXPECT_EQ(1, pn->getSortExpressions().size());
+        EXPECT_EQ(1, pn->getSortDirections().size());
     }
 }
 

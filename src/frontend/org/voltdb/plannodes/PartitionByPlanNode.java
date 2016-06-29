@@ -16,6 +16,9 @@
  */
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -32,12 +35,14 @@ import org.voltdb.types.PlanNodeType;
  */
 public class PartitionByPlanNode extends AggregatePlanNode {
     private enum Members {
-        ORDER_BY_EXPRS,
-        WINDOW_UNITS,
-
+        ORDER_BY_EXPRS
     };
     public final SchemaColumn getWindowedSchemaColumn() {
         return m_windowedSchemaColumn;
+    }
+
+    public final WindowedExpression getWindowedExpression() {
+        return (WindowedExpression)m_windowedSchemaColumn.getExpression();
     }
 
     @Override
@@ -86,6 +91,28 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         for (AbstractExpression expr : we.getPartitionByExpressions()) {
             m_groupByExpressions.add(expr);
         }
+    }
+
+    @Override
+    public void toJSONString(JSONStringer stringer) throws JSONException {
+        super.toJSONString(stringer);
+
+        AbstractExpression.toJSONArrayFromSortList(stringer,
+                                                   getWindowedExpression().getOrderByExpressions(),
+                                                   getWindowedExpression().getOrderByDirections());
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+        WindowedExpression we = new WindowedExpression();
+        AbstractExpression.loadSortListFromJSONArray(we.getOrderByExpressions(), we.getOrderByDirections(), jobj);
+        we.setExpressionType(m_aggregateTypes.get(0));
+        // WE don't really care about the column and table
+        // names and aliases.  These are not the ones from the
+        // original expression, but we'll never use them to
+        // look up things again.
+        m_windowedSchemaColumn = new SchemaColumn("WTN", "WTA", "WCN", "WCA", we);
     }
 
     @Override

@@ -42,4 +42,9 @@ std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
     }
     return buffer.str();
 }
+
+void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    AggregatePlanNode::loadFromJSONObject(obj);
+    loadSortListFromJSONObject(obj, m_sortExpressions, m_sortDirections);
+}
 }

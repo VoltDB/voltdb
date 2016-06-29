@@ -160,7 +160,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
     // This is not actually a test.  This is here just to generate a
     // catalog and a plan for the PartitionByExecutor test.  It doesn't really
     // test anything at all.  So really, just don't enable it.
-    public void NOPEtestRankTestGen() throws Exception {
+    public void testRankTestGen() throws Exception {
         compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
     }
     @Override

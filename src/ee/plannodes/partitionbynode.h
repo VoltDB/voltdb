@@ -36,6 +36,8 @@ public:
     const std::vector<SortDirectionType> getSortDirections() const {
         return m_sortDirections;
     }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
 private:
     OwningExpressionVector          m_sortExpressions;
