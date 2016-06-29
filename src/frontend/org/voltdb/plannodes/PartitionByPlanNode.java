@@ -31,6 +31,11 @@ import org.voltdb.types.PlanNodeType;
  * Note that this is a trivial kind of an AggregatePlanNode.
  */
 public class PartitionByPlanNode extends AggregatePlanNode {
+    private enum Members {
+        ORDER_BY_EXPRS,
+        WINDOW_UNITS,
+
+    };
     public final SchemaColumn getWindowedSchemaColumn() {
         return m_windowedSchemaColumn;
     }
@@ -76,10 +81,10 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         WindowedExpression we = (WindowedExpression)windowedSchemaColumn.getExpression();
         m_aggregateOutputColumns.add(0);
         m_aggregateTypes.add(we.getExpressionType());
+        m_aggregateDistinct.add(0);
+        m_aggregateExpressions.add(null);
         for (AbstractExpression expr : we.getPartitionByExpressions()) {
             m_groupByExpressions.add(expr);
-            m_aggregateDistinct.add(0);
-            m_aggregateExpressions.add(null);
         }
     }
 

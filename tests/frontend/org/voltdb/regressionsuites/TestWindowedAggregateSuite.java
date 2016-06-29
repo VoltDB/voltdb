@@ -48,7 +48,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.planner.PlanAssembler;
 
 public class TestWindowedAggregateSuite extends RegressionSuite {
 
@@ -70,43 +69,37 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
 
     public void testRank() throws Exception {
         // Save the guard and restore it after.
-        boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
-        PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
-        try {
-            Client client = getClient();
+        Client client = getClient();
 
-            long expected[][] = new long[][] {
-                    {  1,  1, 1 },
-                    {  1,  2, 2 },
-                    {  2, 10, 1 },
-                    {  2, 10, 2 },
-                    {  2, 11, 3 },
-                    {  3, 10, 1 }
-            };
-            long input[][] = new long[][] {
-                    {  3, 10, 1 },
-                    {  1,  2, 2 },
-                    {  2, 11, 3 },
-                    {  2, 10, 1 },
-                    {  1,  1, 1 },
-                    {  2, 10, 2 }
-            };
-            ClientResponse cr;
-            VoltTable vt;
-            for (long [] row : input) {
-                cr = client.callProcedure("T.insert", row[0], row[1]);
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            }
-            String sql = "select A, B, rank() over (partition by A order by B) from T;";
-            cr = client.callProcedure("@AdHoc", sql);
+        long expected[][] = new long[][] {
+                {  1,  1, 1 },
+                {  1,  2, 2 },
+                {  2, 10, 1 },
+                {  2, 10, 2 },
+                {  2, 11, 3 },
+                {  3, 10, 1 }
+        };
+        long input[][] = new long[][] {
+                {  3, 10, 1 },
+                {  1,  2, 2 },
+                {  2, 11, 3 },
+                {  2, 10, 1 },
+                {  1,  1, 1 },
+                {  2, 10, 2 }
+        };
+        ClientResponse cr;
+        VoltTable vt;
+        for (long [] row : input) {
+            cr = client.callProcedure("T.insert", row[0], row[1]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            validateTableOfLongs(vt, expected);
-        } finally {
-            PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
         }
-
+        String sql = "select A, B, rank() over (partition by A order by B) from T;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        validateTableOfLongs(vt, expected);
     }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =

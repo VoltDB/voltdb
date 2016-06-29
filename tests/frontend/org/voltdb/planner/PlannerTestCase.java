@@ -29,8 +29,12 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 import junit.framework.TestCase;
 
@@ -288,6 +292,24 @@ public class PlannerTestCase extends TestCase {
         explainStr2 = buildExplainPlan(pns);
 
         assertEquals(explainStr1, explainStr2);
+    }
+
+    protected void verifyOrderByPlanNode(OrderByPlanNode  orderByPlanNode,
+                                         Object       ... columnDescrs) {
+        // We should have an even number of columns
+        assertEquals(0, columnDescrs.length % 2);
+        List<AbstractExpression> exprs = orderByPlanNode.getSortExpressions();
+        List<SortDirectionType>  dirs  = orderByPlanNode.getSortDirections();
+        assertEquals(exprs.size(), dirs.size());
+        assertEquals(columnDescrs.length/2, exprs.size());
+        for (int idx = 0; idx < exprs.size(); idx += 1) {
+            AbstractExpression expr = exprs.get(idx);
+            SortDirectionType  dir  = dirs.get(idx);
+            assertTrue(expr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)expr;
+            assertEquals((String)columnDescrs[2*idx], tve.getColumnName());
+            assertEquals(columnDescrs[2*idx+1],       dir);
+        }
     }
 
     /** Given a list of Class objects for plan node subclasses, asserts

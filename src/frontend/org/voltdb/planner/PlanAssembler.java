@@ -93,8 +93,6 @@ import org.voltdb.utils.CatalogUtil;
  *
  */
 public class PlanAssembler {
-    public static boolean HANDLE_WINDOWED_OPERATORS = Boolean.valueOf(System.getProperty("org.voltdb.handlewindowedfunctions", "False"));
-
     // The convenience struct to accumulate results after parsing multiple statements
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
@@ -692,7 +690,7 @@ public class PlanAssembler {
         AbstractPlanNode subUnionRoot = new UnionPlanNode(m_parsedUnion.m_unionType);
         m_recentErrorMsg = null;
 
-        ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
+        ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
         StatementPartitioning commonPartitioning = null;
 
         // Build best plans for the children first
@@ -2114,9 +2112,6 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
-        if ( ! HANDLE_WINDOWED_OPERATORS ) {
-            throw new PlanningErrorException("Windowed operators are not supported in this version of VoltDB.");
-        }
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
         ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
@@ -2411,7 +2406,7 @@ public class PlanAssembler {
                 // do not try to look at Partial/Sparse index
                 continue;
             }
-            ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> bindings = new ArrayList<>();
             List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
                     index, fromTableAlias, bindings);
 
@@ -2850,7 +2845,7 @@ public class PlanAssembler {
      *         removed.
      */
     private static Set<String> getIndexedColumnSetForTable(Table table) {
-        HashSet<String> columns = new HashSet<String>();
+        HashSet<String> columns = new HashSet<>();
 
         for (Index index : table.getIndexes()) {
             for (ColumnRef colRef : index.getColumns()) {
@@ -2881,7 +2876,7 @@ public class PlanAssembler {
      */
     private static void simplifyOuterJoin(BranchNode joinTree) {
         assert(joinTree != null);
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> exprs = new ArrayList<>();
         JoinNode leftNode = joinTree.getLeftNode();
         JoinNode rightNode = joinTree.getRightNode();
         // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
@@ -2923,7 +2918,7 @@ public class PlanAssembler {
         // Now add this node expression to the list and descend
         // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
         // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
-        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
+        List<AbstractExpression> newExprs = new ArrayList<>(exprs);
         if (leftNode.getJoinExpression() != null) {
             newExprs.add(leftNode.getJoinExpression());
         }

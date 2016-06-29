@@ -55,7 +55,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.SortDirectionType;
 
-public class TestWindowedFunctions extends PlannerTestCase {
+public class TestWindowedAggregatePlans extends PlannerTestCase {
     public void testRank() {
         AbstractPlanNode node = compile("SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A,B ORDER BY B DESC ) AS ARANK FROM AAA;");
         // The plan should look like:
@@ -74,29 +74,22 @@ public class TestWindowedFunctions extends PlannerTestCase {
         AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
         assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
         OrderByPlanNode orderByNode = (OrderByPlanNode)abstractOrderByNode;
-        NodeSchema input_schema = orderByNode.getOutputSchema();
-        assertNotNull(input_schema);
+        // The PartitionByPlanNode's input schema will be the
+        // same as the OrderByPlanNode's output schema.
+        NodeSchema pb_input_schema = orderByNode.getOutputSchema();
+        assertNotNull(pb_input_schema);
+        // The order by plan node should just have "A" and "B".
+        // The column "B" should be ordered descending.
+        verifyOrderByPlanNode(orderByNode,
+                              "A", SortDirectionType.ASC,
+                              "B", SortDirectionType.DESC);
 
         AbstractPlanNode seqScanNode = orderByNode.getChild(0);
         assertTrue(seqScanNode instanceof SeqScanPlanNode);
 
         PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
-        NodeSchema  schema = pbPlanNode.getOutputSchema();
-
-        //
-        // Check that the order by node has the right number of expressions.
-        // and that they have the correct order.
-        //
-        assertEquals(2, orderByNode.getSortExpressions().size());
-        assertEquals(SortDirectionType.ASC, orderByNode.getSortDirections().get(0));
-        assertEquals(SortDirectionType.DESC, orderByNode.getSortDirections().get(1));
-        //
-        // Check that the partition by plan node's output schema correct.  First,
-        // look at the first expression, to verify that it's the windowed expression.
-        // Then check that the TVEs all make sense.
-        //
-        SchemaColumn column = schema.getColumns().get(0);
-        assertEquals("ARANK", column.getColumnAlias());
+        NodeSchema  pb_outputschema = pbPlanNode.getOutputSchema();
+        assertNotNull(pb_outputschema);
     }
 
     public String nodeSchemaString(String label, NodeSchema schema) {
@@ -124,21 +117,21 @@ public class TestWindowedFunctions extends PlannerTestCase {
         AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
         assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
 
-        AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
-        assertTrue(orderByPlanNode instanceof OrderByPlanNode);
-        NodeSchema input_schema = orderByPlanNode.getOutputSchema();
+        AbstractPlanNode orderByPlanNodeBase = partitionByPlanNode.getChild(0);
+        assertTrue(orderByPlanNodeBase instanceof OrderByPlanNode);
+        NodeSchema input_schema = orderByPlanNodeBase.getOutputSchema();
+        assertNotNull(input_schema);
+        OrderByPlanNode orderByPlanNode = (OrderByPlanNode)orderByPlanNodeBase;
+        verifyOrderByPlanNode(orderByPlanNode,
+                              "A", SortDirectionType.ASC,
+                              "B", SortDirectionType.ASC);
 
-        AbstractPlanNode scanNode = orderByPlanNode.getChild(0);
+        AbstractPlanNode scanNode = orderByPlanNodeBase.getChild(0);
         assertTrue(scanNode instanceof NestLoopPlanNode);
 
         NodeSchema  schema = partitionByPlanNode.getOutputSchema();
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
-    }
-
-    public void testRankWithNoPartition() {
-        AbstractPlanNode node = compile("SELECT A, B, RANK() OVER (ORDER BY A, B) AS ARANK FROM BBB;");
-        assertNotNull(node);
     }
 
     public void testRankFailures() {
@@ -151,6 +144,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     }
 
+    public void notestOrderByAndPartitionByExpressions() throws Exception {
+        AbstractPlanNode node;
+        try {
+            node = compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) FROM AAA;");
+        } catch (Exception ex) {
+            assertFalse("PartitionBy expressions in windowed expressions don't compile", true);
+        }
+        try {
+            node = compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA;");
+        } catch (Exception ex) {
+            assertFalse("OrderBy expressions in windowed expressions don't compile", true);
+        }
+    }
     // This is not actually a test.  This is here just to generate a
     // catalog and a plan for the PartitionByExecutor test.  It doesn't really
     // test anything at all.  So really, just don't enable it.
@@ -159,7 +165,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
     }
     @Override
     protected void setUp() throws Exception {
-        setupSchema(true, TestWindowedFunctions.class.getResource("testwindowingfunctions-ddl.sql"), "testwindowfunctions");
+        setupSchema(true, TestWindowedAggregatePlans.class.getResource("testwindowingfunctions-ddl.sql"), "testwindowfunctions");
     }
 
     @Override
