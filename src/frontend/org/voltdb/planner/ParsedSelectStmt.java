@@ -762,7 +762,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.columnName = tvexpr.getColumnName();
                 col.tableName = tvexpr.getTableName();
                 col.tableAlias = tvexpr.getTableAlias();
-                col.alias = tvexpr.getColumnAlias();
             } else {
                 col.columnName = child.attributes.get("column");
                 col.tableName = child.attributes.get("table");

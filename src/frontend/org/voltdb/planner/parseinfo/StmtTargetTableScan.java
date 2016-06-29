@@ -23,6 +23,8 @@ import java.util.List;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
@@ -119,7 +121,7 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public void processTVE(TupleValueExpression expr, String columnName) {
+    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
         if (m_origSubqueryScan != null) {
             // SELECT TA1.CA CA1 FROM (SELECT T.C CA FROM T TA) TA1;
             // The TA1(TA1).(CA)CA1 TVE needs to be adjusted to be T(TA1).C(CA) since the original
@@ -132,17 +134,18 @@ public class StmtTargetTableScan extends StmtTableScan {
             assert(columnIndex != null);
             SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
             assert(origColumnSchema != null);
-            expr.setColumnName(origColumnSchema.getColumnName());
-            // The differentiator value must be taken from the column TVE expression and not the
-            // column schema itself because the TVE value could be adjusted to take a projection
-            // into the account. At the moment, the subquery columns expressions can be TVE only.
-            // The TVE cast should be safe
-            assert(origColumnSchema.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression origTve = (TupleValueExpression) origColumnSchema.getExpression();
-            expr.setColumnName(origColumnSchema.getColumnName());
-            expr.setDifferentiator(origTve.getDifferentiator());
+            // Get the original column expression and adjust its aliases
+            AbstractExpression colExpr = (AbstractExpression) origColumnSchema.getExpression();
+            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(colExpr);
+            for (TupleValueExpression tve : tves) {
+                tve.setTableAlias(expr.getTableAlias());
+                tve.setColumnAlias(expr.getColumnAlias());
+                tve.resolveForTable(m_table);
+            }
+            return colExpr;
         }
         expr.resolveForTable(m_table);
+        return expr;
     }
 
     public void setOriginalSubqueryScan(StmtSubqueryScan origSubqueryScan) {
