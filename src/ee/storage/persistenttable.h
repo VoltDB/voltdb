@@ -525,6 +525,9 @@ public:
 
     MaterializedViewHandler *materializedViewHandler() const { return m_mvHandler; }
 
+    Table* deltaTable() const { return m_deltaTable; }
+    bool isDeltaTableActive() { return m_deltaTableActive; }
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
@@ -642,6 +645,10 @@ private:
 
     void computeSmallestUniqueIndex();
 
+    void addViewToTrigger(MaterializedViewHandler *viewToTrigger);
+    void dropViewToTrigger(MaterializedViewHandler *viewToTrigger);
+    void polluteViews();
+
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
@@ -718,10 +725,9 @@ private:
     // If I am a source table of a view, I will notify all the relevant view handlers
     // when an update is needed.
     std::vector<MaterializedViewHandler*> m_viewsToTrigger;
-    void addViewToTrigger(MaterializedViewHandler *viewToTrigger) {
-        m_viewsToTrigger.push_back(viewToTrigger);
-    }
-    void dropViewToTrigger(MaterializedViewHandler *viewToTrigger);
+
+    PersistentTable *m_deltaTable;
+    bool m_deltaTableActive;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

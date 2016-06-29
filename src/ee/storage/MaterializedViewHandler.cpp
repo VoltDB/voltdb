@@ -33,7 +33,6 @@ namespace voltdb {
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable *destTable,
                                                      catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                      VoltDBEngine *engine) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "View " << destTable->name() << ":\n"; }
         install(destTable, mvHandlerInfo, engine);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
@@ -41,21 +40,21 @@ namespace voltdb {
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::~MaterializedViewHandler() " << endl; }
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::~MaterializedViewHandler() " << endl; }
         for (int i=m_sourceTables.size()-1; i>=0; i--) {
             dropSourceTable(m_sourceTables[i]);
         }
     }
 
     void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::addSourceTable() " << sourceTable->name()  << endl; }
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::addSourceTable() " << sourceTable->name()  << endl; }
         sourceTable->addViewToTrigger(this);
         m_sourceTables.push_back(sourceTable);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "MaterializedViewHandler::dropSourceTable() " << sourceTable->name()  << endl; }
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::dropSourceTable() " << sourceTable->name()  << endl; }
         assert( ! m_sourceTables.empty());
         sourceTable->dropViewToTrigger(this);
         PersistentTable* lastTable = m_sourceTables.back();
@@ -104,7 +103,7 @@ namespace voltdb {
             char* explanation = new char[bufferLength];
             boost::shared_array<char> memoryGuard(explanation);
             catalog::Catalog::hexDecodeString(hexString, explanation);
-            cout << explanation << endl;
+            cout << m_destTable->name() << " MaterializedViewHandler::setUpCreateQuery()\n" << explanation << endl;
         }
 // #endif
     }

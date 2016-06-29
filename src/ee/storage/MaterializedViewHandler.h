@@ -41,6 +41,7 @@ public:
     void dropSourceTable(PersistentTable *sourceTable);
     PersistentTable *destTable() const { return m_destTable; }
     bool isDirty() { return m_dirty; }
+    void pollute() { m_dirty = true; }
 
 private:
     std::vector<PersistentTable*> m_sourceTables;
@@ -56,7 +57,7 @@ private:
     void setUpCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                           VoltDBEngine *engine);
     void setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                            VoltDBEngine *engine);
+                          VoltDBEngine *engine);
 };
 
 } // namespace voltdb

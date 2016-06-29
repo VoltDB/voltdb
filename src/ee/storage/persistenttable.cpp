@@ -131,7 +131,9 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_smallestUniqueIndexCrc(0),
     m_drTimestampColumnIndex(-1),
     m_pkeyIndex(NULL),
-    m_mvHandler(NULL)
+    m_mvHandler(NULL),
+    m_deltaTable(NULL),
+    m_deltaTableActive(false)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -209,6 +211,9 @@ PersistentTable::~PersistentTable() {
     // remove this table from the source table list of the views.
     BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->dropSourceTable(this);
+    }
+    if (m_deltaTable) {
+        m_deltaTable->decrementRefcount();
     }
 }
 
@@ -435,7 +440,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // Add one reference count to keep the original table.
         emptyTable->setPreTruncateTable(this);
     }
-
 
     if (m_viewsToTrigger.size() == 0) {
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": not a joined table view source.\n"; }
@@ -1800,6 +1804,9 @@ void PersistentTable::addIndex(TableIndex *index) {
     m_noAvailableUniqueIndex = false;
     m_smallestUniqueIndex = NULL;
     m_smallestUniqueIndexCrc = 0;
+    // Need to reconstruct the materialized views when a new index is created on the source table.
+    // Because the query plans to refresh the view may be changed.
+    polluteViews();
 }
 
 void PersistentTable::removeIndex(TableIndex *index) {
@@ -1826,6 +1833,9 @@ void PersistentTable::removeIndex(TableIndex *index) {
     delete index;
     m_smallestUniqueIndex = NULL;
     m_smallestUniqueIndexCrc = 0;
+    // Need to reconstruct the materialized views when an index is removed from the source table.
+    // Because the query plans to refresh the view may be changed.
+    polluteViews();
 }
 
 void PersistentTable::setPrimaryKeyIndex(TableIndex *index) {
@@ -1846,6 +1856,17 @@ void PersistentTable::configureIndexStats(CatalogId databaseId) {
 
 }
 
+void PersistentTable::addViewToTrigger(MaterializedViewHandler *viewToTrigger) {
+    if (m_viewsToTrigger.size() == 0) {
+        VoltDBEngine *engine = ExecutorContext::getEngine();
+        TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
+        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
+                                             *engine->getCatalogTable(m_name));
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Delta table for " << m_name << " is created.\n"; }
+    }
+    m_viewsToTrigger.push_back(viewToTrigger);
+}
+
 void PersistentTable::dropViewToTrigger(MaterializedViewHandler *viewToTrigger) {
     assert( ! m_viewsToTrigger.empty());
     MaterializedViewHandler* lastHandler = m_viewsToTrigger.back();
@@ -1860,6 +1881,16 @@ void PersistentTable::dropViewToTrigger(MaterializedViewHandler *viewToTrigger) 
     }
     // The last element is now excess.
     m_viewsToTrigger.pop_back();
+    if (m_viewsToTrigger.size() == 0) {
+        m_deltaTable->decrementRefcount();
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Delta table for " << m_name << " is deleted.\n"; }
+    }
+}
+
+void PersistentTable::polluteViews() {
+    for (auto mvHanlder : m_viewsToTrigger) {
+        mvHanlder->pollute();
+    }
 }
 
 } // namespace voltdb

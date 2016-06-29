@@ -58,6 +58,16 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
+Table *TableCatalogDelegate::getTable() const {
+    // If a persistent table has an active delta table, return the delta table instead of the whole table.
+    PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(m_table);
+    if (persistentTable && persistentTable->isDeltaTableActive()) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Returning deltaTable!" << endl; }
+        return persistentTable->deltaTable();
+    }
+    return m_table;
+}
+
 TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
                                                      catalog::Table const &catalogTable) {
     // Columns:
@@ -460,6 +470,14 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->incrementRefcount();
 }
 
+PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const &catalogDatabase,
+        catalog::Table const &catalogTable)
+{
+    Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable);
+    deltaTable->incrementRefcount();
+    return dynamic_cast<PersistentTable*>(deltaTable);
+}
+
 //After catalog is updated call this to ensure your export tables are connected correctly.
 void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
@@ -731,7 +749,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processSchemaChanges() drop old table" << endl; }
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processSchemaChanges() drop old " << catalogTable.name() << " table" << endl; }
     existingTable->decrementRefcount();
 
     ///////////////////////////////////////////////
