@@ -129,7 +129,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     private void checkSeqScan(AbstractPlanNode scanNode, String tableAlias, String... columns) {
-        assertTrue(scanNode instanceof SeqScanPlanNode);
+        assertEquals(PlanNodeType.SEQSCAN, scanNode.getPlanNodeType());
         SeqScanPlanNode snode = (SeqScanPlanNode) scanNode;
         if (tableAlias != null) {
             assertEquals(tableAlias, snode.getTargetTableAlias());
@@ -225,10 +225,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSimple(sqlNoSimplification, tbName, new String[]{"C1"}, "R1", new String[]{"A", "C"}, true);
         checkSubquerySimplification(sql, equivalentSql);
 
-        // Complex columns in sub selects
-        checkSimple("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) T1 WHERE T1.A1 < 0",
-                tbName, new String[]{"C1"}, "R1", new String[]{"A1", "C"}, true);
-
+        // LIMIT in sub selects
         checkSimple("select COL1 FROM (SELECT A+3, C COL1 FROM R1  LIMIT 10) T1 WHERE T1.COL1 < 0",
                 tbName, new String[]{"COL1"}, "R1", new String[]{"C1", "C"}, true);
 
@@ -260,7 +257,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Three levels selects
         pn = compile("select A2 FROM " +
-                "(SELECT A1 AS A2 FROM (SELECT A + 1 AS A1 FROM R1 WHERE A < 3) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3");
+                "(SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1 WHERE A < 3 LIMIT 10) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3");
         pn = pn.getChild(0);
         checkSeqScan(pn, "T2",  "A2");
         checkPredicateComparisonExpression(pn, "T2");
@@ -268,7 +265,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1",  "A1");
         checkPredicateComparisonExpression(pn, "T1");
         pn = pn.getChild(0);
-        checkSeqScan(pn, "R1",  "A1");
+        checkSeqScan(pn, "R1",  "A");
         checkPredicateComparisonExpression(pn, "R1");
 
         //
@@ -642,7 +639,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // AdHoc multiple partitioned sub-select queries.
         //
         sql = "select A1, C FROM (SELECT A A1, C FROM P1) T1  ";
-        sqlNoSimplification = "select A1, C FROM (SELECT A + 1 A1, C FROM P1) T1 ";
+        sqlNoSimplification = "select A1, C FROM (SELECT DISTINCT A A1, C FROM P1) T1 ";
         equivalentSql = "SELECT A A1, C FROM P1 T1";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
@@ -652,27 +649,15 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ReceivePlanNode);
         pn = planNodes.get(1).getChild(0);
         checkSeqScan(pn, "T1",  "A1", "C" );
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode); // This sounds it could be optimized
-        pn = pn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         checkSubquerySimplification(sql, equivalentSql);
 
         sql = "select A1 FROM (SELECT A A1, C FROM P1 WHERE A > 3) T1 ";
-        sqlNoSimplification = "select A1 FROM (SELECT A + 1 A1, C FROM P1 WHERE A > 3) T1 ";
+        sqlNoSimplification = "select A1 FROM (SELECT A A1, C FROM P1 WHERE A > 3 LIMIT 10) T1 ";
         equivalentSql = "SELECT A A1 FROM P1 T1 WHERE A > 3";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ReceivePlanNode);
-        pn = planNodes.get(1).getChild(0);
-        checkSeqScan(pn, "T1",  "A1" );
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
+        checkSeqScan(pn, "T1", "A1");
         checkSubquerySimplification(sql, equivalentSql);
 
 
@@ -813,7 +798,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         sql = "SELECT T1.A, T1.C, P2.D FROM P2, (SELECT A, C FROM P1) T1 " +
                 "where T1.A = P2.A ";
-        sqlNoSimplification = "SELECT T1.A, T1.C, P2.D FROM P2, (SELECT A, C, A + 1 FROM P1) T1 " +
+        sqlNoSimplification = "SELECT T1.A, T1.C, P2.D FROM P2, (SELECT DISTINCT A, C FROM P1 ) T1 " +
                 "where T1.A = P2.A ";
         equivalentSql = "SELECT T1.A, T1.C, P2.D FROM P2, P1 T1 WHERE T1.A = P2.A";
         planNodes = compileToFragments(sqlNoSimplification);
@@ -830,15 +815,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
         pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1", "A", "C");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        pn = pn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
-        // Check inlined index scan
-        pn = ((NestLoopIndexPlanNode) nlpn).getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkPrimaryKeyIndexScan(pn, "P2", "A", "D");
-        checkSubquerySimplification(sql, equivalentSql);
-
 
         checkFragmentCount("SELECT P2.A, P2.C FROM P2, (SELECT A, C FROM P1 GROUP BY A) T1 " +
                 "where T1.A = P2.A and P2.A = 1", 1);
@@ -1390,7 +1366,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         //
         checkPushedDownJoins(3, 0,
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
-                "                (SELECT A, C + 2 FROM R2 where C > 3 ) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT A, C FROM R2 where C > 3 LIMIT 10) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
         checkPushedDownJoins(2, 1,
@@ -1923,7 +1899,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Join on coordinator: LEFT OUTER JOIN, replicated table on left side
         sql = "SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ";
-        sqlNoSimplification = "SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT A + 1, C FROM P1) T1 ON T1.C = R1.C ";
+        sqlNoSimplification = "SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT DISTINCT A, C FROM P1) T1 ON T1.C = R1.C ";
         equivalentSql = "SELECT R1.A, R1.C FROM R1 LEFT JOIN P1 T1 ON T1.C = R1.C ";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
@@ -1935,7 +1911,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(0);
         checkSeqScan(pn, "R1", "A", "C");
         pn = nlpn.getChild(1);
-        assertTrue(pn instanceof ReceivePlanNode);
+        assertEquals(PlanNodeType.RECEIVE, pn.getPlanNodeType());
 
         pn = planNodes.get(1);
         assertTrue(pn instanceof SendPlanNode);
@@ -2042,7 +2018,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Join locally: inner join case for subselects
         sql = "SELECT R1.A, R1.C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ";
-        sqlNoSimplification = "SELECT R1.A, R1.C FROM R1 INNER JOIN (SELECT A + 1,C FROM P1) T1 ON T1.C = R1.C ";
+        sqlNoSimplification = "SELECT R1.A, R1.C FROM R1 INNER JOIN (SELECT DISTINCT A, C FROM P1) T1 ON T1.C = R1.C ";
         equivalentSql = "SELECT R1.A, R1.C FROM R1 INNER JOIN P1 T1 ON T1.C = R1.C ";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
@@ -2065,7 +2041,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Two sub-queries. One is partitioned and the other one is replicated
         sql = "select A, AC FROM (SELECT A FROM R1) T1, (SELECT C AC FROM P1) T2 WHERE T1.A = T2.AC ";
-        sqlNoSimplification = "select A, AC FROM (SELECT A FROM R1 LIMIT 10) T1, (SELECT A + C AC FROM P1) T2 WHERE T1.A = T2.AC ";
+        sqlNoSimplification = "select A, AC FROM (SELECT A FROM R1 LIMIT 10) T1, (SELECT DISTINCT A AC FROM P1) T2 WHERE T1.A = T2.AC ";
         equivalentSql = "select T1.A, T2.C AC FROM R1 T1, P1 T2 WHERE T1.A = T2.C ";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(2, planNodes.size());
@@ -2091,7 +2067,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // This is a single fragment plan because planner can detect "A = 3".
         // Join locally
         sql = "select A1, A2 FROM (SELECT A A1 FROM R1) T1, (SELECT A A2 FROM P1 where A = 3) T2 WHERE T1.A1 = T2.A2 ";
-        sqlNoSimplification = "select A2, A1 FROM (SELECT A + 1 A1 FROM R1) T1, (SELECT  A + 1 A2 FROM P1 where A = 3) T2 WHERE T1.A1 = T2.A2 ";
+        sqlNoSimplification = "select A2, A1 FROM (SELECT DISTINCT A A1 FROM R1) T1, (SELECT DISTINCT A A2 FROM P1 where A = 3) T2 WHERE T1.A1 = T2.A2 ";
         equivalentSql = "select T1.A A1, T2.A A2 FROM R1 T1 join P1 T2 on T2.A = 3 and T1.A = T2.A";
         planNodes = compileToFragments(sqlNoSimplification);
         assertEquals(1, planNodes.size());
@@ -2106,10 +2082,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = nlpn.getChild(1);
         checkSeqScan(pn, "T2", "A2");
         pn = pn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1", "A2");
+        checkPrimaryKeyIndexScan(pn, "P1", "A");
 
-        assertEquals(((IndexScanPlanNode) pn).getInlinePlanNodes().size(), 1);
+        assertEquals(2, ((IndexScanPlanNode) pn).getInlinePlanNodes().size());
         assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(((IndexScanPlanNode) pn).getInlinePlanNode(PlanNodeType.AGGREGATE));
         checkSubquerySimplification(sql, equivalentSql);
 
 
@@ -2155,7 +2132,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     public void testParameters() {
-        AbstractPlanNode pn = compile("select A1 FROM (SELECT A + 1 A1 FROM R1 WHERE A > ?) TEMP WHERE A1 < ?");
+        AbstractPlanNode pn = compile("select A1 FROM (SELECT A A1 FROM R1 WHERE A > ? LIMIT 10) TEMP WHERE A1 < ?");
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
         AbstractExpression p = ((SeqScanPlanNode) pn).getPredicate();
@@ -2284,11 +2261,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // Subquery contains subquery
         sql = "select * from (select A from (select A from R1 limit 5) T1) T2";
         checkSubqueryNoSimplification(sql);
-
-        // Subquery with display column expression
-        sql = "select * from (select A + 1 from R1) T2";
-        checkSubqueryNoSimplification(sql);
-
     }
 
     private void checkSubquerySimplification(String sql, String equivalentSql, List<String[]> ignoreList) {
@@ -2315,6 +2287,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     public void testSubquerySimplification() {
         String sql;
         String equivalentSql;
+        List<String[]> ignoreList;
 
         // Ambiguous column differentiator test
         sql = "select * from (select D, C as D from R1) T;";
@@ -2371,7 +2344,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // FROM Subquery with subquery expression
         sql = "select A from (select A from R1 where exists (select 1 from R2 where R2.A = 0)) T1";
         equivalentSql = "select T1.A from R1 T1 where exists (select 1 from R2 where R2.A = 0)";
-        List<String[]> ignoreList = new ArrayList<>();
+        ignoreList = new ArrayList<>();
         ignoreList.add(new String[]{"\"SUBQUERY_ID\":2", "\"SUBQUERY_ID\":1"});
         ignoreList.add(new String[]{"\"STATEMENT_ID\":2", "\"STATEMENT_ID\":1"});
         checkSubquerySimplification(sql, equivalentSql, ignoreList);
@@ -2398,6 +2371,22 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // Partitioned LEFT join
         sql = "select T1.A, T1.C from (select A, C from P1) T1 left join P2 on T1.A = P2.A ";
         equivalentSql = "select T1.A, T1.C from P1 T1 left join P2 on T1.A = P2.A ";
+        checkSubquerySimplification(sql, equivalentSql, ignoreList);
+//
+        // Display column Expressions
+        sql = "select A1 A11 from (select A + 1 A1 from R1 where R1.C = 0) T1";
+        equivalentSql = "select T1.A + 1 A11 from R1 T1 where T1.C = 0";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select AC AC1 from (select A + C AC from R1 where R1.C = 0) T1";
+        equivalentSql = "select T1.A + T1.C AC1 from R1 T1 where T1.C = 0";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select SCALAR AC1 from (select (select A from R2) SCALAR from R1 where R1.C = 0) T1";
+        equivalentSql = "select  (select A from R2) AC1 from R1 T1 where T1.C = 0";
+        ignoreList = new ArrayList<>();
+        ignoreList.add(new String[]{"\"SUBQUERY_ID\":2", "\"SUBQUERY_ID\":1"});
+        ignoreList.add(new String[]{"\"STATEMENT_ID\":2", "\"STATEMENT_ID\":1"});
         checkSubquerySimplification(sql, equivalentSql, ignoreList);
     }
 
