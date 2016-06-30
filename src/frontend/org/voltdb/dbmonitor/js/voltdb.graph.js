@@ -1132,6 +1132,9 @@
                 MonitorGraphUI.Monitors.tpsData = datatrans;
                 monitor.tpsFirstData = false;
             }
+            else{
+                datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
+            }
 
             if (graphView == 'Minutes')
                 dataTransactions[0]["values"] = datatransMin;
