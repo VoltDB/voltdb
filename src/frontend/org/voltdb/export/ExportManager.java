@@ -522,7 +522,12 @@ public class ExportManager
             File exportOverflowDirectory, CatalogContext catalogContext,
             CatalogMap<Connector> connectors) throws IOException {
         TreeSet<File> generationDirectories = new TreeSet<File>();
-        for (File f : exportOverflowDirectory.listFiles()) {
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files == null) {
+            //Clean export overflow no generations seen.
+            return;
+        }
+        for (File f : files) {
             if (f.isDirectory()) {
                 if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
                     throw new RuntimeException("Can't one of read/write/execute directory " + f);
