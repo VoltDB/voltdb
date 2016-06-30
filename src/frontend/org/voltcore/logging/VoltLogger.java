@@ -19,6 +19,7 @@ package org.voltcore.logging;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -94,13 +95,24 @@ public class VoltLogger {
         }
     }
 
-    public static void startAsynchronousLogging() {
+    public static synchronized void startAsynchronousLogging(){
         if (m_asynchLoggerPool == null) {
             m_asynchLoggerPool =
                     Boolean.getBoolean("DISABLE_ASYNC_LOGGING") ?
                             null :
                             new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
                                     new LoggerThreadFactory());
+            if (m_asynchLoggerPool != null) {
+                // submit an empty task to activate async logger.
+                try {
+                    m_asynchLoggerPool.submit(new Runnable() {
+                        @Override
+                        public void run() {}
+                    }).get();
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 

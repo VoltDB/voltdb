@@ -26,6 +26,7 @@ package org.voltdb.client;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -121,6 +122,115 @@ public class TestClientClose extends TestCase {
         } finally {
             client2.close();
         }
+    }
 
+    public void testCreateCloseAllClientInParallel() throws Exception{
+        clientCreateCloseAll(50, 3);
+        Thread.sleep(500);
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            // skip the current thread
+            Thread t = e.getKey();
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+            // check thread name and whether the thread should be close.
+            String threadName = t.getName();
+            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
+                    || threadName.contains("Estimated Time Updater"));
+        }
+    }
+
+    public void testCreateCloseInParallelRemainOne() throws Exception {
+        Client remainClient = ClientFactory.createClient();
+        remainClient.createConnection("localhost");
+        clientCreateCloseLeaveOne(50, 3);
+        Thread.sleep(500);
+        assertTrue(checkThreadsAllExist());
+    }
+
+    public void testCreateCloseInParallelStartOne() throws Exception {
+        clientCreateCloseAll(50, 3);
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+        Thread.sleep(500);
+        assertTrue(checkThreadsAllExist());
+        client.close();
+    }
+
+    private void clientCreateCloseAll(int clientNum, int loops) throws Exception {
+        CountDownLatch latch = new CountDownLatch(loops);
+        for (int i = 0; i < loops; i++) {
+            (new clientCreateCloseAllLauncher(clientNum, latch, i, false)).start();
+        }
+        latch.await();
+    }
+
+    private void clientCreateCloseLeaveOne(int clientNum, int loops) throws Exception {
+        CountDownLatch latch = new CountDownLatch(loops);
+        for (int i = 0; i < loops; i++) {
+            (new clientCreateCloseAllLauncher(clientNum, latch, i, true)).start();
+        }
+        latch.await();
+    }
+
+    private boolean checkThreadsAllExist() {
+        boolean haveReverseDNSLookups = false;
+        boolean haveAsyncLogger = false;
+        boolean haveEstTimeUpdater = false;
+        boolean haveClientReaper = false;
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            // skip the current thread
+            Thread t = e.getKey();
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+            // check thread name and whether the thread should be close.
+            String threadName = t.getName();
+            if (threadName.contains("Reverse DNS lookups")) {
+                haveReverseDNSLookups = true;
+            } else if (threadName.contains("Async Logger")) {
+                haveAsyncLogger = true;
+            } else if (threadName.contains("Estimated Time Updater")) {
+                haveEstTimeUpdater = true;
+            } else if (threadName.contains("VoltDB Client Reaper Thread")) {
+                haveClientReaper = true;
+            }
+        }
+        return haveReverseDNSLookups && haveAsyncLogger && haveEstTimeUpdater && haveClientReaper;
+    }
+
+    class clientCreateCloseAllLauncher extends Thread{
+        private final int m_clientNum;
+        private final CountDownLatch m_latch;
+        private final int m_loopNum;
+        private final boolean m_leaveOne;
+
+        public clientCreateCloseAllLauncher (int clientNum, CountDownLatch latch, int loopNum, boolean leaveOne) {
+            m_clientNum = clientNum;
+            m_latch = latch;
+            m_loopNum = loopNum;
+            m_leaveOne = leaveOne;
+        }
+
+        @Override
+        public void run () {
+            try {
+                for (int i = 0; i < m_clientNum; i++) {
+                    Client client = ClientFactory.createClient();
+                    client.createConnection("localhost");
+                    // if leaveOne is true, do not close the first client, leave it running.
+                    if (m_leaveOne && i == 0 && m_loopNum == 0) {
+                        continue;
+                    }
+                    client.close();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                m_latch.countDown();
+            }
+        }
     }
 }

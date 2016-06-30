@@ -53,7 +53,7 @@ public class EstTimeUpdater {
         updater.start();
     }
 
-    public static void start() {
+    public static synchronized void start() {
         if (updater == null) {
             UPDATER_CONTINUE.set(true);
             updater = new Thread("Estimated Time Updater") {
@@ -76,7 +76,7 @@ public class EstTimeUpdater {
         }
     }
 
-    public static void stop() {
+    public static synchronized void stop() {
         UPDATER_CONTINUE.set(false);
         updater = null;
     }

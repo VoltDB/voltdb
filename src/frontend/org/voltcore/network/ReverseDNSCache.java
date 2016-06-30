@@ -67,7 +67,7 @@ public class ReverseDNSCache {
     private final Cache<InetAddress, String> m_failures;
 
 
-    public static void start() {
+    public static synchronized void start() {
         if (m_es == null) {
             m_es = new ThreadPoolExecutor(1, 16, 1, TimeUnit.SECONDS,
                    new SynchronousQueue<Runnable>(),
@@ -75,7 +75,7 @@ public class ReverseDNSCache {
         }
     }
 
-    public static void close() {
+    public static synchronized void close() {
         m_es.shutdown();
         m_es = null;
     }
