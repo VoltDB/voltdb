@@ -774,12 +774,6 @@ public abstract class AbstractParsedStmt {
                 return false;
             }
         }
-        // All display columns must be a simple COLUMNREF (no expressions)
-        for (ParsedColInfo col : selectSubquery.m_displayColumns) {
-            if (!(col.expression instanceof TupleValueExpression)) {
-                return false;
-            }
-        }
         return true;
     }
 

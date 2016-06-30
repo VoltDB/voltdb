@@ -3440,6 +3440,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         sql = "select * from (select A as C, C as D, D from R5) T where C = 1;";
         validateTableOfLongs(client, sql, new long[][] {{1, 2, 3}});
+
+        sql = "select * from (select A + C + D ACD from R5) T where ACD = 6;";
+        validateTableOfLongs(client, sql, new long[][] {{6}});
+
     }
 
     static public junit.framework.Test suite() {
