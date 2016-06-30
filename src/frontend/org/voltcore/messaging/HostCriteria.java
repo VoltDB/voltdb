@@ -73,29 +73,29 @@ public class HostCriteria {
         }
     }
 
-    protected final boolean paused;
-    protected final UUID configHash;
-    protected final UUID meshHash;
-    protected final boolean enterprise;
-    protected final StartAction startAction;
-    protected final boolean bare;
-    protected final int hostCount;
-    protected final NodeState nodeState;
-    protected final boolean addAllowed;
-    protected final boolean safeMode;
+    protected final boolean m_paused;
+    protected final UUID m_configHash;
+    protected final UUID m_meshHash;
+    protected final boolean m_enterprise;
+    protected final StartAction m_startAction;
+    protected final boolean m_bare;
+    protected final int m_hostCount;
+    protected final NodeState m_nodeState;
+    protected final boolean m_addAllowed;
+    protected final boolean m_safeMode;
 
     public HostCriteria(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
-        paused = jo.optBoolean(IS_PAUSED, false);
-        bare = jo.optBoolean(IS_BARE, false);
-        enterprise = jo.optBoolean(IS_ENTERPRISE, false);
-        configHash = UUID.fromString(jo.optString(CONFIG_HASH,UNDEFINED.toString()));
-        meshHash = UUID.fromString(jo.optString(MESH_HASH,UNDEFINED.toString()));
-        startAction = StartAction.valueOf(jo.optString(START_ACTION, StartAction.CREATE.name()));
-        hostCount = jo.optInt(HOST_COUNT,1);
-        nodeState = NodeState.valueOf(jo.optString(NODE_STATE, NodeState.INITIALIZING.name()));
-        addAllowed = jo.optBoolean(ADD_ALLOWED, false);
-        safeMode = jo.optBoolean(SAFE_MODE, false);
+        m_paused = jo.optBoolean(IS_PAUSED, false);
+        m_bare = jo.optBoolean(IS_BARE, false);
+        m_enterprise = jo.optBoolean(IS_ENTERPRISE, false);
+        m_configHash = UUID.fromString(jo.optString(CONFIG_HASH,UNDEFINED.toString()));
+        m_meshHash = UUID.fromString(jo.optString(MESH_HASH,UNDEFINED.toString()));
+        m_startAction = StartAction.valueOf(jo.optString(START_ACTION, StartAction.CREATE.name()));
+        m_hostCount = jo.optInt(HOST_COUNT,1);
+        m_nodeState = NodeState.valueOf(jo.optString(NODE_STATE, NodeState.INITIALIZING.name()));
+        m_addAllowed = jo.optBoolean(ADD_ALLOWED, false);
+        m_safeMode = jo.optBoolean(SAFE_MODE, false);
     }
 
     public HostCriteria(boolean paused, UUID configHash, UUID meshHash,
@@ -106,71 +106,71 @@ public class HostCriteria {
         checkArgument(startAction != null, "start action is null");
         checkArgument(hostCount > 0, "host count %s is less then one", hostCount);
 
-        this.paused = paused;
-        this.configHash = configHash;
-        this.meshHash = meshHash;
-        this.enterprise = enterprise;
-        this.startAction = startAction;
-        this.bare = bare;
-        this.hostCount = hostCount;
-        this.nodeState = nodeState;
-        this.addAllowed = addAllowed;
-        this.safeMode = safeMode;
+        m_paused = paused;
+        m_configHash = configHash;
+        m_meshHash = meshHash;
+        m_enterprise = enterprise;
+        m_startAction = startAction;
+        m_bare = bare;
+        m_hostCount = hostCount;
+        m_nodeState = nodeState;
+        m_addAllowed = addAllowed;
+        m_safeMode = safeMode;
     }
 
     public boolean isPaused() {
-        return paused;
+        return m_paused;
     }
 
     public UUID getConfigHash() {
-        return configHash;
+        return m_configHash;
     }
 
     public UUID getMeshHash() {
-        return meshHash;
+        return m_meshHash;
     }
 
     public boolean isEnterprise() {
-        return enterprise;
+        return m_enterprise;
     }
 
     public StartAction getStartAction() {
-        return startAction;
+        return m_startAction;
     }
 
     public boolean isBare() {
-        return bare;
+        return m_bare;
     }
 
     public int getHostCount() {
-        return hostCount;
+        return m_hostCount;
     }
 
     public NodeState getNodeState() {
-        return nodeState;
+        return m_nodeState;
     }
 
     public boolean isAddAllowed() {
-        return addAllowed;
+        return m_addAllowed;
     }
 
     public boolean isSafeMode() {
-        return safeMode;
+        return m_safeMode;
     }
 
     public JSONObject appendTo(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
         try {
-            jo.put(IS_BARE, bare);
-            jo.put(IS_ENTERPRISE, enterprise);
-            jo.put(IS_PAUSED, paused);
-            jo.put(CONFIG_HASH, configHash.toString());
-            jo.put(MESH_HASH, meshHash.toString());
-            jo.put(START_ACTION, startAction.name());
-            jo.put(HOST_COUNT, hostCount);
-            jo.put(NODE_STATE, nodeState.name());
-            jo.put(ADD_ALLOWED, addAllowed);
-            jo.put(SAFE_MODE, safeMode);
+            jo.put(IS_BARE, m_bare);
+            jo.put(IS_ENTERPRISE, m_enterprise);
+            jo.put(IS_PAUSED, m_paused);
+            jo.put(CONFIG_HASH, m_configHash.toString());
+            jo.put(MESH_HASH, m_meshHash.toString());
+            jo.put(START_ACTION, m_startAction.name());
+            jo.put(HOST_COUNT, m_hostCount);
+            jo.put(NODE_STATE, m_nodeState.name());
+            jo.put(ADD_ALLOWED, m_addAllowed);
+            jo.put(SAFE_MODE, m_safeMode);
         } catch (JSONException e) {
             Throwables.propagate(e);
         }
@@ -178,27 +178,27 @@ public class HostCriteria {
     }
 
     public boolean isUndefined() {
-        return UNDEFINED.equals(configHash) && UNDEFINED.equals(meshHash);
+        return UNDEFINED.equals(m_configHash) && UNDEFINED.equals(m_meshHash);
     }
 
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (bare ? 1231 : 1237);
+        result = prime * result + (m_bare ? 1231 : 1237);
         result = prime * result
-                + ((configHash == null) ? 0 : configHash.hashCode());
-        result = prime * result + (enterprise ? 1231 : 1237);
-        result = prime * result + (addAllowed ? 1231 : 1237);
-        result = prime * result + (safeMode ? 1231 : 1237);
-        result = prime * result + hostCount;
+                + ((m_configHash == null) ? 0 : m_configHash.hashCode());
+        result = prime * result + (m_enterprise ? 1231 : 1237);
+        result = prime * result + (m_addAllowed ? 1231 : 1237);
+        result = prime * result + (m_safeMode ? 1231 : 1237);
+        result = prime * result + m_hostCount;
         result = prime * result
-                + ((meshHash == null) ? 0 : meshHash.hashCode());
-        result = prime * result + (paused ? 1231 : 1237);
+                + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
+        result = prime * result + (m_paused ? 1231 : 1237);
         result = prime * result
-                + ((startAction == null) ? 0 : startAction.hashCode());
+                + ((m_startAction == null) ? 0 : m_startAction.hashCode());
         result = prime * result
-                + ((nodeState == null) ? 0 : nodeState.hashCode());
+                + ((m_nodeState == null) ? 0 : m_nodeState.hashCode());
         return result;
     }
 
@@ -206,22 +206,22 @@ public class HostCriteria {
         checkArgument(o != null, "cant check compatibility against a null host criteria");
         ImmutableList.Builder<String> ilb = ImmutableList.builder();
 
-        if (startAction != o.startAction) {
-            ilb.add(String.format("Start action %s does not match %s", o.startAction, startAction));
+        if (m_startAction != o.m_startAction) {
+            ilb.add(String.format("Start action %s does not match %s", o.m_startAction, m_startAction));
         }
-        if (startAction != StartAction.PROBE) {
+        if (m_startAction != StartAction.PROBE) {
             return ilb.build();
         }
-        if (enterprise != o.enterprise) {
+        if (m_enterprise != o.m_enterprise) {
             ilb.add("Cannot join a community edition with an eterprise one, or viceversa");
         }
-        if (hostCount != o.hostCount) {
-            ilb.add(String.format("Mismatched host count: %d, and %d", hostCount, o.hostCount));
+        if (m_hostCount != o.m_hostCount) {
+            ilb.add(String.format("Mismatched host count: %d, and %d", m_hostCount, o.m_hostCount));
         }
-        if (!meshHash.equals(o.meshHash)) {
+        if (!m_meshHash.equals(o.m_meshHash)) {
             ilb.add("Mismatched host parameters given at database startup");
         }
-        if (!configHash.equals(o.configHash)) {
+        if (!m_configHash.equals(o.m_configHash)) {
             ilb.add("Mismatched deployment configuration given at database startup");
         }
         return ilb.build();
@@ -236,41 +236,41 @@ public class HostCriteria {
         if (getClass() != obj.getClass())
             return false;
         HostCriteria other = (HostCriteria) obj;
-        if (bare != other.bare)
+        if (m_bare != other.m_bare)
             return false;
-        if (configHash == null) {
-            if (other.configHash != null)
+        if (m_configHash == null) {
+            if (other.m_configHash != null)
                 return false;
-        } else if (!configHash.equals(other.configHash))
+        } else if (!m_configHash.equals(other.m_configHash))
             return false;
-        if (enterprise != other.enterprise)
+        if (m_enterprise != other.m_enterprise)
             return false;
-        if (addAllowed != other.addAllowed)
+        if (m_addAllowed != other.m_addAllowed)
             return false;
-        if (safeMode != other.safeMode)
+        if (m_safeMode != other.m_safeMode)
             return false;
-        if (hostCount != other.hostCount)
+        if (m_hostCount != other.m_hostCount)
             return false;
-        if (meshHash == null) {
-            if (other.meshHash != null)
+        if (m_meshHash == null) {
+            if (other.m_meshHash != null)
                 return false;
-        } else if (!meshHash.equals(other.meshHash))
+        } else if (!m_meshHash.equals(other.m_meshHash))
             return false;
-        if (paused != other.paused)
+        if (m_paused != other.m_paused)
             return false;
-        if (startAction != other.startAction)
+        if (m_startAction != other.m_startAction)
             return false;
-        if (nodeState != other.nodeState)
+        if (m_nodeState != other.m_nodeState)
             return false;
         return true;
     }
 
     @Override
     public String toString() {
-        return "HostCriteria [paused=" + paused + ", configHash=" + configHash
-                + ", meshHash=" + meshHash + ", enterprise=" + enterprise
-                + ", startAction=" + startAction + ", bare=" + bare
-                + ", hostCount=" + hostCount + ", nodeState=" + nodeState
-                + ", addAllowed=" + addAllowed + ", safeMode=" + safeMode + "]";
+        return "HostCriteria [paused=" + m_paused + ", configHash=" + m_configHash
+                + ", meshHash=" + m_meshHash + ", enterprise=" + m_enterprise
+                + ", startAction=" + m_startAction + ", bare=" + m_bare
+                + ", hostCount=" + m_hostCount + ", nodeState=" + m_nodeState
+                + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode + "]";
     }
 }

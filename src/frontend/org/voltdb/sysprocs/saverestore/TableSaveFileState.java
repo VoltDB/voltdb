@@ -94,9 +94,18 @@ public abstract class TableSaveFileState
         return m_rootDependencyId;
     }
 
+    public void setIsRecover(boolean isRecover) {
+        this.m_isRecover = isRecover;
+    }
+
+    protected String getIsRecoverParam(){
+        return m_isRecover ? "true" : "false";
+    }
+
     int m_rootDependencyId;
     protected String m_consistencyResult;
     private final String m_tableName;
     private final long m_txnId;
     private final Set<Integer> m_planDependencyIds;
+    private boolean m_isRecover;
 }
