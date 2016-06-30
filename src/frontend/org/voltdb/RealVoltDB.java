@@ -441,8 +441,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return null;
     }
 
-    private void managedPathsEmptyCheck() {
-        List<String> nonEmptyPaths = managedPathsWithFiles(m_catalogContext.getDeployment());
+    private void managedPathsEmptyCheck(Configuration config) {
+        List<String> nonEmptyPaths = managedPathsWithFiles(config, m_catalogContext.getDeployment());
         if (!nonEmptyPaths.isEmpty()) {
             StringBuilder crashMessage =
                     new StringBuilder("Files from a previous database session exist in the managed directories:");
@@ -455,8 +455,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private final List<String> managedPathsWithFiles(DeploymentType deployment) {
+    private final List<String> managedPathsWithFiles(Configuration config, DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        if (!config.m_isEnterprise) {
+            return nonEmptyPaths.build();
+        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = paths.getVoltdbroot().getPath();
         String path;
@@ -473,8 +476,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
-    private final List<String> managedPathsWithFilesPrimed(DeploymentType deployment) {
+    private final List<String> managedPathsWithFilesPrimed(Configuration config, DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        if (!config.m_isEnterprise) {
+            return nonEmptyPaths.build();
+        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = paths.getVoltdbroot().getNodePath();
         String path;
@@ -690,7 +696,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
                 if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                         && !config.m_forceVoltdbCreate) {
-                        managedPathsEmptyCheck();
+                        managedPathsEmptyCheck(config);
                 }
 
                 if (!isRejoin && !m_joining) {
@@ -1648,42 +1654,40 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
                     (new VoltFile(dt.getPaths().getVoltdbroot().getPath())).getCanonicalPath());
 
-            if (config.m_isEnterprise) {
-                File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getSnapshots().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
-
-                path = new VoltFile(dt.getPaths().getDroverflow().getPath());
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
+            File path = new VoltFile(dt.getPaths().getCommandlog().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(config.m_voltdbRoot, path.getPath());
             }
+            m_pathList.put(dt.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(config.m_voltdbRoot, path.getPath());
+            }
+            m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(dt.getPaths().getSnapshots().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(config.m_voltdbRoot, path.getPath());
+            }
+            m_pathList.put(dt.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(dt.getPaths().getExportoverflow().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(config.m_voltdbRoot, path.getPath());
+            }
+            m_pathList.put(dt.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
+
+            path = new VoltFile(dt.getPaths().getDroverflow().getPath());
+            if (!path.isAbsolute()) {
+                path = new VoltFile(config.m_voltdbRoot, path.getPath());
+            }
+            m_pathList.put(dt.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
         }
 
-        List<String> nonEmptyPaths = managedPathsWithFiles(dt);
+        List<String> nonEmptyPaths = managedPathsWithFiles(config, dt);
         if (!nonEmptyPaths.isEmpty()) {
             StringBuilder crashMessage =
                     new StringBuilder("Files from a previous database session exist in the managed directories:");
@@ -2362,7 +2366,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     HostMessenger.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                || managedPathsWithFilesPrimed(readDepl.deployment).isEmpty();
+                || managedPathsWithFilesPrimed(m_config, readDepl.deployment).isEmpty();
 
         JoinerCriteria criteria = JoinerCriteria.builder()
                 .coordinators(m_config.m_coordinators)
