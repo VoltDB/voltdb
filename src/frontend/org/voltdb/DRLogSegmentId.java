@@ -26,7 +26,7 @@ import com.google_voltpatches.common.base.Preconditions;
 public class DRLogSegmentId implements Serializable {
     private static final long serialVersionUID = 2540289527683570995L;
 
-    public static final short MAX_CLUSTER_ID = (1 << 8) - 1;
+    public static final short MAX_CLUSTER_ID = (1 << 7) - 1;
     public static final long MAX_SEQUENCE_NUMBER = (1L << 55) - 1L;
 
     public static final long UNINITIALIZED_SEQUENCE_NUMBER = -1L;
@@ -83,7 +83,7 @@ public class DRLogSegmentId implements Serializable {
      * for cluster 255.
      */
     public static boolean isEmptyDRId (long drId) {
-        return ((drId >>> 63) == 1L) && !(drId == -1);
+        return ((drId >>> 63) == 1L) && (drId != -1);
     }
 
     /*
@@ -92,7 +92,7 @@ public class DRLogSegmentId implements Serializable {
     public static boolean isInitialAckDRId(long drId) {
         if (drId == -1) return true;
         int clusterId = getClusterIdFromDRId(drId);
-        if (clusterId >= 0 && clusterId < MAX_CLUSTER_ID) {
+        if (clusterId >= 0 && clusterId <= MAX_CLUSTER_ID) {
             return ((drId >>> 63) != 1L) && (getSequenceNumberFromDRId(drId) == MAX_SEQUENCE_NUMBER);
         }
         return false;
