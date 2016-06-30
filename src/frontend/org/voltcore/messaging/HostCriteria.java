@@ -30,6 +30,10 @@ import org.voltdb.common.NodeState;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 
+/**
+ *  It is a DTO that snapshots a subset of {@link JoinerCriteria} fields, and is
+ *  passed around in initial mesh requests.
+ */
 public class HostCriteria {
 
     public final static String IS_PAUSED = "paused";
@@ -45,6 +49,12 @@ public class HostCriteria {
 
     public final static UUID UNDEFINED = new UUID(0L,0L);
 
+    /**
+     * It checks whether the given {@link JSONObject} contains the
+     * fields necessary to create an instance of {@link HostCriteria}.
+     * The get[type] variant of {@link JSONObject} throws a {@link JSONException}
+     * when it does not parse to the expected types
+     */
     public static boolean hasCriteria(JSONObject jo) {
         try {
             return jo != null
