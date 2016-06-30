@@ -1349,7 +1349,7 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *c
     // If the table has a mvHandlerInfo, it means this table is a target table of materialized view.
     // Now we only use the new view handler mechanism for joined table views.
     // Further code refactoring saved for future.
-    if (mvHandlerInfo && mvHandlerInfo->isJoinedTableView()) {
+    if (mvHandlerInfo) {
         PersistentTable *destTable = static_cast<PersistentTable*>(m_tables[catalogTable->relativeIndex()]);
         if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
             if (destTable->materializedViewHandler() &&

@@ -411,7 +411,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
     if (m_materialized) {
       catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
-      if (mvInfo->groupbycols().size() == 0) {
+      if (mvInfo && mvInfo->groupbycols().size() == 0) {
         // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
         // to achieve better space efficiency.
         // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)

@@ -114,49 +114,13 @@ public class MaterializedViewFixInfo {
         if (srcTable == null) {
             return false;
         }
-        Column partitionCol = srcTable.getPartitioncolumn();
-        if (partitionCol == null) {
+        if (table.getIsreplicated()) {
             return false;
         }
 
-        int partitionColIndex = partitionCol.getIndex();
-        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
-
-        int numOfGroupByColumns;
         // Justify whether partition column is in group by column list or not
-        String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
-        if (complexGroupbyJson.length() > 0) {
-            List<AbstractExpression> mvComplexGroupbyCols = null;
-            try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            numOfGroupByColumns = mvComplexGroupbyCols.size();
-
-            for (AbstractExpression expr: mvComplexGroupbyCols) {
-                if (expr instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnIndex() == partitionColIndex) {
-                        // If group by columns contain partition column from source table.
-                        // Then, query on MV table will have duplicates from each partition.
-                        // There is no need to fix this case, so just return.
-                        return false;
-                    }
-                }
-            }
-        } else {
-            CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            numOfGroupByColumns = mvSimpleGroupbyCols.size();
-
-            for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getIndex() == partitionColIndex) {
-                    // If group by columns contain partition column from source table.
-                    // Then, query on MV table will have duplicates from each partition.
-                    // There is no need to fix this case, so just return.
-                    return false;
-                }
-            }
+        if (table.getPartitioncolumn() != null) {
+            return false;
         }
         m_mvTableScan = mvTableScan;
 
@@ -173,6 +137,16 @@ public class MaterializedViewFixInfo {
         }
 
         String mvTableAlias = getMVTableAlias();
+
+        int numOfGroupByColumns = 0;
+        for (Column col : table.getColumns()) {
+            ExpressionType aggType = ExpressionType.get(col.getAggregatetype());
+            if (aggType == ExpressionType.VALUE_TUPLE ||
+                    aggType == ExpressionType.VALUE_PARAMETER ||
+                    aggType == ExpressionType.INVALID) {
+                numOfGroupByColumns++;
+            }
+        }
 
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
