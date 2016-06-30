@@ -98,6 +98,14 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         resultMonospace { $("#resultMonospace-1") }
 
         errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
+
+        // Query Box
+        addQueryTab             { $("#new-query > span") }
+        saveTabPopupOk          { $("#btnSaveQueryOk") }
+        saveTabPopupTextField   { $("#txtQueryName") }
+
+        deleteTabOk             { $("#btnCloseTabOk")}
+        deleteTabCancel         { $("#btnCloseTabCancel")}
     }
     static at = {
         sqlQueryTab.displayed
@@ -107,9 +115,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         viewsTab.displayed
         storedProcsTab.displayed
         listsArea.displayed
-        queryInput.displayed
-        queryRes.displayed
-        queryDur.displayed
+//        queryInput.displayed
+//        queryRes.displayed
+//        queryDur.displayed
     }
     boolean textHasChanged = false
 
@@ -490,7 +498,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         }
         if (navDurElem.text() != initDurText ) {
             textHasChanged = true
-         }
+        }
         return textHasChanged
     }
 
@@ -508,8 +516,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
             textHasChanged = false
             waitFor() {
                 hasChanged(queryDur, initQueryDurationText) &&
-                isDisplayed(queryRes) && queryRes.text() != null && !queryRes.text().isEmpty() &&
-                isDisplayed(queryDur) && queryDur.text() != null && !queryDur.text().isEmpty()
+                        isDisplayed(queryRes) && queryRes.text() != null && !queryRes.text().isEmpty() &&
+                        isDisplayed(queryDur) && queryDur.text() != null && !queryDur.text().isEmpty()
             }
         } catch (WaitTimeoutException e) {
             String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
@@ -776,5 +784,22 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         }
 
         return query
+    }
+
+
+    def String getCssPathOfTab(int index) {
+        return "#qTab-" + String.valueOf(index) +" > a"
+    }
+
+    def String getIdOfQueryBox(int index) {
+        return "#querybox-" + String.valueOf(index)
+    }
+
+    def String getIdOfSaveButton(int index) {
+            return "#querySaveBtn-" + String.valueOf(index)
+    }
+
+    def String getIdOfDeleteTab(int index) {
+        return "close-tab-" + String.valueOf(index)
     }
 }

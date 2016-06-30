@@ -2035,6 +2035,7 @@ border:1px solid #FFF;
 #worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
+.workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
 /*********************jquery ui class override ends*********************/
 
 .exportType {

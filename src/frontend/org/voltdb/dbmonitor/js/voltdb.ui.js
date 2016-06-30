@@ -5,7 +5,13 @@ var table = '';
 $(document).ready(function () {
     $("#helppopup").load("help.htm", function () {
     });
-    localStorage.clear(); //clear the localStorage for DataTables in DR Section
+
+    //clear the localStorage for DataTables in DR Section
+    $.each(localStorage, function(key, value){
+        if(key != 'queries' && key != 'queryNameList' ){
+            localStorage.removeItem(key)
+        }
+    });
 
     var rv = -1;
     if (VoltDbUI.getCookie("username") != undefined && VoltDbUI.getCookie("username") != 'null') {

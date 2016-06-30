@@ -1969,6 +1969,7 @@
       </div>
     </div>
     <!-- Tab close confirmation -->
+    <a id="btnCloseTabConfirmation" href="#closeTabConfirmation" style="display: none;"></a>
     <div id="closeTabConfirmation" style="display: none" data-id="" data-elementid="">
         <div class="overlay-title icon-alert">Confirmation</div>
         <div class="clear"></div>
@@ -1978,6 +1979,85 @@
         <div class="overlay-btns"><a id="btnCloseTabOk" class="btn">Ok</a> <a id="btnCloseTabCancel" class="btn btn-gray">Cancel</a></div>
     </div>
     <!-- Tab close confirmation -->
+
+    <!-- Query save confirmation -->
+    <a id="btnQuerySaveConfirmation" href="#querySaveConfirmation" style="display: none;"></a>
+    <div id="querySaveConfirmation" style="display: none" data-id="" data-elementid="">
+        <div class="overlay-title icon-alert">Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to close the tab?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnQuerySaveOk" class="btn">Ok</a> <a id="btnQuerySaveCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- Query save confirmation -->
+
+    <!--Save Query Popup-->
+    <a id="btnSaveQueryConfirmation" href="#saveQueryPopup" style="display: none;"></a>
+    <div id="saveQueryPopup" style="display: none; width:20px;">
+        <div id="saveQueryInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="saveQueryHeader" class="addConfigHeader">Save Query</div>
+            </div>
+            <div id="saveQueryControls">
+                <div class="clear"></div>
+                <form id="formSaveQuery" method="get" action=""  style="overflow:auto;">
+                    <div id="saveQueryWrapper" class="configWrapper" style="width:300px; overflow:hidden">
+                        <table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">
+                            <tbody>
+                                <tr id="Tr1">
+                                    <td>Name:</td>
+                                    <td width="65%" class="txtQName">
+                                        <input id="txtQueryName" name="txtQueryName" type="text" maxlength="25">
+                                        <label id="errorQueryName" for="txtQueryName" class="error" style="display: none;"></label>
+                                    </td>
+                                </tr>
+                            <tr id = 'queryError'>
+                               <td colspan="2">
+                                   Query field is empty. Go back and fill the query field to save queries.
+                               </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnSaveQueryOk" class="btn">Save</a> <a id="btnSaveQueryCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveQueryConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="queryText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveQueryConfrmOk" class="btn closeBtn">Yes</a> <a id="btnSaveQueryConfrmCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--Save Query Popup-->
+
+    <!-- Memory exceeded message -->
+    <a id="btnMemoryError" href="#memoryErrorPopup" style="display: none;"></a>
+    <div id="memoryErrorPopup" style="display: none" data-id="" data-elementid="">
+        <div class="overlay-title errorIcon ">Error</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p id="memErrorMsg" class="txt-bold">Maximum storage limit reached. Cannot save the current tab. <br/>Please remove the existing tabs or decrease the length of query.</p>
+        </div>
+        <div class="overlay-btns"><a id="btnMemoryErrorOk" class="btn">Ok</a></div>
+    </div>
+    <!-- Memory exceeded message -->
+
+    <!-- HTML5 support popup -->
+    <a id="btnHtmlSupport" href="#htmlSupportPopup" style="display: none;"></a>
+    <div id="htmlSupportPopup" style="display: none" data-id="" data-elementid="">
+        <div class="overlay-title errorIcon ">Error</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Your browser doesn't support the html5 web storage. Cannot save the current tab.</p>
+        </div>
+        <div class="overlay-btns"><a id="btnIsSupportedOk" class="btn">Ok</a></div>
+    </div>
+    <!-- HTML5 support popup -->
+
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>
