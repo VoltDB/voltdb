@@ -20,11 +20,10 @@ import org.openqa.selenium.WebElement
 import geb.navigator.Navigator
 
 class ClusterSettingsTest extends TestBase {
-    def setup() { // called before each test
-        count = 0
+    String testingName = getTestingUrl()
 
-        while(count<numberOfTrials) {
-            count ++
+    def setup() { // called before each test
+        for(count=0; count<numberOfTrials; count++) {
             try {
                 setup: 'Open Cluster Settings page'
                 to ClusterSettingsPage
@@ -41,8 +40,8 @@ class ClusterSettingsTest extends TestBase {
         }
     }
 
+
     def createEditDeleteServer() {
-        int value = 0
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -56,31 +55,46 @@ class ClusterSettingsTest extends TestBase {
             }
         }
         then: 'Choose new database'
-        println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Get the count for next server'
         count = 1
-        while(count<numberOfTrials) {
-            try {
-                waitFor { $(getCssPathOfServer(count)).isDisplayed() }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                break
-            }
-            count++
-        }
-        value = count
-        println("The count for test " + count)
         and: 'Set the id for new server'
-        String deleteId = getCssPathOfDeleteServer(1)
-        String editId   = getCssPathOfEditServer(1)
-        String serverId = getCssPathOfServer(1)
+        String editId   = getCssPathOfEditServer(count)
+        String serverId = getCssPathOfServer(count)
         println("this " + " " + serverId + " " + editId)
         then: 'Click Add Server button to open popup'
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -97,13 +111,12 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerHostNameField.value(testingName) }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to the text fields - Retrying")
             }
         }
-        count = 0
         and: 'Click Ok to save the Server'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -140,6 +153,7 @@ class ClusterSettingsTest extends TestBase {
         }
 
         when: 'Click edit button to open the edit popup'
+        indexOfNewDatabase = 1
         for(count=1; count<numberOfTrials; count++) {
             try {
                 waitFor { $(editId).click() }
@@ -157,7 +171,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_edited_server") }
-                waitFor { popupAddServerHostNameField.value("new_edited_host") }
+                // waitFor { popupAddServerHostNameField.value("new_edited_host") }
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to text fields - Retrying")
@@ -170,7 +184,7 @@ class ClusterSettingsTest extends TestBase {
             try {
                 popupAddServerButtonOk.click()
                 waitFor { $(serverId).isDisplayed() }
-                waitFor { $(serverId).text().equals("new_edited_host") }
+                waitFor { $(serverId).text().equals("new_edited_server") }
                 println("The server was edited")
                 break
             } catch(geb.error.RequiredPageContentNotPresent e) {
@@ -180,7 +194,7 @@ class ClusterSettingsTest extends TestBase {
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 try {
                     waitFor { $(serverId).isDisplayed() }
-                    waitFor { $(serverId).text().equals("new_edited_host") }
+                    waitFor { $(serverId).text().equals("new_edited_server") }
                     println("The server was edited")
                     break
                 } catch(geb.waiting.WaitTimeoutException exc) {
@@ -190,6 +204,7 @@ class ClusterSettingsTest extends TestBase {
         }
     }
 
+
     def ensureServerNameAndHostNameIsNotEmpty() {
         println("Test: ensureServerNameAndHostNameIsNotEmpty")
         when:"Click Add Server button"
@@ -198,12 +213,11 @@ class ClusterSettingsTest extends TestBase {
         } catch(geb.waiting.WaitTimeoutException e) {
             println("Unable to find Add Server button or popup - Retrying")
         }
-
         then: "Check popup is displayed"
         waitFor{page.popupAddServer.isDisplayed()}
+
         when: "click the Ok button"
         page.popupAddServerButtonOk.click()
-
         then: "Check validation for server name and host name exists"
         errorHostName.isDisplayed()
         page.popupAddServerButtonCancel.click()
@@ -214,6 +228,7 @@ class ClusterSettingsTest extends TestBase {
 
         }
     }
+
 
     def ensureInternalInterfaceIsValid(){
         println("Test: ensureInternalInterfaceIsValid")
@@ -235,7 +250,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when:
         count=1
@@ -255,7 +296,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { page.btnAddServerOption.click() }
-                waitFor { page.buttonAddServer.click() }
+                //waitFor { page.buttonAddServer.click() }
                 waitFor { page.popupAddServer.isDisplayed() }
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
@@ -342,7 +383,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when:
         count=1
@@ -362,14 +429,13 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { page.btnAddServerOption.click() }
-                waitFor { page.buttonAddServer.click() }
+                //waitFor { page.buttonAddServer.click() }
                 waitFor { page.popupAddServer.isDisplayed() }
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
                 println("Unable to find Add Server button or popup - Retrying")
             }
         }
-
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { page.popupAddServerDetails.click() }
@@ -428,8 +494,10 @@ class ClusterSettingsTest extends TestBase {
         println()
     }
 
+
     def verifyDuplicateNameAndPortNotCreated() {
         int count
+        println("Print name" + testingName)
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -442,7 +510,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Set the id for new server'
         String serverId = getCssPathOfServer(1)
@@ -450,7 +544,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -467,13 +561,12 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerHostNameField.value(testingName) }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to the text fields - Retrying")
             }
         }
-        count = 0
         and: 'Click Ok to save the Server'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -507,7 +600,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                //page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -523,7 +616,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerHostNameField.value(testingName) }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to the text fields - Retrying")
@@ -549,7 +642,7 @@ class ClusterSettingsTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        then:
+        then: 'Check for the error message'
         try {
             waitFor { page.errorClientPort.text().equals("Default port already exists") }
         } catch(geb.waiting.WaitTimeoutException exception) {
@@ -557,6 +650,7 @@ class ClusterSettingsTest extends TestBase {
             assert false
         }
     }
+
 
     def verifyDuplicateNameButDifferentPortCreated() {
         int count
@@ -572,7 +666,34 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Set the id for new server'
         String serverId = getCssPathOfServer(1)
@@ -581,7 +702,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -598,13 +719,12 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerHostNameField.value(testingName) }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to provide value to the text fields - Retrying")
             }
         }
-        count = 0
         and: 'Click Ok to save the Server'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -638,7 +758,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -659,12 +779,11 @@ class ClusterSettingsTest extends TestBase {
                 println("Unable to open Details")
             }
         }
-
         then: 'Provide values for new server'
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerHostNameField.value(testingName) }
 
                 waitFor { popupAddServerClientListenerField.value("12") }
                 waitFor { popupAddServerAdminListenerField.value("13") }
@@ -710,67 +829,12 @@ class ClusterSettingsTest extends TestBase {
         }
     }
 
+
     def cleanup() {
         to ClusterSettingsPage
-
-        println("Cleaning up")
-        int counter= 0
-        openDatabase()
-
-        while(counter<numberOfTrials) {
-            counter++
-            try {
-                waitFor { $(id:page.getIdOfDeleteButton(counter)).isDisplayed() }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                break
-            }
-        }
-
-        println("The counter is " + counter)
-
-        if(counter>=1) {
-            int count=0
-            for(count=0; count<numberOfTrials; count++) {
-                try {
-                    buttonDatabase.click()
-                    waitFor { buttonAddDatabase.isDisplayed() }
-
-                    break
-                } catch (geb.waiting.WaitTimeoutException e) {
-                    println("Waiting - Retrying")
-                }
-            }
-
-            chooseDatabase(1, "Database")
-            println("Database 1 chosen")
-            println(buttonDatabase.text())
-
-            for(count=0; count<numberOfTrials; count++) {
-                try {
-                    buttonDatabase.click()
-                    waitFor { buttonAddDatabase.isDisplayed() }
-
-                    break
-                } catch (geb.waiting.WaitTimeoutException e) {
-                    println("Waiting - Retrying")
-                }
-            }
-            count=0
-            while(count<numberOfTrials) {
-                count++
-                try {
-                    waitFor { $(id:page.getIdOfDeleteButton(count)).isDisplayed() }
-
-                } catch(geb.waiting.WaitTimeoutException e) {
-                    break
-                }
-            }
-            // at the moment count gives the value of the last Database, the current limitation is use of id
-            println("the count " + count)
-            deleteNewDatabase(count, "name_src")
-        }
-        else {
-            println("There is only one database")
-        }
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }

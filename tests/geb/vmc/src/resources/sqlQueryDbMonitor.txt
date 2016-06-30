@@ -1,12 +1,22 @@
 #create
-CREATE TABLE LINA (
-   LINA_NUMBER integer NOT NULL,
-   LINA_NAME varchar(50) NOT NULL,
-   CONSTRAINT PK_LINA PRIMARY KEY (LINA_NUMBER)
+CREATE TABLE voters (
+    name varchar(50),
+    zipcode varchar(5),
+    registration smallint
 );
 
 #delete
-DROP TABLE lina
+Drop view registrations_by_zipcode;
+DROP TABLE voters;
 
 #name
-lina
+voters
+
+#index
+CREATE INDEX voters_index ON voters ( zipcode )
+
+#view
+CREATE VIEW registrations_by_zipcode (
+    zipcode, registered_voters
+) AS
+SELECT zipcode, count(*) from voters where registration=1 GROUP BY zipcode;
