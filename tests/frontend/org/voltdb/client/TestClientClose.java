@@ -197,12 +197,10 @@ public class TestClientClose extends TestCase {
     class clientCreateCloseAllLauncher extends Thread{
         private final int m_clientNum;
         private final CountDownLatch m_latch;
-        private final int m_loopNum;
 
         public clientCreateCloseAllLauncher (int clientNum, CountDownLatch latch, int loopNum) {
             m_clientNum = clientNum;
             m_latch = latch;
-            m_loopNum = loopNum;
         }
 
         @Override
