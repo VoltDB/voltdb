@@ -72,8 +72,6 @@ public class InsertBaseProc extends VoltProcedure {
             prevrid = row.getLong("rid");
         }
 
-        validateCIDData(data, getClass().getName());
-
         // check the rids monotonically increase
         if (prevrid > rid) {
             throw new VoltAbortException(getClass().getName() +
@@ -96,31 +94,10 @@ public class InsertBaseProc extends VoltProcedure {
             throw new VoltAbortException("Value column contained no data in InsertBaseProc");
         }
 
-        validateCIDData(data, getClass().getName());
-
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
         }
 
         return retval;
-    }
-
-    public static void validateCIDData(VoltTable data, String callerId) {
-        // empty tables are lamely valid
-        if (data.getRowCount() == 0) return;
-
-        byte cid = (byte) data.fetchRow(0).getLong("cid");
-
-        data.resetRowPosition();
-        long prevCnt = 0;
-        while (data.advanceRow()) {
-            // make sure all cnt values are consecutive
-            long cntValue = data.getLong("cnt");
-            if ((prevCnt > 0) && ((prevCnt - 1) != cntValue)) {
-                throw new VoltAbortException(callerId +
-                        " cnt values are not consecutive for cid " + cid + ". Got " + cntValue + ", prev was: " + prevCnt);
-            }
-            prevCnt = cntValue;
-        }
     }
 }

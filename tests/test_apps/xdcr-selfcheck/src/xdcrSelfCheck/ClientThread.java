@@ -192,20 +192,12 @@ public class ClientThread extends BenchmarkThread {
                 m_permits.acquire();
 
                 String tableName = new Random().nextInt(2) == 0 ? "xdcr_partitioned" : "xdcr_replicated";
-                //String tableName = "xdcr_partitioned";
                 List<Integer> ordinals = ConflictType.ordinals();
                 Collections.shuffle(ordinals);
                 for (int ord : ordinals) {
                     ConflictType conflictType = ConflictType.fromOrdinal(ord);
                     runOne(tableName, conflictType);
                 }
-
-/*                String tableName = "xdcr_replicated";
-                final int ord = 5;
-                ConflictType conflictType = ConflictType.fromOrdinal(ord);
-                runOne(tableName, conflictType);
-
-                m_shouldContinue.set(false);*/
             }
             catch (NoConnectionsException e) {
                 log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");

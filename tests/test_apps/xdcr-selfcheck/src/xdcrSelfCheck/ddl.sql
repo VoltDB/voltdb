@@ -160,5 +160,3 @@ CREATE PROCEDURE FROM CLASS xdcrSelfCheck.procedures.InsertXdcrReplicatedActualS
 PARTITION PROCEDURE InsertXdcrReplicatedActualSP ON TABLE xdcr_replicated_conflict_actual COLUMN cid;
 CREATE PROCEDURE FROM CLASS xdcrSelfCheck.procedures.InsertXdcrReplicatedExpectedSP;
 PARTITION PROCEDURE InsertXdcrReplicatedExpectedSP ON TABLE xdcr_replicated_conflict_expected COLUMN cid;
-
-CREATE PROCEDURE FROM CLASS xdcrSelfCheck.procedures.Summarize;

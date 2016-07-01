@@ -71,9 +71,9 @@ public class Benchmark {
 
     // validated command line configuration
     final Config config;
-    // create a primaryClient for each xdcr1 node
+    // create a client for xdcr1 node
     Client primaryClient;
-    // create a secondaryClient for each xdcr2 node
+    // create a client for xdcr2 node
     Client secondaryClient;
     // Timer for periodic stats printing
     Timer timer;
@@ -521,27 +521,6 @@ public class Benchmark {
         }
     }
 
-    private int getUniquePartitionCount() throws Exception {
-        int partitionCount = -1;
-        ClientResponse cr = primaryClient.callProcedure("@Statistics", "PARTITIONCOUNT");
-
-        if (cr.getStatus() != ClientResponse.SUCCESS) {
-            log.error("Failed to call Statistics proc at startup. Exiting.");
-            log.error(((ClientResponseImpl) cr).toJSONString());
-            printJStack();
-            System.exit(-1);
-        }
-
-        VoltTable t = cr.getResults()[0];
-        partitionCount = (int) t.fetchRow(0).getLong(3);
-        log.info("unique partition count is " + partitionCount);
-        if (partitionCount <= 0) {
-            log.error("partition count is zero");
-            System.exit(-1);
-        }
-        return partitionCount;
-    }
-
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread th, Throwable ex) {
@@ -575,43 +554,6 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
-
-        // get partition count
-        int partitionCount = 0;
-        int trycount = 12;
-        while (trycount-- > 0) {
-            try {
-                partitionCount = getUniquePartitionCount();
-                break;
-            } catch (Exception e) {
-            }
-            Thread.sleep(10000);
-        }
-
-        // get stats
-        try {
-            ClientResponse cr = primaryClient.callProcedure("Summarize", config.threadoffset, config.threads);
-            if (cr.getStatus() != ClientResponse.SUCCESS) {
-                log.error("Failed to call Summarize proc at startup. Exiting.");
-                log.error(((ClientResponseImpl) cr).toJSONString());
-                printJStack();
-                System.exit(-1);
-            }
-
-            // successfully called summarize
-            VoltTable t = cr.getResults()[0];
-            long ts = t.fetchRow(0).getLong("ts");
-            String tsStr = ts == 0 ? "NO TIMESTAMPS" : String.valueOf(ts) + " / " + new Date(ts).toString();
-            long count = t.fetchRow(0).getLong("count");
-
-            log.info("STARTUP TIMESTAMP OF LAST UPDATE (GMT): " + tsStr);
-            log.info("UPDATES RUN AGAINST THIS DB TO DATE: " + count);
-        } catch (ProcCallException e) {
-            log.error("Failed to call Summarize proc at startup. Exiting.", e);
-            log.error(((ClientResponseImpl) e.getClientResponse()).toJSONString());
-            printJStack();
-            System.exit(-1);
-        }
 
         CountDownLatch latch = new CountDownLatch(config.threads);
         clientThreads = new ArrayList<>();
@@ -653,7 +595,6 @@ public class Benchmark {
     void shutdow() {
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
-
 
         // cancel periodic stats printing
         timer.cancel();

@@ -108,7 +108,6 @@ function pr() {
     ./plot.py replicated
 }
 
-# Benchmark sample
 # Use this target for argument help
 function benchmark-help() {
     srccompile

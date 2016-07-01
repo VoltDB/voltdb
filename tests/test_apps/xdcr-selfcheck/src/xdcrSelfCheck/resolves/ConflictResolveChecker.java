@@ -300,9 +300,8 @@ public class ConflictResolveChecker {
 
         String primaryRoot = "/Users/dsun/code/voltdb/tests/test_apps/xdcr-selfcheck/voltxdcr1";
         ConflictResolveChecker checker = new ConflictResolveChecker(client, null, primaryRoot, null);
-        /*checker.verifyTable(client, "xdcr_replicated");
-        checker.verifyTable(client, "xdcr_partitioned");*/
         checker.runPrimaryResolveVerification();
+        checker.runSecondaryResolveVerification();
     }
 
 }
