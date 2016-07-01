@@ -441,13 +441,20 @@
                 callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
 
+            var unauthorizedTimeout = setTimeout(function () {
+                callback(false, { "status": -100, "statusstring": "Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser" }, isLoginTest);
+            }, callbackTimeout);
+
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
                     if (response.status == 1) {
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
-                    } else {
+                    } else if(response.status == 401){
+                        clearTimeout(unauthorizedTimeout);
+                        callback(true, response, isLoginTest);
+                    }else{
                         callback(false, response, isLoginTest);
                     }
                 } catch (x) {
@@ -480,8 +487,14 @@
                     }
                 },
                 error: function (e) {
-                    if (e.status != 200) {
+                    if (e.status != 200)
+                    {
                         checkConnection(false);
+                    }
+                },
+                 statusCode:{
+                    401: function(response){
+                        alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
                 },
                 timeout: 60000
@@ -703,6 +716,11 @@ jQuery.extend({
                 },
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                    }
                 }
             });
 
@@ -720,6 +738,11 @@ jQuery.extend({
                 success: callback,
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    }
                 }
             });
         }

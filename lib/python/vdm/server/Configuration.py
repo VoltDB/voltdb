@@ -1182,72 +1182,79 @@ def print_errors(config_type, error):
 
 
 def set_deployment_for_upload(database_id, request):
-    dep_file = request.files['file']
-    if dep_file and HTTPListener.allowed_file(dep_file.filename):
-        try:
-            content = dep_file.read()
-            o = XML(content)
-            xml_final = json.loads(json.dumps(etree_to_dict(o)))
-            if 'deployment' in xml_final and type(xml_final['deployment']) is dict:
-                deployment_data = get_deployment_for_upload(xml_final['deployment'])
-                if type(deployment_data) is dict:
-                    if 'error' in deployment_data:
-                        return {'status': 'failure', 'error': deployment_data['error']}
-                else:
-                    deployment_json = deployment_data[0]
-                req = HTTPListener.DictClass()
-                req.json = {}
-                req.json = deployment_json
-                inputs = JsonInputs(req)
-                if not inputs.validate():
-                    return {'status': 'failure', 'errors': inputs.errors}
-
-                result = check_validation_deployment(req)
-                if 'status' in result and result['status'] == 'error':
-                    return {'status': 'failure', 'error': result['error']}
-
-                is_duplicate_user = check_duplicate_users(req)
-                if not is_duplicate_user:
-                    return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
-
-                is_invalid_roles = check_invalid_roles(req)
-                if not is_invalid_roles:
-                    return {'status': 'failure', 'error': 'Invalid user roles.'}
-
-                HTTPListener.map_deployment(req, database_id)
-
-                deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
-                if deployment_user is not None:
-                    for user in deployment_user:
-                        if user[0]['databaseid'] == database_id:
-                            del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
-                if 'users' in req.json and 'user' in req.json['users']:
-                    for user in req.json['users']['user']:
-                        if not HTTPListener.Global.DEPLOYMENT_USERS:
-                            user_id = 1
-                        else:
-                            user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
-                        user_roles = ','.join(Set(user['roles'].split(',')))
-
-                        HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
-                                'name': user['name'],
-                                'roles': user_roles,
-                                'password': user['password'],
-                                'plaintext': user['plaintext'],
-                                'databaseid': database_id,
-                                'userid': user_id
-                            }
-                HTTPListener.sync_configuration()
-                write_configuration_file()
-
-            else:
-                return {'status': 'failure', 'error': 'Invalid file content.'}
-
-        except Exception as err:
-            return {'status': 'failure', 'error': 'Invalid file content.'}
+    if 'text/xml' in request.headers['Content-Type'] or 'application/xml' in request.headers['Content-Type']:
+        content = request.data
+        return read_content(content, database_id)
     else:
-        return {'status': 'failure', 'error': 'Invalid file type.'}
-    return {'status': 'success'}
+        dep_file = request.files['file']
+        if dep_file and HTTPListener.allowed_file(dep_file.filename):
+            content = dep_file.read()
+            return read_content(content, database_id)
+        else:
+            return {'status': 'failure', 'error': 'Invalid file type.'}
+        return {'status': 'success'}
+
+
+def read_content(content, database_id):
+    try:
+        o = XML(content)
+        xml_final = json.loads(json.dumps(etree_to_dict(o)))
+        if 'deployment' in xml_final and type(xml_final['deployment']) is dict:
+            deployment_data = get_deployment_for_upload(xml_final['deployment'])
+            if type(deployment_data) is dict:
+                if 'error' in deployment_data:
+                    return {'status': 'failure', 'error': deployment_data['error']}
+            else:
+                deployment_json = deployment_data[0]
+            req = HTTPListener.DictClass()
+            req.json = {}
+            req.json = deployment_json
+            inputs = JsonInputs(req)
+            if not inputs.validate():
+                return {'status': 'failure', 'errors': inputs.errors}
+
+            result = check_validation_deployment(req)
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'failure', 'error': result['error']}
+
+            is_duplicate_user = check_duplicate_users(req)
+            if not is_duplicate_user:
+                return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
+
+            is_invalid_roles = check_invalid_roles(req)
+            if not is_invalid_roles:
+                return {'status': 'failure', 'error': 'Invalid user roles.'}
+
+            HTTPListener.map_deployment(req, database_id)
+
+            deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
+            if deployment_user is not None:
+                for user in deployment_user:
+                    if user[0]['databaseid'] == database_id:
+                        del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
+            if 'users' in req.json and 'user' in req.json['users']:
+                for user in req.json['users']['user']:
+                    if not HTTPListener.Global.DEPLOYMENT_USERS:
+                        user_id = 1
+                    else:
+                        user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                    user_roles = ','.join(Set(user['roles'].split(',')))
+
+                    HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
+                            'name': user['name'],
+                            'roles': user_roles,
+                            'password': user['password'],
+                            'plaintext': user['plaintext'],
+                            'databaseid': database_id,
+                            'userid': user_id
+                        }
+            HTTPListener.sync_configuration()
+            write_configuration_file()
+            return {'status': 'success'}
+        else:
+            return {'status': 'failure', 'error': 'Invalid file content.'}
+    except Exception as err:
+        return {'status': 'failure', 'error': 'Invalid file content.'}
 
 
 def check_duplicate_users(req):
