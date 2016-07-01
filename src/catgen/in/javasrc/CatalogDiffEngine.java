@@ -369,6 +369,7 @@ public class CatalogDiffEngine {
             suspect instanceof ConstraintRef ||
             suspect instanceof GroupRef ||
             suspect instanceof UserRef ||
+            suspect instanceof TableRef ||
             // The only meaty constraints (for now) are UNIQUE, PKEY and NOT NULL.
             // The UNIQUE and PKEY constraints are supported as index definitions.
             // NOT NULL is supported as a field on columns.
@@ -376,10 +377,10 @@ public class CatalogDiffEngine {
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
             suspect instanceof Constraint ||
-            suspect instanceof TableRef ||
             // If one of the source tables of a joined table view is marked export, the createQuery statemnt
             // will be dropped because we do not support joined table view on streamed table now.
-            suspect instanceof Statement)
+            suspect instanceof Statement ||
+            suspect instanceof PlanFragment)
         {
             return null;
         }
