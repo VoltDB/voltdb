@@ -490,7 +490,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             new Object[] {
                 paths,
                 nonces,
-                SnapshotUtil.SnapthotPathType.SNAP_PATH.toString()
+                SnapshotUtil.SnapthotPathType.SNAP_CL.toString()
                 };
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
