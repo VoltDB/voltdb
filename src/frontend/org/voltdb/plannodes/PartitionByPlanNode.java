@@ -93,20 +93,25 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         }
     }
 
+    /**
+     * Serialize to JSON.  We only serialize the expressions, and not the
+     * directions.  We won't need them in the exector.  The directions will
+     * be in the order by plan node in any case.
+     */
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
         AbstractExpression.toJSONArrayFromSortList(stringer,
                                                    getWindowedExpression().getOrderByExpressions(),
-                                                   getWindowedExpression().getOrderByDirections());
+                                                   null);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         WindowedExpression we = new WindowedExpression();
-        AbstractExpression.loadSortListFromJSONArray(we.getOrderByExpressions(), we.getOrderByDirections(), jobj);
+        AbstractExpression.loadSortListFromJSONArray(we.getOrderByExpressions(), null, jobj);
         we.setExpressionType(m_aggregateTypes.get(0));
         // WE don't really care about the column and table
         // names and aliases.  These are not the ones from the

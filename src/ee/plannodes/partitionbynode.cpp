@@ -43,13 +43,21 @@ std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
 void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AggregatePlanNode::loadFromJSONObject(obj);
     std::vector<AbstractExpression*>  orderByExpressions;
-    loadSortListFromJSONObject(obj, &orderByExpressions, NULL);
+    // AggregatePlanNode knows there is an aggregate but
+    // it doesn't know the input expression.  Since we are
+    // coding the order by expression as the input expression
+    // we will need special handling below.
+    assert(m_aggregateInputExpressions.size() == 1);
+    // The Java PartitionByPlanNode puts the order by
+    // expressions in a sensible place.  However, we want
+    // to subvert this sensible behavior by putting the
+    // first and only one in the input expression list for
+    // the only windowed aggregate in this node.  This is
+    // temporizing around our unfortunate inability to
+    // add order by expressions to Agg subobjects in the
+    // executors.
+    AbstractPlanNode::loadSortListFromJSONObject(obj, &orderByExpressions, NULL);
     assert(orderByExpressions.size() == 1);
-    // We push the first sort expression here.  This is not
-    // actually right, but it all works out.  When we want to
-    // allow more sort expressions, say when we want to implement
-    // row units and not range units for windowed functions, we
-    // need to do a better job of this.
-    m_aggregateInputExpressions.push_back(orderByExpressions[0]);
+    m_aggregateInputExpressions[0] = orderByExpressions[0];
 }
 }

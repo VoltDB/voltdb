@@ -547,11 +547,13 @@ public:
 
     virtual NValue finalize(ValueType type)
     {
+        VOLT_TRACE("finalize(m_rank == %lld)", m_rank);
         return ValueFactory::getBigIntValue(m_rank).castAs(type);
     }
 
     virtual void resetAgg()
     {
+        VOLT_TRACE("reset windowed agg");
         m_haveAdvanced = false;
         m_rank = 0;
         m_peerCount = 0;
@@ -629,8 +631,10 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     assert(node);
 
     m_inputExpressions = node->getAggregateInputExpressions();
+    std::string spacer("");
     for (int i = 0; i < m_inputExpressions.size(); i++) {
-        VOLT_DEBUG("\nAGG INPUT EXPRESSION: %s\n",
+        VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
+                   i,
                    m_inputExpressions[i] ? m_inputExpressions[i]->debug().c_str() : "null");
     }
 
