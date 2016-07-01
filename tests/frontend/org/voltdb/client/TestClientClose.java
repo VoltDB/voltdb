@@ -144,9 +144,10 @@ public class TestClientClose extends TestCase {
     public void testCreateCloseInParallelRemainOne() throws Exception {
         Client remainClient = ClientFactory.createClient();
         remainClient.createConnection("localhost");
-        clientCreateCloseLeaveOne(50, 3);
+        clientCreateCloseAll(50, 3);
         Thread.sleep(500);
         assertTrue(checkThreadsAllExist());
+        remainClient.close();
     }
 
     public void testCreateCloseInParallelStartOne() throws Exception {
@@ -161,15 +162,7 @@ public class TestClientClose extends TestCase {
     private void clientCreateCloseAll(int clientNum, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(loops);
         for (int i = 0; i < loops; i++) {
-            (new clientCreateCloseAllLauncher(clientNum, latch, i, false)).start();
-        }
-        latch.await();
-    }
-
-    private void clientCreateCloseLeaveOne(int clientNum, int loops) throws Exception {
-        CountDownLatch latch = new CountDownLatch(loops);
-        for (int i = 0; i < loops; i++) {
-            (new clientCreateCloseAllLauncher(clientNum, latch, i, true)).start();
+            (new clientCreateCloseAllLauncher(clientNum, latch, i)).start();
         }
         latch.await();
     }
@@ -205,13 +198,11 @@ public class TestClientClose extends TestCase {
         private final int m_clientNum;
         private final CountDownLatch m_latch;
         private final int m_loopNum;
-        private final boolean m_leaveOne;
 
-        public clientCreateCloseAllLauncher (int clientNum, CountDownLatch latch, int loopNum, boolean leaveOne) {
+        public clientCreateCloseAllLauncher (int clientNum, CountDownLatch latch, int loopNum) {
             m_clientNum = clientNum;
             m_latch = latch;
             m_loopNum = loopNum;
-            m_leaveOne = leaveOne;
         }
 
         @Override
@@ -220,10 +211,6 @@ public class TestClientClose extends TestCase {
                 for (int i = 0; i < m_clientNum; i++) {
                     Client client = ClientFactory.createClient();
                     client.createConnection("localhost");
-                    // if leaveOne is true, do not close the first client, leave it running.
-                    if (m_leaveOne && i == 0 && m_loopNum == 0) {
-                        continue;
-                    }
                     client.close();
                 }
             } catch (Exception ex) {
