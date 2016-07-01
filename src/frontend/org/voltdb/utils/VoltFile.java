@@ -262,27 +262,22 @@ public class VoltFile extends File {
      * of m_voltFilePrefix
      */
     private static String getFixedPathname(final String pathname) {
-        if (pathname == null) {
+        if (pathname == null || m_voltFilePrefix == null) {
             return pathname;
         }
         if (pathname.contains(m_magic)) {
             if (pathname.contains(m_voltFilePrefix.getAbsolutePath())) {
                 return pathname;
             }
-            else {
-                int offset = pathname.indexOf(m_magic) + m_magic.length();
-                String relativePath = pathname.substring(offset);
-                // The this is probably a snapshot path and needs to be re-mapped to our snapshot
-                // directory because truncation snapshot requests specify absolute paths
-                return m_voltFilePrefix.getAbsolutePath() + relativePath;
-            }
+
+            int offset = pathname.indexOf(m_magic) + m_magic.length();
+            String relativePath = pathname.substring(offset);
+            // The this is probably a snapshot path and needs to be re-mapped to our snapshot
+            // directory because truncation snapshot requests specify absolute paths
+            return m_voltFilePrefix.getAbsolutePath() + relativePath;
         }
 
-        if (m_voltFilePrefix != null) {
-            return m_voltFilePrefix + File.separator + pathname;
-        } else {
-            return pathname;
-        }
+        return m_voltFilePrefix + File.separator + pathname;
     }
 
     public VoltFile(String parent, String child) {
