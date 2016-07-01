@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.PosixAdvise;
 
 public class EELibraryLoader {
 
@@ -33,7 +34,6 @@ public class EELibraryLoader {
     private static boolean voltSharedLibraryLoaded = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
 
     static private boolean test64bit() {
         // Sun JVMs are nice and chatty on this topic.
@@ -50,7 +50,7 @@ public class EELibraryLoader {
     /**
      * Load the shared native library if not yet loaded. Returns true if the library was loaded
      **/
-    public synchronized static boolean loadExecutionEngineLibrary(boolean mustSuccede) {
+    public synchronized static boolean loadExecutionEngineLibrary(boolean mustSucceed) {
         if (!voltSharedLibraryLoaded) {
             if (VoltDB.getLoadLibVOLTDB()) {
                 test64bit();
@@ -72,12 +72,13 @@ public class EELibraryLoader {
                         System.load(libFile.getAbsolutePath());
                     }
                     voltSharedLibraryLoaded = true;
+                    PosixAdvise.nativeInitGlobals();
                     hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
                     if (hostLog.isDebugEnabled()) {
                         hostLog.debug("Error loading VoltDB JNI shared library", e);
                     }
-                    if (mustSuccede) {
+                    if (mustSucceed) {
                         String msg = "Library VOLTDB JNI shared library loading failed with error: " + e.getMessage() + "\n";
                         msg += "Library path " + System.getProperty("java.library.path") + ", " +
                                USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";

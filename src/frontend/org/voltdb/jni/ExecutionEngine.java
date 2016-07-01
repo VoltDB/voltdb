@@ -827,6 +827,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int clusterIndex,
             long siteId,
             int partitionId,
+            int sitesPerHost,
             int hostId,
             byte hostname[],
             int drClusterId,

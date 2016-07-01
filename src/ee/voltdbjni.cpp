@@ -110,6 +110,7 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
@@ -179,6 +180,16 @@ void setupSigHandler(void) {
         && orig_action.sa_sigaction != signalHandler)
         sigaction(SIGSEGV, &orig_action, NULL);
 #endif
+}
+
+/*
+ * Initializes the global ee objects with a lock for managing the map and a counter for sitesPerHost
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_PosixAdvise_nativeInitGlobals(JNIEnv *, jclass) {
+    assert(SITES_PER_HOST == -1);
+    SITES_PER_HOST = 0;
+    pthread_mutex_init(&sharedEngineMutex, NULL);
+    pthread_cond_init(&sharedEngineCondition, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -262,6 +273,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint clusterIndex,
     jlong siteId,
     jint partitionId,
+    jint sitesPerHost,
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
@@ -289,6 +301,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         engine->initialize(clusterIndex,
                            siteId,
                            partitionId,
+                           sitesPerHost,
                            hostId,
                            hostString,
                            drClusterId,
