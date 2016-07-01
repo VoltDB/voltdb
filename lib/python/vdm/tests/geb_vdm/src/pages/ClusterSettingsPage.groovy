@@ -91,6 +91,7 @@ class ClusterSettingsPage extends Page {
         //      waitFor(30) { serverSettingsTab.isDisplayed() }
     }
 
+
     /*
      *  Return the id of Server with index as input
      */
@@ -266,6 +267,14 @@ class ClusterSettingsPage extends Page {
 
         for(count=0; count<numberOfTrials; count++) {
             try {
+                for(nextCount=0; nextCount<numberOfTrials; nextCount++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
                 $(id:deleteId).click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
@@ -319,8 +328,17 @@ class ClusterSettingsPage extends Page {
      *  Choose the database with given index and name
      */
     boolean chooseDatabase(int indexOfNewDatabase, String newDatabaseName) {
+        int countNext = 0
         for (count = 0; count < numberOfTrials; count++) {
             try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
                 $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
                 waitFor { currentDatabase.text().equals(newDatabaseName) }
                 return true
@@ -532,4 +550,7 @@ class ClusterSettingsPage extends Page {
         }
         return cssPath
     }
+
+
+
 }

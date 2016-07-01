@@ -190,7 +190,7 @@ public class LeaderAppointer implements Promotable
                 }
                 // If we are a DR replica and starting from a snapshot, check if that has completed
                 if (m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false) {
-                    VoltDB.crashGlobalVoltDB("Detected node failure during DR snapshot sync. Cluster will shut down.",
+                    VoltDB.crashGlobalVoltDB("Detected node failure before DR sync snapshot completes. Cluster will shut down.",
                                              false, null);
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.

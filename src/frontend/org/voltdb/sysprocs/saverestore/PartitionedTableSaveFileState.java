@@ -322,7 +322,8 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 getTableName(),
                 originalHostsArray,
                 uncoveredPartitionsAtHost,
-                result_dependency_id);
+                result_dependency_id,
+                getIsRecoverParam());
         return plan_fragment;
     }
 
@@ -341,7 +342,8 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 result_dependency_id,
                 (asReplicated ?
                         "Aggregating partitioned-to-replicated table restore results"
-                        : "Aggregating partitioned table restore results"));
+                        : "Aggregating partitioned table restore results"),
+                getIsRecoverParam());
         return plan_fragment;
     }
 
