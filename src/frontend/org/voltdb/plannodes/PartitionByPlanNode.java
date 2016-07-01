@@ -16,6 +16,8 @@
  */
 package org.voltdb.plannodes;
 
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -87,6 +89,15 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         m_aggregateOutputColumns.add(0);
         m_aggregateTypes.add(we.getExpressionType());
         m_aggregateDistinct.add(0);
+        // This could be the first order by expression.  We currently
+        // just support RANGE units, so there is only one order by expression.
+        // Furthermore, the RANK() operation does not have an argument, unlike,
+        // say, the MEAN(EXP) operation.  So, we pass the only order by
+        // expression in as the aggregate expression.  However, it seems
+        // like propagating this hack out of the EE seems wrong.  So, we
+        // don't add an expression here, and we will add order by expressions
+        // to the plan node, as if we were doing it right.  We will fix it
+        // up, which is to say, we will break it, in the EE.
         m_aggregateExpressions.add(null);
         for (AbstractExpression expr : we.getPartitionByExpressions()) {
             m_groupByExpressions.add(expr);
@@ -95,7 +106,7 @@ public class PartitionByPlanNode extends AggregatePlanNode {
 
     /**
      * Serialize to JSON.  We only serialize the expressions, and not the
-     * directions.  We won't need them in the exector.  The directions will
+     * directions.  We won't need them in the executor.  The directions will
      * be in the order by plan node in any case.
      */
     @Override
@@ -128,6 +139,23 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.PARTITIONBY;
+    }
+
+    @Override
+    protected List<TupleValueExpression> getResolvableExpressions() {
+        List<TupleValueExpression> answer = super.getResolvableExpressions();
+        WindowedExpression we = getWindowedExpression();
+        // The partition by expressions are in the group by list.  So
+        // they have been managed by the AggregatePlanNode.  We do need
+        // to resolve column indices for the order by expressions.  We will
+        // only have one of these, but we will act as if we have more than
+        // one, which is the general case.
+        for (AbstractExpression ae : we.getOrderByExpressions()) {
+            if (ae instanceof TupleValueExpression) {
+                answer.add((TupleValueExpression)ae);
+            }
+        }
+        return answer;
     }
 
     private SchemaColumn       m_windowedSchemaColumn = null;

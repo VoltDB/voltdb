@@ -141,6 +141,12 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
                       "At most one windowed display column is supported.");
+        failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
+                      "Aggregate Windowed Expressions With Range " +
+                      "Window Frame Units Can Have Only One Order By Expression.");
+        failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
+                      "Aggregate windowed expressions with RANGE " +
+                      "window frame units can have only integer or TIMESTAMP value types.");
 
     }
 
@@ -157,11 +163,19 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
             assertFalse("OrderBy expressions in windowed expressions don't compile", true);
         }
     }
+
     // This is not actually a test.  This is here just to generate a
     // catalog and a plan for the PartitionByExecutor test.  It doesn't really
     // test anything at all.  So really, just don't enable it.
     public void testRankTestGen() throws Exception {
-        compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
+        AbstractPlanNode node;
+        try {
+            node = compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
+
+            assertTrue(true);
+        } catch (Exception ex) {
+            assertTrue("Unexpected exception in compilation", false);
+        }
     }
     @Override
     protected void setUp() throws Exception {

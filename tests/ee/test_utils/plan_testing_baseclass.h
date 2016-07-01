@@ -213,7 +213,7 @@ public:
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer[row * nCols + col];
                 int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
-                VOLT_TRACE("Row %d, col %d: expected %d, got %d%s",
+                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
                            row, col,
                            expected, v1,
                            (expected != v1) ? "failed" : "ok");
@@ -223,10 +223,10 @@ public:
             }
         }
         bool hasNext = iter.next(tuple);
-        if (!hasNext) {
+        if (hasNext) {
             VOLT_TRACE("Unexpected next element\n");
+            failed = true;
         }
-        ASSERT_FALSE(hasNext);
         ASSERT_FALSE(failed);
     }
 protected:

@@ -547,7 +547,7 @@ public:
 
     virtual NValue finalize(ValueType type)
     {
-        VOLT_TRACE("finalize(m_rank == %lld)", m_rank);
+        VOLT_TRACE("finalize(m_rank == %d)", (int)m_rank);
         return ValueFactory::getBigIntValue(m_rank).castAs(type);
     }
 
@@ -1047,7 +1047,9 @@ bool AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
         if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
-            VOLT_TRACE("new group!");
+            VOLT_TRACE("new group!: %s -> %s",
+                       nextGroupByKeyTuple.getNValue(ii).toString().c_str(),
+                       m_inProgressGroupByKeyTuple.getNValue(ii).toString().c_str());
             // Remember to output the old row.
             outputRow = true;
             // We also want to reset the aggs.
