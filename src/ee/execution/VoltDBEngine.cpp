@@ -97,6 +97,8 @@
 #include <sstream>
 #include <locale>
 #include <typeinfo>
+#include <pthread.h>
+#include <atomic>
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -132,6 +134,14 @@ typedef boost::multi_index::multi_index_container<
         >
     >
 > PlanSet;
+
+
+pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sharedEngineCondition;
+SharedEngineLocalsType enginesByPartitionId;
+std::atomic<int32_t> globalTxnStartCountdownLatch(0);
+int32_t globalTxnEndCountdownLatch = 0;
+int32_t SITES_PER_HOST = -1;
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -172,6 +182,7 @@ bool
 VoltDBEngine::initialize(int32_t clusterIndex,
                          int64_t siteId,
                          int32_t partitionId,
+                         int32_t sitesPerHost,
                          int32_t hostId,
                          std::string hostname,
                          int32_t drClusterId,
@@ -185,6 +196,18 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+
+    // Add the engine to the global list tracking replicated tables
+    pthread_mutex_lock(&sharedEngineMutex);
+    VOLT_ERROR("assigned engine for partition %d with mem %p", partitionId, ThreadLocalPool::getDataPoolPair());
+    enginesByPartitionId[partitionId] = EngineLocals(this);
+    if (partitionId != 16383) {
+        if (SITES_PER_HOST == 0) {
+            SITES_PER_HOST = sitesPerHost;
+            globalTxnStartCountdownLatch = SITES_PER_HOST;
+        }
+    }
+    pthread_mutex_unlock(&sharedEngineMutex);
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -251,6 +274,7 @@ VoltDBEngine::~VoltDBEngine() {
     // greatly increases the risk of accidentally freeing the same
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
+    VOLT_ERROR("starting deallocate for partition %d", m_partitionId);
 
     // clean up execution plans
     m_plans.reset();
@@ -269,8 +293,11 @@ VoltDBEngine::~VoltDBEngine() {
     // Delete table delegates and release any table reference counts.
     typedef std::pair<int64_t, Table*> TID;
 
-    BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
-        delete cd.second;
+    if (m_partitionId != 16383) {
+        //
+        BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
+            delete cd.second;
+        }
     }
 
     BOOST_FOREACH (TID tid, m_snapshottingTables) {
@@ -283,6 +310,17 @@ VoltDBEngine::~VoltDBEngine() {
     delete m_drStream;
     delete m_compatibleDRStream;
     delete m_compatibleDRReplicatedStream;
+
+    // Add the engine to the global list tracking replicated tables
+    pthread_mutex_lock(&sharedEngineMutex);
+    enginesByPartitionId.erase(m_partitionId);
+    bool allEnginesDestroyed = enginesByPartitionId.empty();
+    pthread_mutex_unlock(&sharedEngineMutex);
+    if (allEnginesDestroyed) {
+        pthread_mutex_destroy(&sharedEngineMutex);
+    }
+
+    VOLT_ERROR("finished deallocate for partition %d", m_partitionId);
 }
 
 // ------------------------------------------------------------------
@@ -581,6 +619,32 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
+void VoltDBEngine::signalLastSiteFinished() {
+    pthread_mutex_lock(&sharedEngineMutex);
+    globalTxnEndCountdownLatch++;
+    while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
+        pthread_mutex_unlock(&sharedEngineMutex);
+        pthread_yield();
+        pthread_mutex_lock(&sharedEngineMutex);
+    }
+    // We now know all other threads are waiting to be signaled
+    globalTxnEndCountdownLatch = 0;
+    VOLT_ERROR("partition %d kicking everyone awake with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
+    pthread_cond_broadcast(&sharedEngineCondition);
+    pthread_mutex_unlock(&sharedEngineMutex);
+}
+
+void VoltDBEngine::waitForLastSiteFinished() {
+    pthread_mutex_lock(&sharedEngineMutex);
+    VOLT_ERROR("partition %d falling asleep", m_partitionId);
+    globalTxnEndCountdownLatch++;
+    while (globalTxnEndCountdownLatch != 0) {
+        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
+    }
+    VOLT_ERROR("partition %d waking up with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
+    pthread_mutex_unlock(&sharedEngineMutex);
+}
+
 bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catalogPayload) {
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
@@ -590,6 +654,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->bindToThread();
     }
 
+    if (m_partitionId == 16383) {
+        // Don't bother allocating tables on the mp site's ee
+        return true;
+    }
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
@@ -610,20 +678,53 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
+    bool lastSite = --globalTxnStartCountdownLatch == 0;
+
+    if (lastSite) {
+        VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
+        EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
+        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
+        //VoltDBEngine* mpEngine = mpEngineLocals->engine;
+        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
+
+//        // load up all the tables, adding all tables
+//        if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
+//            return false;
+//        }
+//
+//        mpEngine->rebuildTableCollections(true);
+//
+//        // load up all the materialized views
+//        // and limit delete statements.
+//        //
+//        // This must be done after loading all the tables.
+//        mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
+
+        globalTxnStartCountdownLatch = SITES_PER_HOST;
+        // Assign the correct pool back to this thread
+        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+        signalLastSiteFinished();
+    }
+    else {
+        // Unfortunately the site thread calls getStats() before all the tables are created so we need to
+        // block the site thread until the replicated tables have been applied in all partitions
+        waitForLastSiteFinished();
+    }
+
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
+    if (processCatalogAdditions(timestamp, false) == false) {
         return false;
     }
 
-    rebuildTableCollections();
+    rebuildTableCollections(false);
 
     // load up all the materialized views
     // and limit delete statements.
     //
     // This must be done after loading all the tables.
-    initMaterializedViewsAndLimitDeletePlans();
+    initMaterializedViewsAndLimitDeletePlans(false);
 
-    VOLT_DEBUG("Loaded catalog...");
+    VOLT_DEBUG("Loaded catalog from partition...");
     return true;
 }
 
@@ -639,7 +740,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  * processCatalogAdditions(..) for dumb reasons.
  */
 void
-VoltDBEngine::processCatalogDeletes(int64_t timestamp )
+VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
 {
     std::vector<std::string> deletion_vector;
     m_catalog->getDeletedPaths(deletion_vector);
@@ -747,7 +848,6 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
     return false;
 }
 
-
 /*
  * Create catalog delegates for new catalog tables.
  * Create the tables themselves when new tables are needed.
@@ -757,8 +857,9 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(int64_t timestamp)
+VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
 {
+    VOLT_ERROR("loading catalog for partition %d with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -773,14 +874,30 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // add a completely new table
             //////////////////////////////////////////
 
-            tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                           m_compactionThreshold);
-            // use the delegate to init the table and create indexes n' stuff
-            tcd->init(*m_database, *catalogTable);
-            m_catalogDelegates[catalogTable->path()] = tcd;
-            Table* table = tcd->getTable();
-            m_delegatesByName[table->name()] = tcd;
-
+//            if (catalogTable->isreplicated()) {
+//                if (updateReplicated) {
+//                    tcd = new TableCatalogDelegate(catalogTable->signature(),
+//                                                   m_compactionThreshold);
+//                    // use the delegate to init the table and create indexes n' stuff
+//                    tcd->init(*m_database, *catalogTable);
+//                    std::string& tableName = tcd->getTable()->name();
+//                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+//                        VoltDBEngine* currEngine = enginePair.second.engine;
+//                        currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
+//                        currEngine->m_delegatesByName[tableName] = tcd;
+//                    }
+//                }
+//            }
+//            else {
+            {
+                tcd = new TableCatalogDelegate(catalogTable->signature(),
+                                               m_compactionThreshold);
+                // use the delegate to init the table and create indexes n' stuff
+                tcd->init(*m_database, *catalogTable);
+                m_catalogDelegates[catalogTable->path()] = tcd;
+                Table* table = tcd->getTable();
+                m_delegatesByName[table->name()] = tcd;
+            }
             // set export info on the new table
             StreamedTable *streamedtable = tcd->getStreamedTable();
             if (streamedtable) {
@@ -1090,18 +1207,42 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    processCatalogDeletes(timestamp);
+    bool lastSite = --globalTxnStartCountdownLatch == 0;
 
-    if (processCatalogAdditions(timestamp) == false) {
-        VOLT_ERROR("Error processing catalog additions.");
-        return false;
+    if (lastSite) {
+        VOLT_ERROR("updating catalog from partition %d", m_partitionId);
+        EngineLocals* ourEngineLocals = NULL;
+        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+            EngineLocals locals = enginePair.second;
+            VoltDBEngine* currEngine = locals.engine;
+            ThreadLocalPool::assignThreadLocals(locals);
+            bool thisEngine = (currEngine == this);
+            if (thisEngine) {
+                ourEngineLocals = &locals;
+            }
+
+            currEngine->processCatalogDeletes(timestamp, thisEngine);
+
+            if (currEngine->processCatalogAdditions(timestamp, thisEngine) == false) {
+                VOLT_ERROR("Error processing catalog additions.");
+                return false;
+            }
+
+            currEngine->rebuildTableCollections(thisEngine);
+
+            currEngine->initMaterializedViewsAndLimitDeletePlans(thisEngine);
+
+            currEngine->m_catalog->purgeDeletions();
+        }
+        globalTxnStartCountdownLatch = SITES_PER_HOST;
+        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+        signalLastSiteFinished();
     }
-
-    rebuildTableCollections();
-
-    initMaterializedViewsAndLimitDeletePlans();
-
-    m_catalog->purgeDeletions();
+    else {
+        // Unfortunately the site thread calls getStats() before all the tables are created so we need to
+        // block the site thread until the replicated tables have been applied in all partitions
+        waitForLastSiteFinished();
+    }
     VOLT_DEBUG("Updated catalog...");
     return true;
 }
@@ -1152,7 +1293,7 @@ VoltDBEngine::loadTable(int32_t tableId,
  * Delete and rebuild id based table collections. Does not affect
  * any currently stored tuples.
  */
-void VoltDBEngine::rebuildTableCollections()
+void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
 {
     // 1. See header comments explaining m_snapshottingTables.
     // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
@@ -1356,7 +1497,7 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *srcCatal
  *
  * Assumes all tables (sources and destinations) have been constructed.
  */
-void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
+void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicated) {
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;

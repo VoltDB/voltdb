@@ -87,4 +87,10 @@ public class PosixAdvise {
         final long filedescriptor = SharedSecrets.getJavaIOFileDescriptorAccess().get(fd);
         return sync_file_range(filedescriptor, offset, size, flags);
     }
+
+    /**
+     * Interface for initializing globals shared by all EE instances
+     * CALL ONLY ONCE FOR JNI INITIALIZATION!!!!!
+     */
+    public static native void nativeInitGlobals();
 }

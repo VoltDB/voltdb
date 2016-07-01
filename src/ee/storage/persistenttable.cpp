@@ -329,7 +329,8 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
     // reset base table pointer
     tcd->setTable(originalTable);
 
-    engine->rebuildTableCollections();
+    // TODO: Fix this to coordinate the undo for replicated tables by the last site.
+    engine->rebuildTableCollections(false);
 }
 
 void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
@@ -433,7 +434,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->swapPurgeExecutorVector(evPtr);
     }
 
-    engine->rebuildTableCollections();
+    // TODO: Fix this to coordinate the truncate for replicated tables by the last site.
+    engine->rebuildTableCollections(false);
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
