@@ -42,11 +42,12 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltcore.messaging.HostMessenger.Determination;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.common.NodeState;
+import org.voltdb.probe.MeshProber;
+import org.voltdb.probe.MeshProber.Determination;
 
 import com.google_voltpatches.common.base.Supplier;
 
@@ -96,7 +97,7 @@ public class TestHostMessenger {
         String [] coordinators = IntStream.range(0, hostcount)
                 .mapToObj(i -> ":" + (i+config.internalPort))
                 .toArray(s -> new String[s]);
-        config.criteria = JoinerCriteria.builder()
+        config.acceptor = MeshProber.builder()
                 .coordinators(coordinators)
                 .build();
         config.internalPort = config.internalPort + index;
@@ -109,19 +110,23 @@ public class TestHostMessenger {
         return hm;
     }
 
+    private MeshProber prober(HostMessenger hm) {
+        return MeshProber.prober(hm);
+    }
+
     private String [] coordinators(int hostCount) {
         return IntStream.range(0, hostCount)
                 .mapToObj(i -> ":" + (i+DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
     }
 
-    private HostMessenger createHostMessenger(int index, JoinerCriteria jc,
+    private HostMessenger createHostMessenger(int index, MeshProber jc,
             boolean start)  throws Exception {
         assertTrue("index is bigger than hostcount", index < jc.getHostCount());
         final HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        config.criteria = jc;
+        config.acceptor = jc;
         HostMessenger hm = new HostMessenger(config, null);
         createdMessengers.add(hm);
         if (start) {
@@ -175,7 +180,7 @@ public class TestHostMessenger {
 
     @Test
     public void testSingleProbedCreateHost() throws Exception {
-        JoinerCriteria jc = JoinerCriteria.builder()
+        MeshProber jc = MeshProber.builder()
                 .coordinators(coordinators(1))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
@@ -184,7 +189,7 @@ public class TestHostMessenger {
 
         HostMessenger hm = createHostMessenger(0, jc, true);
 
-        Determination dtm =  hm.waitForDetermination();
+        Determination dtm =  prober(hm).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(1, dtm.hostCount);
 
@@ -206,7 +211,7 @@ public class TestHostMessenger {
 
     @Test
     public void testSingleProbedRecoverHost() throws Exception {
-        JoinerCriteria jc = JoinerCriteria.builder()
+        MeshProber jc = MeshProber.builder()
                 .coordinators(coordinators(1))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
@@ -215,7 +220,7 @@ public class TestHostMessenger {
 
         HostMessenger hm = createHostMessenger(0, jc, true);
 
-        Determination dtm =  hm.waitForDetermination();
+        Determination dtm =  prober(hm).waitForDetermination();
         assertEquals(StartAction.RECOVER, dtm.startAction);
         assertEquals(1, dtm.hostCount);
 
@@ -237,7 +242,7 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHostProbedCreate() throws Exception {
-        JoinerCriteria jc = JoinerCriteria.builder()
+        MeshProber jc = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
@@ -261,12 +266,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -285,7 +290,7 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHostProbedRecover() throws Exception {
-        JoinerCriteria jc = JoinerCriteria.builder()
+        MeshProber jc = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
@@ -309,12 +314,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.RECOVER, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -333,14 +338,14 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHostProbedRecoverWithOneBare() throws Exception {
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
                 .kfactor(1);
 
-        JoinerCriteria bare  = jcb.bare(true).build();
-        JoinerCriteria dressed = jcb.bare(false).build();
+        MeshProber bare  = jcb.bare(true).build();
+        MeshProber dressed = jcb.bare(false).build();
 
         HostMessenger hm1 = createHostMessenger(0, bare, true);
         HostMessenger hm2 = createHostMessenger(1, dressed, false);
@@ -360,12 +365,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.RECOVER, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -384,19 +389,19 @@ public class TestHostMessenger {
 
     @Test
     public void testPauseModePropagation() throws Exception {
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
                 .bare(true)
                 .kfactor(1);
 
-        JoinerCriteria paused  = jcb.paused(true).build();
-        JoinerCriteria unpaused = jcb.paused(false).build();
+        MeshProber paused  = jcb.paused(true).build();
+        MeshProber unpaused = jcb.paused(false).build();
 
-        HostMessenger hm1 = createHostMessenger(0, unpaused, true);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(unpaused).build(), true);
         HostMessenger hm2 = createHostMessenger(1, paused, false);
-        HostMessenger hm3 = createHostMessenger(2, unpaused, false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(unpaused).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -412,16 +417,14 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
-        assertTrue(hm1.isPaused());
-        assertTrue(hm2.isPaused());
-        assertTrue(hm3.isPaused());
+        assertTrue(dtm.paused);
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -440,15 +443,15 @@ public class TestHostMessenger {
 
     @Test
     public void testSafeModePropagation() throws Exception {
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
                 .bare(false)
                 .kfactor(1);
 
-        JoinerCriteria safe  = jcb.safeMode(true).build();
-        JoinerCriteria unsafe = jcb.safeMode(false).build();
+        MeshProber safe  = jcb.safeMode(true).build();
+        MeshProber unsafe = jcb.safeMode(false).build();
 
         HostMessenger hm1 = createHostMessenger(0, unsafe, true);
         HostMessenger hm2 = createHostMessenger(1, safe, false);
@@ -468,12 +471,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.SAFE_RECOVER, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -492,14 +495,14 @@ public class TestHostMessenger {
 
     @Test
     public void testStaggeredStartsWithFewerCoordinators() throws Exception {
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
                 .kfactor(1);
 
-        JoinerCriteria jc  = jcb.bare(true).build();
+        MeshProber jc  = jcb.bare(true).build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, false);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -522,12 +525,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
@@ -547,7 +550,7 @@ public class TestHostMessenger {
     @Test
     public void testProbedRejoinForPreviousLeader() throws Exception {
         NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -556,7 +559,7 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc  = jcb.build();
+        MeshProber jc  = jcb.build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, true);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -576,12 +579,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
         hm1.shutdown();
@@ -594,7 +597,7 @@ public class TestHostMessenger {
                 .build();
         hm1 = createHostMessenger(0, jc, true);
 
-        dtm = hm1.waitForDetermination();
+        dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
         assertEquals(3, dtm.hostCount);
         assertFalse(hm1.isPaused());
@@ -617,7 +620,7 @@ public class TestHostMessenger {
     @Test
     public void testProbedRejoinForNonLeader() throws Exception {
         NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -626,7 +629,7 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc  = jcb.build();
+        MeshProber jc  = jcb.build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, false);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -647,12 +650,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
         hm2.shutdown();
@@ -663,7 +666,7 @@ public class TestHostMessenger {
                 .build();
         hm2 = createHostMessenger(1, jc, true);
 
-        dtm = hm2.waitForDetermination();
+        dtm = prober(hm2).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
         assertEquals(3, dtm.hostCount);
         assertFalse(hm2.isPaused());
@@ -688,7 +691,7 @@ public class TestHostMessenger {
         VoltDB.ignoreCrash = true;
 
         NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -697,7 +700,7 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc  = jcb.build();
+        MeshProber jc  = jcb.build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, false);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -720,12 +723,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
 
@@ -746,7 +749,7 @@ public class TestHostMessenger {
     public void testProbedJoinOnWholeCluster() throws Exception {
         NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -755,7 +758,7 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc  = jcb.build();
+        MeshProber jc  = jcb.build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, false);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -778,12 +781,12 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(3, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
 
@@ -795,7 +798,7 @@ public class TestHostMessenger {
         HostMessenger hm4 = createHostMessenger(3, jc, false);
 
         hm4.start();
-        dtm = hm4.waitForDetermination();
+        dtm = prober(hm4).waitForDetermination();
         assertEquals(StartAction.JOIN, dtm.startAction);
         assertEquals(5, dtm.hostCount);
 
@@ -822,7 +825,7 @@ public class TestHostMessenger {
     public void testTwoProbedConcuncurrentRejoins() throws Exception {
 
         NodeStateRef hmns1 = new NodeStateRef(NodeState.INITIALIZING);
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(5)
                 .startAction(StartAction.PROBE)
@@ -831,7 +834,7 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc  = jcb.build();
+        MeshProber jc  = jcb.build();
 
         HostMessenger hm1 = createHostMessenger(0, jc, false);
         HostMessenger hm2 = createHostMessenger(1, jc, false);
@@ -862,14 +865,14 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        Determination dtm = hm1.waitForDetermination();
+        Determination dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.CREATE, dtm.startAction);
         assertEquals(5, dtm.hostCount);
 
-        assertEquals(dtm, hm2.waitForDetermination());
-        assertEquals(dtm, hm3.waitForDetermination());
-        assertEquals(dtm, hm4.waitForDetermination());
-        assertEquals(dtm, hm5.waitForDetermination());
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
+        assertEquals(dtm, prober(hm4).waitForDetermination());
+        assertEquals(dtm, prober(hm5).waitForDetermination());
 
         assertTrue(hmns1.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
 
@@ -898,10 +901,10 @@ public class TestHostMessenger {
             fail(exception.get().toString());
         }
 
-        dtm = hm6.waitForDetermination();
+        dtm = prober(hm6).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
         assertEquals(5, dtm.hostCount);
-        assertEquals(dtm, hm6.waitForDetermination());
+        assertEquals(dtm, prober(hm6).waitForDetermination());
 
         assertTrue(Math.max(hm6.getHostId(), hm7.getHostId()) > 6);
 
@@ -932,7 +935,7 @@ public class TestHostMessenger {
     public void testProbedConfigMismatchCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -941,8 +944,8 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb.configHash(new UUID(-2L, -2L)).build();
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.configHash(new UUID(-2L, -2L)).build();
 
         assertNotSame(jc1.getConfigHash(), jc2.getConfigHash());
 
@@ -977,7 +980,7 @@ public class TestHostMessenger {
     public void testProbedMeshMismatchCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -986,8 +989,8 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb.coordinators(coordinators(3)).build();
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.coordinators(coordinators(3)).build();
 
         assertNotSame(jc1.getMeshHash(), jc2.getMeshHash());
 
@@ -1022,7 +1025,7 @@ public class TestHostMessenger {
     public void testProbedHostCountMismatchCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -1031,8 +1034,8 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb.hostCount(4).build();
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.hostCount(4).build();
 
         assertNotSame(jc1.getHostCount(), jc2.getHostCount());
 
@@ -1067,7 +1070,7 @@ public class TestHostMessenger {
     public void testProbedEditionMismatchCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -1077,8 +1080,8 @@ public class TestHostMessenger {
                 .enterprise(true)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb.enterprise(false).build();
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.enterprise(false).build();
 
         assertNotSame(jc1.isEnterprise(), jc2.isEnterprise());
 
@@ -1113,7 +1116,7 @@ public class TestHostMessenger {
     public void testStartActionMismatchCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -1122,8 +1125,8 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb.startAction(StartAction.CREATE).build();
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.startAction(StartAction.CREATE).build();
 
         assertNotSame(jc1.getStartAction(), jc2.getStartAction());
 
@@ -1158,7 +1161,7 @@ public class TestHostMessenger {
     public void testMultipleMismatchesCrash() throws Exception {
         VoltDB.ignoreCrash = true;
 
-        JoinerCriteria.Builder jcb = JoinerCriteria.builder()
+        MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(2))
                 .hostCount(3)
                 .startAction(StartAction.PROBE)
@@ -1167,8 +1170,8 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        JoinerCriteria jc1 = jcb.build();
-        JoinerCriteria jc2 = jcb
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb
                 .startAction(StartAction.CREATE)
                 .configHash(new UUID(-2L, -2L))
                 .hostCount(4)

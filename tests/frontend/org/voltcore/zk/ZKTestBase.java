@@ -34,10 +34,10 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -62,7 +62,7 @@ public class ZKTestBase {
         for (int ii = 0; ii < sites; ii++) {
             HostMessenger.Config config = new HostMessenger.Config();
             config.internalPort += ii;
-            config.criteria = JoinerCriteria.builder()
+            config.acceptor = MeshProber.builder()
                     .coordinators(coordinators)
                     .startAction(StartAction.PROBE)
                     .hostCount(sites)
@@ -76,11 +76,11 @@ public class ZKTestBase {
             m_messengers.add(hm);
         }
         for (HostMessenger hm: m_messengers) {
-            hm.waitForDetermination();
+            MeshProber.prober(hm).waitForDetermination();
         }
     }
 
-    protected void setUpZK(JoinerCriteria criteria, boolean waitForDetermination) throws Exception {
+    protected void setUpZK(MeshProber criteria, boolean waitForDetermination) throws Exception {
         m_siteIdToZKPort = new TreeMap<Integer, Integer>();
         m_clients = new ArrayList<ZooKeeper>();
         m_messengers = new ArrayList<HostMessenger>();
@@ -89,7 +89,7 @@ public class ZKTestBase {
         for (String coord: criteria.getCoordinators()) {
             HostAndPort hp = HostAndPort.fromString(coord).withDefaultPort(VoltDB.DEFAULT_INTERNAL_PORT);
             HostMessenger.Config config = new HostMessenger.Config();
-            config.criteria = criteria;
+            config.acceptor = criteria;
             assert config.internalPort + i == hp.getPort() : "coordinator port mismatches internal port";
             config.internalPort = hp.getPort();
             int externalPort = m_ports.next();
@@ -104,7 +104,7 @@ public class ZKTestBase {
 
         for (; i < criteria.getHostCount(); ++i) {
             HostMessenger.Config config = new HostMessenger.Config();
-            config.criteria = criteria;
+            config.acceptor = criteria;
             config.internalPort += i;
             int externalPort = m_ports.next();
             config.zkInterface = "127.0.0.1:" + externalPort;
@@ -117,7 +117,7 @@ public class ZKTestBase {
 
         if (waitForDetermination) {
             for (HostMessenger hm: m_messengers) {
-                hm.waitForDetermination();
+                MeshProber.prober(hm).waitForDetermination();
             }
         }
     }

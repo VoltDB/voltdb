@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.messaging;
+package org.voltdb.probe;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
@@ -31,7 +31,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
- *  It is a DTO that snapshots a subset of {@link JoinerCriteria} fields, and is
+ *  It is a DTO that snapshots a subset of {@link MeshProber} fields, and is
  *  passed around in initial mesh requests.
  */
 public class HostCriteria {
@@ -205,7 +205,10 @@ public class HostCriteria {
     public List<String> listIncompatibilities(HostCriteria o) {
         checkArgument(o != null, "cant check compatibility against a null host criteria");
         ImmutableList.Builder<String> ilb = ImmutableList.builder();
-
+        if (o.isUndefined()) {
+            ilb.add("Joining node has incompatible version");
+            return ilb.build();
+        }
         if (m_startAction != o.m_startAction) {
             ilb.add(String.format("Start action %s does not match %s", o.m_startAction, m_startAction));
         }

@@ -28,11 +28,11 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.voltcore.messaging.JoinerCriteria;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -258,7 +258,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     public CommandLine coordinators(String coordinators) {
-        m_coordinators = JoinerCriteria.hosts(coordinators);
+        m_coordinators = MeshProber.hosts(coordinators);
         return this;
     }
 

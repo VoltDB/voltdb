@@ -39,11 +39,11 @@ import java.util.UUID;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -305,7 +305,7 @@ public class VoltDB {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
-            m_coordinators = JoinerCriteria.hosts(m_internalPort);
+            m_coordinators = MeshProber.hosts(m_internalPort);
         }
 
         public Configuration(String args[]) {
@@ -651,7 +651,7 @@ public class VoltDB {
                 }
             }
             if (m_meshBrokers != null) {
-                m_coordinators = JoinerCriteria.hosts(m_meshBrokers);
+                m_coordinators = MeshProber.hosts(m_meshBrokers);
                 if (m_leader == null) {
                     m_leader = m_coordinators.first();
                 }
