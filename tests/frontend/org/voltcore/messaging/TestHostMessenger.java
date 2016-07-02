@@ -242,15 +242,15 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHostProbedCreate() throws Exception {
-        MeshProber jc = MeshProber.builder()
+        MeshProber.Builder jc = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
-                .bare(true)
-                .build();
-        HostMessenger hm1 = createHostMessenger(0, jc, true);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+                .bare(true);
+
+        HostMessenger hm1 = createHostMessenger(0, jc.build(), true);
+        HostMessenger hm2 = createHostMessenger(1, jc.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jc.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -290,15 +290,15 @@ public class TestHostMessenger {
 
     @Test
     public void testMultiHostProbedRecover() throws Exception {
-        MeshProber jc = MeshProber.builder()
+        MeshProber.Builder jc = MeshProber.builder()
                 .coordinators(coordinators(3))
                 .startAction(StartAction.PROBE)
                 .nodeState(NodeState.INITIALIZING)
-                .bare(false)
-                .build();
-        HostMessenger hm1 = createHostMessenger(0, jc, true);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+                .bare(false);
+
+        HostMessenger hm1 = createHostMessenger(0, jc.build(), true);
+        HostMessenger hm2 = createHostMessenger(1, jc.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jc.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -348,8 +348,8 @@ public class TestHostMessenger {
         MeshProber dressed = jcb.bare(false).build();
 
         HostMessenger hm1 = createHostMessenger(0, bare, true);
-        HostMessenger hm2 = createHostMessenger(1, dressed, false);
-        HostMessenger hm3 = createHostMessenger(2, dressed, false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(dressed).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(dressed).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -453,9 +453,9 @@ public class TestHostMessenger {
         MeshProber safe  = jcb.safeMode(true).build();
         MeshProber unsafe = jcb.safeMode(false).build();
 
-        HostMessenger hm1 = createHostMessenger(0, unsafe, true);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(unsafe).build(), true);
         HostMessenger hm2 = createHostMessenger(1, safe, false);
-        HostMessenger hm3 = createHostMessenger(2, unsafe, false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(unsafe).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -502,11 +502,10 @@ public class TestHostMessenger {
                 .nodeState(NodeState.INITIALIZING)
                 .kfactor(1);
 
-        MeshProber jc  = jcb.bare(true).build();
 
-        HostMessenger hm1 = createHostMessenger(0, jc, false);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.bare(true).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.bare(true).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.bare(true).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -559,11 +558,9 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        MeshProber jc  = jcb.build();
-
-        HostMessenger hm1 = createHostMessenger(0, jc, true);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), true);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
@@ -590,12 +587,11 @@ public class TestHostMessenger {
         hm1.shutdown();
 
         // rejoining node cannot propagate its safe mode or paused demand
-        jc = jcb.nodeState(NodeState.INITIALIZING)
+        jcb.nodeState(NodeState.INITIALIZING)
                 .bare(false)
                 .paused(true)
-                .safeMode(true)
-                .build();
-        hm1 = createHostMessenger(0, jc, true);
+                .safeMode(true);
+        hm1 = createHostMessenger(0, jcb.build(), true);
 
         dtm = prober(hm1).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
@@ -629,11 +625,9 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        MeshProber jc  = jcb.build();
-
-        HostMessenger hm1 = createHostMessenger(0, jc, false);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -660,11 +654,10 @@ public class TestHostMessenger {
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
         hm2.shutdown();
 
-        jc = jcb.nodeState(NodeState.INITIALIZING)
+        jcb.nodeState(NodeState.INITIALIZING)
                 .bare(false)
-                .paused(true)
-                .build();
-        hm2 = createHostMessenger(1, jc, true);
+                .paused(true);
+        hm2 = createHostMessenger(1, jcb.build(), true);
 
         dtm = prober(hm2).waitForDetermination();
         assertEquals(StartAction.LIVE_REJOIN, dtm.startAction);
@@ -700,11 +693,9 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        MeshProber jc  = jcb.build();
-
-        HostMessenger hm1 = createHostMessenger(0, jc, false);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -732,10 +723,9 @@ public class TestHostMessenger {
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
 
-        jc = jcb.nodeState(NodeState.INITIALIZING)
-                .bare(true)
-                .build();
-        HostMessenger hm4 = createHostMessenger(2, jc, false);
+        jcb.nodeState(NodeState.INITIALIZING)
+            .bare(true);
+        HostMessenger hm4 = createHostMessenger(2, jcb.build(), false);
 
         try {
             hm4.start();
@@ -758,11 +748,9 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        MeshProber jc  = jcb.build();
-
-        HostMessenger hm1 = createHostMessenger(0, jc, false);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -790,12 +778,11 @@ public class TestHostMessenger {
 
         assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
 
-        jc = jcb.nodeState(NodeState.INITIALIZING)
+        jcb.nodeState(NodeState.INITIALIZING)
                 .bare(true)
                 .addAllowed(true)
-                .hostCount(5)
-                .build();
-        HostMessenger hm4 = createHostMessenger(3, jc, false);
+                .hostCount(5);
+        HostMessenger hm4 = createHostMessenger(3, jcb.build(), false);
 
         hm4.start();
         dtm = prober(hm4).waitForDetermination();
@@ -834,13 +821,11 @@ public class TestHostMessenger {
                 .paused(false)
                 .bare(true);
 
-        MeshProber jc  = jcb.build();
-
-        HostMessenger hm1 = createHostMessenger(0, jc, false);
-        HostMessenger hm2 = createHostMessenger(1, jc, false);
-        HostMessenger hm3 = createHostMessenger(2, jc, false);
-        HostMessenger hm4 = createHostMessenger(3, jc, false);
-        HostMessenger hm5 = createHostMessenger(4, jc, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
+        HostMessenger hm4 = createHostMessenger(3, jcb.build(), false);
+        HostMessenger hm5 = createHostMessenger(4, jcb.build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -879,11 +864,10 @@ public class TestHostMessenger {
         hm1.shutdown();
         hm3.shutdown();
 
-        jc = jcb.nodeState(NodeState.INITIALIZING)
-                .bare(true)
-                .build();
-        HostMessenger hm6 = createHostMessenger(0, jc, false);
-        HostMessenger hm7 = createHostMessenger(2, jc, false);
+        jcb.nodeState(NodeState.INITIALIZING)
+                .bare(true);
+        HostMessenger hm6 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm7 = createHostMessenger(2, jcb.build(), false);
 
         HostMessengerThread hm6Start = new HostMessengerThread(hm6, exception);
         HostMessengerThread hm7Start = new HostMessengerThread(hm7, exception);
@@ -949,9 +933,9 @@ public class TestHostMessenger {
 
         assertNotSame(jc1.getConfigHash(), jc2.getConfigHash());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -994,9 +978,9 @@ public class TestHostMessenger {
 
         assertNotSame(jc1.getMeshHash(), jc2.getMeshHash());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -1039,9 +1023,9 @@ public class TestHostMessenger {
 
         assertNotSame(jc1.getHostCount(), jc2.getHostCount());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -1085,9 +1069,9 @@ public class TestHostMessenger {
 
         assertNotSame(jc1.isEnterprise(), jc2.isEnterprise());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -1130,9 +1114,9 @@ public class TestHostMessenger {
 
         assertNotSame(jc1.getStartAction(), jc2.getStartAction());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
@@ -1181,9 +1165,9 @@ public class TestHostMessenger {
         assertNotSame(jc1.getHostCount(), jc2.getHostCount());
         assertNotSame(jc1.getConfigHash(), jc2.getConfigHash());
 
-        HostMessenger hm1 = createHostMessenger(0, jc1, false);
-        HostMessenger hm2 = createHostMessenger(1, jc1, false);
-        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
