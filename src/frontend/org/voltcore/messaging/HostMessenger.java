@@ -751,23 +751,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public static class PleaDecision {
-        public final String errMsg;
-        public final boolean accepted;
-        public final boolean mayRetry;
-        public PleaDecision(String errMsg, boolean accepted, boolean mayRetry) {
-            this.errMsg = errMsg;
-            this.accepted = accepted;
-            this.mayRetry = mayRetry;
-        }
-        @Override
-        public String toString() {
-            return "PleaDecision [errMsg=" + errMsg + ", accepted=" + accepted
-                    + ", mayRetry=" + mayRetry + "]";
-        }
-
-    }
-
     /**
      * Any node can serve a request to join. The coordination of generating a new host id
      * is done via ZK
