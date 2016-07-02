@@ -26,7 +26,7 @@ import com.google_voltpatches.common.base.Preconditions;
 public class DRLogSegmentId implements Serializable {
     private static final long serialVersionUID = 2540289527683570995L;
 
-    public static final short MAX_CLUSTER_ID = (1 << 8) - 1;
+    public static final short MAX_CLUSTER_ID = (1 << 7) - 1;
     public static final long MAX_SEQUENCE_NUMBER = (1L << 55) - 1L;
 
     public static final long UNINITIALIZED_SEQUENCE_NUMBER = -1L;
@@ -73,8 +73,29 @@ public class DRLogSegmentId implements Serializable {
         return makeDRIdFromComponents(clusterId, 0L) - 1L;
     }
 
+    /*
+     * Empty DR Id is used as a sentinel
+     * 1) in EndOfSnapshotBuffer to indicate the partition doesn't have any snapshot buffer,
+     * 2) in registerLastAckedSegmentId() when the partition has no tracker to recover.
+     *
+     * Empty DR Id has the highest significant bit been set, but there is one exception that
+     * if all bits are set then it belongs to cluster 0's Initial Ack DR Id, not Empty DR Id
+     * for cluster 255.
+     */
     public static boolean isEmptyDRId (long drId) {
-        return (drId >>> 63) == 1L;
+        return ((drId >>> 63) == 1L) && (drId != -1);
+    }
+
+    /*
+     * Initial Ack DR Id is used as initial value for DR Idempotency filter
+     */
+    public static boolean isInitialAckDRId(long drId) {
+        if (drId == -1) return true;
+        int clusterId = getClusterIdFromDRId(drId);
+        if (clusterId >= 0 && clusterId <= MAX_CLUSTER_ID) {
+            return ((drId >>> 63) != 1L) && (getSequenceNumberFromDRId(drId) == MAX_SEQUENCE_NUMBER);
+        }
+        return false;
     }
 
     public static boolean seqIsBeforeZero(long drId) {
@@ -94,6 +115,18 @@ public class DRLogSegmentId implements Serializable {
     }
 
     public static String getDebugStringFromDRId(long drId) {
+        if (drId == Long.MAX_VALUE) {
+            return "QUEUE EMPTY";
+        }
+        if (isEmptyDRId(drId)) {
+            return String.format("%d:Empty DR ID", getClusterIdFromDRId(drId));
+        }
+        if (isInitialAckDRId(drId)) {
+            if (drId == -1) {
+                return "0:Init Ack ID";
+            }
+            return String.format("%d:Init Ack ID", getClusterIdFromDRId(drId) + 1);
+        }
         return String.format("%d:%d", getClusterIdFromDRId(drId), getSequenceNumberFromDRId(drId));
     }
 
