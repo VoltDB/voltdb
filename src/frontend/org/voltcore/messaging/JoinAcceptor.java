@@ -156,4 +156,9 @@ public interface JoinAcceptor extends JSONString {
         return HostAndPort.fromString(getCoordinators().first())
                 .withDefaultPort(org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
     }
+
+    @Override
+    default String toJSONString() {
+        return "{}";
+    }
 }

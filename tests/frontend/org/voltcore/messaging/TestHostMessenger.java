@@ -33,11 +33,13 @@ import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
+import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -120,9 +122,11 @@ public class TestHostMessenger {
                 .toArray(s -> new String[s]);
     }
 
-    private HostMessenger createHostMessenger(int index, MeshProber jc,
+    private HostMessenger createHostMessenger(int index, JoinAcceptor jc,
             boolean start)  throws Exception {
-        assertTrue("index is bigger than hostcount", index < jc.getHostCount());
+        if (jc instanceof MeshProber) {
+            assertTrue("index is bigger than hostcount", index < ((MeshProber)jc).getHostCount());
+        }
         final HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
@@ -1047,6 +1051,65 @@ public class TestHostMessenger {
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
             assertTrue(VoltDB.crashMessage.contains("Mismatched host count"));
+        }
+    }
+
+    @Test
+    public void testProbedJoinerAcceptorMismatchCrash() throws Exception {
+        VoltDB.ignoreCrash = true;
+
+        MeshProber.Builder jcb = MeshProber.builder()
+                .coordinators(coordinators(2))
+                .hostCount(3)
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .kfactor(1)
+                .paused(false)
+                .bare(true);
+
+        MeshProber jc1 = jcb.build();
+        JoinAcceptor jc2 = new JoinAcceptor() {
+            @Override
+            public void detract(Set<Integer> hostIds) {
+            }
+
+            @Override
+            public void detract(int hostId) {
+            }
+
+            @Override
+            public void accrue(Map<Integer, JSONObject> jos) {
+            }
+
+            @Override
+            public void accrue(int hostId, JSONObject jo) {
+            }
+        };
+
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jc2, false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+
+        hm1Start.start();
+        hm2Start.start();
+
+        hm1Start.join();
+        hm2Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        try {
+            hm3.start();
+            fail("did not crash on whole cluster rejoin attempt");
+        } catch (AssertionError pass) {
+            assertTrue(VoltDB.wasCrashCalled);
+            assertTrue(VoltDB.crashMessage.contains("is incompatible with this node verion"));
         }
     }
 
