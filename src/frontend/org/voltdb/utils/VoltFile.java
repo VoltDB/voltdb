@@ -131,42 +131,44 @@ public class VoltFile extends File {
         assert(fromSubRoot.exists() && fromSubRoot.isDirectory());
         assert(toSubRoot.exists() && toSubRoot.isDirectory());
 
-        for (File f : fromSubRoot.listFiles()) {
-            File fInOtherSubroot = new File(toSubRoot, f.getName());
+        for (File file : fromSubRoot.listFiles()) {
+            File fInOtherSubroot = new File(toSubRoot, file.getName());
 
-            if (f.isDirectory()) {
+            if (file.isDirectory()) {
                 if (!fInOtherSubroot.exists()) {
                     if (!fInOtherSubroot.mkdir()) {
                         throw new IOException("Can't create directory " + fInOtherSubroot);
                     }
                 }
-                moveSubRootContents( f, fInOtherSubroot);
-            } else {
-                if (!fInOtherSubroot.exists()) {
-                    if (!fInOtherSubroot.createNewFile()) {
-                        throw new IOException();
-                    }
-
-                    FileInputStream fis = new FileInputStream(f);
-                    FileOutputStream fos = new FileOutputStream(fInOtherSubroot);
-                    FileChannel inputChannel = fis.getChannel();
-                    FileChannel outputChannel = fos.getChannel();
-                    BBContainer bufC = DBBPool.allocateDirect(8192);
-                    ByteBuffer buf = bufC.b();
-
-                    try {
-                        while (inputChannel.read(buf) != -1) {
-                            buf.flip();
-                            outputChannel.write(buf);
-                            buf.clear();
-                        }
-                        inputChannel.close();
-                        outputChannel.close();
-                    } finally {
-                        bufC.discard();
-                    }
-                } else {
+                moveSubRootContents(file, fInOtherSubroot);
+            }
+            else {
+                if (fInOtherSubroot.exists()) {
                     throw new IOException(fInOtherSubroot + " already exists");
+                }
+                if (!fInOtherSubroot.createNewFile()) {
+                    throw new IOException();
+                }
+
+                FileInputStream fis = new FileInputStream(file);
+                FileOutputStream fos = new FileOutputStream(fInOtherSubroot);
+                FileChannel inputChannel = fis.getChannel();
+                FileChannel outputChannel = fos.getChannel();
+                BBContainer bufC = DBBPool.allocateDirect(8192);
+                ByteBuffer buf = bufC.b();
+
+                try {
+                    while (inputChannel.read(buf) != -1) {
+                        buf.flip();
+                        outputChannel.write(buf);
+                        buf.clear();
+                    }
+                }
+                finally {
+                    // These calls to close() also close the channels.
+                    fis.close();
+                    fos.close();
+                    bufC.discard();
                 }
             }
         }
@@ -197,11 +199,10 @@ public class VoltFile extends File {
 
         if (deleteRoot) {
             recursivelyDelete(file);
-        } else {
-            if (file.isDirectory()) {
-                for (File f : file.listFiles()) {
-                    recursivelyDelete(f);
-                }
+        }
+        else if (file.isDirectory()) {
+            for (File f : file.listFiles()) {
+                recursivelyDelete(f);
             }
         }
     }
@@ -209,7 +210,7 @@ public class VoltFile extends File {
     /*
      * One of those why doesn't Java ship with this functions
      */
-    public static void recursivelyDelete(File f) throws IOException  {
+    public static void recursivelyDelete(File f) throws IOException {
         if (!f.exists()) {
             return;
         }
@@ -220,7 +221,8 @@ public class VoltFile extends File {
             if (!f.delete()) {
                 throw new IOException("Unable to delete directory " + f);
             }
-        } else {
+        }
+        else {
             if (!f.delete()) {
                 throw new IOException("Unable to delete file " + f);
             }
@@ -245,9 +247,8 @@ public class VoltFile extends File {
     public static String removeTestPrefix(final String path) {
         if (isTestPath(path)) {
             return path.substring(m_voltFilePrefix.getAbsolutePath().length());
-        } else {
-            return path;
         }
+        return path;
     }
 
     /*
