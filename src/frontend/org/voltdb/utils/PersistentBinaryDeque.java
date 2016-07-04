@@ -60,7 +60,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                   @Override
                   public synchronized void discard() {
-                      final ByteBuffer buf = checkDoubleFree();
+                      checkDoubleFree();
                       if (discarded) {
                           LOG.error("Avoided double discard in PBD");
                           return;
