@@ -60,7 +60,8 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         String literalSchema =
                 "CREATE TABLE T (\n"
                 + "  A INTEGER,"
-                + "  B INTEGER"
+                + "  B INTEGER,"
+                + "  C INTEGER"
                 + ");\n"
                 ;
         project.addLiteralSchema(literalSchema);
@@ -72,28 +73,31 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         Client client = getClient();
 
         long expected[][] = new long[][] {
-                {  1,  1, 1 },
-                {  1,  2, 2 },
-                {  2, 10, 1 },
-                {  2, 10, 2 },
-                {  2, 11, 3 },
-                {  3, 10, 1 }
+                {  1L,  1L,  101L, 1L },
+                {  1L,  1L,  102L, 1L },
+                {  1L,  2L,  201L, 3L },
+                {  1L,  2L,  202L, 3L },
+                {  1L,  3L,  203L, 5L },
+                {  2L,  1L, 1101L, 1L },
+                {  2L,  1L, 1102L, 1L },
+                {  2L,  2L, 1201L, 3L },
+                {  2L,  2L, 1202L, 3L },
+                {  2L,  3L, 1203L, 5L },
+                { 20L,  1L, 2101L, 1L },
+                { 20L,  1L, 2102L, 1L },
+                { 20L,  2L, 2201L, 3L },
+                { 20L,  2L, 2202L, 3L },
+                { 20L,  3L, 2203L, 5L },
         };
-        long input[][] = new long[][] {
-                {  3, 10, 1 },
-                {  1,  2, 2 },
-                {  2, 11, 3 },
-                {  2, 10, 1 },
-                {  1,  1, 1 },
-                {  2, 10, 2 }
-        };
+        long input[][] = expected.clone();
+        shuffleArrayOfLongs(input);
         ClientResponse cr;
         VoltTable vt;
         for (long [] row : input) {
-            cr = client.callProcedure("T.insert", row[0], row[1]);
+            cr = client.callProcedure("T.insert", row[0], row[1], row[2]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
-        String sql = "select A, B, rank() over (partition by A order by B) from T;";
+        String sql = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];

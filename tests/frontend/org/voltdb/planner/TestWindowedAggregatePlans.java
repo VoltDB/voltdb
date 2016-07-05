@@ -108,7 +108,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
     }
 
     public void testRankWithSubqueries() {
-        AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A, B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
+        AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
         // Dissect the plan.
         assertTrue(node instanceof SendPlanNode);
         AbstractPlanNode projectionPlanNode = node.getChild(0);
@@ -123,8 +123,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
         assertNotNull(input_schema);
         OrderByPlanNode orderByPlanNode = (OrderByPlanNode)orderByPlanNodeBase;
         verifyOrderByPlanNode(orderByPlanNode,
-                              "A", SortDirectionType.ASC,
-                              "B", SortDirectionType.ASC);
+                              "A", SortDirectionType.ASC);
 
         AbstractPlanNode scanNode = orderByPlanNodeBase.getChild(0);
         assertTrue(scanNode instanceof NestLoopPlanNode);
@@ -142,8 +141,8 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
                       "FROM AAA;",
                       "At most one windowed display column is supported.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Aggregate Windowed Expressions With Range " +
-                      "Window Frame Units Can Have Only One Order By Expression.");
+                      "Aggregate windowed expressions with range " +
+                      "window frame units can have only one order by expression.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
                       "Aggregate windowed expressions with RANGE " +
                       "window frame units can have only integer or TIMESTAMP value types.");

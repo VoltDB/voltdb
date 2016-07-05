@@ -739,8 +739,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 if (orderByExpressions.size() > 1) {
                     // This is perhaps slightly misleading, since we will not
                     // offer syntax for selecting any other units.
-                    throw new PlanningErrorException("Aggregate Windowed Expressions With Range " +
-                                                     "Window Frame Units Can Have Only One Order By Expression.");
+                    throw new PlanningErrorException("Aggregate windowed expressions with range " +
+                                                     "window frame units can have only one order by expression.");
                 }
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
