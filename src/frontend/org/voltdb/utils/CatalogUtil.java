@@ -620,6 +620,13 @@ public abstract class CatalogUtil {
         return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
+    public static String compileDeployment(Catalog catalog,
+            DeploymentType deployment,
+            boolean isPlaceHolderCatalog)
+    {
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, false);
+    }
+
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
@@ -629,7 +636,7 @@ public abstract class CatalogUtil {
      */
     public static String compileDeployment(Catalog catalog,
             DeploymentType deployment,
-            boolean isPlaceHolderCatalog)
+            boolean isPlaceHolderCatalog, boolean startUp)
     {
         String errmsg = null;
 
@@ -659,7 +666,7 @@ public abstract class CatalogUtil {
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
             if (!isPlaceHolderCatalog) {
-                setUsersInfo(catalog, deployment.getUsers());
+                setUsersInfo(catalog, deployment.getUsers(), startUp);
             }
 
             // set the HTTPD info
@@ -1837,11 +1844,10 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param users A reference to the <users> element of the deployment.xml file.
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users) {
+    private static void setUsersInfo(Catalog catalog, UsersType users, boolean startUp) {
         if (users == null) {
             return;
         }
-
         // The database name is not available in deployment.xml (it is defined
         // in project.xml). However, it must always be named "database", so
         // I've temporarily hardcoded it here until a more robust solution is
@@ -1862,7 +1868,12 @@ public abstract class CatalogUtil {
                 sha256hex = sha256hex.substring(sha1len);
             } else {
                 BAD_PASSWORD_WARN = "Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.";
-                hostLog.warn(BAD_PASSWORD_WARN);
+                if (startUp) {
+                    hostLog.fatal(BAD_PASSWORD_WARN);
+                    System.exit(-1);
+                } else {
+                    hostLog.warn(BAD_PASSWORD_WARN);
+                }
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
