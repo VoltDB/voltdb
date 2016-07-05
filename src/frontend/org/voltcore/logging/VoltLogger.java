@@ -110,7 +110,6 @@ public class VoltLogger {
                         public void run() {}
                     }).get();
                 } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
                 }
             }
         }

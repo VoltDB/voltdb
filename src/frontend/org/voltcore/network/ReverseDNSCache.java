@@ -75,8 +75,9 @@ public class ReverseDNSCache {
         }
     }
 
-    public static synchronized void close() {
+    public static synchronized void close() throws InterruptedException{
         m_es.shutdown();
+        m_es.awaitTermination(1, TimeUnit.SECONDS);
         m_es = null;
     }
 
