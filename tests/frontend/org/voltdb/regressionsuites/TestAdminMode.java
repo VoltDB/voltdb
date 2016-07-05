@@ -187,7 +187,7 @@ public class TestAdminMode extends RegressionSuite
         }
     }
 
- // Somewhat hacky test of the LIVECLIENTS @Statistics selector
+    // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
         if (isValgrind()) {
