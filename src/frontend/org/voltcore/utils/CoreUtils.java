@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -60,7 +61,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
-import org.voltdb.utils.CLibrary;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
@@ -1153,6 +1153,18 @@ public class CoreUtils {
     }
 
     /**
+     * @return the process pid if is available from the JVM's runtime bean
+     */
+    public static String getPID() {
+        String name = ManagementFactory.getRuntimeMXBean().getName();
+        int atat = name.indexOf('@');
+        if (atat == -1) {
+            return "(unavailable)";
+        }
+        return name.substring(0, atat);
+    }
+
+    /**
      * Log (to the fatal logger) the list of ports in use.
      * Uses "lsof -i" internally.
      *
@@ -1172,7 +1184,7 @@ public class CoreUtils {
             log.fatal("Logging ports that are bound for listening, " +
                       "this doesn't include ports bound by outgoing connections " +
                       "which can also cause a failure to bind");
-            log.fatal("The PID of this process is " + CLibrary.getpid());
+            log.fatal("The PID of this process is " + getPID());
             if (str != null) {
                 log.fatal(str);
             }
