@@ -26,6 +26,7 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.common.Constants;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
@@ -111,7 +112,7 @@ public class ServerThread extends Thread {
             int internalPort,
             int zkPort,
             BackendTarget target) {
-        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
+        this(pathToCatalog, pathToDeployment, Constants.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
     }
 
     private ServerThread(String pathToCatalog,

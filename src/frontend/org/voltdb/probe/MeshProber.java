@@ -21,7 +21,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
-import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
 
 import java.net.InetAddress;
 import java.util.Arrays;
@@ -42,6 +41,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.json_voltpatches.JSONWriter;
+import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.JoinAcceptor;
@@ -100,13 +100,13 @@ public class MeshProber implements JoinAcceptor {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
             return ImmutableSortedSet.of(
-                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
+                    HostAndPort.fromParts("", Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         Splitter commaSplitter = Splitter.on(',').omitEmptyStrings().trimResults();
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (String h: commaSplitter.split(option)) {
             checkArgument(isValidCoordinatorSpec(h), "%s is not a valid host spec", h);
-            sbld.add(HostAndPort.fromString(h).withDefaultPort(DEFAULT_INTERNAL_PORT).toString());
+            sbld.add(HostAndPort.fromString(h).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         return sbld.build();
     }
@@ -114,7 +114,7 @@ public class MeshProber implements JoinAcceptor {
     public static ImmutableSortedSet<String> hosts(int...ports) {
         if (ports.length == 0) {
             return ImmutableSortedSet.of(
-                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
+                    HostAndPort.fromParts("", Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (int p: ports) {
@@ -134,7 +134,7 @@ public class MeshProber implements JoinAcceptor {
 
         final HostAndPort parsedHost = HostAndPort
                 .fromString(specifier)
-                .withDefaultPort(DEFAULT_INTERNAL_PORT);
+                .withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
         final String host = parsedHost.getHostText();
         if (host.isEmpty()) {
             return true;
@@ -238,7 +238,7 @@ public class MeshProber implements JoinAcceptor {
 
     @Override
     public HostAndPort getLeader() {
-        return HostAndPort.fromString(m_coordinators.first()).withDefaultPort(DEFAULT_INTERNAL_PORT);
+        return HostAndPort.fromString(m_coordinators.first()).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
     }
 
     @Override

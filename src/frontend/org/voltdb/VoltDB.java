@@ -63,11 +63,8 @@ public class VoltDB {
     public static final int UNDEFINED = Constants.UNDEFINED;
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
-    public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
-    public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
@@ -151,7 +148,7 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        public String m_zkInterface = "127.0.0.1:" + VoltDB.DEFAULT_ZK_PORT;
+        public String m_zkInterface = "127.0.0.1:" + org.voltcore.common.Constants.DEFAULT_ZK_PORT;
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
@@ -165,13 +162,13 @@ public class VoltDB {
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
 
         /** port number to use to build intra-cluster mesh */
-        public int m_internalPort = DEFAULT_INTERNAL_PORT;
+        public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
 
         /** interface to listen to clients on (default: any) */
         public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
 
         /** interface to use for backchannel comm (default: any) */
-        public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
+        public String m_internalInterface = org.voltcore.common.Constants.DEFAULT_INTERNAL_INTERFACE;
 
         /** port number to use for DR channel (override in the deployment file) */
         public int m_drAgentPortStart = DISABLED_PORT;
@@ -292,7 +289,7 @@ public class VoltDB {
         public boolean m_safeMode = false;
 
         public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
+            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
         }
 
         public Configuration(PortGenerator ports) {
@@ -404,7 +401,7 @@ public class VoltDB {
                     //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
                         m_zkInterface = hap.getHostText() + ":" + hap.getPort();
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();

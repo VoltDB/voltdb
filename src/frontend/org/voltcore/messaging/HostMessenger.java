@@ -146,7 +146,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public Config() {
-            this(null, org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
+            this(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
             acceptor = org.voltdb.probe.MeshProber.builder()
                     .coordinators(":" + internalPort)
                     .build();
@@ -167,7 +167,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             String [] coordinators = new String[hostCount];
 
             for (int i = 0; i < hostCount; ++i) {
-                Config cnf = new Config(null, org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
+                Config cnf = new Config(null, org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
                 cnf.zkInterface = "127.0.0.1:" + ports.next();
                 cnf.internalPort = ports.next();
                 coordinators[i] = ":" + cnf.internalPort;
@@ -190,7 +190,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public int getZKPort() {
             return HostAndPort.fromString(zkInterface)
-                    .getPortOrDefault(org.voltdb.VoltDB.DEFAULT_ZK_PORT);
+                    .getPortOrDefault(org.voltcore.common.Constants.DEFAULT_ZK_PORT);
         }
 
         private void initNetworkThreads() {

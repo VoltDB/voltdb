@@ -49,9 +49,9 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.common.Constants;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.StartAction;
-import org.voltdb.VoltDB;
 import org.voltdb.probe.MeshProber;
 
 public class TestZK extends ZKTestBase {
@@ -64,7 +64,7 @@ public class TestZK extends ZKTestBase {
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
         coordinators = IntStream.range(0, NUM_AGREEMENT_SITES)
-                .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
+                .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
         criteria = MeshProber.builder()
                 .coordinators(coordinators)
