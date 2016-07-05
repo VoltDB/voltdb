@@ -22,12 +22,15 @@
  */
 package org.voltdb.regressionsuites;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
@@ -41,6 +44,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -122,6 +127,8 @@ public class LocalCluster implements VoltServerConfig {
 
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    private InternalPortGeneratorForTest internalPortGenerator;
+    private int numberOfCoordinators = 1;
     private String m_voltdbroot = "";
     private VoltFile m_filePrefix;
 
@@ -220,9 +227,12 @@ public class LocalCluster implements VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        assert (jarFileName != null);
-        assert (siteCount > 0);
-        assert (hostCount > 0);
+        assert jarFileName != null : "jar file name is null";
+        assert siteCount > 0 : "site count is less than 0";
+        assert hostCount > 0 : "host count is less than 0";
+
+        numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
         m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
         if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
@@ -436,6 +446,9 @@ public class LocalCluster implements VoltServerConfig {
     public void setHostCount(int hostCount)
     {
         m_hostCount = hostCount;
+        if (hostCount < numberOfCoordinators) {
+            numberOfCoordinators = hostCount;
+        }
         // Force recompilation
         m_compiled = false;
     }
@@ -478,9 +491,9 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
-        cmdln.internalPort(portGenerator.nextInternalPort());
         cmdln.voltFilePrefix(subroot.getPath());
-        cmdln.internalPort(portGenerator.nextInternalPort());
+        cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
+        cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
@@ -609,7 +622,10 @@ public class LocalCluster implements VoltServerConfig {
         // reset the port generator. RegressionSuite always expects
         // to find ClientInterface and Admin mode on known ports.
         portGenerator.reset();
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
+
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
+        templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
 
         m_eeProcs.clear();
         for (int ii = 0; ii < m_hostCount; ii++) {
@@ -726,7 +742,8 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         try {
-            cmdln.internalPort(portGenerator.nextInternalPort());
+            cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
+            cmdln.coordinators(internalPortGenerator.getCoordinators());
             if (m_replicationPort != -1) {
                 int index = m_hasLocalServer ? hostId + 1 : hostId;
                 cmdln.drAgentStartPort(m_replicationPort + index);
@@ -765,6 +782,7 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.startCommand(startAction);
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
+                cmdln.enableAdd(true);
             }
 
             // If local directories are being cleared
@@ -871,6 +889,13 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
+    public void setNumberOfCoordinators(int i) {
+        checkArgument(i > 0 && i <= m_hostCount,
+                "coordinators count %s must be greater than 0, and less or equal to host count %s",
+                i, m_hostCount);
+        numberOfCoordinators = i;
+    }
+
     /**
      * Use the weird portable java way to figure out if a cluster is alive
      */
@@ -962,7 +987,8 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
             rejoinCmdLn.m_httpPort = portGenerator.nextHttp();
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
-            rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
+            rejoinCmdLn.m_internalPort = internalPortGenerator.nextInternalPort(hostId);
+            rejoinCmdLn.m_coordinators = internalPortGenerator.getCoordinators();
             setPortsFromConfig(hostId, rejoinCmdLn);
             if (this.m_additionalProcessEnv != null) {
                 for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -1423,6 +1449,10 @@ public class LocalCluster implements VoltServerConfig {
         return m_cmdLines.get(hostId).internalPort();
     }
 
+    public NavigableSet<String> coordinators(int hostId) {
+        return m_cmdLines.get(hostId).coordinators();
+    }
+
     public int port(int hostId) {
         return m_cmdLines.get(hostId).port();
     }
@@ -1439,6 +1469,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
         cl.m_leader = config.m_leader;
+        cl.m_coordinators = ImmutableSortedSet.copyOf(cl.m_coordinators);
     }
 
     public static boolean isMemcheckDefined() {

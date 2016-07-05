@@ -27,6 +27,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKTestBase;
 
 import static org.junit.Assert.assertEquals;
@@ -59,17 +60,17 @@ public class TestVoltZK extends ZKTestBase {
     public void testRejoinBlocker()
     {
         // Create a rejoin blocker for host 0
-        assertEquals(-1, VoltZK.createRejoinNodeIndicator(m_zk, 0));
+        assertEquals(-1, CoreZK.createRejoinNodeIndicator(m_zk, 0));
         // Try to create a blocker for host 1 while host 0 is still in progress, should fail
-        assertEquals(0, VoltZK.createRejoinNodeIndicator(m_zk, 1));
+        assertEquals(0, CoreZK.createRejoinNodeIndicator(m_zk, 1));
         // Try removing the blocker for host 1, which doesn't hold the blocker, no-op
-        assertFalse(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 1));
+        assertFalse(CoreZK.removeRejoinNodeIndicatorForHost(m_zk, 1));
         // Remove host 0's blocker
-        assertTrue(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 0));
+        assertTrue(CoreZK.removeRejoinNodeIndicatorForHost(m_zk, 0));
         // Should be able to create another blocker now
-        assertEquals(-1, VoltZK.createRejoinNodeIndicator(m_zk, 2));
-        assertTrue(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
+        assertEquals(-1, CoreZK.createRejoinNodeIndicator(m_zk, 2));
+        assertTrue(CoreZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
         // Removing the same hostId twice should be okay
-        assertTrue(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
+        assertTrue(CoreZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
     }
 }

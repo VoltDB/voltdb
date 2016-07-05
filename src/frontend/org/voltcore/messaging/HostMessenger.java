@@ -17,6 +17,12 @@
 
 package org.voltcore.messaging;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.base.Predicates.equalTo;
+import static com.google_voltpatches.common.base.Predicates.not;
+import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
+import static org.voltdb.VoltDB.DEFAULT_ZK_PORT;
+
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -24,6 +30,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,8 +47,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -60,15 +69,20 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB;
+import org.voltdb.StartAction;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -83,19 +97,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
-
-    /**
-     * Callback for making decision on whether a new node can join the cluster.
-     */
-    public interface MembershipAcceptor {
-        /**
-         * @param hostId     The new host trying to join the mesh
-         * @param request    The requested action from the node joining the mesh
-         * @param errMsg     Error message to send to the new host
-         * @return true if the new host can join the mesh, false otherwise.
-         */
-        boolean shouldAccept(int hostId, String request, StringBuilder errMsg);
-    }
 
     /**
      * Callback for watching for host failures.
@@ -128,7 +129,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
-        public AtomicBoolean isPaused = new AtomicBoolean(false);
+        public JoinerCriteria criteria = null;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -140,13 +141,43 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public Config() {
-            this(null, 3021);
+            this(null, DEFAULT_INTERNAL_PORT);
+            criteria = JoinerCriteria.builder()
+                    .coordinators(":" + internalPort)
+                    .build();
         }
 
-        public Config(PortGenerator ports) {
-            this(null, 3021);
-            zkInterface = "127.0.0.1:" + ports.next();
-            internalPort = ports.next();
+        public static List<Config> generate(PortGenerator ports, int hostCount) {
+            checkArgument(ports != null, "port generator is null");
+            checkArgument(hostCount > 0, "host count %s is not greater than 0", hostCount);
+
+            ImmutableList.Builder<Config> lbld = ImmutableList.builder();
+            String [] coordinators = new String[hostCount];
+
+            for (int i = 0; i < hostCount; ++i) {
+                Config cnf = new Config(null, DEFAULT_INTERNAL_PORT);
+                cnf.zkInterface = "127.0.0.1:" + ports.next();
+                cnf.internalPort = ports.next();
+                coordinators[i] = ":" + cnf.internalPort;
+                lbld.add(cnf);
+            }
+
+            List<Config> configs = lbld.build();
+            JoinerCriteria jc = JoinerCriteria.builder()
+                    .startAction(StartAction.PROBE)
+                    .hostCount(hostCount)
+                    .coordinators(coordinators)
+                    .build();
+
+            for (Config cnf: configs) {
+                cnf.criteria = jc;
+            }
+
+            return configs;
+        }
+
+        public int getZKPort() {
+            return MiscUtils.getPortFromHostnameColonPort(zkInterface, DEFAULT_ZK_PORT);
         }
 
         private void initNetworkThreads() {
@@ -176,6 +207,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 js.key("deadhosttimeout").value(deadHostTimeout);
                 js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
                 js.key("networkThreads").value(networkThreads);
+                js.key("criteria");
+                if (criteria != null) {
+                    criteria.appendTo(js);
+                } else {
+                    js.value(null);
+                }
                 js.endObject();
 
                 return js.toString();
@@ -244,7 +281,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(false);
     private boolean m_partitionDetected = false;
 
-    private final MembershipAcceptor m_membershipAcceptor;
     private final HostWatcher m_hostWatcher;
 
     private final Object m_mapLock = new Object();
@@ -254,6 +290,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Updates via COW
      */
     volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
+
+    /*
+     * holder of host criteria used to determine start action
+     */
+    volatile ImmutableMap<Integer, HostCriteria> m_hostCriteria = ImmutableMap.of();
 
     /*
      * References to all the local mailboxes
@@ -270,6 +311,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
+    private final AtomicBoolean m_paused = new AtomicBoolean(false);
+
+    /*
+     * on probe startup mode this future is set when there are enough
+     * hosts to matched the configured cluster size
+     */
+    private final SettableFuture<Determination> m_probedDetermination =
+            SettableFuture.create();
+
+    /*
+     * Holds values that help in the determination of a probed
+     * startup action
+     */
+    private final JoinerCriteria m_criteria;
 
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get(hsId);
@@ -284,15 +339,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param membershipAcceptor
      * @param m_hostWatcher
      */
-    public HostMessenger(Config config, MembershipAcceptor membershipAcceptor, HostWatcher hostWatcher) {
+    public HostMessenger(Config config, HostWatcher hostWatcher) {
         m_config = config;
-        m_membershipAcceptor = membershipAcceptor;
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
+        m_paused.set(m_config.criteria.isPaused());
+        m_criteria = config.criteria;
         m_joiner = new SocketJoiner(
-                m_config.coordinatorIp,
                 m_config.internalInterface,
-                m_config.internalPort, m_config.isPaused,
+                m_config.internalPort,
+                m_paused,
+                m_criteria,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
@@ -415,7 +472,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (makePPDDecision(m_localHostId, previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
             // record here so we can ensure this only happens once for this node
             m_partitionDetected = true;
-            VoltDB.crashLocalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
+            org.voltdb.VoltDB.crashLocalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
                         false, null);
         }
     }
@@ -430,9 +487,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 // one viable cluster is running.
                 // This feature is called "Partition Detection" in the docs.
                 doPartitionDetectionActivities(failedHostIds);
+                addFailedHosts(failedHostIds);
 
                 for (int hostId: failedHostIds) {
-                    addFailedHost(hostId);
                     removeForeignHost(hostId);
                     if (!m_shuttingDown) {
                         // info to avoid printing on the console more than once
@@ -440,7 +497,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
                 }
-
+                removeCriteria(failedHostIds);
                 // notifying any watchers who are interested in failure -- used
                 // initially to do ZK cleanup when rejoining nodes die
                 if (m_hostWatcher != null) {
@@ -450,15 +507,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     };
 
+    private final void addFailedHosts(Set<Integer> rip) {
+        synchronized (m_mapLock) {
+            m_knownFailedHosts = ImmutableSet.<Integer>builder()
+                    .addAll(Sets.filter(m_knownFailedHosts, not(in(rip))))
+                    .addAll(rip)
+                    .build();
+        }
+    }
+
     private final void addFailedHost(int hostId) {
         if (!m_knownFailedHosts.contains(hostId)) {
             synchronized (m_mapLock) {
-                if (!m_knownFailedHosts.contains(hostId)) {
-                    ImmutableSet.Builder<Integer> b = ImmutableSet.builder();
-                    b.addAll(m_knownFailedHosts);
-                    b.add(hostId);
-                    m_knownFailedHosts = b.build();
-                }
+                m_knownFailedHosts = ImmutableSet.<Integer>builder()
+                        .addAll(Sets.filter(m_knownFailedHosts, not(equalTo(hostId))))
+                        .build();
             }
         }
     }
@@ -505,7 +568,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * live hosts. The live hosts can use this request string to make further
      * decision on whether or not to accept the request.
      */
-    public void start(String request) throws Exception {
+    public void start() throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -516,7 +579,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * If start returns true then this node is the leader, it bound to the coordinator address
          * It needs to bootstrap its agreement site so that other nodes can join
          */
-        if(m_joiner.start(zkInitBarrier, request)) {
+        if(m_joiner.start(zkInitBarrier)) {
             m_network.start();
 
             /*
@@ -570,6 +633,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 org.voltdb.VoltDB.crashLocalVoltDB("Selected host id for coordinator was not 0, " + selectedHostId, false, null);
             }
 
+            /*
+             * seed the leader host criteria ad leader is always host id 0
+             */
+            putCriteria(selectedHostId, m_criteria.asHostCriteria(m_paused.get()));
+            determineStartActionIfNecessary();
+
             // Store the components of the instance ID in ZK
             JSONObject instance_id = new JSONObject();
             instance_id.put("coord",
@@ -587,6 +656,57 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
+    }
+
+    private PleaDecision considerMeshPlea(int hostId, HostCriteria hc) {
+        if (   !m_criteria.getNodeState().operational()
+            && !m_hostCriteria.values().stream().anyMatch(c->c.getNodeState().operational())) {
+            List<String> incompatibilities = m_criteria
+                    .asHostCriteria()
+                    .listIncompatibilities(hc);
+            if (!incompatibilities.isEmpty()) {
+                Joiner joiner = Joiner.on("\n    ").skipNulls();
+                String error = "Incompatible joining criteria:\n    "
+                        + joiner.join(incompatibilities);
+                return new PleaDecision(error, false, false);
+            }
+            return new PleaDecision(null, true, false);
+        }
+        Stat stat = new Stat();
+        try {
+            m_zk.getChildren(CoreZK.hosts, false, stat);
+        } catch (InterruptedException e) {
+            String msg = "Interrupted while considering mesh plea";
+            m_networkLog.error(msg, e);
+            return new PleaDecision(msg, false, false);
+        } catch (KeeperException e) {
+            EnumSet<KeeperException.Code> closing = EnumSet.of(
+                    KeeperException.Code.SESSIONEXPIRED,
+                    KeeperException.Code.CONNECTIONLOSS);
+            if (closing.contains(e.code())) {
+                return new PleaDecision("Shutting down", false, false);
+            } else {
+                String msg = "Failed to list hosts while considering a mesh plea";
+                m_networkLog.error(msg, e);
+                return new PleaDecision(msg, false, false);
+            }
+        }
+        if (stat.getNumChildren() >= m_criteria.getHostCount()) {
+            return new PleaDecision(
+                    hc.isAddAllowed()? null : "Cluster is already whole",
+                    hc.isAddAllowed(), false);
+        } else if (stat.getNumChildren() < m_criteria.getHostCount()) {
+            final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_zk, hostId);
+
+            if (rejoiningHost == -1) {
+                return new PleaDecision(null, true, false);
+            } else {
+                String msg = "Only one host can rejoin at a time. Host "
+                      + rejoiningHost + " is still rejoining.";
+                return new PleaDecision(msg, false, true);
+            }
+        }
+        return new PleaDecision(null, true, false);
     }
 
     /*
@@ -633,7 +753,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * and put it in the map of foreign hosts
      */
     @Override
-    public void notifyOfJoin(int hostId, SocketChannel socket, InetSocketAddress listeningAddress) {
+    public void notifyOfJoin(
+            int hostId, SocketChannel socket,
+            InetSocketAddress listeningAddress,
+            HostCriteria joinerCriteria) {
         m_networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
@@ -644,11 +767,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
-    }
-
-    @Override
-    public void notifyAsPaused() {
-        m_config.isPaused.set(true);
+        putCriteria(hostId, joinerCriteria);
+        determineStartActionIfNecessary();
     }
 
     /*
@@ -668,10 +788,53 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
         synchronized (m_mapLock) {
-            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
-            b.putAll(m_foreignHosts);
-            b.put(hostId, fh);
-            m_foreignHosts = b.build();
+            m_foreignHosts = ImmutableMap.<Integer, ForeignHost>builder()
+                    .putAll(m_foreignHosts)
+                    .put(hostId, fh)
+                    .build();
+        }
+    }
+
+    static final Predicate<Integer> in(final Set<Integer> set) {
+        return new Predicate<Integer>() {
+            @Override
+            public boolean apply(Integer input) {
+                return set.contains(input);
+            }
+        };
+    }
+
+    private void putAllCriteria(Map<Integer,HostCriteria> criteria) {
+        synchronized(m_mapLock) {
+            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
+                    .putAll(Maps.filterKeys(m_hostCriteria, not(in(criteria.keySet()))))
+                    .putAll(criteria)
+                    .build();
+        }
+    }
+
+    private void putCriteria(int hostId, HostCriteria criteria) {
+        synchronized(m_mapLock) {
+            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
+                    .putAll(Maps.filterKeys(m_hostCriteria, not(equalTo(hostId))))
+                    .put(hostId, criteria)
+                    .build();
+        }
+    }
+
+    private void removeCriteria(Set<Integer> rip) {
+        synchronized (m_mapLock) {
+            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
+                    .putAll(Maps.filterKeys(m_hostCriteria, not(in(rip))))
+                    .build();
+        }
+    }
+
+    private void removeCriteria(int rip) {
+        synchronized (m_mapLock) {
+            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
+                    .putAll(Maps.filterKeys(m_hostCriteria, not(equalTo(rip))))
+                    .build();
         }
     }
 
@@ -679,21 +842,32 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(int hostId) {
-        ForeignHost fh = null;
+        ForeignHost fh = m_foreignHosts.get(hostId);
         synchronized (m_mapLock) {
-            ImmutableMap.Builder<Integer, ForeignHost> b = ImmutableMap.builder();
-            for (Map.Entry<Integer, ForeignHost> e : m_foreignHosts.entrySet()) {
-                if (e.getKey().equals(hostId)) {
-                    fh = e.getValue();
-                    continue;
-                }
-                b.put(e.getKey(), e.getValue());
-            }
-            m_foreignHosts = b.build();
+            m_foreignHosts = ImmutableMap.<Integer, ForeignHost>builder()
+                    .putAll(Maps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
+                    .build();
         }
         if (fh != null) {
             fh.close();
         }
+    }
+
+    public static class PleaDecision {
+        public final String errMsg;
+        public final boolean accepted;
+        public final boolean mayRetry;
+        public PleaDecision(String errMsg, boolean accepted, boolean mayRetry) {
+            this.errMsg = errMsg;
+            this.accepted = accepted;
+            this.mayRetry = mayRetry;
+        }
+        @Override
+        public String toString() {
+            return "PleaDecision [errMsg=" + errMsg + ", accepted=" + accepted
+                    + ", mayRetry=" + mayRetry + "]";
+        }
+
     }
 
     /**
@@ -706,7 +880,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * in the MembershipAcceptor.
      */
     @Override
-    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception {
+    public void requestJoin(
+            SocketChannel socket,
+            InetSocketAddress listeningAddress,
+            HostCriteria joinerCriteria) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -715,19 +892,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             try {
-                final boolean shouldAcceptMember;
-                final StringBuilder errMsg = new StringBuilder();
-                if (m_membershipAcceptor != null) {
-                    shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, request, errMsg);
-                } else {
-                    shouldAcceptMember = true;
-                }
+                PleaDecision decision = considerMeshPlea(hostId, joinerCriteria);
 
                 /*
                  * Write the response that advertises the cluster topology
                  */
-                writeRequestJoinResponse(hostId, shouldAcceptMember, errMsg.toString(), socket);
-                if (!shouldAcceptMember) {
+                writeRequestJoinResponse(hostId, decision, socket);
+                if (!decision.accepted) {
                     socket.close();
                     return;
                 }
@@ -757,10 +928,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
+
+                putCriteria(hostId, joinerCriteria);
+                determineStartActionIfNecessary();
             } catch (Exception e) {
                 m_networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
                 removeForeignHost(hostId);
+                removeCriteria(hostId);
                 socket.close();
                 return;
             }
@@ -794,11 +969,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Advertise to a newly connecting node the topology of the cluster so that it can connect to
      * the rest of the nodes
      */
-    private void writeRequestJoinResponse(int hostId, boolean shouldAccept, String errMsg, SocketChannel socket) throws Exception {
+    private void writeRequestJoinResponse(
+            int hostId,
+            PleaDecision decision,
+            SocketChannel socket) throws Exception {
+
         JSONObject jsObj = new JSONObject();
 
-        jsObj.put("accepted", shouldAccept);
-        if (shouldAccept) {
+        jsObj.put("accepted", decision.accepted);
+        if (decision.accepted) {
             /*
              * Tell the new node what its host id is
              */
@@ -834,7 +1013,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             jsObj.put("hosts", jsArray);
         } else {
-            jsObj.put("reason", errMsg);
+            jsObj.put("reason", decision.errMsg);
+            jsObj.put("mayRetry", decision.mayRetry);
         }
 
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");
@@ -855,7 +1035,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             int yourHostId,
             int[] hosts,
             SocketChannel[] sockets,
-            InetSocketAddress listeningAddresses[]) throws Exception {
+            InetSocketAddress listeningAddresses[],
+            Map<Integer,HostCriteria> criteria) throws Exception {
         m_localHostId = yourHostId;
         long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
 
@@ -879,6 +1060,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
             }
         }
+
+        putAllCriteria(criteria);
+        determineStartActionIfNecessary();
 
         /*
          * Create the local agreement site. It knows that it is recovering because the number of
@@ -936,6 +1120,130 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
 
+    public static class Determination {
+        public final StartAction startAction;
+        public final int hostCount;
+        private Determination(StartAction startAction, int hostCount) {
+            this.startAction = startAction;
+            this.hostCount = hostCount;
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + hostCount;
+            result = prime * result
+                    + ((startAction == null) ? 0 : startAction.hashCode());
+            return result;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            Determination other = (Determination) obj;
+            if (hostCount != other.hostCount)
+                return false;
+            if (startAction != other.startAction)
+                return false;
+            return true;
+        }
+        @Override
+        public String toString() {
+            return "Determination [startAction=" + startAction + ", hostCount="
+                    + hostCount + "]";
+        }
+    }
+
+    private void determineStartActionIfNecessary() {
+        if (m_probedDetermination.isDone()) {
+            return;
+        }
+
+        int hostCount = m_hostCriteria.values().stream()
+                .filter(h -> h.getNodeState().operational())
+                .map(h -> h.getHostCount())
+                .findAny().orElse(m_criteria.getHostCount());
+
+        final int ksafety = m_criteria.getkFactor() + 1;
+        if (m_hostCriteria.size() < hostCount) {
+            return;
+        }
+        if (hostCount < m_criteria.getHostCount() && m_hostCriteria.size() <= hostCount) {
+            return;
+        }
+
+        int bare = 0;
+        int unmeshed = 0;
+        int operational = 0;
+        boolean paused = false;
+
+        for (HostCriteria c: m_hostCriteria.values()) {
+            if (c.getNodeState().operational()) {
+                paused = operational == 0 ? c.isPaused() : paused;
+                operational += 1;
+            }
+            unmeshed += c.getNodeState().unmeshed() ? 1 : 0;
+            bare += c.isBare() ? 1 : 0;
+            if (c.isPaused()) {
+                m_paused.set(true);
+            }
+        }
+
+        if (operational > 0 && m_paused.get() != paused) {
+            m_paused.set(paused);
+        }
+
+        if (m_criteria.getStartAction() != StartAction.PROBE) {
+            m_probedDetermination.set(new Determination(
+                    m_criteria.getStartAction(), m_criteria.getHostCount()));
+            return;
+        }
+
+        StartAction determination = m_criteria.isBare() ?
+                  StartAction.CREATE
+                : StartAction.RECOVER;
+
+        if (operational > 0 && operational < hostCount) {
+            determination = StartAction.LIVE_REJOIN;
+        } else if (operational > 0 && operational == hostCount) {
+            if (m_criteria.isAddAllowed()) {
+                hostCount = hostCount + ksafety;
+                determination = StartAction.JOIN;
+            } else {
+                try { shutdown(); } catch (Exception ignoreIt) {}
+                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
+                return;
+            }
+        } else if (operational == 0 && bare == unmeshed) {
+            determination = StartAction.CREATE;
+        } else if (operational == 0 && bare < ksafety) {
+            determination = StartAction.RECOVER;
+        } else if (operational == 0 && bare >= ksafety) {
+            try { shutdown(); } catch (Exception ignoreIt) {}
+            org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
+                    + bare + " nodes have no command logs, while "
+                    + (unmeshed - bare) + " nodes have them");
+            return;
+        }
+        m_probedDetermination.set(new Determination(determination, hostCount));
+    }
+
+    public Determination waitForDetermination() {
+        try {
+            return m_probedDetermination.get();
+        } catch (ExecutionException notThrownBecauseItIsASettableFuture) {
+        } catch (InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    "interrupted while waiting to determine the cluster start action",
+                    false, e);
+        }
+        return new Determination(null,-1);
+    }
+
     /**
      * Wait until all the nodes have built a mesh.
      */
@@ -985,16 +1293,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public boolean isPaused() {
-        return m_config.isPaused.get();
+        return m_paused.get();
     }
 
-    public void resetPaused() {
-        m_config.isPaused.set(false);
+    public void unpause() {
+        m_paused.set(false);
     }
 
     //Set Paused so socketjoiner will communicate correct status during mesh building.
     public void pause() {
-        m_config.isPaused.set(true);
+        m_paused.set(true);
     }
 
     public int getHostId() {
@@ -1258,8 +1566,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public void shutdown() throws InterruptedException
     {
-        m_zk.close();
-        m_agreementSite.shutdown();
+        if (m_zk != null) {
+            m_zk.close();
+        }
+        if (m_agreementSite != null) {
+            m_agreementSite.shutdown();
+        }
         for (ForeignHost host : m_foreignHosts.values())
         {
             // null is OK. It means this host never saw this host id up
