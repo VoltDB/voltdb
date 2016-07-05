@@ -30,12 +30,12 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -47,10 +47,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -70,10 +68,10 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.StartAction;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -82,7 +80,6 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -129,7 +126,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
-        public JoinerCriteria criteria = null;
+        public JoinAcceptor acceptor = null;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -142,7 +139,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public Config() {
             this(null, DEFAULT_INTERNAL_PORT);
-            criteria = JoinerCriteria.builder()
+            acceptor = MeshProber.builder()
                     .coordinators(":" + internalPort)
                     .build();
         }
@@ -170,14 +167,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
 
             List<Config> configs = lbld.build();
-            JoinerCriteria jc = JoinerCriteria.builder()
+            MeshProber jc = MeshProber.builder()
                     .startAction(StartAction.PROBE)
                     .hostCount(hostCount)
                     .coordinators(coordinators)
                     .build();
 
             for (Config cnf: configs) {
-                cnf.criteria = jc;
+                cnf.acceptor = jc;
             }
 
             return configs;
@@ -214,12 +211,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 js.key("deadhosttimeout").value(deadHostTimeout);
                 js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
                 js.key("networkThreads").value(networkThreads);
-                js.key("criteria");
-                if (criteria != null) {
-                    criteria.appendTo(js);
-                } else {
-                    js.value(null);
-                }
+                js.key("acceptor").value(acceptor);
                 js.endObject();
 
                 return js.toString();
@@ -299,11 +291,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
 
     /*
-     * holder of host criteria used to determine start action
-     */
-    volatile ImmutableMap<Integer, HostCriteria> m_hostCriteria = ImmutableMap.of();
-
-    /*
      * References to all the local mailboxes
      * Updates via COW
      */
@@ -321,17 +308,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
     /*
-     * on probe startup mode this future is set when there are enough
-     * hosts to matched the configured cluster size
+     * used when coordinating joining hosts
      */
-    private final SettableFuture<Determination> m_probedDetermination =
-            SettableFuture.create();
-
-    /*
-     * Holds values that help in the determination of a probed
-     * startup action
-     */
-    private final JoinerCriteria m_criteria;
+    private final JoinAcceptor m_acceptor;
 
     public Mailbox getMailbox(long hsId) {
         return m_siteMailboxes.get(hsId);
@@ -350,13 +329,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_config = config;
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
-        m_paused.set(m_config.criteria.isPaused());
-        m_criteria = config.criteria;
+        m_acceptor = config.acceptor;
         m_joiner = new SocketJoiner(
                 m_config.internalInterface,
                 m_config.internalPort,
                 m_paused,
-                m_criteria,
+                m_acceptor,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
@@ -504,7 +482,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
                 }
-                removeCriteria(failedHostIds);
+                m_acceptor.detract(failedHostIds);
                 // notifying any watchers who are interested in failure -- used
                 // initially to do ZK cleanup when rejoining nodes die
                 if (m_hostWatcher != null) {
@@ -643,8 +621,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             /*
              * seed the leader host criteria ad leader is always host id 0
              */
-            putCriteria(selectedHostId, m_criteria.asHostCriteria(m_paused.get()));
-            determineStartActionIfNecessary();
+            m_acceptor.accrue(selectedHostId, m_acceptor.ornate(new JSONObject(), Optional.empty()));
 
             // Store the components of the instance ID in ZK
             JSONObject instance_id = new JSONObject();
@@ -663,70 +640,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
-    }
-
-    /**
-     * Given the {@link HostCriteria} of a connecting node, determine if it is
-     * compatible.
-     *
-     * @param hostId connecting node host id
-     * @param hc {@link HostCriteria} of a connecting node
-     * @return a {@link PleaDecision}
-     */
-    private PleaDecision considerMeshPlea(int hostId, HostCriteria hc) {
-        // host criteria must be strictly compatible only if no node is operational (i.e.
-        // when the cluster is forming anew)
-        if (   !m_criteria.getNodeState().operational()
-            && !m_hostCriteria.values().stream().anyMatch(c->c.getNodeState().operational())) {
-            List<String> incompatibilities = m_criteria
-                    .asHostCriteria()
-                    .listIncompatibilities(hc);
-            if (!incompatibilities.isEmpty()) {
-                Joiner joiner = Joiner.on("\n    ").skipNulls();
-                String error = "Incompatible joining criteria:\n    "
-                        + joiner.join(incompatibilities);
-                return new PleaDecision(error, false, false);
-            }
-            return new PleaDecision(null, true, false);
-        }
-        // how many hosts are already in the mesh?
-        Stat stat = new Stat();
-        try {
-            m_zk.getChildren(CoreZK.hosts, false, stat);
-        } catch (InterruptedException e) {
-            String msg = "Interrupted while considering mesh plea";
-            m_networkLog.error(msg, e);
-            return new PleaDecision(msg, false, false);
-        } catch (KeeperException e) {
-            EnumSet<KeeperException.Code> closing = EnumSet.of(
-                    KeeperException.Code.SESSIONEXPIRED,
-                    KeeperException.Code.CONNECTIONLOSS);
-            if (closing.contains(e.code())) {
-                return new PleaDecision("Shutting down", false, false);
-            } else {
-                String msg = "Failed to list hosts while considering a mesh plea";
-                m_networkLog.error(msg, e);
-                return new PleaDecision(msg, false, false);
-            }
-        }
-        // connecting to already wholly formed cluster
-        if (stat.getNumChildren() >= m_criteria.getHostCount()) {
-            return new PleaDecision(
-                    hc.isAddAllowed()? null : "Cluster is already whole",
-                    hc.isAddAllowed(), false);
-        } else if (stat.getNumChildren() < m_criteria.getHostCount()) {
-            // check for concurrent rejoins
-            final int rejoiningHost = CoreZK.createRejoinNodeIndicator(m_zk, hostId);
-
-            if (rejoiningHost == -1) {
-                return new PleaDecision(null, true, false);
-            } else {
-                String msg = "Only one host can rejoin at a time. Host "
-                      + rejoiningHost + " is still rejoining.";
-                return new PleaDecision(msg, false, true);
-            }
-        }
-        return new PleaDecision(null, true, false);
     }
 
     /*
@@ -776,7 +689,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void notifyOfJoin(
             int hostId, SocketChannel socket,
             InetSocketAddress listeningAddress,
-            HostCriteria joinerCriteria) {
+            JSONObject jo) {
         m_networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         ForeignHost fhost = null;
@@ -787,8 +700,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
-        putCriteria(hostId, joinerCriteria);
-        determineStartActionIfNecessary();
+        m_acceptor.accrue(hostId, jo);
     }
 
     /*
@@ -824,40 +736,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         };
     }
 
-    private void putAllCriteria(Map<Integer,HostCriteria> criteria) {
-        synchronized(m_mapLock) {
-            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
-                    .putAll(Maps.filterKeys(m_hostCriteria, not(in(criteria.keySet()))))
-                    .putAll(criteria)
-                    .build();
-        }
-    }
-
-    private void putCriteria(int hostId, HostCriteria criteria) {
-        synchronized(m_mapLock) {
-            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
-                    .putAll(Maps.filterKeys(m_hostCriteria, not(equalTo(hostId))))
-                    .put(hostId, criteria)
-                    .build();
-        }
-    }
-
-    private void removeCriteria(Set<Integer> rip) {
-        synchronized (m_mapLock) {
-            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
-                    .putAll(Maps.filterKeys(m_hostCriteria, not(in(rip))))
-                    .build();
-        }
-    }
-
-    private void removeCriteria(int rip) {
-        synchronized (m_mapLock) {
-            m_hostCriteria = ImmutableMap.<Integer,HostCriteria>builder()
-                    .putAll(Maps.filterKeys(m_hostCriteria, not(equalTo(rip))))
-                    .build();
-        }
-    }
-
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
@@ -873,23 +751,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public static class PleaDecision {
-        public final String errMsg;
-        public final boolean accepted;
-        public final boolean mayRetry;
-        public PleaDecision(String errMsg, boolean accepted, boolean mayRetry) {
-            this.errMsg = errMsg;
-            this.accepted = accepted;
-            this.mayRetry = mayRetry;
-        }
-        @Override
-        public String toString() {
-            return "PleaDecision [errMsg=" + errMsg + ", accepted=" + accepted
-                    + ", mayRetry=" + mayRetry + "]";
-        }
-
-    }
-
     /**
      * Any node can serve a request to join. The coordination of generating a new host id
      * is done via ZK
@@ -903,7 +764,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void requestJoin(
             SocketChannel socket,
             InetSocketAddress listeningAddress,
-            HostCriteria joinerCriteria) throws Exception {
+            JSONObject jo) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -912,7 +773,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             try {
-                PleaDecision decision = considerMeshPlea(hostId, joinerCriteria);
+                JoinAcceptor.PleaDecision decision = m_acceptor.considerMeshPlea(m_zk, hostId, jo);
 
                 /*
                  * Write the response that advertises the cluster topology
@@ -949,13 +810,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
-                putCriteria(hostId, joinerCriteria);
-                determineStartActionIfNecessary();
+                m_acceptor.accrue(hostId, jo);
             } catch (Exception e) {
                 m_networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
                 removeForeignHost(hostId);
-                removeCriteria(hostId);
+                m_acceptor.detract(hostId);
                 socket.close();
                 return;
             }
@@ -991,7 +851,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void writeRequestJoinResponse(
             int hostId,
-            PleaDecision decision,
+            JoinAcceptor.PleaDecision decision,
             SocketChannel socket) throws Exception {
 
         JSONObject jsObj = new JSONObject();
@@ -1056,7 +916,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             int[] hosts,
             SocketChannel[] sockets,
             InetSocketAddress listeningAddresses[],
-            Map<Integer,HostCriteria> criteria) throws Exception {
+            Map<Integer, JSONObject> jos) throws Exception {
         m_localHostId = yourHostId;
         long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
 
@@ -1077,12 +937,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii], new PicoNetwork(sockets[ii]));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
+                org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
             }
         }
 
-        putAllCriteria(criteria);
-        determineStartActionIfNecessary();
+        m_acceptor.accrue(jos);
 
         /*
          * Create the local agreement site. It knows that it is recovering because the number of
@@ -1138,166 +997,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-    }
-
-    public static class Determination {
-        public final StartAction startAction;
-        public final int hostCount;
-        private Determination(StartAction startAction, int hostCount) {
-            this.startAction = startAction;
-            this.hostCount = hostCount;
-        }
-        @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + hostCount;
-            result = prime * result
-                    + ((startAction == null) ? 0 : startAction.hashCode());
-            return result;
-        }
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj)
-                return true;
-            if (obj == null)
-                return false;
-            if (getClass() != obj.getClass())
-                return false;
-            Determination other = (Determination) obj;
-            if (hostCount != other.hostCount)
-                return false;
-            if (startAction != other.startAction)
-                return false;
-            return true;
-        }
-        @Override
-        public String toString() {
-            return "Determination [startAction=" + startAction + ", hostCount="
-                    + hostCount + "]";
-        }
-    }
-
-    /**
-     * Check to see if we have enough {@link HostCriteria} gathered to make a
-     * start action {@link Determination}
-     */
-    private void determineStartActionIfNecessary() {
-        // already made a determination
-        if (m_probedDetermination.isDone()) {
-            return;
-        }
-        // prefer host count from operational nodes
-        int hostCount = m_hostCriteria.values().stream()
-                .filter(h -> h.getNodeState().operational())
-                .map(h -> h.getHostCount())
-                .findAny().orElse(m_criteria.getHostCount());
-
-        final int ksafety = m_criteria.getkFactor() + 1;
-
-        // not enough host criteria to make a determination
-        if (m_hostCriteria.size() < hostCount) {
-            m_networkLog.debug("have yet to receive all the required host criteria");
-            return;
-        }
-        // handle add (i.e. join) cases too
-        if (hostCount < m_criteria.getHostCount() && m_hostCriteria.size() <= hostCount) {
-            m_networkLog.debug("have yet to receive all the required host criteria");
-            return;
-        }
-
-        m_networkLog.debug("Received all the required host criteria");
-
-        int bare = 0;
-        int unmeshed = 0;
-        int operational = 0;
-
-        // both paused and safemode need to be specified on only one node to
-        // make them a cluster attribute. These are overridden if there are
-        // any nodes in operational state
-        boolean paused = false;
-        boolean safemode = false;
-
-
-        for (HostCriteria c: m_hostCriteria.values()) {
-            if (c.getNodeState().operational()) {
-                // pause state from operational nodes overrides yours
-                paused = operational == 0 ? c.isPaused() : paused;
-                operational += 1;
-            }
-            unmeshed += c.getNodeState().unmeshed() ? 1 : 0;
-            bare += c.isBare() ? 1 : 0;
-            if (c.isPaused()) {
-                m_paused.set(true);
-            }
-            safemode = safemode || c.isSafeMode();
-        }
-
-        if (operational > 0 && m_paused.get() != paused) {
-            m_paused.set(paused);
-        }
-
-        safemode = safemode && operational == 0 && bare < ksafety;
-
-        if (m_networkLog.isDebugEnabled()) {
-            m_networkLog.debug("We have "
-                    + operational + " operational nodes, "
-                    + bare + " bare nodes, and "
-                    + unmeshed + " unmeshed nodes");
-            m_networkLog.debug("cluster flag pause is " + m_paused.get()
-                    + ", and safe mode is " + safemode);
-        }
-
-        if (m_criteria.getStartAction() != StartAction.PROBE) {
-            m_probedDetermination.set(new Determination(
-                    m_criteria.getStartAction(), m_criteria.getHostCount()));
-            return;
-        }
-
-        StartAction determination = m_criteria.isBare() ?
-                  StartAction.CREATE
-                : StartAction.RECOVER;
-
-        if (operational > 0 && operational < hostCount) { // rejoin
-            determination = StartAction.LIVE_REJOIN;
-        } else if (operational > 0 && operational == hostCount) { // join
-            if (m_criteria.isAddAllowed()) {
-                hostCount = hostCount + ksafety;
-                determination = StartAction.JOIN;
-            } else {
-                // don't continue if you are an excess node
-                try { shutdown(); } catch (Exception ignoreIt) {}
-                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
-                return;
-            }
-        } else if (operational == 0 && bare == unmeshed) {
-            determination = StartAction.CREATE;
-        } else if (operational == 0 && bare < ksafety) {
-            determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
-        } else if (operational == 0 && bare >= ksafety) {
-            try { shutdown(); } catch (Exception ignoreIt) {}
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
-                    + bare + " nodes have no command logs, while "
-                    + (unmeshed - bare) + " nodes have them");
-            return;
-        }
-        final Determination dtrm = new Determination(determination, hostCount);
-        if (m_networkLog.isDebugEnabled()) {
-            m_networkLog.debug("made the following " + dtrm);
-        }
-        m_probedDetermination.set(dtrm);
-    }
-
-    public Determination waitForDetermination() {
-        try {
-            return m_probedDetermination.get();
-        } catch (ExecutionException notThrownBecauseItIsASettableFuture) {
-        } catch (InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB(
-                    "interrupted while waiting to determine the cluster start action",
-                    false, e);
-        }
-        return new Determination(null,-1);
     }
 
     /**
@@ -1687,6 +1386,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public ZooKeeper getZK() {
         return m_zk;
+    }
+
+    public JoinAcceptor getAcceptor() {
+        return m_acceptor;
     }
 
     public void sendPoisonPill(Collection<Integer> hostIds, String err, int cause) {

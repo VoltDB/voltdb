@@ -137,7 +137,7 @@ $(document).ready(function () {
                     if(localStorage.queries != undefined){
                         queries = $.parseJSON(localStorage.queries)
                         $.each(queries, function(key){
-                            arr.push(key)
+                            arr.push(key.split('_')[1])
                         })
                     }
                     if ($.inArray(value, SQLQueryRender.queryNameList) != -1 || $.inArray(value, arr) != -1) {
@@ -187,17 +187,22 @@ $(document).ready(function () {
                         orgQueryData = query_localStorage
                     }
 
-                    queryData[newTabName] = $('#querybox-' + element_id).val()
-
                     if($('#qTab-' + element_id).data('isold')){
+                        var key_index = getKeyIndex(queryData, oldTabName)
                         if(newTabName != oldTabName){
-                            oldQuery = queryData[oldTabName]
-                            delete queryData[oldTabName]
+                            oldQuery = queryData[key_index + '_' + oldTabName]
+                            delete queryData[key_index + '_' + oldTabName]
+                            queryData[key_index + '_' + newTabName] =  $('#querybox-' + element_id).val()
+                        } else{
+                            queryData[key_index + '_' + newTabName] =  $('#querybox-' + element_id).val()
                         }
+                    } else {
+                        key_name = generateKeyIndex(queryData) + '_' + newTabName
+                        queryData[key_name] = $('#querybox-' + element_id).val()
                     }
-
+                    var orderedData = SQLQueryRender.getOrderedData(queryData)
                     try{
-                        localStorage.queries = JSON.stringify(queryData)
+                        localStorage.queries = JSON.stringify(orderedData)
                         $('#qTab-' + element_id).find('a').html(newTabName)
                         $('#qTab-' + element_id).data('isold', true)
                         deleteQueryFromGlobal(oldTabName)
@@ -233,6 +238,29 @@ $(document).ready(function () {
             });
         }
     });
+
+    var generateKeyIndex = function(queryData){
+        var key_index = 1;
+        if(!$.isEmptyObject(queryData)){
+            $.each(queryData, function(key){
+                if(parseInt(key.split('_')[0]) > key_index)
+                    key_index = parseInt(key.split('_')[0])
+                    key_index++
+            })
+        }
+        return key_index
+    }
+
+    var getKeyIndex = function(queryData, oldName){
+        key_index = 0
+        if(!$.isEmptyObject(queryData)){
+            $.each(queryData, function(key){
+                if(key.split('_')[1] == oldName)
+                    key_index = parseInt(key.split('_')[0])
+            })
+        }
+        return key_index
+    }
 
     var saveQueryNameListToStorage = function(queryName){
         var queryList = localStorage.queryNameList
@@ -309,12 +337,14 @@ $(document).ready(function () {
 
     var removeTabData =  function(elementId){
         var tabName = $('#' + elementId).find('a').text();
+        var keyName =  getKeyIndex() + '_' + tabName
         var queryData = {}
         var sql_localStorage = localStorage.queries
         if(sql_localStorage != undefined){
             queryData = $.parseJSON(sql_localStorage);
         }
-        delete queryData[tabName]
+        var keyName =  getKeyIndex(queryData, tabName) + '_' + tabName
+        delete queryData[keyName]
         if(typeof(Storage) !== "undefined")
             localStorage.queries = JSON.stringify(queryData);
     }
@@ -525,16 +555,25 @@ $(document).ready(function () {
         this.queryNameList = []
         this.orgQueryName = ''
 
+        this.getOrderedData = function(unOrdered){
+            var orderData = {}
+            Object.keys(unOrdered).sort().forEach(function(key) {
+              orderData[key] = unOrdered[key];
+            });
+            return orderData
+        }
+
         this.loadSavedQueries= function(){
             var sql_localStorage = localStorage.queries
             var queryData = {}
 
             if(sql_localStorage != undefined){
-                queryData = $.parseJSON(sql_localStorage)
+                unOrderedData = $.parseJSON(sql_localStorage)
+                queryData = SQLQueryRender.getOrderedData(unOrderedData)
             }
 
             $.each( queryData, function( key, value ) {
-                SQLQueryRender.createQueryTab(key, value)
+                SQLQueryRender.createQueryTab(key.split('_')[1], value)
             });
 
             if($.isEmptyObject(queryData)){

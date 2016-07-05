@@ -42,9 +42,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.JoinerCriteria;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -73,7 +73,7 @@ public class TestStateMachine extends ZKTestBase {
     final String defaultTaskResult = "FINISHED THE WORK";
 
     private String [] coordinators;
-    private JoinerCriteria criteria;
+    private MeshProber criteria;
 
 
     byte getNextByteState(byte oldState) {
@@ -137,7 +137,7 @@ public class TestStateMachine extends ZKTestBase {
         coordinators = IntStream.range(0, NUM_AGREEMENT_SITES)
                 .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
-        criteria = JoinerCriteria.builder()
+        criteria = MeshProber.builder()
                 .coordinators(coordinators)
                 .startAction(StartAction.PROBE)
                 .hostCount(NUM_AGREEMENT_SITES)
@@ -169,14 +169,14 @@ public class TestStateMachine extends ZKTestBase {
     public void recoverSite(int site) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort += site;
-        config.criteria = criteria;
+        config.acceptor = criteria;
         int clientPort = m_ports.next();
         config.zkInterface = "127.0.0.1:" + clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
         HostMessenger hm = new HostMessenger(config, null);
         hm.start();
-        hm.waitForDetermination();
+        MeshProber.prober(hm).waitForDetermination();
         m_messengers.set(site, hm);
         addStateMachinesFor(site);
     }

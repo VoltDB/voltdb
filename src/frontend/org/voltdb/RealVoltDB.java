@@ -83,7 +83,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
@@ -131,6 +130,7 @@ import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
@@ -651,7 +651,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            HostMessenger.Determination determination = buildClusterMesh(readDepl);
+            MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
                 if (determination.startAction.doesRejoin()) {
@@ -2364,11 +2364,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    HostMessenger.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
+    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || managedPathsWithFilesPrimed(m_config, readDepl.deployment).isEmpty();
 
-        JoinerCriteria criteria = JoinerCriteria.builder()
+        MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
                 .versionChecker(m_versionChecker)
                 .enterprise(m_config.m_isEnterprise)
@@ -2399,7 +2399,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
-        hmconfig.criteria = criteria;
+        hmconfig.acceptor = criteria;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
 
@@ -2418,7 +2418,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
         consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
-        HostMessenger.Determination determination = m_messenger.waitForDetermination();
+        MeshProber.Determination determination = criteria.waitForDetermination();
+
+        // paused is determined in the mesh formation exchanged
+        if (determination.paused) {
+            m_messenger.pause();
+        } else {
+            m_messenger.unpause();
+        }
 
         // Semi-hacky check to see if we're attempting to rejoin to ourselves.
         // The leader node gets assigned host ID 0, always, so if we're the
