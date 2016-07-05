@@ -170,12 +170,23 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
         AbstractPlanNode node;
         try {
             node = compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
-
             assertTrue(true);
         } catch (Exception ex) {
             assertTrue("Unexpected exception in compilation", false);
         }
     }
+
+    // This is also not a test.  It's used to generate a plan for the PartitionByExecutor test.
+    public void testRankTestGenRankInOrderBy() throws Exception {
+        AbstractPlanNode node;
+        try {
+            node = compile("select A, B, RANK() OVER (PARTITION BY A ORDER BY B) AS R FROM AAA ORDER BY A, B, R;");
+            assertTrue(true);
+        } catch (Exception ex) {
+            assertTrue("Unexpected exception in compilation", false);
+        }
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(true, TestWindowedAggregatePlans.class.getResource("testwindowingfunctions-ddl.sql"), "testwindowfunctions");
