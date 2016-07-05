@@ -33,7 +33,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.voltcore.logging.VoltLogger.CoreVoltLogger;
 import org.voltcore.utils.ShutdownHooks;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Implements the core logging functionality for VoltLogger specific to
@@ -199,8 +198,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         }
         checkArgument(logRootDH != null, "log root directory is null");
 
-        File logDH = new VoltFile(logRootDH, "log");
-        File napFH = new VoltFile(logDH, "volt.log");
+        File logDH = new File(logRootDH, "log");
+        File napFH = new File(logDH, "volt.log");
 
         Logger rootLogger = LogManager.getRootLogger();
         Appender current = rootLogger.getAppender("file");

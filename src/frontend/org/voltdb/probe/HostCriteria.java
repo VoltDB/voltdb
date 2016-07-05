@@ -31,8 +31,8 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
- *  It is a DTO that snapshots a subset of {@link MeshProber} fields, and is
- *  passed around in initial mesh requests.
+ *  It is a data transfer object (DTO) that snapshots a subset of {@link MeshProber}
+ *  fields, and is passed around in initial mesh requests.
  */
 public class HostCriteria {
 

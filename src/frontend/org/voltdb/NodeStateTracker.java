@@ -22,11 +22,14 @@ import org.voltdb.common.NodeState;
 
 import com.google_voltpatches.common.base.Supplier;
 
-public class StatusTracker {
+/**
+ * Class that aides in the tracking of a VoltDB node state.
+ */
+public class NodeStateTracker {
 
     private final AtomicReference<NodeState> nodeState = new AtomicReference<>(NodeState.INITIALIZING);
 
-    public StatusTracker() {
+    public NodeStateTracker() {
     }
 
     static class NodeStateSupplier implements Supplier<NodeState> {

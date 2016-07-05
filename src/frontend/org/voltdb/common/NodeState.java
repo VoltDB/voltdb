@@ -24,7 +24,9 @@ import java.util.List;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
-//Enup representing state of the node
+/**
+ * Enum representing state of the node
+ */
 public enum NodeState {
 
     INITIALIZING, //Initial state

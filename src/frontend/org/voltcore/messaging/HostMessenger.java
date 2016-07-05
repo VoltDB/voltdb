@@ -20,8 +20,6 @@ package org.voltcore.messaging;
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
-import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
-import static org.voltdb.VoltDB.DEFAULT_ZK_PORT;
 
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -67,9 +65,7 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.StartAction;
 import org.voltdb.probe.MeshProber;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
@@ -79,6 +75,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -138,8 +135,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public Config() {
-            this(null, DEFAULT_INTERNAL_PORT);
-            acceptor = MeshProber.builder()
+            this(null, org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
+            acceptor = org.voltdb.probe.MeshProber.builder()
                     .coordinators(":" + internalPort)
                     .build();
         }
@@ -159,7 +156,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             String [] coordinators = new String[hostCount];
 
             for (int i = 0; i < hostCount; ++i) {
-                Config cnf = new Config(null, DEFAULT_INTERNAL_PORT);
+                Config cnf = new Config(null, org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
                 cnf.zkInterface = "127.0.0.1:" + ports.next();
                 cnf.internalPort = ports.next();
                 coordinators[i] = ":" + cnf.internalPort;
@@ -167,8 +164,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
 
             List<Config> configs = lbld.build();
-            MeshProber jc = MeshProber.builder()
-                    .startAction(StartAction.PROBE)
+            MeshProber jc = org.voltdb.probe.MeshProber.builder()
+                    .startAction(org.voltdb.StartAction.PROBE)
                     .hostCount(hostCount)
                     .coordinators(coordinators)
                     .build();
@@ -181,7 +178,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(zkInterface, DEFAULT_ZK_PORT);
+            return HostAndPort.fromString(zkInterface)
+                    .getPortOrDefault(org.voltdb.VoltDB.DEFAULT_ZK_PORT);
         }
 
         private void initNetworkThreads() {
@@ -621,7 +619,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             /*
              * seed the leader host criteria ad leader is always host id 0
              */
-            m_acceptor.accrue(selectedHostId, m_acceptor.ornate(new JSONObject(), Optional.empty()));
+            m_acceptor.accrue(selectedHostId, m_acceptor.decorate(new JSONObject(), Optional.empty()));
 
             // Store the components of the instance ID in ZK
             JSONObject instance_id = new JSONObject();

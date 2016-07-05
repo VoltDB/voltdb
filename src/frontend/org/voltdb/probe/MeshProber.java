@@ -46,9 +46,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.JoinAcceptor;
 import org.voltcore.messaging.SocketJoiner;
+import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.StartAction;
-import org.voltdb.VersionChecker;
 import org.voltdb.common.NodeState;
 import org.voltdb.utils.Digester;
 import org.voltdb.utils.MiscUtils;
@@ -67,6 +67,13 @@ import com.google_voltpatches.common.net.InetAddresses;
 import com.google_voltpatches.common.net.InternetDomainName;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
+/**
+ * The VoltDB implementation of {@link JoinAcceptor} that piggy backs the mesh
+ * establishment messaged to determine if connecting nodes are compatible, and
+ * if they are compatible it determines the voltdb start action from the information
+ * gathered from other connecting nodes.
+ *
+ */
 public class MeshProber implements JoinAcceptor {
 
     private static final String COORDINATORS = "coordinators";
@@ -83,6 +90,12 @@ public class MeshProber implements JoinAcceptor {
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
+    /**
+     * Helper method that takes a comma delimited list of host specs, validates it,
+     * and converts it to a set of valid coordinators
+     * @param option a string that contains comma delimited list of host specs
+     * @return a set of valid coordinators
+     */
     public static ImmutableSortedSet<String> hosts(String option) {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
@@ -328,7 +341,7 @@ public class MeshProber implements JoinAcceptor {
     }
 
     @Override
-    public JSONObject ornate(JSONObject jo, Optional<Boolean> paused) {
+    public JSONObject decorate(JSONObject jo, Optional<Boolean> paused) {
         return paused.map(p -> asHostCriteria(p).appendTo(jo)).orElse(asHostCriteria().appendTo(jo));
     }
 

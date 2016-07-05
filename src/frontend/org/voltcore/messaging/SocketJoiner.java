@@ -16,8 +16,6 @@
  */
 package org.voltcore.messaging;
 
-import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -51,8 +49,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VersionChecker;
-import org.voltdb.utils.MiscUtils;
+import org.voltcore.utils.VersionChecker;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -166,7 +163,8 @@ public class SocketJoiner {
             if (m_coordIp != null) {
                 break;
             }
-            HostAndPort host = HostAndPort.fromString(coordHost).withDefaultPort(DEFAULT_INTERNAL_PORT);
+            HostAndPort host = HostAndPort.fromString(coordHost)
+                    .withDefaultPort(org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
 
             InetSocketAddress ip = !host.getHostText().isEmpty() ?
                       new InetSocketAddress(host.getHostText(), host.getPort())
@@ -355,7 +353,7 @@ public class SocketJoiner {
              */
             if (m_listenerSockets.isEmpty()) {
                 LOG.fatal("Failed to bind to " + inetsockaddr);
-                MiscUtils.printPortsInUse(hostLog);
+                CoreUtils.printPortsInUse(hostLog);
                 throw e;
             }
         }
@@ -447,7 +445,7 @@ public class SocketJoiner {
                     versionChecker.isCompatibleVersionString(remoteBuildString));
 
             // inject acceptor fields
-            m_acceptor.ornate(returnJs, Optional.of(m_paused.get()));
+            m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
 
             byte jsBytes[] = returnJs.toString(4).getBytes(StandardCharsets.UTF_8);
 
@@ -661,7 +659,7 @@ public class SocketJoiner {
             /*
              * communicate configuration and node state
              */
-            m_acceptor.ornate(jsObj, Optional.empty());
+            m_acceptor.decorate(jsObj, Optional.empty());
             jsObj.put(MAY_EXCHANGE_TS, true);
 
             byte jsBytes[] = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
@@ -698,7 +696,7 @@ public class SocketJoiner {
             m_localHostId = jsonObj.getInt(NEW_HOST_ID);
             m_reportedInternalInterface = jsonObj.getString(REPORTED_ADDRESS);
 
-            cmbld.put(m_localHostId, m_acceptor.ornate(jsonObj, Optional.<Boolean>empty()));
+            cmbld.put(m_localHostId, m_acceptor.decorate(jsonObj, Optional.<Boolean>empty()));
 
             /*
              * Loop over all the hosts and create a connection (except for the first entry, that is the leader)
@@ -766,7 +764,7 @@ public class SocketJoiner {
                         m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
                 jsObj.put(VERSION_STRING, versionChecker.getVersionString());
 
-                m_acceptor.ornate(jsObj, Optional.empty());
+                m_acceptor.decorate(jsObj, Optional.empty());
                 jsObj.put(MAY_EXCHANGE_TS, true);
 
                 jsBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);

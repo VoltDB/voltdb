@@ -24,7 +24,7 @@ import java.util.Set;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
-import org.voltdb.VersionChecker;
+import org.voltcore.utils.VersionChecker;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -33,8 +33,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * An interface that allows non voltcore components to effect how hosts
- * can become or not mesh mesh members
- *
+ * can become or not mesh members
  */
 public interface JoinAcceptor extends JSONString {
 
@@ -58,7 +57,7 @@ public interface JoinAcceptor extends JSONString {
      * Allows the acceptor to inject its fields into the connection handshake message
      * @param jo the initial handshake message
      */
-    default JSONObject ornate(JSONObject jo, Optional<Boolean> paused) {
+    default JSONObject decorate(JSONObject jo, Optional<Boolean> paused) {
         return jo;
     }
 

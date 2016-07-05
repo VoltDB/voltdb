@@ -979,7 +979,37 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0, and adminstartup set to false
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
+        normalized = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("hostcount=\"0\"");
+        matcher = ADMINMODE_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("adminstartup=\"false\"");
+        return Digester.md5AsUUID(normalized);
+    }
+
+    /**
      * Given the deployment object generate the XML
+     * @param deployment
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     *
      * @param deployment
      * @param indent
      * @return XML of deployment object.
@@ -1008,35 +1038,6 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(e);
             }
         }
-    }
-
-    /**
-     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
-     * two longs) of a deployment file stripped of all comments and its hostcount
-     * attribute set to 0 ,and adminstartup set to false
-     *
-     * @param deploymentBytes
-     * @return MD5 digest for for configuration
-     */
-    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
-        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
-        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
-        normalized = matcher.replaceAll("");
-        matcher = HOSTCOUNT_RE.matcher(normalized);
-        normalized = matcher.replaceFirst("hostcount=\"0\"");
-        matcher = ADMINMODE_RE.matcher(normalized);
-        normalized = matcher.replaceFirst("adminstartup=\"false\"");
-        return Digester.md5AsUUID(normalized);
-    }
-
-    /**
-     * Given the deployment object generate the XML
-     * @param deployment
-     * @return XML of deployment object.
-     * @throws IOException
-     */
-    public static String getDeployment(DeploymentType deployment) throws IOException {
-        return getDeployment(deployment, false);
     }
 
     /**
