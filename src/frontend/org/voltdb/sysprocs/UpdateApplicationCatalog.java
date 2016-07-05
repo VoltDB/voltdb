@@ -190,8 +190,23 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
             // the actual work on the *next* round-trip below
+
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
+            DependencyPair success = new DependencyPair(DEP_updateCatalogSync,
+                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+
+            if ( ! context.isLowestSiteId()) {
+                // Any class-loading issues with the new catalog jar only need
+                // to be flagged by one site per host. So, for speed, return
+                // early from all sites except one -- the site with the lowest
+                // id on this host.
+                if (log.isInfoEnabled()) {
+                    log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                            " completed data precheck.");
+                }
+                return success;
+            }
 
             // We know the ZK bytes are okay because the run() method wrote them before sending
             // out fragments
@@ -214,9 +229,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         try {
                             major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
                         } catch (Exception ex) {
-                            if (log.isDebugEnabled())
-                                log.debug("Unable to parse compile version number from UnsupportedClassVersionError. " +
-                                          ex.getMessage());
+                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.",
+                                    ex);
                         }
 
                         if (m_versionMap.containsKey(major)) {
@@ -243,12 +257,17 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 Throwables.propagate(e);
             }
 
-            return new DependencyPair(DEP_updateCatalogSync,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+            if (log.isInfoEnabled()) {
+                log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                        " completed data and catalog precheck.");
+            }
+            return success;
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
+            log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
+                    " acknowledged data and catalog prechecks.");
             return new DependencyPair(DEP_updateCatalogSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
@@ -286,17 +305,18 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
-                log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
-                        CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
-                        Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
-                        Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
-                        replayInfo));
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
+                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
+                            Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
+                            Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
+                            replayInfo));
+                }
             }
             // if seen before by this code, then check to see if this is a restart
-            else if ((context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                     (Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                      Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash()))))
-            {
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                    Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash())) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()),
@@ -310,10 +330,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair(DEP_updateCatalog, result);
-        } else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+        }
+        else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
             return new DependencyPair(DEP_updateCatalogAggregate, result);
-        } else {
+        }
+        else {
             VoltDB.crashLocalVoltDB(
                     "Received unrecognized plan fragment id " + fragmentId + " in UpdateApplicationCatalog",
                     false,
@@ -421,17 +443,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
         // New update?
         if (catalogStuff.version == expectedCatalogVersion) {
-            log.debug("New catalog update from: " + catalogStuff.toString());
-            log.debug("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
-                    ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+            if (log.isInfoEnabled()) {
+                log.info("New catalog update from: " + catalogStuff.toString());
+                log.info("To: catalog hash: " + Encoder.hexEncode(catalogHash).substring(0, 10) +
+                        ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
+            }
         }
         // restart?
         else {
             if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                (Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-                 Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)))
-            {
-                log.debug("Restarting catalog update: " + catalogStuff.toString());
+                    Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                    Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
+                if (log.isInfoEnabled()) {
+                    log.info("Restarting catalog update: " + catalogStuff.toString());
+                }
             }
             else {
                 String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
