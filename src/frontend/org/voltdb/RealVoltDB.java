@@ -88,6 +88,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
@@ -229,7 +230,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledFuture<?> resMonitorWork;
 
 
-    private StatusTracker m_statusTracker;
+    private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -457,7 +458,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // config UUID is part of the status tracker that is slated to be an
             // Information source for an http admun endpoint
-            m_statusTracker = new StatusTracker();
+            m_statusTracker = new NodeStateTracker();
 
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
@@ -1522,6 +1523,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    /**
+     * Takes the deployment file given at initialization and the voltdb root given as
+     * a command line options, and it performs the following tasks:
+     * <p><ul>
+     * <li>creates if necessary the voltdbroot directory
+     * <li>fail if voltdbroot is already configured and populated with database artifacts
+     * <li>creates command log, dr, snaphot, and export directories
+     * <li>creates the config directory under voltdbroot
+     * <li>moves the deployment file under the config directory
+     * </ul>
+     * @param config
+     * @param dt a {@link DeploymentTypel}
+     */
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
@@ -1544,6 +1558,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 differingRoots = true;
                 dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
             }
+            // root in deployment conflicts with command line voltdbroot
             if (!VoltDB.DBROOT.equals(deprootFN) && differingRoots) {
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
@@ -1554,7 +1569,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     false, e);
             return;
         }
-
+        // check for already existing artifacts
         List<String> nonEmptyPaths = managedPathsWithFiles(dt);
         if (!nonEmptyPaths.isEmpty()) {
             StringBuilder crashMessage =
@@ -1567,12 +1582,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB(crashMessage.toString());
             return;
         }
-
+        // create the config subdirectory
         File confDH = getConfigLogDirectory(config);
         if (!confDH.exists() && !confDH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
             return;
         }
+        // create the remaining paths
         if (config.m_isEnterprise) {
             List<String> failed = new ArrayList<>();
             List<File> paths = ImmutableList.<File>builder()
@@ -1601,7 +1617,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
         }
-
+        // see if you just can simply copy the deployment file
         if (differingRoots) {
             File depFH = getConfigLogDeployment(config);
             try (FileWriter fw = new FileWriter(depFH)) {
@@ -1614,6 +1630,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File optFH = new VoltFile(config.m_pathToDeployment);
             File depFH = getConfigLogDeployment(config);
             try {
+                // can't copy file to itself
                 if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
                     Files.copy(optFH, depFH);
                 }
@@ -3297,7 +3314,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
         } catch (Exception ex) {
-            MiscUtils.printPortsInUse(hostLog);
+            CoreUtils.printPortsInUse(hostLog);
             VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
         }
     }

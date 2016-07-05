@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltcore.utils;
 
 public interface VersionChecker {
     public String getVersionString();

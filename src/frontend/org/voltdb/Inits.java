@@ -71,7 +71,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
-    final StatusTracker m_statusTracker;
+    final NodeStateTracker m_statusTracker;
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
@@ -115,7 +115,7 @@ public class Inits {
         }
     }
 
-    Inits(StatusTracker statusTracker, RealVoltDB rvdb, int threadCount) {
+    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
         m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
