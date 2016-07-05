@@ -22,6 +22,8 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import java.util.List;
 import java.util.UUID;
 
+import javax.annotation.Generated;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.StartAction;
@@ -78,6 +80,9 @@ public class HostCriteria {
     protected final UUID m_meshHash;
     protected final boolean m_enterprise;
     protected final StartAction m_startAction;
+    /**
+     * {@code true} if there are no recoverable artifacts (Command Logs, Snapshots)
+     */
     protected final boolean m_bare;
     protected final int m_hostCount;
     protected final NodeState m_nodeState;
@@ -138,6 +143,9 @@ public class HostCriteria {
         return m_startAction;
     }
 
+    /**
+     * @return {@code true} if there are no recoverable artifacts (Command Logs, Snapshots)
+     */
     public boolean isBare() {
         return m_bare;
     }
@@ -181,27 +189,6 @@ public class HostCriteria {
         return UNDEFINED.equals(m_configHash) && UNDEFINED.equals(m_meshHash);
     }
 
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (m_bare ? 1231 : 1237);
-        result = prime * result
-                + ((m_configHash == null) ? 0 : m_configHash.hashCode());
-        result = prime * result + (m_enterprise ? 1231 : 1237);
-        result = prime * result + (m_addAllowed ? 1231 : 1237);
-        result = prime * result + (m_safeMode ? 1231 : 1237);
-        result = prime * result + m_hostCount;
-        result = prime * result
-                + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
-        result = prime * result + (m_paused ? 1231 : 1237);
-        result = prime * result
-                + ((m_startAction == null) ? 0 : m_startAction.hashCode());
-        result = prime * result
-                + ((m_nodeState == null) ? 0 : m_nodeState.hashCode());
-        return result;
-    }
-
     public List<String> listIncompatibilities(HostCriteria o) {
         checkArgument(o != null, "cant check compatibility against a null host criteria");
         ImmutableList.Builder<String> ilb = ImmutableList.builder();
@@ -230,7 +217,28 @@ public class HostCriteria {
         return ilb.build();
     }
 
-    @Override
+    @Override @Generated("by eclipse's equals and hashCode source generators")
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + (m_bare ? 1231 : 1237);
+        result = prime * result
+                + ((m_configHash == null) ? 0 : m_configHash.hashCode());
+        result = prime * result + (m_enterprise ? 1231 : 1237);
+        result = prime * result + (m_addAllowed ? 1231 : 1237);
+        result = prime * result + (m_safeMode ? 1231 : 1237);
+        result = prime * result + m_hostCount;
+        result = prime * result
+                + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
+        result = prime * result + (m_paused ? 1231 : 1237);
+        result = prime * result
+                + ((m_startAction == null) ? 0 : m_startAction.hashCode());
+        result = prime * result
+                + ((m_nodeState == null) ? 0 : m_nodeState.hashCode());
+        return result;
+    }
+
+    @Override @Generated("by eclipse's equals and hashCode source generators")
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
