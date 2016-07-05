@@ -1701,9 +1701,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
         }
 
-        List<String> nonEmptyPaths = managedPathsWithFiles(config, dt);
         // check for already existing artifacts
-        List<String> nonEmptyPaths = managedPathsWithFiles(dt);
+        List<String> nonEmptyPaths = managedPathsWithFiles(config, dt);
         if (!nonEmptyPaths.isEmpty()) {
             StringBuilder crashMessage =
                     new StringBuilder("Files from a previous database session exist in the managed directories:");
