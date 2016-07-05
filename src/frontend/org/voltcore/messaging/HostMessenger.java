@@ -25,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -67,7 +68,6 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.probe.MeshProber;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -113,6 +113,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      *
      */
     public static class Config {
+
+        private static final String ACCEPTOR = "acceptor";
+        private static final String NETWORK_THREADS = "networkThreads";
+        private static final String BACKWARDS_TIME_FORGIVENESS_WINDOW = "backwardstimeforgivenesswindow";
+        private static final String DEAD_HOST_TIMEOUT = "deadhosttimeout";
+        private static final String INTERNAL_PORT = "internalport";
+        private static final String INTERNAL_INTERFACE = "internalinterface";
+        private static final String ZK_INTERFACE = "zkinterface";
+        private static final String COORDINATOR_IP = "coordinatorip";
+        private static final String GROUP = "group";
+
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:7181";
         public String internalInterface = "";
@@ -185,7 +196,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private void initNetworkThreads() {
             try {
                 m_networkLog.info("Default network thread count: " + this.networkThreads);
-                Integer networkThreadConfig = Integer.getInteger("networkThreads");
+                Integer networkThreadConfig = Integer.getInteger(NETWORK_THREADS);
                 if ( networkThreadConfig != null ) {
                     this.networkThreads = networkThreadConfig;
                     m_networkLog.info("Overridden network thread count: " + this.networkThreads);
@@ -201,15 +212,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
-                js.key("group").value(group);
-                js.key("coordinatorip").value(coordinatorIp.toString());
-                js.key("zkinterface").value(zkInterface);
-                js.key("internalinterface").value(internalInterface);
-                js.key("internalport").value(internalPort);
-                js.key("deadhosttimeout").value(deadHostTimeout);
-                js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
-                js.key("networkThreads").value(networkThreads);
-                js.key("acceptor").value(acceptor);
+                js.key(GROUP).value(group);
+                js.key(COORDINATOR_IP).value(coordinatorIp.toString());
+                js.key(ZK_INTERFACE).value(zkInterface);
+                js.key(INTERNAL_INTERFACE).value(internalInterface);
+                js.key(INTERNAL_PORT).value(internalPort);
+                js.key(DEAD_HOST_TIMEOUT).value(deadHostTimeout);
+                js.key(BACKWARDS_TIME_FORGIVENESS_WINDOW).value(backwardsTimeForgivenessWindow);
+                js.key(NETWORK_THREADS).value(networkThreads);
+                js.key(ACCEPTOR).value(acceptor);
                 js.endObject();
 
                 return js.toString();
@@ -224,6 +235,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Stores the information about the host's IP.
      */
     private static class HostInfo {
+
+        private final static String HOST_IP = "hostIp";
+        private final static String GROUP = "group";
+
         final String m_hostIp;
         final String m_group;
 
@@ -236,16 +251,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         {
             final JSONStringer js = new JSONStringer();
             js.object();
-            js.key("hostIp").value(m_hostIp);
-            js.key("group").value(m_group);
+            js.key(HOST_IP).value(m_hostIp);
+            js.key(GROUP).value(m_group);
             js.endObject();
-            return js.toString().getBytes(Charsets.UTF_8);
+            return js.toString().getBytes(StandardCharsets.UTF_8);
         }
 
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
-            final JSONObject obj = new JSONObject(new String(bytes, Charsets.UTF_8));
-            return new HostInfo(obj.getString("hostIp"), obj.getString("group"));
+            final JSONObject obj = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP));
         }
     }
 
