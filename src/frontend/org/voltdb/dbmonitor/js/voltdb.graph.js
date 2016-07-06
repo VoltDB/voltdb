@@ -1210,14 +1210,12 @@
             var cpuDetailsArr = []
             var cpuDetailsArrMin = []
             var cpuDetailsArrDay = []
-            debugger;
             if(localStorage.cpuDetails != undefined)
                 cpuDetailsArr = JSON.parse(localStorage.cpuDetails)
             var cpuDetailsMod = []
 
             if(monitor.cpuFirstData){
                 for(var i = 0; i< cpuDetailsArr.length; i++){
-                    monitor.cpuData.slice(1)
                     monitor.cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
                         "y": cpuDetailsArr[i].percentUsed
                     })
@@ -1276,13 +1274,12 @@
                     cpuMinCount = 0;
                 }
                 cpuData = sliceFirstData(cpuData, dataView.Seconds);
-                debugger;
                 if (timeStamp == monitor.cpuMaxTimeStamp) {
                     cpuData.push({ "x": new Date(timeStamp), "y": cpuData[cpuData.length - 1].y });
-                    MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
+                    cpuDetailsArr = MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
                 } else {
                     cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                    MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
+                    cpuDetailsArr = MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
                 }
                 localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
                 localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
@@ -1313,15 +1310,16 @@
         };
 
         this.saveLocalStorage = function(data, newItem, timeUnit){
-            var sliderValue = 1
-
+            var sliderValue = $( "#slider-range-min" ).slider( "value" )
+            var slicedData = []
             var interval = (sliderValue * 60) / timeUnit
-
-            if (data.length >= interval){
-                data.slice(data.length - interval)
+            if (data.length > interval){
+                slicedData = data.slice(1,  (data.length - (data.length - interval)) -1 )
+            } else {
+                slicedData = data
             }
-
-            data.push(newItem);
+            slicedData.push(newItem)
+            return slicedData;
         }
 
         function getPartitionData() {
@@ -1351,7 +1349,6 @@
                     currentTimerTick: partitionDetails["partitionDetail"]["timeStamp"]
                 });
                 localStorage.partitionDetails = JSON.stringify(VoltDbUi.partitionDetails)
-//                console.log(localStorage.partitionDetails);
             }
 
             if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
