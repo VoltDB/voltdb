@@ -63,32 +63,51 @@ import org.voltdb.utils.VoltFile;
     static OutputStream connectToOneServerWithRetry(String server, int port) {
         int sleep = 1000;
         while (true) {
+            Socket pushSocket = null;
             try {
-                Socket pushSocket = new Socket(server, port);
+                pushSocket = new Socket(server, port);
                 OutputStream out = pushSocket.getOutputStream();
                 System.out.printf("Connected to VoltDB node at: %s.\n", server);
                 return out;
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
                 try {
                     Thread.sleep(sleep);
-                } catch (Exception interruted) {
                 }
-                if (sleep < 8000)
+                catch (Exception interrupted) {
+                }
+                if (sleep < 8000) {
                     sleep += sleep;
+                }
             }
         }
     }
-    class SocketDataPusher extends Thread {
-        private final String m_server;
+
+    public static CountDownLatch pushDataAsync(int port, String[] data) {
+        CountDownLatch latch = new CountDownLatch(1);
+        (new SocketDataPusher(port, latch, data)).start();
+        return latch;
+    }
+
+    public static void pushDataSync(int port, String[] data) {
+        CountDownLatch latch = pushDataAsync(port, data);
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static class SocketDataPusher extends Thread {
+        private static final String m_server = "localhost";
         private OutputStream m_sout;
         private final CountDownLatch m_latch;
         private final int m_port;
         private final String[] m_data;
 
-        public SocketDataPusher(String server, int port, CountDownLatch latch, String[] data) {
+        private SocketDataPusher(int port, CountDownLatch latch, String[] data) {
             m_latch = latch;
-            m_server = server;
             m_port = port;
             m_data = data;
         }
@@ -107,9 +126,11 @@ import org.voltdb.utils.VoltFile;
                     m_sout.write(m_data[icnt].getBytes());
                     Thread.sleep(0, 1);
                 }
-            } catch (Exception ex) {
+            }
+            catch (Exception ex) {
                 ex.printStackTrace();
-            } finally {
+            }
+            finally {
                 close();
                 m_latch.countDown();
             }
@@ -118,8 +139,10 @@ import org.voltdb.utils.VoltFile;
         protected void close() {
             try {
                 m_sout.close();
-            } catch (IOException ex) {
+            }
+            catch (IOException ignored) {
             }
         }
+
     }
 }
