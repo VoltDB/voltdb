@@ -28,7 +28,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 package org.hsqldb_voltpatches;
 
 import java.util.Comparator;
@@ -68,46 +67,33 @@ public class ExpressionColumn extends Expression {
      * Creates a OpCodes.COLUMN expression
      */
     ExpressionColumn(String schema, String table, String column) {
-
         super(OpTypes.COLUMN);
-
         this.schema = schema;
         tableName   = table;
         columnName  = column;
     }
 
     ExpressionColumn(ColumnSchema column) {
-
         super(OpTypes.COLUMN);
-
         columnName = column.getName().name;
     }
 
     ExpressionColumn(RangeVariable rangeVar, ColumnSchema column) {
-
         super(OpTypes.COLUMN);
-
-        columnIndex = rangeVar.rangeTable.findColumn(column.getName().name);
-
-        setAttributesAsColumn(rangeVar, columnIndex);
+        setAttributesAsColumn(rangeVar,
+                rangeVar.rangeTable.findColumn(column.getName().name));
     }
 
     ExpressionColumn(RangeVariable rangeVar, ColumnSchema column, int index) {
-
         super(OpTypes.COLUMN);
-
-        columnIndex = index;
-
-        setAttributesAsColumn(rangeVar, columnIndex);
+        setAttributesAsColumn(rangeVar, index);
     }
 
     /**
      * Creates a temporary OpCodes.COLUMN expression
      */
     ExpressionColumn(Expression e, int colIndex, int rangePosition) {
-
         this(OpTypes.SIMPLE_COLUMN);
-
         dataType           = e.dataType;
         columnIndex        = colIndex;
         alias              = e.alias;
@@ -119,18 +105,14 @@ public class ExpressionColumn extends Expression {
     }
 
     ExpressionColumn(int type) {
-
         super(type);
-
         if (type == OpTypes.DYNAMIC_PARAM) {
             isParam = true;
         }
     }
 
     ExpressionColumn(Expression[] nodes, String name) {
-
         super(OpTypes.COALESCE);
-
         this.nodes      = nodes;
         this.columnName = name;
     }
@@ -139,9 +121,7 @@ public class ExpressionColumn extends Expression {
      * Creates an OpCodes.ASTERISK expression
      */
     ExpressionColumn(String schema, String table) {
-
         super(OpTypes.MULTICOLUMN);
-
         this.schema = schema;
         tableName   = table;
     }
@@ -150,38 +130,33 @@ public class ExpressionColumn extends Expression {
      * Creates a OpCodes.SEQUENCE expression
      */
     ExpressionColumn(NumberSequence sequence) {
-
         super(OpTypes.SEQUENCE);
-
         this.sequence = sequence;
         dataType      = sequence.getDataType();
     }
 
-    void setAttributesAsColumn(RangeVariable range, int i) {
-
-        if (range.variables != null) {
-            columnIndex   = i;
-            column        = range.getColumn(i);
-            dataType      = column.getDataType();
-            rangeVariable = range;
-        } else {
-            Table t = range.getTable();
-
-            columnIndex = i;
-            column      = range.getColumn(i);
-            dataType    = column.getDataType();
-            columnName  = column.getName().name;
-            tableName   = t.getName().name;
-            schema      = t.getSchemaName().name;
-
-            if (alias == null && range.hasColumnAlias()) {
-                alias = range.getColumnAliasName(i);
-            }
-
-            rangeVariable = range;
-
-            rangeVariable.addColumn(columnIndex);
+    void setAttributesAsColumn(RangeVariable range, int index) {
+        columnIndex   = index;
+        column        = range.getColumn(index);
+        dataType      = column.getDataType();
+        rangeVariable = range;
+        // Note: rangeVariable.variables is only non-null in the
+        // special case of a RangeVariable that is rigged to contain
+        // system settings.
+        // There's a good chance that this special case is not
+        // exercised by VoltDB.
+        if (rangeVariable.variables != null) {
+            return;
         }
+
+        columnName  = column.getName().name;
+        Table table = range.getTable();
+        tableName   = table.getName().name;
+        schema      = table.getSchemaName().name;
+        if (alias == null && rangeVariable.hasColumnAliases()) {
+            alias = rangeVariable.getColumnAliasName(index);
+        }
+        rangeVariable.addColumn(columnIndex);
     }
 
     @Override
@@ -370,22 +345,22 @@ public class ExpressionColumn extends Expression {
                             if (usingResolutions.add(resolution)) {
                                 foundSize += 1;
                             }
-                            // Cache this in case this is the only resolution.
-                            lastRes = resolution;
-                        } else {
+                        }
+                        else {
                             assert(resolution instanceof RangeVariableColumnReferenceResolution);
                             if (rangeVariableResolutions.add(resolution)) {
                                 foundSize += 1;
                             }
-                            // Cache this in case this is the only resolution.
-                            lastRes = resolution;
                         }
+                        // Cache this in case this is the only resolution.
+                        lastRes = resolution;
                     }
                 }
                 if (foundSize == 1) {
                     lastRes.finallyResolve();
                     return unresolvedSet;
-                } else if (foundSize > 1) {
+                }
+                if (foundSize > 1) {
                     StringBuffer sb = new StringBuffer();
                     sb.append(String.format("Column \"%s\" is ambiguous.  It's in tables: ", columnName));
                     String sep = "";
@@ -525,7 +500,8 @@ public class ExpressionColumn extends Expression {
             // alias, we use the table name.
             if (m_rangeVariable.tableAlias != null && m_rangeVariable.tableAlias.name != null) {
                 return m_rangeVariable.tableAlias.name;
-            } else if (m_rangeVariable.getTable() != null
+            }
+            if (m_rangeVariable.getTable() != null
                        && m_rangeVariable.getTable().getName() != null
                        && m_rangeVariable.getTable().getName().name != null) {
                 return m_rangeVariable.getTable().getName().name;
@@ -663,9 +639,7 @@ public class ExpressionColumn extends Expression {
 
     @Override
     public String getSQL() {
-
         switch (opType) {
-
             case OpTypes.DEFAULT :
                 return Tokens.T_DEFAULT;
 
@@ -676,8 +650,6 @@ public class ExpressionColumn extends Expression {
                 return "*";
 
             case OpTypes.COALESCE :
-
-//                return columnName;
                 return alias.getStatementName();
 
             case OpTypes.VARIABLE :
@@ -686,47 +658,32 @@ public class ExpressionColumn extends Expression {
                 if (column == null) {
                     if (alias != null) {
                         return alias.getStatementName();
-                    } else {
-                        return columnName;
                     }
+                    return columnName;
                 }
 
-                // A VoltDB extension to allow toSQL on expressions in DDL
                 if (rangeVariable == null || rangeVariable.tableAlias == null) {
-                /* disable 1 line ...
-                if (rangeVariable.tableAlias == null) {
-                ... disabled 1 line */
-                // End of VoltDB extension
                     return column.getName().getSchemaQualifiedStatementName();
-                } else {
-                    StringBuffer sb = new StringBuffer();
-
-                    sb.append(rangeVariable.tableAlias.getStatementName());
-                    sb.append('.');
-                    sb.append(column.getName().statementName);
-
-                    return sb.toString();
                 }
+                StringBuffer sb = new StringBuffer();
+                sb.append(rangeVariable.tableAlias.getStatementName());
+                sb.append('.');
+                sb.append(column.getName().statementName);
+                return sb.toString();
             }
+
             case OpTypes.MULTICOLUMN : {
                 if (nodes.length == 0) {
                     return "*";
                 }
 
                 StringBuffer sb = new StringBuffer();
-
-                for (int i = 0; i < nodes.length; i++) {
-                    Expression e = nodes[i];
-
-                    if (i > 0) {
-                        sb.append(',');
-                    }
-
+                String prefix = "";
+                for (Expression e : nodes) {
                     String s = e.getSQL();
-
-                    sb.append(s);
+                    sb.append(prefix).append(s);
+                    prefix = ",";
                 }
-
                 return sb.toString();
             }
             default :
@@ -806,11 +763,9 @@ public class ExpressionColumn extends Expression {
 
     /**
      * Returns the table name for a column expression as a string
-     *
      * @return table name
      */
     String getTableName() {
-
         if (opType == OpTypes.MULTICOLUMN) {
             return tableName;
         }
@@ -818,11 +773,9 @@ public class ExpressionColumn extends Expression {
         if (opType == OpTypes.COLUMN) {
             if (rangeVariable == null) {
                 return tableName;
-            } else {
-                return rangeVariable.getTable().getName().name;
             }
+            return rangeVariable.getTable().getName().name;
         }
-
         return "";
     }
 
@@ -960,9 +913,8 @@ public class ExpressionColumn extends Expression {
         public final ExpressionColumn getExpressionColumn() {
             if (m_expression instanceof ExpressionColumn) {
                 return (ExpressionColumn)m_expression;
-            } else {
-                return null;
             }
+            return null;
         }
 
         @Override
@@ -1016,63 +968,58 @@ public class ExpressionColumn extends Expression {
                 // We only want to be equal if the other's index is
                 // equal to ours.  This will always be false, I think.
                 return m_index - o.m_index;
-            } else {
-                // They are both column references.  We want to return
-                // 0 if they refer to the same table expression column.
-                // This is to say, if they have the same column name and
-                // the same table alias or else their column name is in
-                // the using list for their range variables.  It has to
-                // be in the using list for both range variables.  In
-                // a query like this:
-                //   select C from R as LR join R as CR using(C), R as RR order by C;
-                // C is in the using list of the first join (LR and CR) but
-                // not the third (RR).  So, this would be ambiguous.
-                int nc = m_columnName.compareTo(o.m_columnName);
-                if (nc != 0) {
-                    return nc;
-                } else {
-                    RangeVariable rv = ecol.getRangeVariable();
-                    RangeVariable orv = oecol.getRangeVariable();
-                    if (rv == null) {
-                        if (orv == null) {
-                            return m_index - o.m_index;
-                        } else {
-                            // Find out if this column name is in the
-                            // using list of orv.  If it is, these both
-                            // denote the same column.  We want to use the
-                            // alias here because we always have an alias
-                            // and we may not have a column name.
-                            if (orv.getColumnExpression(m_alias) != null) {
-                                return 0;
-                            } else {
-                                return m_index - o.m_index;
-                            }
-                        }
-                    } else if (orv == null) {
-                        // If orv == null but the column names are equal, it
-                        // could be that orv is an instance of a using variable
-                        // and rv is the range variable for the column with
-                        // the same column name.  Remember, getColumnExpression()
-                        // just gets ExpressionColumns for USING column names.
-                        if (rv.getColumnExpression(m_columnName) != null) {
-                            return 0;
-                        } else {
-                            return m_index - o.m_index;
-                        }
-                    } else {
-                        ExpressionColumn myEC = rv.getColumnExpression(m_columnName);
-                        ExpressionColumn oEC = orv.getColumnExpression(m_columnName);
-
-                        if (myEC != null && oEC != null && myEC == oEC) {
-                            // They are the same in a using list.
-                            return 0;
-                        } else {
-                            assert(m_tableAlias != null);
-                            return m_tableAlias.compareTo(o.m_tableAlias);
-                        }
-                    }
-                }
             }
+
+            // They are both column references.  We want to return
+            // 0 if they refer to the same table expression column.
+            // This is to say, if they have the same column name and
+            // the same table alias or else their column name is in
+            // the using list for their range variables.  It has to
+            // be in the using list for both range variables.  In
+            // a query like this:
+            //   select C from R as LR join R as CR using(C), R as RR order by C;
+            // C is in the using list of the first join (LR and CR) but
+            // not the third (RR).  So, this would be ambiguous.
+            int nc = m_columnName.compareTo(o.m_columnName);
+            if (nc != 0) {
+                return nc;
+            }
+            RangeVariable rv = ecol.getRangeVariable();
+            RangeVariable orv = oecol.getRangeVariable();
+            if (rv == null) {
+                if (orv == null) {
+                    return m_index - o.m_index;
+                }
+                // Find out if this column name is in the
+                // using list of orv.  If it is, these both
+                // denote the same column.  We want to use the
+                // alias here because we always have an alias
+                // and we may not have a column name.
+                if (orv.getColumnExpression(m_alias) != null) {
+                    return 0;
+                }
+                return m_index - o.m_index;
+            }
+            if (orv == null) {
+                // If orv == null but the column names are equal, it
+                // could be that orv is an instance of a using variable
+                // and rv is the range variable for the column with
+                // the same column name.  Remember, getColumnExpression()
+                // just gets ExpressionColumns for USING column names.
+                if (rv.getColumnExpression(m_columnName) != null) {
+                    return 0;
+                }
+                return m_index - o.m_index;
+            }
+            ExpressionColumn myEC = rv.getColumnExpression(m_columnName);
+            ExpressionColumn oEC = orv.getColumnExpression(m_columnName);
+
+            if (myEC != null && oEC != null && myEC == oEC) {
+                // They are the same in a using list.
+                return 0;
+            }
+            assert(m_tableAlias != null);
+            return m_tableAlias.compareTo(o.m_tableAlias);
         }
     }
 
@@ -1151,12 +1098,10 @@ public class ExpressionColumn extends Expression {
             if (nodes[i] == null) {
                 continue;
             }
-
             nodes[i] = nodes[i].replaceAliasInOrderBy(columns, length);
         }
         // Now process the node itself.
         switch (opType) {
-
             case OpTypes.COALESCE :
             case OpTypes.COLUMN : {
                 // Look through all the columns in columns.  These are
@@ -1216,7 +1161,8 @@ public class ExpressionColumn extends Expression {
                 // handle it in the usual way.
                 if (foundNames.size() == 1) {
                     return firstFoundExpr;
-                } else if (foundNames.size() > 1) {
+                }
+                if (foundNames.size() > 1) {
                     StringBuffer sb = new StringBuffer();
                     sb.append(String.format("The name \"%s\" in an order by expression is ambiguous.  It's in columns: ", columnName));
                     appendNameList(sb, foundNames, "");
@@ -1337,18 +1283,17 @@ public class ExpressionColumn extends Expression {
      * representation of this HSQLDB object.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
-    {
+    VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp) {
         if (tableName != null) {
             if (rangeVariable != null && rangeVariable.rangeTable != null &&
                     rangeVariable.tableAlias != null &&
                     rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
                 exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
-            } else {
+            }
+            else {
                 exp.attributes.put("table", tableName.toUpperCase());
             }
         }
-        //TODO: also indicate RangeVariable in case table is ambiguous (for self-joins).
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {
             exp.attributes.put("alias", columnName.toUpperCase());

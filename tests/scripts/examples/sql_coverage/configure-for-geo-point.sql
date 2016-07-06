@@ -20,6 +20,8 @@
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
+
+{@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
 {@insertvals = "_id, _value[point], _value[point null25], _value[point null50], null, null, null, _value[float]"}
 {@onefun = ""}  -- There are no handy unary point-to-point functions
 {@optionalfn = "_geofun"}

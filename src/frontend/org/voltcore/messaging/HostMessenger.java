@@ -415,7 +415,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (makePPDDecision(m_localHostId, previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
             // record here so we can ensure this only happens once for this node
             m_partitionDetected = true;
-            VoltDB.crashGlobalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
+            VoltDB.crashLocalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
                         false, null);
         }
     }
@@ -1378,11 +1378,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void cutLink(int hostIdA, int hostIdB) {
         if (m_localHostId == hostIdA) {
             ForeignHost fh = m_foreignHosts.get(hostIdB);
-            fh.cutLink();
+            if (fh != null) {
+                fh.cutLink();
+            }
         }
         if (m_localHostId == hostIdB) {
             ForeignHost fh = m_foreignHosts.get(hostIdA);
-            fh.cutLink();
+            if (fh != null) {
+                fh.cutLink();
+            }
         }
     }
 

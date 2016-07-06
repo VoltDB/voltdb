@@ -620,7 +620,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      * Add a table to the statement cache.
-     * @param tableName
+     * @param table
      * @param tableAlias
      * @return the cache entry
      */
@@ -636,7 +636,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      * Add a sub-query to the statement cache.
-     * @param subQuery
+     * @param subquery
      * @param tableAlias
      * @return the cache entry
      */

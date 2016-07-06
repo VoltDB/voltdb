@@ -143,7 +143,7 @@ public class QueryExpression {
         sortAndSlice.sortUnion = true;
     }
 
-    public void setUnionCorresoponding() {
+    public void setUnionCorresponding() {
         unionCorresponding = true;
     }
 
