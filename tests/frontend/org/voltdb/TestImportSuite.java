@@ -47,8 +47,6 @@ import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-
 /**
  * End to end Import tests using the injected socket importer.
  *
@@ -367,20 +365,18 @@ public class TestImportSuite extends RegressionSuite {
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
 
         // configure socket importer
-        Properties props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        Properties props = buildProperties(
                 "port", "7001",
                 "decode", "true",
-                "procedure", "importTable.insert"));
+                "procedure", "importTable.insert");
         project.addImport(true, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // configure log4j socket handler importer
-        props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        props = buildProperties(
                 "port", "6060",
                 "procedure", "log_events.insert",
-                "log-event-table", "log_events"));
+                "log-event-table", "log_events");
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
         /*

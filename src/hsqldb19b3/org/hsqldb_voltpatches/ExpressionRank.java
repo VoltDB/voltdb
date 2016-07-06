@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.types.Type;
 
 
@@ -48,8 +49,7 @@ public class ExpressionRank extends Expression {
 
     ExpressionRank(SortAndSlice sortAndSlice, List<Expression> partitionByList, boolean isPercent) {
         super(OpTypes.RANK);
-
-        nodes       = Expression.emptyExpressionArray;
+        nodes = Expression.emptyExpressionArray;
         m_partitionByList = partitionByList;
         m_sortAndSlice = sortAndSlice;
     }
@@ -68,14 +68,44 @@ public class ExpressionRank extends Expression {
     }
 
     @Override
-    public void resolveTypes(Session session, Expression parent) {
-
-        for(int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
-            Expression e = (Expression) m_sortAndSlice.exprList.get(i);
-            e.resolveTypes(session, parent);
+    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
+            int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
+        HsqlList localSet = null;
+        for (Expression e : m_partitionByList) {
+            localSet = e.resolveColumnReferences(
+                    RangeVariable.emptyArray, localSet);
         }
+
+        for (int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
+            Expression e = (Expression) m_sortAndSlice.exprList.get(i);
+            assert(e instanceof ExpressionOrderBy);
+            ExpressionOrderBy expr = (ExpressionOrderBy)e;
+            localSet = expr.resolveColumnReferences(
+                    RangeVariable.emptyArray, localSet);
+        }
+
+        if (localSet != null) {
+            isCorrelated = true;
+            for (int i = 0; i < localSet.size(); i++) {
+                Expression e = (Expression) localSet.get(i);
+                unresolvedSet = e.resolveColumnReferences(rangeVarArray,
+                        unresolvedSet);
+            }
+            unresolvedSet = Expression.resolveColumnSet(rangeVarArray,
+                    localSet, unresolvedSet);
+        }
+
+        return unresolvedSet;
+    }
+
+    @Override
+    public void resolveTypes(Session session, Expression parent) {
         for (Expression expr : m_partitionByList) {
             expr.resolveTypes(session, parent);
+        }
+        for (int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
+            Expression e = (Expression) m_sortAndSlice.exprList.get(i);
+            e.resolveTypes(session, parent);
         }
     }
 
@@ -107,28 +137,27 @@ public class ExpressionRank extends Expression {
         return sb.toString();
     }
 
-    public VoltXMLElement voltAnnotateRankXML(VoltXMLElement exp, Session session) throws HSQLParseException {
+    public VoltXMLElement voltAnnotateRankXML(VoltXMLElement exp, SimpleColumnContext context)
+            throws HSQLParseException {
     	if (m_partitionByList.size() > 0) {
             VoltXMLElement pxe = new VoltXMLElement("partitionbyList");
             exp.children.add(pxe);
             for (Expression e : m_partitionByList) {
-                pxe.children.add(e.voltGetXML(session));
+                pxe.children.add(e.voltGetXML(context, null));
             }
         }
 
         VoltXMLElement rxe = new VoltXMLElement("orderbyList");
         exp.children.add(rxe);
 
-        for(int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
+        for (int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
             Expression e = (Expression) m_sortAndSlice.exprList.get(i);
             assert(e instanceof ExpressionOrderBy);
             ExpressionOrderBy expr = (ExpressionOrderBy)e;
-            VoltXMLElement orderby = expr.voltGetXML(session);
+            VoltXMLElement orderby = expr.voltGetXML(context, null);
             boolean isDecending = expr.isDescending();
             orderby.attributes.put("decending", isDecending ? "true": "false");
             rxe.children.add(orderby);
-
-            // ignore isNullFist flag as VoltDB is not configurable now
         }
 
         return exp;
