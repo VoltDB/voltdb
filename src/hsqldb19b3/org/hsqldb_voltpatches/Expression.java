@@ -240,10 +240,8 @@ public class Expression {
      * ROW or VALUELIST
      */
     Expression(int type, Expression[] list) {
-
         this(type);
-
-        this.nodes = list;
+        nodes = list;
     }
 
     public String describe(Session session) {
@@ -441,7 +439,7 @@ public class Expression {
         switch (opType) {
 
             case OpTypes.SIMPLE_COLUMN :
-                return this.columnIndex == other.columnIndex;
+                return columnIndex == other.columnIndex;
 
             case OpTypes.VALUE :
                 return equals(valueData, other.valueData);
@@ -1159,7 +1157,9 @@ public class Expression {
 
             try {
                 store.indexRow(session, row);
-            } catch (HsqlException e) {}
+            }
+            //XXX: what conditions are being casually ignored here?
+            catch (HsqlException e) {}
         }
     }
 
@@ -1236,7 +1236,8 @@ public class Expression {
 
         try {
             return getValue(session);
-        } catch (HsqlException e) {
+        }
+        catch (HsqlException e) {
             return null;
         }
     }
@@ -1550,35 +1551,84 @@ public class Expression {
     }
 
     /**
-     * @param session
-     * @return
-     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-     */
-    VoltXMLElement voltGetXML(Session session)
-            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        return voltGetXML(session, null, null, -1);
+     * A SimpleColumnContext encapsulates the current Session object and
+     * (optionally) select statement display columns and related state that may
+     * be needed to resolve some column expressions in a statement's expression
+     * trees. It is also used to tag pseudo-display-columns that are used solely
+     * to resolve column expressions but are NOT actually intended for "display"
+     * in the query result set. A SimpleColumnContext is the main vehicle for
+     * passing shared context into the recursive Expression.voltGetXML process.
+     **/
+    static class SimpleColumnContext {
+        final Session m_session;
+        final List<Expression> m_displayCols;
+        final java.util.Set<Integer> m_ignoredDisplayColIndexes = new java.util.HashSet<>();
+        private int m_startKey = -1;
+
+        SimpleColumnContext(Session session, List<Expression> displayCols) {
+            m_session = session;
+            m_displayCols = displayCols;
+        }
+
+        SimpleColumnContext withStartKey(int startKey) {
+            m_startKey = startKey;
+            return this;
+        }
+
+        private VoltXMLElement resolveSimpleColumn(Expression simpleCol)
+                throws HSQLParseException {
+            if (m_displayCols == null) {
+                if (simpleCol instanceof ExpressionColumn == false) {
+                    throw new HSQLParseException(
+                            "VoltDB does not support this complex query currently.");
+                }
+            }
+            else {
+                // find the substitute from displayCols list
+                for (int ii=m_startKey+1; ii < m_displayCols.size(); ++ii) {
+                    Expression otherCol = m_displayCols.get(ii);
+                    // This mechanism of finding the expression that a SIMPLE_COLUMN
+                    // is referring to is inherently fragile---columnIndex is an
+                    // offset into different things depending on context!
+                    if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                             (otherCol.columnIndex == simpleCol.columnIndex)  &&
+                             !(otherCol instanceof ExpressionColumn)) {
+                        // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN.
+                        m_ignoredDisplayColIndexes.add(ii);
+                        // Serialize the column this simple column stands-in for.
+                        return otherCol.voltGetXML(this, simpleCol.getAlias());
+                    }
+                }
+            }
+            return null;
+        }
+
+        public boolean disabledTheColumnForDisplay(int jj) {
+            return m_ignoredDisplayColIndexes.contains(jj);
+        }
+
+
     }
 
-    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey)
-            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        return voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, null);
+    /**
+     * @param session
+     * @return
+     * @throws HSQLParseException
+     */
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
+        return voltGetXML(new SimpleColumnContext(session, null), null);
     }
 
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
-     * some names.
-     * @return XML, correctly indented, representing this object.
-     * @throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+     * @param context The context encapsulates the current Session object and (optionally)
+     * select statement display columns that may be needed to resolve some names.
+     * @return A VoltXML tree structure.
+     * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols,
-            java.util.Set<Integer> ignoredDisplayColIndexes, int startKey, String realAlias)
-        throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
+    VoltXMLElement voltGetXML(SimpleColumnContext context, String realAlias)
+        throws HSQLParseException {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
         int exprOp = getType();
@@ -1594,30 +1644,9 @@ public class Expression {
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
         if (exprOp == OpTypes.SIMPLE_COLUMN) {
-            if (displayCols == null) {
-                if (this instanceof ExpressionColumn == false) {
-                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                            "VoltDB does not support this complex query currently.");
-                }
-            } else {
-                // find the substitue from displayCols list
-                for (int ii=startKey+1; ii < displayCols.size(); ++ii)
-                {
-                    Expression otherCol = displayCols.get(ii);
-                    // This mechanism of finding the expression that a SIMPLE_COLUMN
-                    // is referring to is inherently fragile---columnIndex is an
-                    // offset into different things depending on context!
-                    if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                             (otherCol.columnIndex == this.columnIndex)  &&
-                             !(otherCol instanceof ExpressionColumn))
-                    {
-                        ignoredDisplayColIndexes.add(ii);
-                        // serialize the column this simple column stands-in for.
-                        // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
-                        // quit seeking simple_column's replacement.
-                        return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
-                    }
-                }
+            VoltXMLElement asResolved = context.resolveSimpleColumn(this);
+            if (asResolved != null) {
+                return asResolved;
             }
             // ENG-10429 moved the following two lines here. See fix note https://issues.voltdb.com/browse/ENG-10429.
             // convert the SIMPLE_COLUMN into a COLUMN
@@ -1636,24 +1665,26 @@ public class Expression {
         // Duplicate the prototype and add any expression particulars needed for the specific opType value,
         // as well as a unique identifier, a possible alias, and child nodes.
         exp = exp.duplicate();
-        exp.attributes.put("id", this.getUniqueId(session));
+        exp.attributes.put("id", getUniqueId(context.m_session));
 
         if (realAlias != null) {
             exp.attributes.put("alias", realAlias);
-        } else if ((alias != null) && (getAlias().length() > 0)) {
+        }
+        else if ((alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
         }
 
         // Add expression sub type
         if (exprSubType == OpTypes.ANY_QUANTIFIED) {
             exp.attributes.put("opsubtype", "any");
-        } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
+        }
+        else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
             exp.attributes.put("opsubtype", "all");
         }
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
+                VoltXMLElement vxmle = expr.voltGetXML(context, null);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -1667,15 +1698,13 @@ public class Expression {
         // VoltXMLElement.
         switch (exprOp) {
         case OpTypes.VALUE:
-            // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
-            // I'm not sure why this must be the case --paul.
-            // if the actual value is null, make sure the type is null as well
+            // Apparently at this stage, all valid non-NULL values must have a
+            // type determined by HSQL.
+            // (I'm not sure why this MUST be the case --paul.)
             if (valueData == null) {
-                if (dataType == null) {
-                    exp.attributes.put("valuetype", "NULL");
-                    return exp;
-                }
-                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
+                String valueType = (dataType == null) ? "NULL" :
+                        Types.getTypeName(dataType.typeCode);
+                exp.attributes.put("valuetype", valueType);
                 return exp;
             }
 
@@ -1736,7 +1765,7 @@ public class Expression {
 
         case OpTypes.CAST:
             if (dataType == null) {
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                throw new HSQLParseException(
                         "VoltDB could not determine the type in a CAST operation");
             }
             exp.attributes.put("valuetype", dataType.getNameString());
@@ -1747,7 +1776,8 @@ public class Expression {
                 throw new HSQLParseException("VoltDB could not determine the subquery");
             }
             ExpressionColumn parameters[] = new ExpressionColumn[0];
-            exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression, parameters, session));
+            exp.children.add(StatementQuery.voltGetXMLExpression(subQuery.queryExpression,
+                    parameters, context.m_session));
             return exp;
 
         case OpTypes.ALTERNATIVE:
@@ -1766,11 +1796,11 @@ public class Expression {
             return exp;
 
         case OpTypes.RANK:
-            exp.attributes.put("valuetype", Type.SQL_NUMERIC.getNameString());
+            assert(dataType != null);
+            exp.attributes.put("valuetype", dataType.getNameString());
             ExpressionRank erank = (ExpressionRank) this;
+            return erank.voltAnnotateRankXML(exp, context);
 
-            return erank.voltAnnotateRankXML(exp, session);
-            
         default:
             return exp;
         }
@@ -1783,8 +1813,9 @@ public class Expression {
      * @return A hex-encoded string with double length.
      */
     public static String hexEncode(byte[] data) {
-        if (data == null)
+        if (data == null) {
             return null;
+        }
 
         StringBuilder sb = new StringBuilder();
         for (byte b : data) {
@@ -1805,8 +1836,7 @@ public class Expression {
     }
 
     private static void throwForUnsupportedExpression(int exprOp)
-            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
+            throws HSQLParseException {
         String opAsString;
         switch (exprOp) {
         //case OpTypes.COALESCE:
@@ -1860,8 +1890,7 @@ public class Expression {
         default:
             opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
         }
-        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                "VoltDB does not support " + opAsString);
+        throw new HSQLParseException("VoltDB does not support " + opAsString);
     }
 
     /**
@@ -1896,7 +1925,8 @@ public class Expression {
         if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
             extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
             extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
-        } else {
+        }
+        else {
             String id = expr.getUniqueId(session);
             subExprMap.put(id, expr);
        }
@@ -1922,15 +1952,12 @@ public class Expression {
         // seems to help with some types like "equal"
         cached_id = new String();
         int hashCode = 0;
-        //
-        // If object is a leaf node, then we'll use John's original code...
-        //
+        // If object is a leaf node, then use John's original code...
         if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
             hashCode = super.hashCode();
-        //
-        // Otherwise we need to generate and Id based on what our children are
-        //
-        } else {
+        }
+        // Otherwise, generate an id based on the children
+        else {
             //
             // Horribly inefficient, but it works for now...
             //
@@ -1938,8 +1965,9 @@ public class Expression {
             new Object() {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {
-                        if (expr != null)
+                        if (expr != null) {
                             id_list.add(expr.getUniqueId(session));
+                        }
                     }
                 }
             }.traverse(this);
@@ -1947,11 +1975,12 @@ public class Expression {
             if (id_list.size() > 0) {
                 // Flatten the id list, intern it, and then do the same trick from above
                 for (String temp : id_list)
-                    this.cached_id += "+" + temp;
-                hashCode = this.cached_id.intern().hashCode();
+                    cached_id += "+" + temp;
+                hashCode = cached_id.intern().hashCode();
             }
-            else
+            else {
                 hashCode = super.hashCode();
+            }
         }
 
         long id = session.getNodeIdForExpression(hashCode);
@@ -1961,11 +1990,11 @@ public class Expression {
 
     // A VoltDB extension to support indexed expressions
     public VoltXMLElement voltGetExpressionXML(Session session, Table table)
-            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+            throws HSQLParseException {
         resolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
-        return voltGetXML(session);
+        return voltGetXML(new SimpleColumnContext(session, null), null);
     }
 
     // A VoltDB extension to support indexed expressions
@@ -1995,11 +2024,14 @@ public class Expression {
         // sadly do this with reflection
         Field[] fields = OpTypes.class.getFields();
         for (Field f : fields) {
-            if (f.getType() != int.class) continue;
+            if (f.getType() != int.class) {
+                continue;
+            }
             int value = 0;
             try {
                 value = f.getInt(null);
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
@@ -2017,9 +2049,8 @@ public class Expression {
                 ", isAggregate: " + isAggregate +
                 ", columnIndex: " + columnIndex;
         if (this instanceof ExpressionOrderBy) {
-            str += "\n  " + this.nodes[LEFT].toString();
+            str += "\n  " + nodes[LEFT].toString();
         }
         return str;
     }
-    /**********************************************************************/
 }

@@ -64,52 +64,89 @@ public class TestWindowedFunctions extends PlannerTestCase {
         boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
         PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
         try {
-            AbstractPlanNode node = compile("SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A,B ORDER BY B DESC ) AS ARANK FROM AAA;");
-            // The plan should look like:
-            // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
-            // We also do some santity checking on the PartitionPlan node.
-            // First dissect the plan.
-            assertTrue(node instanceof SendPlanNode);
-            AbstractPlanNode sendNode = node;
+            String windowedQuery;
+            windowedQuery = "SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+            validateWindowedFunctionPlan(windowedQuery, 3, 2);
 
-            AbstractPlanNode projPlanNode = node.getChild(0);
-            assertTrue(projPlanNode instanceof ProjectionPlanNode);
+            // Altering the position of the rank column does not radically
+            // change the plan structure.
+            windowedQuery = "SELECT RANK() OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK, A+B, MOD(A, B), B FROM AAA;";
+            validateWindowedFunctionPlan(windowedQuery, 3, 2);
 
-            AbstractPlanNode partitionByPlanNode = projPlanNode.getChild(0);
-            assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+            // Try some strange edge case that trivially order by a partition
+            // by column, so they should trivially result in a rank of 1 for
+            // each partition.
 
-            AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
-            assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
-            OrderByPlanNode orderByNode = (OrderByPlanNode)abstractOrderByNode;
-            NodeSchema input_schema = orderByNode.getOutputSchema();
-            assertNotNull(input_schema);
+            windowedQuery = "SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A, B ORDER BY B DESC) AS ARANK FROM AAA;";
+            validateWindowedFunctionPlan(windowedQuery, 2, 1);
 
-            AbstractPlanNode seqScanNode = orderByNode.getChild(0);
-            assertTrue(seqScanNode instanceof SeqScanPlanNode);
-
-            PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
-            NodeSchema  schema = pbPlanNode.getOutputSchema();
-
-            //
-            // Check that the order by node has the right number of expressions.
-            // and that they have the correct order.
-            //
-            assertEquals(2, orderByNode.getSortExpressions().size());
-            assertEquals(SortDirectionType.ASC, orderByNode.getSortDirections().get(0));
-            assertEquals(SortDirectionType.DESC, orderByNode.getSortDirections().get(1));
-            //
-            // Check that the partition by plan node's output schema correct.  First,
-            // look at the first expression, to verify that it's the windowed expression.
-            // Then check that the TVEs all make sense.
-            //
-            SchemaColumn column = schema.getColumns().get(0);
-            assertTrue(column.getExpression() instanceof WindowedExpression);
-            assertEquals("ARANK", column.getColumnAlias());
-            assertEquals(2, pbPlanNode.getNumberOfPartitionByExpressions());
-            validateTVEs(input_schema, pbPlanNode);
+            // The order in which the PARTITION BY keys are listed should not
+            // radically change the plan structure.
+            windowedQuery = "SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY B, A ORDER BY B DESC ) AS ARANK FROM AAA;";
+            validateWindowedFunctionPlan(windowedQuery, 2, 0);
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
         }
+    }
+
+    /**
+     * Validate that each similar windowed query in testRank produces a similar
+     * plan, with the expected minor variation to its ORDER BY node.
+     * @param windowedQuery a variant of a test query of a known basic format
+     * @param nSorts the expected number of sort criteria that should have been
+     *        extracted from the variant query's PARTITION BY and ORDER BY.
+     * @param descSortIndex the position among the sort criteria of the original
+     *        ORDER BY column, always distinguishable by its "DESC" direction.
+     **/
+    private void validateWindowedFunctionPlan(String windowedQuery, int nSorts, int descSortIndex) {
+        AbstractPlanNode node = compile(windowedQuery);
+        // The plan should look like:
+        // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
+        // We also do some sanity checking on the PartitionPlan node.
+        // First dissect the plan.
+        assertTrue(node instanceof SendPlanNode);
+
+        AbstractPlanNode projPlanNode = node.getChild(0);
+        assertTrue(projPlanNode instanceof ProjectionPlanNode);
+
+        AbstractPlanNode partitionByPlanNode = projPlanNode.getChild(0);
+        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+
+        AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
+        assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
+        OrderByPlanNode orderByNode = (OrderByPlanNode)abstractOrderByNode;
+        NodeSchema input_schema = orderByNode.getOutputSchema();
+        assertNotNull(input_schema);
+
+        AbstractPlanNode seqScanNode = orderByNode.getChild(0);
+        assertTrue(seqScanNode instanceof SeqScanPlanNode);
+
+        PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
+        NodeSchema  schema = pbPlanNode.getOutputSchema();
+
+        //
+        // Check that the order by node has the right number of expressions.
+        // and that they have the correct order.
+        //
+        assertEquals(nSorts, orderByNode.getSortExpressions().size());
+        int sortIndex = 0;
+        for (SortDirectionType direction : orderByNode.getSortDirections()) {
+            SortDirectionType expected = (sortIndex == descSortIndex) ?
+                    SortDirectionType.DESC : SortDirectionType.ASC;
+            assertEquals(expected, direction);
+            ++sortIndex;
+        }
+
+        //
+        // Check that the partition by plan node's output schema is correct.
+        // Look at the first expression, to verify that it's the windowed expression.
+        // Then check that the TVEs all make sense.
+        //
+        SchemaColumn column = schema.getColumns().get(0);
+        assertTrue(column.getExpression() instanceof WindowedExpression);
+        assertEquals("ARANK", column.getColumnAlias());
+        assertEquals(2, pbPlanNode.getNumberOfPartitionByExpressions());
+        validateTVEs(input_schema, pbPlanNode);
     }
 
     public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
@@ -149,40 +186,77 @@ public class TestWindowedFunctions extends PlannerTestCase {
         boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
         PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
         try {
-            AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A, B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
-            // Dissect the plan.
-            assertTrue(node instanceof SendPlanNode);
-            AbstractPlanNode projectionPlanNode = node.getChild(0);
-            assertTrue(projectionPlanNode instanceof ProjectionPlanNode);
+            String windowedQuery;
+            // The following variants exercise resolving columns to subquery result columns.
+            // At one point in development, this would only work by disabling ALPHA.A as a possible resolution.
+            // It got a mysterious "Mismatched columns A in subquery" error.
 
-            AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
-            assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            validateQueryWithSubquery(windowedQuery);
 
-            AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
-            assertTrue(orderByPlanNode instanceof OrderByPlanNode);
-            NodeSchema input_schema = orderByPlanNode.getOutputSchema();
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            validateQueryWithSubquery(windowedQuery);
 
-            AbstractPlanNode scanNode = orderByPlanNode.getChild(0);
-            assertTrue(scanNode instanceof NestLoopPlanNode);
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            validateQueryWithSubquery(windowedQuery);
 
-            NodeSchema  schema = partitionByPlanNode.getOutputSchema();
-            SchemaColumn column = schema.getColumns().get(0);
-            assertTrue(column.getExpression() instanceof WindowedExpression);
-            assertEquals("ARANK", column.getColumnAlias());
-
-            validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            validateQueryWithSubquery(windowedQuery);
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
         }
     }
 
+    /**
+     * Validate that each similar windowed query in testRankWithSubqueries
+     * produces a similar plan
+     * @param windowedQuery a variant of a test query of a known basic format
+     **/
+    private void validateQueryWithSubquery(String windowedQuery) {
+        AbstractPlanNode node = compile(windowedQuery);
+        // Dissect the plan.
+        assertTrue(node instanceof SendPlanNode);
+        AbstractPlanNode projectionPlanNode = node.getChild(0);
+        assertTrue(projectionPlanNode instanceof ProjectionPlanNode);
+
+        AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
+        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+
+        AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
+        assertTrue(orderByPlanNode instanceof OrderByPlanNode);
+        NodeSchema input_schema = orderByPlanNode.getOutputSchema();
+
+        AbstractPlanNode scanNode = orderByPlanNode.getChild(0);
+        assertTrue(scanNode instanceof NestLoopPlanNode);
+
+        NodeSchema  schema = partitionByPlanNode.getOutputSchema();
+        SchemaColumn column = schema.getColumns().get(0);
+        assertTrue(column.getExpression() instanceof WindowedExpression);
+        assertEquals("ARANK", column.getColumnAlias());
+
+        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+    }
+
     public void testRankFailures() {
-        failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
-                      "Use of both windowed operations and GROUP BY is not supported.");
-        failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
-                      "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
-                      "FROM AAA;",
-                      "At most one windowed display column is supported.");
+        boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
+        PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
+        try {
+            failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
+                          "Use of both windowed operations and GROUP BY is not supported.");
+            failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
+                          "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
+                          "FROM AAA;",
+                          "At most one windowed display column is supported.");
+            // Detect that PARTITION BY A is ambiguous when A names multiple columns.
+            // Queries like this passed at one point in development, ignoring the subquery
+            // result column as a possible binding for A.
+            failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) AS ARANK " +
+                          "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
+                          "WHERE ALPHA.C <> BBB.C;",
+                          "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
+        } finally {
+            PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
+        }
 
     }
 
