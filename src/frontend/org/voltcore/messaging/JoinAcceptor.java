@@ -153,7 +153,7 @@ public interface JoinAcceptor extends JSONString {
      */
     default HostAndPort getLeader() {
         return HostAndPort.fromString(getCoordinators().first())
-                .withDefaultPort(org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
+                .withDefaultPort(org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
     }
 
     @Override

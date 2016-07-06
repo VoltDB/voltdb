@@ -164,7 +164,7 @@ public class SocketJoiner {
                 break;
             }
             HostAndPort host = HostAndPort.fromString(coordHost)
-                    .withDefaultPort(org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT);
+                    .withDefaultPort(org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT);
 
             InetSocketAddress ip = !host.getHostText().isEmpty() ?
                       new InetSocketAddress(host.getHostText(), host.getPort())

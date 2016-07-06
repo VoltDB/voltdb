@@ -21,7 +21,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
-import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
 
 import java.net.InetAddress;
 import java.util.Arrays;
@@ -35,6 +34,8 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.annotation.Generated;
+
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -42,6 +43,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.json_voltpatches.JSONWriter;
+import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.JoinAcceptor;
@@ -69,8 +71,8 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  * The VoltDB implementation of {@link JoinAcceptor} that piggy backs the mesh
- * establishment messaged to determine if connecting nodes are compatible, and
- * if they are compatible it determines the voltdb start action from the information
+ * establishment messages to determine if connecting nodes are compatible, and
+ * if they are, it determines the voltdb start action from the information
  * gathered from other connecting nodes.
  *
  */
@@ -100,21 +102,27 @@ public class MeshProber implements JoinAcceptor {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
             return ImmutableSortedSet.of(
-                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
+                    HostAndPort.fromParts("", Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         Splitter commaSplitter = Splitter.on(',').omitEmptyStrings().trimResults();
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (String h: commaSplitter.split(option)) {
             checkArgument(isValidCoordinatorSpec(h), "%s is not a valid host spec", h);
-            sbld.add(HostAndPort.fromString(h).withDefaultPort(DEFAULT_INTERNAL_PORT).toString());
+            sbld.add(HostAndPort.fromString(h).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         return sbld.build();
     }
 
+    /**
+     * Convenience method mainly used in local cluster testing
+     *
+     * @param ports a list of ports
+     * @return a set of coordinator specs
+     */
     public static ImmutableSortedSet<String> hosts(int...ports) {
         if (ports.length == 0) {
             return ImmutableSortedSet.of(
-                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
+                    HostAndPort.fromParts("", Constants.DEFAULT_INTERNAL_PORT).toString());
         }
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (int p: ports) {
@@ -134,7 +142,7 @@ public class MeshProber implements JoinAcceptor {
 
         final HostAndPort parsedHost = HostAndPort
                 .fromString(specifier)
-                .withDefaultPort(DEFAULT_INTERNAL_PORT);
+                .withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
         final String host = parsedHost.getHostText();
         if (host.isEmpty()) {
             return true;
@@ -175,6 +183,7 @@ public class MeshProber implements JoinAcceptor {
     protected final VersionChecker m_versionChecker;
     protected final boolean m_enterprise;
     protected final StartAction m_startAction;
+    /** {@code true} if there are no recoverable artifacts (Command Logs, Snapshots) */
     protected final boolean m_bare;
     protected final UUID m_configHash;
     protected final UUID m_meshHash;
@@ -238,7 +247,7 @@ public class MeshProber implements JoinAcceptor {
 
     @Override
     public HostAndPort getLeader() {
-        return HostAndPort.fromString(m_coordinators.first()).withDefaultPort(DEFAULT_INTERNAL_PORT);
+        return HostAndPort.fromString(m_coordinators.first()).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
     }
 
     @Override
@@ -254,6 +263,9 @@ public class MeshProber implements JoinAcceptor {
         return m_startAction;
     }
 
+    /**
+     * @return {@code true} if there are no recoverable artifacts (Command Logs, Snapshots)
+     */
     public boolean isBare() {
         return m_bare;
     }
@@ -495,7 +507,7 @@ public class MeshProber implements JoinAcceptor {
 
         m_networkLog.debug("Received all the required host criteria");
 
-        int bare = 0;
+        int bare = 0; // node has no recoverable artifacts (Command Logs, Snapshots)
         int unmeshed = 0;
         int operational = 0;
 
@@ -519,7 +531,7 @@ public class MeshProber implements JoinAcceptor {
             safemode = safemode || c.isSafeMode();
         }
 
-        safemode = safemode && operational == 0 && bare < ksafety;
+        safemode = safemode && operational == 0 && bare < ksafety; // kfactor + 1
 
         if (m_networkLog.isDebugEnabled()) {
             m_networkLog.debug("We have "
@@ -544,7 +556,7 @@ public class MeshProber implements JoinAcceptor {
             determination = StartAction.LIVE_REJOIN;
         } else if (operational > 0 && operational == hostCount) { // join
             if (isAddAllowed()) {
-                hostCount = hostCount + ksafety;
+                hostCount = hostCount + ksafety; // kfactor + 1
                 determination = StartAction.JOIN;
             } else {
                 org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
@@ -552,9 +564,9 @@ public class MeshProber implements JoinAcceptor {
             }
         } else if (operational == 0 && bare == unmeshed) {
             determination = StartAction.CREATE;
-        } else if (operational == 0 && bare < ksafety) {
+        } else if (operational == 0 && bare < ksafety /* kfactor + 1 */) {
             determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
-        } else if (operational == 0 && bare >= ksafety) {
+        } else if (operational == 0 && bare >= ksafety  /* kfactor + 1 */) {
             org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
                     + bare + " nodes have no command logs, while "
                     + (unmeshed - bare) + " nodes have them");
@@ -579,7 +591,7 @@ public class MeshProber implements JoinAcceptor {
         return new Determination(null,-1, false);
     }
 
-    @Override
+    @Override @Generated("by eclipse's equals and hashCode source generators")
     public int hashCode() {
         final int prime = 31;
         int result = 1;
@@ -600,7 +612,7 @@ public class MeshProber implements JoinAcceptor {
         return result;
     }
 
-    @Override
+    @Override @Generated("by eclipse's equals and hashCode source generators")
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
@@ -695,7 +707,7 @@ public class MeshProber implements JoinAcceptor {
             this.paused = paused;
         }
 
-        @Override
+        @Override @Generated("by eclipse's equals and hashCode source generators")
         public int hashCode() {
             final int prime = 31;
             int result = 1;
@@ -706,7 +718,7 @@ public class MeshProber implements JoinAcceptor {
             return result;
         }
 
-        @Override
+        @Override @Generated("by eclipse's equals and hashCode source generators")
         public boolean equals(Object obj) {
             if (this == obj)
                 return true;

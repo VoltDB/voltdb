@@ -28,7 +28,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.voltdb.VoltDB.DEFAULT_INTERNAL_PORT;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -44,6 +43,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.voltcore.common.Constants;
 import org.voltcore.zk.CoreZK;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -118,7 +118,7 @@ public class TestHostMessenger {
 
     private String [] coordinators(int hostCount) {
         return IntStream.range(0, hostCount)
-                .mapToObj(i -> ":" + (i+DEFAULT_INTERNAL_PORT))
+                .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
     }
 

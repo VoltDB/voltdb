@@ -33,10 +33,10 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.common.Constants;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.StartAction;
-import org.voltdb.VoltDB;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.collect.Sets;
@@ -57,7 +57,7 @@ public class ZKTestBase {
         m_clients = new ArrayList<ZooKeeper>();
         m_messengers = new ArrayList<HostMessenger>();
         String [] coordinators = IntStream.range(0, sites)
-                .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
+                .mapToObj(i -> ":" + (i+Constants.DEFAULT_INTERNAL_PORT))
                 .toArray(s -> new String[s]);
         for (int ii = 0; ii < sites; ii++) {
             HostMessenger.Config config = new HostMessenger.Config();
@@ -87,7 +87,7 @@ public class ZKTestBase {
         int i = 0;
 
         for (String coord: criteria.getCoordinators()) {
-            HostAndPort hp = HostAndPort.fromString(coord).withDefaultPort(VoltDB.DEFAULT_INTERNAL_PORT);
+            HostAndPort hp = HostAndPort.fromString(coord).withDefaultPort(Constants.DEFAULT_INTERNAL_PORT);
             HostMessenger.Config config = new HostMessenger.Config();
             config.acceptor = criteria;
             assert config.internalPort + i == hp.getPort() : "coordinator port mismatches internal port";
