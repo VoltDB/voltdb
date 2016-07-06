@@ -489,8 +489,6 @@ public abstract class AbstractParsedStmt {
             // from TestVoltCompler.testScalarSubqueriesExpectedFailures.
             throw new PlanningErrorException("Object not found: " + tableAlias);
         }
-        %%%
-        // This call to resolveTVE is failing.  The differentiator is -1.
         tableScan.resolveTVE(expr);
 
         if (m_stmtId == tableScan.getStatementId()) {
