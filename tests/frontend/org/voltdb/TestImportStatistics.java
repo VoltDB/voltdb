@@ -52,8 +52,6 @@ import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-
 /**
  * Import statistics tests using the socket importer and a test log4j importer.
  */
@@ -542,29 +540,26 @@ public class TestImportStatistics extends RegressionSuite {
         project.addProcedures(TestStatsProcedure11.class);
 
         // configure socket importer
-        Properties props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        Properties props = buildProperties(
                 "port", "7001",
                 "decode", "true",
-                "procedure", "TestImportStatistics$TestStatsProcedure7"));
+                "procedure", "TestImportStatistics$TestStatsProcedure7");
         project.addImport(true, "custom", "csv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // another socket importer
-        props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        props = buildProperties(
                 "port", "7002",
                 "decode", "true",
-                "procedure", "TestImportStatistics$TestStatsProcedure11"));
+                "procedure", "TestImportStatistics$TestStatsProcedure11");
         project.addImport(true, "custom", "csv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // configure log4j socket handler importer
-        props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        props = buildProperties(
                 "port", "6060",
                 "procedure", "log_events.insert",
-                "log-event-table", "log_events"));
+                "log-event-table", "log_events");
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
         config = new LocalCluster("import-stats-ddl-cluster-rep.jar", 4, 1, 0,

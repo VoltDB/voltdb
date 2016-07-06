@@ -18,7 +18,6 @@ import os
 from collections import defaultdict
 import json
 import traceback
-from sets import Set
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 from flask import jsonify
@@ -1238,7 +1237,7 @@ def read_content(content, database_id):
                         user_id = 1
                     else:
                         user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
-                    user_roles = ','.join(Set(user['roles'].split(',')))
+                    user_roles = ','.join(set(user['roles'].split(',')))
 
                     HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
                             'name': user['name'],
