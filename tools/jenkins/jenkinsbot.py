@@ -156,7 +156,7 @@ class JenkinsBot(object):
                 logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 logfile.write(' ' + message + '\n')
         else:
-            self.post_message('D1JG6N2A2', 'Something went wrong with the query.')
+            self.post_message('D1JG6N2A2', 'Log file too large.')
 
     def connect(self):
         token = os.environ.get('token', None)
@@ -189,10 +189,10 @@ class JenkinsBot(object):
 
         while True:
             try:
-                # Wait for and respond to commands.
+                # Wait for and respond to incoming data that is: text, not from a bot, not a file.
                 incoming = list(self.client.rtm_read())
                 if (len(incoming) > 0 and incoming[0].get('text', None) is not None and
-                    incoming[0].get('bot_id', None) is None):
+                    incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None):
                     text = incoming[0]['text']
                     channel = incoming[0]['channel']
                     if 'end-session' in text:
