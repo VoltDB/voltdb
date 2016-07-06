@@ -8,6 +8,7 @@
 import os
 import sys
 import time
+from datetime import datetime
 
 import mysql.connector
 
@@ -58,7 +59,7 @@ INNER JOIN `junit-builds` AS jr
 
 TOM_QUERY = ("""
     SELECT MAX(tf.build) AS 'Most recent failure on master',
-           MAX(jr.build) AS 'Most recent build on master'
+           MAX(jr.build) AS 'Most recent build of master'
       FROM `junit-test-failures` AS tf
 RIGHT JOIN `junit-builds` AS jr
         ON NOT tf.status='FIXED' AND
@@ -139,16 +140,40 @@ class JenkinsBot(object):
 
     def __init__(self):
         self.client = None
+        self.logfile = 'jenkinslog.txt'
+
+    def log(self, message):
+        size = 1 << 30
+        message = str(message)
+        try:
+            size = os.path.getsize(self.logfile)
+        except OSError:
+            message = self.logfile + ' does not exist. Creating..\n' + message
+            size = 0
+        if size < (1 << 30):
+            # Limit log file to 1G
+            with open(self.logfile, 'a') as logfile:
+                logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                logfile.write(' ' + message + '\n')
+        else:
+            self.post_message('D1JG6N2A2', 'Something went wrong with the query.')
 
     def connect(self):
         token = os.environ.get('token', None)
         if token is None:
-            print('Could not retrieve token for jenkinsbot')
+            self.log('Could not retrieve token for jenkinsbot')
             return False
+
         self.client = SlackClient(token)
+
+        # Connect to real time messaging
+        if not self.client.rtm_connect():
+            self.log('Could not connect to real time messaging')
+            return False
+
         return True
 
-    def session(self):
+    def listen(self):
         """
         Establishes session and responds to commands
         """
@@ -161,11 +186,6 @@ class JenkinsBot(object):
                      'All failures for a job:\n\tall-failures <job>\n',
                      'For any <job>, you can specify "pro" or "com" for the master jobs\n',
                      'help\n']
-
-        # Connect to real time messaging
-        if not self.client.rtm_connect():
-            print "Connection failed for Real Time Messaging, invalid token?"
-            return
 
         while True:
             try:
@@ -194,51 +214,62 @@ class JenkinsBot(object):
                                 'job': job,
                                 'test': args[2],
                             }
-                            self.query_and_response(TOM_QUERY, params, [channel], 'testonmaster.txt')
+                            self.query_and_response(TOM_QUERY, params, [channel],
+                                                    '%s-testonmaster.txt' % (args[2]))
                         elif 'all-failures' in text:
                             params = {
                                 'job': job
                             }
-                            self.query_and_response(AF_QUERY, params, [channel], 'allfailures.txt')
+                            self.query_and_response(AF_QUERY, params, [channel],
+                                                    '%s-allfailures.txt' % (job))
                         elif 'days' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'days': args[2]
                             }
-                            self.query_and_response(D_QUERY, params, [channel], '%s-leaderboard-%s.txt' % args[2])
+                            self.query_and_response(D_QUERY, params, [channel],
+                                                    '%s-leaderboard-past-%s.txt' % (job, args[2]))
                         elif 'test-leaderboard' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'beginning': args[2]
                             }
-                            self.query_and_response(TL_QUERY, params, [channel], 'testleaderboard.txt')
+                            self.query_and_response(TL_QUERY, params, [channel],
+                                                    '%s-testleaderboard-from-%s.txt' % (job, args[2]))
                         elif 'build-range' in text:
                             args = text.split(' ')
-                            builds = args[2]
+                            builds = args[2].split('-')
                             params = {
                                 'job': job,
                                 'build_low': builds[0],
                                 'build_high': builds[1]
                             }
-                            self.query_and_response(BR_QUERY, params, [channel], 'buildrange.txt')
+                            self.query_and_response(BR_QUERY, params, [channel],
+                                                    '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
+                # Slow but reconfigurable
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
-                # Turning off the bot
-                break
+                self.log('Turning off the bot')
+                return
             except IndexError as error:
-                print(error)
+                self.log(error)
                 self.post_message(channel, 'Incorrect number of arguments\n\n' + ''.join(help_text))
             except MySQLError as error:
-                print(error)
+                self.log(error)
                 self.post_message(channel, 'Something went wrong with the query.')
             except Exception as error:
-                # Something unexpected went wrong
-                print(error)
-            sys.stdout.flush()
+                self.log('Something unexpected went wrong')
+                self.log(error)
 
-    def query_and_response(self, query, params, channels, filename):
+                # Try to reconnect
+                if not self.connect():
+                    self.log('Could not connect to Slack')
+                    self.log('Turning off the bot')
+                    return
+
+    def query_and_response(self, query, params, channels, filename, retry=False):
         """
         Make a query then upload a text file with tables to the channels.
         """
@@ -248,27 +279,36 @@ class JenkinsBot(object):
                                                password=os.environ.get('dbpass', None),
                                                database=os.environ.get('dbdb', None))
             cursor = database.cursor()
+
+            cursor.execute(query, params)
+            headers = list(cursor.column_names)
+            table = cursor.fetchall()
+
+            if query == L_QUERY:
+            # Do some specific replacement for long rows in this query.
+                for i, row in enumerate(table):
+                    table[i] = list(row)
+                    table[i][0] = table[i][0].replace('branch-2-', '')
+                    table[i][1] = table[i][1].replace('org.voltdb.', '')
+
+            self.client.api_call(
+                'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
+            )
+
         except MySQLError as error:
-            print('Could not connect to database')
-            print(error)
+            self.log('Could not connect to database')
+            self.log(error)
             self.post_message(channel, 'Something went wrong with the query.')
-            return
+        except Exception as error:
+            self.log('Something unexpected went wrong')
+            self.log(error)
 
-        cursor.execute(query, params)
-        headers = list(cursor.column_names)
-        table = cursor.fetchall()
-        if query == L_QUERY:
-        # Do some specific replacement for long rows in this query.
-            for i, row in enumerate(table):
-                table[i] = list(row)
-                table[i][0] = table[i][0].replace('branch-2-', '')
-                table[i][1] = table[i][1].replace('org.voltdb.', '')
-        self.client.api_call(
-            'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
-        )
-
-        cursor.close()
-        database.close()
+            # Try to reconnect only once
+            if self.connect() and retry == False:
+                self.query_and_response(query, params, channels, filename, retry=True)
+        finally:
+            cursor.close()
+            database.close()
 
     def post_message(self, channel, text):
         """
@@ -280,12 +320,15 @@ class JenkinsBot(object):
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
-    if jenkinsbot.connect() and len(sys.argv) > 1:
-        if sys.argv[1] == 'session':
-            jenkinsbot.session()
+    if jenkinsbot.connect() and len(sys.argv) == 3:
+        if sys.argv[1] == 'listen':
+            jenkinsbot.logfile = sys.argv[2]
+            jenkinsbot.listen()
         elif sys.argv[1] == 'leaderboard':
-            jenkinsbot.query_and_response(L_QUERY,
-                                    {'jobA': PRO, 'jobB': COMMUNITY},
-                                    ['#junit'],
-                                    'leaderboard.txt'
+            jenkinsbot.logfile = sys.argv[2]
+            jenkinsbot.query_and_response(
+                L_QUERY,
+                {'jobA': PRO, 'jobB': COMMUNITY},
+                ['#junit'],
+                'leaderboard-past30days.txt'
             )
