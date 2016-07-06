@@ -7,9 +7,8 @@
 
 import os
 import sys
-import time
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from mysql.connector.errors import Error as MySQLError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
@@ -116,6 +115,7 @@ class Stats(object):
                           'exist on Jenkins' % build)
                     print('Last completed build for this job is %d\n' % latestBuild)
                     continue
+                # Already in EST
                 job_stamp = datetime.fromtimestamp(job_report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
 
                 # Compile job data to write to database
@@ -159,7 +159,9 @@ class Stats(object):
                         if timestamp is None or timestamp == 'None':
                             timestamp = job_stamp
                         else:
-                            timestamp = time.strptime(timestamp.replace('T', ' '), '%Y-%m-%d %H:%M:%S')
+                            timestamp = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S')
+                            # Convert from GMT to EST
+                            timestamp = (timestamp - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
