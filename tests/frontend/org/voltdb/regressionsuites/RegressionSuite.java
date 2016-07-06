@@ -396,7 +396,7 @@ public class RegressionSuite extends TestCase {
      * @return internal port number
      */
     public int internalPort(int hostId) {
-        return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
+        return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT+hostId;
     }
 
     static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)

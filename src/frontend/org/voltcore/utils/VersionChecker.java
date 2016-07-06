@@ -15,14 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.common;
+package org.voltcore.utils;
 
-public class Constants
-{
-    // The default heartbeat timeout value
-    public static final int DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 90;
-    public static final String VOLT_TMP_DIR = "volt.tmpdir";
-    public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 7181;
-    public static final String DEFAULT_INTERNAL_INTERFACE = "";
+public interface VersionChecker {
+    public String getVersionString();
+    public String getBuildString();
+    public boolean isCompatibleVersionString(String other);
 }
