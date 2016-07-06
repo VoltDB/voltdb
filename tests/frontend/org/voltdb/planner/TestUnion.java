@@ -353,7 +353,10 @@ public class TestUnion extends PlannerTestCase {
 
     public void testUnionDeterminism() {
 
+        // Not deterministic because no ordering on either statement.
         assertIsNonDeterministic("select B, DESC from T2 UNION select A, DESC from T1");
+
+        // Not deterministic because ordering by just one column is not sufficient.
         assertIsNonDeterministic("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
 
         // Ordering by all columns should be deterministic.
@@ -397,11 +400,17 @@ public class TestUnion extends PlannerTestCase {
         assertIsDeterministic("(((select a from t1) union (select b from t2 order by b)) "
                 + "intersect select b from t2) order by a");
 
+        // Not deterministic, because outer ORDER BY does not make LHS of interestect
+        // (the UNION) deterministic.
+        assertIsNonDeterministic("(((select a, desc from t1) union (select b, desc from t2 order by b)) "
+                + "intersect select b, desc from t2) order by a");
+
         // intersect on LHS of union
         // Not deterministic because LHS of union is not determinstic.
         assertIsNonDeterministic("((select a from t1) intersect (select b from t2)) "
                 + "union (select b from t2 order by b)");
 
+        // Deterministic because both sides of union are deterministic.
         assertIsDeterministic("((select a from t1) intersect (select b from t2) order by a) "
                 + "union (select b from t2 order by b)");
     }
