@@ -250,8 +250,6 @@ class JenkinsBot(object):
                             }
                             self.query_and_response(BR_QUERY, params, [channel],
                                                     '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
-                # Slow but reconfigurable
-                time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 self.log('Turning off the bot')
                 self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
@@ -259,9 +257,6 @@ class JenkinsBot(object):
             except IndexError as error:
                 self.log(error)
                 self.post_message(channel, 'Incorrect number of arguments\n\n' + ''.join(help_text))
-            except MySQLError as error:
-                self.log(error)
-                self.post_message(channel, 'Something went wrong with the query.')
             except Exception as error:
                 self.log('Something unexpected went wrong')
                 self.log(error)
@@ -272,6 +267,9 @@ class JenkinsBot(object):
                     self.log('Turning off the bot')
                     self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
                     return
+
+            # Slow but reconfigurable
+            time.sleep(1)
 
     def query_and_response(self, query, params, channels, filename, retry=False):
         """
@@ -302,7 +300,8 @@ class JenkinsBot(object):
         except MySQLError as error:
             self.log('Could not connect to database')
             self.log(error)
-            self.post_message(channel, 'Something went wrong with the query.')
+            for channel in channels:
+                self.post_message(channel, 'Something went wrong with the query.')
         except Exception as error:
             self.log('Something unexpected went wrong')
             self.log(error)
