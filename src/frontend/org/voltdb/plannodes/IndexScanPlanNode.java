@@ -154,7 +154,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         int nextKeyIndex;
         if (m_endExpression != null &&
-                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
+                searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
         } else if (searchKeySize == 0) {
             m_skip_null_predicate = null;
@@ -234,7 +234,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
             exprs.add(expr);
 
-            skipNullPredicate = ExpressionUtil.combine(exprs);
+            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
@@ -446,9 +446,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     {
         if (newExpr != null)
         {
-            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
+            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add((AbstractExpression)newExpr.clone());
-            m_endExpression = ExpressionUtil.combine(newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
         }
     }
 
@@ -960,7 +960,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // added for reverse scan purpose only
     public boolean isPredicatesOptimizableForAggregate() {
         // for reverse scan, need to examine "added" predicates
-        List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
+        List<AbstractExpression> predicates = ExpressionUtil.uncombinePredicate(m_predicate);
         // if the size of predicates doesn't equal 1, can't be our added artifact predicates
         if (predicates.size() != 1) {
             return false;
