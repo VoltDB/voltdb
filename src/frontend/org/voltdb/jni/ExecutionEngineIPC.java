@@ -172,7 +172,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                 }
                 if (!connected && retries == 1 && target == BackendTarget.NATIVE_EE_IPC) {
-                    System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
+                    System.out.println("Ready to connect to voltdbipc process on port " + port);
                     System.out.println("Press Enter after you have started the EE process to initiate the connection to the EE");
                     try {
                         System.in.read();
@@ -292,9 +292,97 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                     dependencyIdBuffer.rewind();
                     sendDependencyTable(dependencyIdBuffer.getInt());
-                    continue;
                 }
-                if (status == kErrorCode_CrashVoltDB) {
+                else if (status == ExecutionEngine.ERRORCODE_PROGRESS_UPDATE) {
+                    m_history.append("GOT PROGRESS_UPDATE... ");
+                    int batchIndex = m_connection.readInt();
+                    int planNodeTypeAsInt = m_connection.readInt();
+                    long tuplesFound = m_connection.readLong();
+                    long currMemoryInBytes = m_connection.readLong();
+                    long peakMemoryInBytes = m_connection.readLong();
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeTypeAsInt, tuplesFound,
+                            currMemoryInBytes, peakMemoryInBytes);
+                    m_history.append("...RESPONDING TO PROGRESS_UPDATE...nextStep=" + nextStep);
+                    m_data.clear();
+                    m_data.putLong(nextStep);
+                    m_data.flip();
+                    m_connection.write();
+                    m_history.append(" WROTE RESPONSE TO PROGRESS_UPDATE\n");
+                }
+                else if (status == kErrorCode_pushExportBuffer) {
+                    // Message structure:
+                    // pushExportBuffer error code - 1 byte
+                    // export generation - 8 bytes
+                    // partition id - 4 bytes
+                    // signature length (in bytes) - 4 bytes
+                    // signature - signature length bytes
+                    // uso - 8 bytes
+                    // sync - 1 byte
+                    // end of generation flag - 1 byte
+                    // export buffer length - 4 bytes
+                    // export buffer - export buffer length bytes
+                    long exportGeneration = getBytes(8).getLong();
+                    int partitionId = getBytes(4).getInt();
+                    int signatureLength = getBytes(4).getInt();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    getBytes(signatureLength).get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
+                    long uso = getBytes(8).getLong();
+                    boolean sync = getBytes(1).get() == 1 ? true : false;
+                    boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
+                    int length = getBytes(4).getInt();
+                    ExportManager.pushExportBuffer(
+                            exportGeneration,
+                            partitionId,
+                            signature,
+                            uso,
+                            0,
+                            length == 0 ? null : getBytes(length),
+                            sync,
+                            isEndOfGeneration);
+                }
+                else if (status == kErrorCode_getQueuedExportBytes) {
+                    ByteBuffer header = ByteBuffer.allocate(8);
+                    while (header.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(header);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    header.flip();
+
+                    int partitionId = header.getInt();
+                    int signatureLength = header.getInt();
+                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
+                    while (sigbuf.hasRemaining()) {
+                        final int read = m_socket.getChannel().read(sigbuf);
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    sigbuf.flip();
+                    byte signatureBytes[] = new byte[signatureLength];
+                    sigbuf.get(signatureBytes);
+                    String signature = new String(signatureBytes, "UTF-8");
+
+                    long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
+                    ByteBuffer buf = ByteBuffer.allocate(8);
+                    buf.putLong(retval).flip();
+
+                    while (buf.hasRemaining()) {
+                        m_socketChannel.write(buf);
+                    }
+                }
+                else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
+                    int dataLength = m_connection.readInt();
+                    String data = m_connection.readString(dataLength);
+                    byte[] decodedDecompressedData = Encoder.decodeBase64AndDecompressToBytes(data);
+                    m_data.clear();
+                    m_data.put(decodedDecompressedData);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (status == kErrorCode_CrashVoltDB) {
                     ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
                     while (lengthBuffer.hasRemaining()) {
                         final int read = m_socket.getChannel().read(lengthBuffer);
@@ -336,97 +424,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
-                if (status == kErrorCode_pushExportBuffer) {
-                    // Message structure:
-                    // pushExportBuffer error code - 1 byte
-                    // export generation - 8 bytes
-                    // partition id - 4 bytes
-                    // signature length (in bytes) - 4 bytes
-                    // signature - signature length bytes
-                    // uso - 8 bytes
-                    // sync - 1 byte
-                    // end of generation flag - 1 byte
-                    // export buffer length - 4 bytes
-                    // export buffer - export buffer length bytes
-                    long exportGeneration = getBytes(8).getLong();
-                    int partitionId = getBytes(4).getInt();
-                    int signatureLength = getBytes(4).getInt();
-                    byte signatureBytes[] = new byte[signatureLength];
-                    getBytes(signatureLength).get(signatureBytes);
-                    String signature = new String(signatureBytes, "UTF-8");
-                    long uso = getBytes(8).getLong();
-                    boolean sync = getBytes(1).get() == 1 ? true : false;
-                    boolean isEndOfGeneration = getBytes(1).get() == 1 ? true : false;
-                    int length = getBytes(4).getInt();
-                    ExportManager.pushExportBuffer(
-                            exportGeneration,
-                            partitionId,
-                            signature,
-                            uso,
-                            0,
-                            length == 0 ? null : getBytes(length),
-                            sync,
-                            isEndOfGeneration);
-                    continue;
-                }
-                if (status == kErrorCode_getQueuedExportBytes) {
-                    ByteBuffer header = ByteBuffer.allocate(8);
-                    while (header.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(header);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    header.flip();
-
-                    int partitionId = header.getInt();
-                    int signatureLength = header.getInt();
-                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
-                    while (sigbuf.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(sigbuf);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    sigbuf.flip();
-                    byte signatureBytes[] = new byte[signatureLength];
-                    sigbuf.get(signatureBytes);
-                    String signature = new String(signatureBytes, "UTF-8");
-
-                    long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
-                    ByteBuffer buf = ByteBuffer.allocate(8);
-                    buf.putLong(retval).flip();
-
-                    while (buf.hasRemaining()) {
-                        m_socketChannel.write(buf);
-                    }
-                    continue;
-                }
-                if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {
-                    int dataLength = m_connection.readInt();
-                    String data = m_connection.readString(dataLength);
-                    byte[] decodedDecompressedData = Encoder.decodeBase64AndDecompressToBytes(data);
-                    m_data.clear();
-                    m_data.put(decodedDecompressedData);
-                    m_data.flip();
-                    m_connection.write();
-                    continue;
-                }
-
-                try {
-                    checkErrorCode(status);
+                else {
                     break;
-                }
-                catch (final RuntimeException e) {
-                    if (e instanceof SerializableException) {
-                        throw e;
-                    } else {
-                        throw (IOException)e.getCause();
-                    }
                 }
             }
 
-            return status;
+            try {
+                checkErrorCode(status);
+                return status;
+            }
+            catch (SerializableException e) {
+                throw e;
+            }
+            catch (RuntimeException e) {
+                throw (IOException)e.getCause();
+            }
         }
 
 
@@ -657,11 +669,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
     }
 
+    private StringBuffer m_history = new StringBuffer();
     @Override
     public void release() throws EEException, InterruptedException {
         System.out.println("Shutdown IPC connection in progress.");
+        System.out.println("But first, a little history:\n" + m_history );
         m_connection.close();
-        System.out.println("Shutdown IPC connection in done.");
+        System.out.println("Shutdown IPC connection done.");
         m_dataNetworkOrigin.discard();
     }
 
@@ -898,19 +912,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_data.flip();
                     m_connection.write();
                 }
-                else if (result == ExecutionEngine.ERRORCODE_PROGRESS_UPDATE) {
-                    int batchIndex = m_connection.readInt();
-                    int planNodeTypeAsInt = m_connection.readInt();
-                    long tuplesFound = m_connection.readLong();
-                    long currMemoryInBytes = m_connection.readLong();
-                    long peakMemoryInBytes = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeTypeAsInt, tuplesFound,
-                            currMemoryInBytes, peakMemoryInBytes);
-                    m_data.clear();
-                    m_data.putLong(nextStep);
-                    m_data.flip();
-                    m_connection.write();
-                }
                 else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
                     final VoltTable resultTables[] = new VoltTable[numFragmentIds];
                     for (int ii = 0; ii < numFragmentIds; ii++) {
@@ -928,9 +929,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // failure
                     return null;
                 }
-            } catch (final IOException e) {
+            }
+            catch (final IOException e) {
+                m_history.append("GOT IOException: " + e.toString());
                 System.out.println("Exception: " + e.getMessage());
                 throw new RuntimeException(e);
+            }
+            catch (final Throwable thrown) {
+                thrown.printStackTrace();
+                m_history.append("GOT Throwable: " + thrown.toString());
+                throw thrown;
             }
         }
     }
