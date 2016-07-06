@@ -6,6 +6,17 @@ $(document).ready(function () {
     $("#helppopup").load("help.htm", function () {
     });
 
+    $( "#slider-range-min" ).slider({
+      range: "min",
+      value: 1,
+      min: 1,
+      max: 30,
+      slide: function( event, ui ) {
+        $( "#timeInterval" ).val(ui.value );
+      }
+    });
+    $( "#timeInterval" ).val( $( "#slider-range-min" ).slider( "value" ) );
+
     //clear the localStorage for DataTables in DR Section
     $.each(localStorage, function(key, value){
         if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'){

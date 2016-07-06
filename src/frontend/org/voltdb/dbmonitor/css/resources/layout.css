@@ -622,6 +622,8 @@ ul.rightShowhideList {
     .viewSelect label {
         font-weight: bold;
         font-size: 14px;
+        position:relative;
+        top:2px;
     }
 
     .viewSelect select {
@@ -3774,6 +3776,12 @@ label.errorTimeOut {
 .clsQueryWrapper {float:right;}
 .queryTimeClass {float:left;}
 .clsQueryBtns { float:right;}
+.sliderGraph { float:left; margin:8px 30px 0 0;}
+.labelSlider { float:left; position:relative;right:125px;}
+.labelSlider label {font-weight: bold; font-size: 14px;}
+.sliderGraph .ui-slider .ui-widget-header { background:#ccc}
+.sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
+.sliderMain { position:relative; top:3px;}
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
