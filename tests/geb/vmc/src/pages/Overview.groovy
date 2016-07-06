@@ -41,9 +41,9 @@ class Overview extends Module {
 
     static content = {
         title               { $("h1", text:"Overview") }
-        sitePerHost         { $(class:"configLabel", text:"Sites Per Host") }
-        ksafety             { $(class:"configLabel", text:"K-Safety") }
-        partitionDetection  { $(class:"configLabel", text:"Partition Detection") }
+        sitePerHost         { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(1) > td.configLabel") }
+        ksafety             { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(2) > td.configLabel") }
+        partitionDetection  { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(3) > td.configLabel") }
         security            { $(class:"labelCollapsed", text:"Security") }
         httpAccess          { $(class:"labelCollapsed", text:"HTTP Access") }
         autoSnapshots       { $(class:"labelCollapsed", text:"Auto Snapshots") }
@@ -308,6 +308,7 @@ class Overview extends Module {
         errorValue1 {$("#errorValueDL1")}
         errortxtName2 {$("#error_txtNameDL2")}
         errortxtName1 {$("#error_txtNameDL1")}
+        diskLimitEdit {$("#btnEditDiskLimit") }
 
 
             //$(class:"labelCollapsed labelExpanded", text:"Disk Limit") }
@@ -689,17 +690,18 @@ class Overview extends Module {
     }
 
     def openEditDiskLimitPopup() {
-        waitFor(waitTime) { page.diskLimitEdit.isDisplayed() }
-        int count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.diskLimitEdit.click()
-                waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
+        waitFor(waitTime) { diskLimitEdit.isDisplayed() }
+        diskLimitEdit.click()
+        waitFor(waitTime) { addDiskLimitHeader.isDisplayed() }
+//        int count = 0
+//        while(count<numberOfTrials) {
+//            count++
+//            try {
+//
+//                break
+//            } catch(geb.waiting.WaitTimeoutException e) {
+//            }
+//        }
     }
 
     // For Export

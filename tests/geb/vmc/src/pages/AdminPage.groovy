@@ -146,7 +146,7 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         autoSnapshotsEdit           { $("#autoSnapshotEdit") }
         autoSnapshotsEditCheckbox1  { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td#autoSnapshotOption.snapshottd div.icheckbox_square-aero.customCheckbox ins.iCheck-helper") }
-        autoSnapshotsEditCheckbox   { $(class:"icheckbox_square-aero customCheckbox") }
+        autoSnapshotsEditCheckbox   { $("#autoSnapshotOption > div.icheckbox_square-aero.customCheckbox > ins") }
 
         autoSnapshotsEditOk         { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotOk.editOk") }
         autoSnapshotsEditCancel     { $("html body div.page-wrap div#wrapper div#admin.container.contents div.adminContainer div.adminContentLeft div.overviewTbl table.adminTbl1 tbody tr#row-2.hasSubLabel.parent td a#btnEditAutoSnapshotCancel.editCancel") }
@@ -266,6 +266,8 @@ class AdminPage extends VoltDBManagementCenterPage {
         diskLimitExpanded              {$("#diskLimitConfiguration").find(".configLabel").first()}
         snapShotName {$("#diskLimitConfiguration").find(".configLabe2").first()}
         noFeaturestxt           { $("#diskLimitConfiguration > tr.childprop-row-60 > td.configLabel")}
+
+        updateInnerErrorPopup {$("#updateInnerErrorPopup")}
 
     }
     static at = {

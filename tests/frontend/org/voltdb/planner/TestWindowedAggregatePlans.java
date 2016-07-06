@@ -108,7 +108,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
     }
 
     public void testRankWithSubqueries() {
-        AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
+        AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
         // Dissect the plan.
         assertTrue(node instanceof SendPlanNode);
         AbstractPlanNode projectionPlanNode = node.getChild(0);
@@ -123,7 +123,8 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
         assertNotNull(input_schema);
         OrderByPlanNode orderByPlanNode = (OrderByPlanNode)orderByPlanNodeBase;
         verifyOrderByPlanNode(orderByPlanNode,
-                              "A", SortDirectionType.ASC);
+                              "BBB.A", SortDirectionType.ASC,
+                              "ALPHA.A", SortDirectionType.ASC);
 
         AbstractPlanNode scanNode = orderByPlanNodeBase.getChild(0);
         assertTrue(scanNode instanceof NestLoopPlanNode);

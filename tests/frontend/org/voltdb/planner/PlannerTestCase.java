@@ -307,7 +307,19 @@ public class PlannerTestCase extends TestCase {
             SortDirectionType  dir  = dirs.get(idx);
             assertTrue(expr instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)expr;
-            assertEquals((String)columnDescrs[2*idx], tve.getColumnName());
+            String expectedNames[] = ((String)columnDescrs[2*idx]).split("\\.");
+            String tableName = null;
+            String columnName = null;
+            if (expectedNames.length == 2) {
+                tableName = expectedNames[0].toUpperCase();
+                columnName = expectedNames[1].toUpperCase();
+            } else {
+                columnName = expectedNames[0].toUpperCase();
+            }
+            assertEquals(columnName, tve.getColumnName().toUpperCase());
+            if (tableName != null) {
+                assertEquals(tableName, tve.getTableName().toUpperCase());
+            }
             assertEquals(columnDescrs[2*idx+1],       dir);
         }
     }

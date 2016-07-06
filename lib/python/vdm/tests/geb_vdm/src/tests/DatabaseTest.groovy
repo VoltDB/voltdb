@@ -248,7 +248,7 @@ class DatabaseTest extends TestBase {
                 } catch(geb.waiting.WaitTimeoutException e) {
 
                 }
-                $(id:deleteId).click()
+                $("#deleteDatabase_2").click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {

@@ -9,24 +9,50 @@
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
 import matplotlib
+
 matplotlib.use('Agg')
+from matplotlib.colors import rgb2hex
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
 import numpy as np
+import csv
+import time
+import datetime
 
 STATS_SERVER = 'volt2'
+NaN = float("nan")
 
-COLORS = ['b','g','c','m','k']
+# These are the "Tableau 20" colors as RGB.
+COLORS = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
+          (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),
+          (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),
+          (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),
+          (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)]
+# Scale the RGB values to the [0, 1] range, which is the format matplotlib accepts.
+for i in range(len(COLORS)):
+    r, g, b = COLORS[i]
+    COLORS[i] = (r / 255., g / 255., b / 255.)
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
 
-mc = {}
+WIDTH = 1700
+HEIGHT = 850
+APX = 80
+APY = 10
+last = -1
+
+DATA_HEADER = "branch|chart|master-last|master-ma-last|master-stdev|branch-last|no-stdev-vs-master(neg=worse)|pct-vs-master(neg=worse)".split(
+    "|")
+
+branch_colors = {}
+
 
 def get_stats(hostname, port, days):
     """Get most recent run statistics of all apps within the last 'days'
@@ -39,12 +65,13 @@ def get_stats(hostname, port, days):
     conn.close()
 
     # keyed on app name, value is a list of runs sorted chronologically
-    maxdate = datetime.datetime(1970,1,1,0,0,0)
-    mindate = datetime.datetime(2038,1,19,0,0,0)
+    maxdate = datetime.datetime(1970, 1, 1, 0, 0, 0)
+    mindate = datetime.datetime(2038, 1, 19, 0, 0, 0)
     stats = dict()
     run_stat_keys = ['app', 'nodes', 'branch', 'date', 'tps', 'lat95', 'lat99']
+    # print resp
     for row in resp.tables[0].tuples:
-        group = (row[0],row[1])
+        group = (row[0], row[1])
         app_stats = []
         maxdate = max(maxdate, row[3])
         mindate = min(mindate, row[3])
@@ -57,28 +84,28 @@ def get_stats(hostname, port, days):
 
     return (stats, mindate, maxdate)
 
+
 class Plot:
     DPI = 100.0
 
     def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax, series):
         self.filename = filename
         self.legends = {}
-        w = w == None and 2000 or w
-        h = h == None and 1000 or h
         self.xmax = xmax
         self.xmin = xmin
         self.series = series
         self.title = title
 
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
-                         dpi=self.DPI)
+                              dpi=self.DPI)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title(title)
         plt.tick_params(axis='x', which='major', labelsize=16)
         plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
-        plt.Locator.MAXTICKS=2000
-        plt.grid(True)
+        plt.Locator.MAXTICKS = 2000
+        plt.grid(True, color='black', alpha=0.5)
         self.fig.autofmt_xdate()
+        plt.autoscale(enable=True, axis='x', tight=None)
         plt.ylabel(ylabel)
         plt.xlabel(xlabel)
 
@@ -87,7 +114,7 @@ class Plot:
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
-        plt.axvline(x=datetime.datetime(2016,1,11,12,00,0),color='black')
+        plt.axvline(x=datetime.datetime(2016, 1, 11, 12, 00, 0), color='black')
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
         xmin, xmax = plt.xlim()
@@ -106,132 +133,293 @@ class Plot:
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
+        plt.xlim((self.xmin.toordinal(),
+                  (self.xmax + datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
         if self.series.startswith('lat'):
             lloc = 2
         else:
             lloc = 3
         plt.legend(prop={'size': 10}, loc=lloc)
-        plt.savefig(self.filename, format="png", transparent=False,
-                    bbox_inches="tight", pad_inches=0.2)
+        plt.savefig(self.filename, format="png", transparent=False, bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate, polarity):
-    global mc
+
+class Bdata(dict):
+    def __init__(self, *args, **kwargs):
+        dict.update(self, *args, **kwargs)
+
+    def __getitem__(self, key):
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return None
+
+    def __setitem__(self, key, value):
+        return dict.__setitem__(self, key, value)
+
+    def __delitem__(self, key):
+        return dict.__delitem__(self, key)
+
+    def __contains__(self, key):
+        return dict.__contains__(self, key)
+
+    def update(self, *args, **kwargs):
+        dict.update(self, *args, **kwargs)
+
+    def __getattribute__(self, *args, **kwargs):
+        if dict.__contains__(self, args[0]):
+            return self.__getitem__(args[0])
+        return dict.__getattribute__(self, args[0])
+
+    def __setattr__(self, key, value):
+        return dict.__setitem__(self, key, value)
+
+
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate, polarity, analyze):
+    global branch_colors
     plot_data = dict()
+
     for run in data:
         if run['branch'] not in plot_data:
             plot_data[run['branch']] = {series: []}
 
         if series == 'tppn':
-            value = run['tps']/run['nodes']
+            value = run['tps'] / run['nodes']
         else:
             value = run[series]
 
-        datenum = matplotlib.dates.date2num(run['date'])
-        plot_data[run['branch']][series].append((datenum,value))
+        if value != 0.0:
+            datenum = matplotlib.dates.date2num(run['date'])
+            plot_data[run['branch']][series].append((datenum, value))
 
     if len(plot_data) == 0:
         return
 
+    runs = 0
+    for run in plot_data.itervalues():
+        runs += len(run.values()[0])
+
+    if runs == 0:
+        pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
+        pl.ax.annotate("Intentionally blank", xy=(.5, .5), xycoords='axes fraction',
+                       horizontalalignment='center', verticalalignment='center')
+        pl.close()
+        return
+
+    # increase the figure size to allow for annotations
+    branches_sort = sorted(plot_data.keys())
+    height = (height or HEIGHT) + APY * len(branches_sort)
+
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
-    flag = dict()
-    for b,bd in plot_data.items():
-        for k,v in bd.items():
-            if k not in flag.keys():
-                flag[k] = []
+    toc = dict()
+    branches_sort = sorted(plot_data.keys())
+    try:
+        # may not have a master branch for this chart
+        branches_sort.remove('master')
+    except:
+        print "WARN: has no master: %s" % title
+        return
+    branches_master_first = ['master'] + branches_sort
+
+    # loop thru branches, 'master' is first
+    bn = 0
+    for b in branches_master_first:
+        bd = plot_data[b]
+        bn += 1
+        # k is the chart type like lat95, lat99, thpt, etc
+        # v is the chart's data list[tuples(float,float),]
+        for k, v in bd.items():
+            if len(v) == 0:
+                print "branch %s, chart %s has no data points, skipping..." % (b, k)
+                continue
+            if k not in toc.keys():
+                toc[k] = []
             v = sorted(v, key=lambda x: x[0])
+            # u is the chart data
             u = zip(*v)
-            if b not in mc:
-                mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
-            ma = [None]
-            if b == 'master' and len(u[0]) >= 10:
-                (ma,mstd) = moving_average(u[1], 10)
-                pl.plot(u[0], ma, mc[b][0], None, None, ":")
-                median = np.median(ma)
-                failed = 0
-                if polarity==1:
-                    cv = np.nanmin(ma)
-                    rp = (u[0][np.nanargmin(ma)], cv)
-                    if b == 'master' and ma[-1] > median * 1.05:
-                        failed = 1
-                else:
-                    cv = np.nanmax(ma)
-                    rp = (u[0][np.nanargmax(ma)], cv)
-                    if b == 'master' and ma[-1] < median * 0.95:
-                        failed = 1
+            # get the colors and markers
+            if b not in branch_colors:
+                branch_colors[b] = (
+                COLORS[len(branch_colors.keys()) % len(COLORS)], MARKERS[len(branch_colors.keys()) % len(MARKERS)])
 
-                twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
-                pl.plot(u[0], twosigma, mc[b][0], None, None, '-.')
-                pl.ax.annotate(r"$2\sigma$", xy=(u[0][-1], twosigma[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+            # compute and saved master's average, median, std on raw (all) data
+            bdata = Bdata(branch=b, title=title, chart=k, color=None, seriescolor=branch_colors[b][0],
+                          seriesmarker=branch_colors[b][1], xdata=u[0], ydata=u[1],
+                          last=u[1][-1], avg=np.average(u[1]), median=np.median(u[1]), stdev=np.std(u[1]), ma=[NaN],
+                          ama=NaN, mstd=[NaN],
+                          pctmadiff=NaN, mnstddiff=NaN, failed=None, bgcolor=None)
 
-                twntypercent = np.sum([np.convolve(ma, polarity*0.2), ma], axis=0)
-                pl.plot(u[0], twntypercent, mc[b][0], None, None, '-.')
-                pl.ax.annotate(r"20%", xy=(u[0][-1], twntypercent[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+            analyze.append(bdata)
 
-                p = (ma[-1]-rp[1])/rp[1]*100.
-                q = (ma[-1]-median)/median*100.
+            # plot the series
+            pl.plot(u[0], u[1], bdata.seriescolor, bdata.seriesmarker, bdata.branch, '-')
 
-                if failed != 0:
-                    if abs(p) < 10:
-                        color = 'yellow'
+            if b == 'master':
+
+                master = analyze[-1]  # remember master
+
+                # if we have enough data compute moving average and moving std dev
+                # std is std of data correspoinding to each ma window
+                # nb. std is used only in the charts for the 2-sigma line
+                # ama is mean of moving average population
+                # mstd is std of moving average all values
+
+                (ma, ama, mstd, mastd) = moving_average(bdata.ydata, 10)
+
+                if len(ma) >= 10:
+
+                    bdata.update(ma=ma, ama=ama, mstd=mstd, mastd=mastd)
+
+                    # plot the moving average
+                    pl.plot(bdata.xdata, bdata.ma, bdata.seriescolor, None, None, ":")
+
+                    # see if the series should be flagged out of spec
+                    failed = 0
+                    if polarity == 1:
+                        # increasing is bad
+                        bestpoint = np.nanmin(ma)
+                        localminormax = (bdata.xdata[np.nanargmin(ma)], bestpoint)
+                        if b == 'master' and bdata.ma[last] > bdata.median * 1.05:
+                            failed = 1
                     else:
+                        # decreasing is bad
+                        bestpoint = np.nanmax(ma)
+                        localminormax = (bdata.xdata[np.nanargmax(ma)], bestpoint)
+                        if b == 'master' and bdata.ma[last] < bdata.median * 0.95:
+                            failed = 1
+
+                    # plot the 2-sigma line
+                    twosigma = np.sum([np.convolve(bdata.mstd, polarity * 2), bdata.ma], axis=0)
+                    pl.plot(bdata.xdata, twosigma, bdata.seriescolor, None, None, '-.')
+                    pl.ax.annotate(r"$2\sigma$", xy=(bdata.xdata[last], twosigma[last]), xycoords='data',
+                                   xytext=(20, 0),
+                                   textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
+
+                    # plot the 20% line
+                    twntypercent = np.sum([np.convolve(bdata.ma, polarity * 0.2), bdata.ma], axis=0)
+                    pl.plot(bdata.xdata, twntypercent, bdata.seriescolor, None, None, '-.')
+                    pl.ax.annotate(r"20%", xy=(bdata.xdata[last], twntypercent[last]), xycoords='data', xytext=(20, 0),
+                                   textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
+
+                    pctmaxdev = (bestpoint- master.ma[last]) / bestpoint * 100. * polarity  # pct diff min/max
+                    # pctmedian = (master.ma[last] - bdata.median) / master.median * 100.  #pct diff median
+                    pctmadiff = (master.ma[last] - bdata.ydata[last]) / master.ma[last] * 100. * polarity  # pct diff last vs ma mean
+                    mnstddiff = (master.ma[last] - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
+                    mnstdmadiff = (master.ma[last] - bdata.ydata[last]) / master.mstd[last] * polarity  # no std diff std of most recent window
+
+                    bdata.update(pctmadiff=pctmadiff, mnstddiff=mnstddiff)
+
+                    # when do we flag a chart? standard deviation is easy to use for an estimator but since it relies
+                    # on squares it will tend to give poor results if the deviations are large. Also, we'll just assume
+                    # that our distribution is Normal, so 95% of data points should lie withing 2 stddev of the mean
+
+                    # set background color of chart if there's a data point outside 2sigma or if the moving
+                    # average has negatively deviated from its mean by more than 5 or 10%
+
+                    # yellow if > 5%
+                    # red if >= 10%
+                    # negative values are worse
+                    failed = False
+                    color = None
+                    # moving average has degraded by 5+ (yellow) or 10+ (red) pct
+                    # last has degraded from ma (mean) by 5+ or 10+ pcs AND last >= 1.5 stdev off the last mean
+                    if pctmaxdev <= -10.0 or \
+                            pctmadiff <= -10.0 and mnstddiff <= -1.5:
                         color = 'red'
-                    flag[k].append((b, p))
-                    for pos in ['top', 'bottom', 'right', 'left']:
-                        pl.ax.spines[pos].set_edgecolor(color)
-                    pl.ax.set_axis_bgcolor(color)
+                    elif  pctmaxdev <= -5.0 or \
+                            pctmadiff > -10.0 and pctmadiff <= -5.0 and mnstddiff <= -1.5:
+                        color = 'yellow'
+                    if color:
+                        failed = True
+                    print title, b, k, pctmaxdev, pctmadiff, mnstddiff, str(color)
+
+                    toc[k].append((b, color))
+                    if failed:
+                        for pos in ['top', 'bottom', 'right', 'left']:
+                            pl.ax.spines[pos].set_edgecolor(color)
+                        pl.ax.set_axis_bgcolor(color)
                     pl.ax.patch.set_alpha(0.1)
 
-                pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,-10*polarity),
-                    textcoords='offset points', ha='center')
-                pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
-                    textcoords='offset points', ha='left')
-                pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
-                    textcoords='offset points', ha='left')
+                    bdata.update(failed=failed, bgcolor=color)
 
-                pl.ax.annotate('ma: %.2f median: %.2f (%+.2f) cv: %.2f (%+.2f%%)' % (ma[-1], median, q, cv, p),
-                    xy=(.07, .06), xycoords='figure fraction', horizontalalignment='left', verticalalignment='top')
+                    # annotate value of the best point aka localminormax
+                    pl.ax.annotate("%.2f" % bestpoint, xy=localminormax, xycoords='data', xytext=(0, -10 * polarity),
+                                   textcoords='offset points', ha='center', color=bdata.seriescolor, alpha=0.5)
 
-            """
-            #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
-            #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
-            x = u[0][-1]
-            y = u[1][-1]
-            pl.ax.annotate(str(y), xy=(x,y), xycoords='data', xytext=(5,0),
-                textcoords='offset points', ha='left')
-            xmin, ymin = [(u[0][i],y) for i,y in enumerate(u[1]) if y == min(u[1])][-1]
-            xmax, ymax= [(u[0][i],y) for i,y in enumerate(u[1]) if y == max(u[1])][-1]
-            if ymax != ymin:
-                if xmax != x:
-                    pl.ax.annotate(str(ymax), xy=(xmax,ymax),
-                        textcoords='offset points', ha='center', va='bottom', xytext=(0,5))
-                if xmin != x:
-                    pl.ax.annotate(str(ymin), xy=(xmin,ymin),
-                        textcoords='offset points', ha='center', va='top', xytext=(0,-5))
-            """
+                    # annotate value and percent vs reference point of most recent moving average on master
+                    pl.ax.annotate("%.2f" % bdata.ma[last], xy=(bdata.xdata[last], bdata.ma[last]), xycoords='data',
+                                   xytext=(5, +5), textcoords='offset points', ha='left', alpha=0.5)
+
+                    pl.ax.annotate("(%+.2f%%)" % pctmaxdev, xy=(bdata.xdata[last], bdata.ma[last]), xycoords='data',
+                                   xytext=(5, -5),
+                                   textcoords='offset points', ha='left', alpha=0.5)
+
+                    # annotation with moving average values
+                    # bdata.update(pctmedian=pctmedian, bestpoint=bestpoint, pctmaxdev=pctmaxdev)
+                    # raw data to the chart
+                    pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma) ma: %.2f'
+                                   ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #mstd) avg(ma):'
+                                   ' %.2f std(ma): %.2f' % (
+                                       bdata.seriesmarker, bdata.branch, bdata.bgcolor, len(bdata.ydata),
+                                       bdata.ydata[last],
+                                       bdata.avg, bdata.stdev, bdata.stdev / bdata.avg * 100., bdata.stdev / bdata.ma[last] * 100.,
+                                       bdata.ma[last], pctmaxdev, bdata.pctmadiff, bdata.mnstddiff, mnstdmadiff, bdata.ama, bdata.mastd),
+                                   xy=(APX, APY * bn),
+                                   xycoords='figure points', horizontalalignment='left', verticalalignment='top',
+                                   color=bdata.seriescolor, fontsize=10, alpha=1.0)
+
+            else:
+                # branches comparing to master (no moving average component)
+
+                if master.ama is not NaN:
+                    pctmadiff = (master.ama - bdata.ydata[
+                        last]) / master.ama * 100. * polarity  # pct diff last vs ma mean
+                    mnstddiff = (master.ama - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
+
+                    color = 'black'
+                    if pctmadiff > -10.0 and pctmadiff <= -5.0:
+                        color = 'yellow'
+                    elif pctmadiff <= -10.0:
+                        color = 'red'
+                    if mnstddiff >= 2.0:
+                        color = 'red'
+
+                    bdata.update(bgcolor=color, pctmadiff=pctmadiff, mnstddiff=mnstddiff)
+
+                pl.ax.annotate(
+                    bdata.seriesmarker + ' %s: %s n: %d last %.2f avg: %.2f sdev: %.2f (%.2f%% of ma) no-std-master-avg(ma): %.2f pct-master-avg(ma): %.2f' %
+                    (bdata.branch, bdata.bgcolor, len(bdata.ydata), bdata.ydata[last], bdata.avg, bdata.stdev,
+                     bdata.stdev / master.ama * 100., bdata.mnstddiff, bdata.pctmadiff),
+                    xy=(APX, APY * bn), xycoords='figure points', horizontalalignment='left', verticalalignment='top',
+                    color=bdata.seriescolor, fontsize=10, alpha=1.0)
+
+        if len(analyze) == 1:
+            pl.ax.annotate(datetime.datetime.today().strftime("%Y/%m/%d %H:%M:%S"), xy=(.20, .95),
+                       xycoords='figure fraction', horizontalalignment='left', verticalalignment='top',
+                       fontsize=8)
+
     pl.close()
-    return flag
+    return toc
 
-def generate_index_file(filenames):
+
+def generate_index_file(filenames, branches):
     row = """
       <tr>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
-        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
+        <td><a href="%s"><img src="%s" width="100%%" height="35%%"/></a></td>
+        <td><a href="%s"><img src="%s" width="100%%" height="35%%"/></a></td>
+        <td><a href="%s"><img src="%s" width="100%%" height="35%%"/></a></td>
       </tr>
-"""
+    """
 
     sep = """
      </table>
-     <table frame="box">
+     <table frame="box" width="100%%">
      <tr>
          <th colspan="3"><a name="%s">%s</a></th>
      </tr>
-"""
+    """
 
     full_content = """
 <html>
@@ -239,13 +427,17 @@ def generate_index_file(filenames):
     <title>Performance Graphs</title>
   </head>
   <body>
-    Generated on %s
-    <table frame="box">
+    Generated on %s<br>
+    %s
+    <table frame="box" width="100%%">
 %s
     </table>
   </body>
 </html>
 """
+    branch_studies = """
+        <a href=%s>%s</a>
+    """
 
     hrow = """
     <tr>
@@ -254,34 +446,38 @@ def generate_index_file(filenames):
         <td %s><a href=#%s>%s</a></td>
         <td %s><a href=#%s>%s</a></td>
     </tr>
-"""
-    #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
-    h = []
+    """
+
+    toc = []
     for x in filenames:
-        tdattr = "<span></span>" #"bgcolor=green"
-        tdnote = ""
-        M = 0.0
+        tdattr = "<span></span>"
         if len(x) == 6:
-            for v in x[5].values():
-                if len(v) > 0:
-                    M = max(M, abs(v[0][1]))
-        if M > 0.0:
-            tdattr = '<span style="color:yellow">&#9658;</span>'
-            if M > 10.0:
-                tdattr = '<span style="color:red">&#9658;</span>'
-            tdnote = " (by %.2f%%)" % M
-        h.append(("", x[0].replace(' ','%20'), tdattr + x[0] + tdnote))
+            color = None
+            # rollup worse case color flag condition
+            for type in x[5].values():
+                for branch in type:
+                    if branch[1] == 'red':
+                        color = 'red'
+                        break
+                    elif color is None and branch[1] == 'yellow':
+                        color = 'yellow'
+                if color == 'red':
+                    break
+            if color:
+                tdattr = '<span style="color:%s">&#9658;</span>' % color
+        toc.append(("", x[0].replace(' ', '%20'), tdattr + x[0]))
+
     n = 4
-    z = n-len(h)%n
+    z = n - len(toc) % n
     while z > 0 and z < n:
-        h.append(('','',''))
+        toc.append(('', '', ''))
         z -= 1
 
     rows = []
     t = ()
-    for i in range(1, len(h)+1):
-        t += tuple(h[i-1])
-        if i%n == 0:
+    for i in range(1, len(toc) + 1):
+        t += tuple(toc[i - 1])
+        if i % n == 0:
             rows.append(hrow % t)
             t = ()
 
@@ -292,7 +488,80 @@ def generate_index_file(filenames):
             last_app = i[0]
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
-    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), ''.join(rows))
+    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), branches, ''.join(rows))
+
+
+def generate_data_file(data, branches, prefix):
+    row = """
+          <tr>
+            <td align="center"><span style="color:%s">&#9658;</span></td>
+            <td align="left" width="40%%"><a href="%s">%s</a></td>
+            <td align="right">%s</td>
+            <td align="right">%s</td>
+            <td align="right">%s</td>
+            <td align="right">%s</td>
+            <td align="right">%s</td>
+            <td align="right">%s</td>
+          </tr>
+    """
+
+    sep = """
+         </table>
+         <table frame="box" width="100%%">
+         <tr>
+             <th colspan="8"><a name="%s">%s</a></th>
+         </tr>
+            %s
+    """
+
+    full_content = """
+    <html>
+      <head>
+        <title>Performance Raw Data</title>
+      </head>
+      <body>
+        Generated on %s<br>
+            %s
+        <table frame="box" width="100%%">
+    %s
+        </table>
+      </body>
+    </html>
+    """
+
+    hrow = """
+        <tr>
+            <th>Flag</th>
+            <th>%s</th>
+            <th>%s</th>
+            <th>%s</th>
+            <th>%s</th>
+            <th>%s</th>
+            <th>%s</th>
+            <th>%s</th>
+        </tr>
+    """
+
+    rows = []
+    header2 = DATA_HEADER[1:]
+    #for i in range(0, len(header2) * 2, 2):
+    #    header2.insert(i + 1, header2[i])
+
+    last_app = None
+    bgcolors = {'black': 'white', 'None': 'white'}
+    # data is an numpy ndarray = trouble
+    for d in range(len(data)):
+        i = tuple(data[d])
+        if i[0] != last_app:
+            rows.append(sep % ((i[0], i[0], hrow % tuple(header2))))
+            last_app = i[0]
+        bgcolor = bgcolors.get(i[1], i[1] or 'white')
+        rows.append(row % ((bgcolor, png_filename(i[2], prefix), i[2]) + tuple([round(x, 3) for x in i[3:]])))
+
+    return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), branches, ''.join(rows))
+
+def png_filename(filename, prefix):
+    return prefix + "_" + filename.replace(" ", "_") + ".png"
 
 def moving_average(x, n, type='simple'):
     """
@@ -301,30 +570,45 @@ def moving_average(x, n, type='simple'):
     type is 'simple' | 'exponential'
 
     """
+
+    if len(x) < n:
+        return ([], NaN, [], NaN)
+
     x = np.asarray(x)
-    if type=='simple':
+    if type == 'simple':
         weights = np.ones(n)
     else:
         weights = np.exp(np.linspace(-1., 0., n))
 
     weights /= weights.sum()
 
-    a =  np.convolve(x, weights, mode='full')[:len(x)]
-    a[:n-1] = None
+    a = [NaN]*(n-1) + list(np.convolve(x, weights, mode='valid'))
 
-    s = [float('NaN')]*(n-1)
-    for d in range(n, len(x)+1):
-        s.append(np.std(x[d-n:d]))
-    return (a,s)
+    # compute the mean of the moving avearage population
+    # over the most recent ma group
+    ama = np.average(a[len(a)-n:])
+
+    # compute the standard deviation of the set of data
+    # corresponding to each moving average window
+    s = [NaN]*(n-1)
+    for d in range(0, len(x)-n+1):
+        s.append(np.std(x[d : d+n]))
+
+    # also compute the standard deviation of the moving avg
+    # all available data points. scalar result
+    z = np.std(a[n - 1:])
+
+    return (a, ama, s, z)
 
 
 def usage():
     print "Usage:"
     print "\t", sys.argv[0], "output_dir filename_base [ndays]" \
-        " [width] [height]"
+                             " [width] [height]"
     print
     print "\t", "width in pixels"
     print "\t", "height in pixels"
+
 
 def main():
     if len(sys.argv) < 3:
@@ -338,10 +622,10 @@ def main():
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
     ndays = 2000
-    if len(sys.argv) >=4:
+    if len(sys.argv) >= 4:
         ndays = int(sys.argv[3])
-    width = None
-    height = None
+    width = WIDTH
+    height = HEIGHT
     if len(sys.argv) >= 5:
         width = int(sys.argv[4])
     if len(sys.argv) >= 6:
@@ -353,52 +637,107 @@ def main():
     maxdate = (maxdate + datetime.timedelta(days=1)).replace(minute=0, hour=0, second=0, microsecond=0)
 
     root_path = path
-    filenames = []              # (appname, latency, throughput)
+    filenames = []  # (appname, latency, throughput)
     iorder = 0
+
+    analyze = []
+
     for group, data in stats.iteritems():
-        (app,nodes) = group
-        app = app.replace('/','')
+
+        (study, nodes) = group
+        study = study.replace('/', '')
+
+        #if study != 'CSV-narrow-ix':
+        #    continue
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
-        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label, polarity from charts where appname = '%s' order by chart_order" % app])
+        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label, polarity from charts where appname = '%s' order by chart_order" % study])
         conn.close()
 
-        app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
+        app = study + " %d %s" % (nodes, ["node", "nodes"][nodes > 1])
 
-        #chart polarity: -1 for tps (decreasing is bad), 1 for latencies (increasing is bad)
+        # chart polarity: -1 for tps (decreasing is bad), 1 for latencies (increasing is bad)
 
-        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
-                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
-                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node", polarity=-1)
-                 }
+        legend = {1: dict(series="lat95", heading="95tile latency", xlabel="Time", ylabel="Latency (ms)", polarity=1),
+                  2: dict(series="lat99", heading="99tile latency", xlabel="Time", ylabel="Latency (ms)", polarity=1),
+                  3: dict(series="tppn", heading="avg throughput per node", xlabel="Time", ylabel="ops/sec per node",
+                          polarity=-1)
+                  }
 
         for r in resp.tables[0].tuples:
             legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4], polarity=r[5])
 
         fns = [app]
-        flags = dict()
+        tocs = dict()
         for r in legend.itervalues():
+            aanalyze = []
             title = app + " " + r['heading']
-            fn = "_" + title.replace(" ","_") + ".png"
+            fn = "_" + title.replace(" ", "_") + ".png"
             fns.append(prefix + fn)
-            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate, r['polarity'])
-            flags.update(f)
+            toc = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate,
+                       maxdate, r['polarity'], aanalyze)
+            master = Bdata()
+            if len(aanalyze):
+                master = aanalyze[0]
+            for branch in aanalyze:
+                analyze.append(tuple(
+                    [branch['branch'], branch['bgcolor'], branch['title'], master['last'], master['ma'][last], master['stdev'], branch['last'],
+                     branch['mnstddiff'], branch['pctmadiff']]))
+            if toc:
+                tocs.update(toc)
+
+        #if len(analyze)/3 >= 6:
+        #  break
 
         fns.append(iorder)
-        fns.append(flags)
+        fns.append(tocs)
         filenames.append(tuple(fns))
 
-    #filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    #filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-nocl-kvm-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl-kvm/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "",
+                      "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png",
+                      iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "",
+                      "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png",
+                      iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-kvm-latency", "", "",
+                      "http://ci/job/performance-nextrelease-5nines-nofail-nocl-kvm/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png",
+                      iorder))
+    filenames.append(("Openet-Shocker-three9s-latency", "", "",
+                      "http://ci/job/performance-nextrelease-shocker/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/3nines-histograms.png",
+                      iorder))
+    filenames.append(("Openet-Shocker-three9s-4x2-latency", "", "",
+                      "http://ci/job/performance-nextrelease-shocker-4x2/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/3nines-histograms.png",
+                      iorder))
+
+    # sort and save the raw data analyze file
+    with open(root_path + "-analyze.csv", "wb") as f:
+        writer = csv.writer(f, delimiter='|')
+        writer.writerows(DATA_HEADER)
+        aa = np.array(analyze,
+                      dtype=[('branch-name', 'S99'), ('bgcolor', 'S99'), ('file', 'S99'), ('master', float),
+                             ('ma', float), ('std', float), ('branch-last', float), ('nstd', float), ('pct', float)])
+        branches = []
+        sanalyze = np.sort(aa, order=['branch-name', 'nstd'])
+        for r in sanalyze:
+            if r[0] not in branches:
+                branches.append(r[0])
+        writer.writerows(sanalyze)
+
+    # make convenient links to the branch studies tables
+    branches = '\n'.join(
+        ["<a href=" + prefix + "-analyze.html#" + b + ">" + b + "</a><br>" for b in sorted(np.unique(branches))])
+
+    # generate branch study html page
+    with open(root_path + '-analyze.html', 'w') as data_file:
+        data_file.write(generate_data_file(sanalyze, branches, prefix))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')
-    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[1]))
-    index_file.write(generate_index_file(sorted_filenames))
+    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower() + str(f[1]))
+    index_file.write(generate_index_file(sorted_filenames, branches))
     index_file.close()
+
 
 if __name__ == "__main__":
     main()

@@ -43,6 +43,9 @@ class ClusterConfigurationDRTest extends TestBase {
     }
 
     def createAndDelete() {
+        int countNext = 0
+        int indexOfNewDatabase = 0
+        String newDatabaseName = ""
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -54,8 +57,36 @@ class ClusterConfigurationDRTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
+        report "hello"
 
         // Create a DR configuration
         when: 'Open popup for DR'
@@ -92,6 +123,7 @@ class ClusterConfigurationDRTest extends TestBase {
                 println("Waiting - Retrying")
             }
         }
+        report "hello1"
 
         when: 'Fill the form for master'
         for(count=0; count<numberOfTrials; count++) {
@@ -118,6 +150,7 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
         }
+        report "hello2"
 
         when: 'Open popup for DR'
         for(count=0; count<numberOfTrials; count++) {
@@ -200,18 +233,48 @@ class ClusterConfigurationDRTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
+
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+        report "hello3"
     }
 
 
     def cleanup() { // called after each test
-        count = 0
-
+        /*count = 0
+        int countNext = 0
+        String newDatabaseName = ""
         while (count < numberOfTrials) {
             count++
             try {
@@ -240,8 +303,34 @@ class ClusterConfigurationDRTest extends TestBase {
             catch (geb.waiting.WaitTimeoutException exception) {
                 openDatabase()
             }
-
-            chooseDatabase(indexOfLocal, "local")
+            newDatabaseName = "Database"
+            //chooseDatabase(indexOfLocal, "local")
+            for (count = 0; count < numberOfTrials; count++) {
+                try {
+                    for(countNext=0; countNext<numberOfTrials; countNext++) {
+                        try {
+                            waitFor { buttonAddDatabase.isDisplayed() }
+                            break
+                        } catch(geb.waiting.WaitTimeoutException exception) {
+                            currentDatabase.click()
+                        }
+                    }
+                    $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exception) {
+                    println("Waiting - Retrying")
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    println("Stale Element exception - Retrying")
+                } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                    try {
+                        waitFor { currentDatabase.text().equals(newDatabaseName) }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                }
+            }
             openDatabase()
 
             for (count = 0; count < numberOfTrials; count++) {
@@ -264,6 +353,11 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
             println()
-        }
+        }*/
+        to ClusterSettingsPage
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }

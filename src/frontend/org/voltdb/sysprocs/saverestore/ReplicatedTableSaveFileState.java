@@ -125,7 +125,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                result_dependency_id);
+                result_dependency_id,
+                getIsRecoverParam());
         return plan_fragment;
     }
 
@@ -191,7 +192,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                result_dependency_id);
+                result_dependency_id,
+                getIsRecoverParam());
         return plan_fragment;
     }
 
@@ -211,7 +213,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
                 destinationSiteId,
-                result_dependency_id);
+                result_dependency_id,
+                getIsRecoverParam());
         return plan_fragment;
     }
 
@@ -228,7 +231,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         setRootDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id,
                 (asPartitioned ? "Aggregating replicated-to-partitioned table restore results"
-                               : "Aggregating replicated table restore results"));
+                               : "Aggregating replicated table restore results"),
+                getIsRecoverParam());
         return plan_fragment;
     }
 

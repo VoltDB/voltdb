@@ -18,7 +18,6 @@ import os
 from collections import defaultdict
 import json
 import traceback
-from sets import Set
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 from flask import jsonify
@@ -1182,72 +1181,79 @@ def print_errors(config_type, error):
 
 
 def set_deployment_for_upload(database_id, request):
-    dep_file = request.files['file']
-    if dep_file and HTTPListener.allowed_file(dep_file.filename):
-        try:
-            content = dep_file.read()
-            o = XML(content)
-            xml_final = json.loads(json.dumps(etree_to_dict(o)))
-            if 'deployment' in xml_final and type(xml_final['deployment']) is dict:
-                deployment_data = get_deployment_for_upload(xml_final['deployment'])
-                if type(deployment_data) is dict:
-                    if 'error' in deployment_data:
-                        return {'status': 'failure', 'error': deployment_data['error']}
-                else:
-                    deployment_json = deployment_data[0]
-                req = HTTPListener.DictClass()
-                req.json = {}
-                req.json = deployment_json
-                inputs = JsonInputs(req)
-                if not inputs.validate():
-                    return {'status': 'failure', 'errors': inputs.errors}
-
-                result = check_validation_deployment(req)
-                if 'status' in result and result['status'] == 'error':
-                    return {'status': 'failure', 'error': result['error']}
-
-                is_duplicate_user = check_duplicate_users(req)
-                if not is_duplicate_user:
-                    return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
-
-                is_invalid_roles = check_invalid_roles(req)
-                if not is_invalid_roles:
-                    return {'status': 'failure', 'error': 'Invalid user roles.'}
-
-                HTTPListener.map_deployment(req, database_id)
-
-                deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
-                if deployment_user is not None:
-                    for user in deployment_user:
-                        if user[0]['databaseid'] == database_id:
-                            del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
-                if 'users' in req.json and 'user' in req.json['users']:
-                    for user in req.json['users']['user']:
-                        if not HTTPListener.Global.DEPLOYMENT_USERS:
-                            user_id = 1
-                        else:
-                            user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
-                        user_roles = ','.join(Set(user['roles'].split(',')))
-
-                        HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
-                                'name': user['name'],
-                                'roles': user_roles,
-                                'password': user['password'],
-                                'plaintext': user['plaintext'],
-                                'databaseid': database_id,
-                                'userid': user_id
-                            }
-                HTTPListener.sync_configuration()
-                write_configuration_file()
-
-            else:
-                return {'status': 'failure', 'error': 'Invalid file content.'}
-
-        except Exception as err:
-            return {'status': 'failure', 'error': 'Invalid file content.'}
+    if 'text/xml' in request.headers['Content-Type'] or 'application/xml' in request.headers['Content-Type']:
+        content = request.data
+        return read_content(content, database_id)
     else:
-        return {'status': 'failure', 'error': 'Invalid file type.'}
-    return {'status': 'success'}
+        dep_file = request.files['file']
+        if dep_file and HTTPListener.allowed_file(dep_file.filename):
+            content = dep_file.read()
+            return read_content(content, database_id)
+        else:
+            return {'status': 401, 'statusString': 'Invalid file type.'}
+        return {'status': 201, 'statusString': 'success'}
+
+
+def read_content(content, database_id):
+    try:
+        o = XML(content)
+        xml_final = json.loads(json.dumps(etree_to_dict(o)))
+        if 'deployment' in xml_final and type(xml_final['deployment']) is dict:
+            deployment_data = get_deployment_for_upload(xml_final['deployment'])
+            if type(deployment_data) is dict:
+                if 'error' in deployment_data:
+                    return {'status': 'failure', 'error': deployment_data['error']}
+            else:
+                deployment_json = deployment_data[0]
+            req = HTTPListener.DictClass()
+            req.json = {}
+            req.json = deployment_json
+            inputs = JsonInputs(req)
+            if not inputs.validate():
+                return {'status': 401, 'statusString': inputs.errors}
+
+            result = check_validation_deployment(req)
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 401, 'statusString': result['error']}
+
+            is_duplicate_user = check_duplicate_users(req)
+            if not is_duplicate_user:
+                return {'status': 401, 'statusString': 'Duplicate users not allowed.'}
+
+            is_invalid_roles = check_invalid_roles(req)
+            if not is_invalid_roles:
+                return {'status': 401, 'statusString': 'Invalid user roles.'}
+
+            HTTPListener.map_deployment(req, database_id)
+
+            deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
+            if deployment_user is not None:
+                for user in deployment_user:
+                    if user[0]['databaseid'] == database_id:
+                        del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
+            if 'users' in req.json and 'user' in req.json['users']:
+                for user in req.json['users']['user']:
+                    if not HTTPListener.Global.DEPLOYMENT_USERS:
+                        user_id = 1
+                    else:
+                        user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                    user_roles = ','.join(set(user['roles'].split(',')))
+
+                    HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
+                            'name': user['name'],
+                            'roles': user_roles,
+                            'password': user['password'],
+                            'plaintext': user['plaintext'],
+                            'databaseid': database_id,
+                            'userid': user_id
+                        }
+            HTTPListener.sync_configuration()
+            write_configuration_file()
+            return {'status': 200, 'statusString': 'success'}
+        else:
+            return {'status': 401, 'statusString': 'Invalid file content.'}
+    except Exception as err:
+        return {'status': 401, 'statusString': 'Invalid file content.'}
 
 
 def check_duplicate_users(req):
@@ -1277,44 +1283,44 @@ def check_validation_deployment(req):
             size = str(req.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
             response = json.loads(HTTPListener.check_size_value(size, 'memorylimit').data)
             if 'error' in response:
-                return {'status': 'error', 'error': response['error']}
+                return {'status': 401, 'statusString': response['error']}
         disk_limit_arr = []
         if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
             for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
                 size = feature['size']
                 if feature['name'] in disk_limit_arr:
-                    return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
+                    return {'status': 401, 'statusString': 'Duplicate items are not allowed.'}
                 disk_limit_arr.append(feature['name'])
                 response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
                 if 'error' in response:
-                    return {'status': 'error', 'error': response['error']}
+                    return {'status': 401, 'statusString': response['error']}
         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
             frequency_unit = ['h', 'm', 's']
             frequency = str(req.json['snapshot']['frequency'])
             if ' ' in frequency:
-                return {'status': 'error', 'error': 'Snapshot: White spaces not allowed in frequency.'}
+                return {'status': 401, 'statusString': 'Snapshot: White spaces not allowed in frequency.'}
             last_char = frequency[len(frequency) - 1]
             if last_char not in frequency_unit:
-                return {'status': 'error', 'error': 'Snapshot: Invalid frequency value.'}
+                return {'status': 401, 'statusString': 'Snapshot: Invalid frequency value.'}
             frequency = frequency[:-1]
             try:
                 int_frequency = int(frequency)
             except Exception, exp:
-                return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
+                return {'status': 401, 'statusString': 'Snapshot: ' + str(exp)}
     if 'export' in req.json and 'configuration' in req.json['export']:
         for configuration in req.json['export']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
             if 'status' in result and result['status'] == 'error':
-                return {'status': 'error', 'error': 'Export: ' + result['error']}
+                return {'status': 401, 'statusString': 'Export: ' + result['error']}
 
     if 'import' in req.json and 'configuration' in req.json['import']:
         for configuration in req.json['import']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
             if 'status' in result and result['status'] == 'error':
-                return {'status': 'error', 'error': 'Import: ' + result['error']}
+                return {'status': 401, 'statusString': 'Import: ' + result['error']}
 
-    return {'status': 'success'}
+    return {'status': 200, 'statusString': 'success'}
 
 
 def check_export_property(type, properties):
@@ -1322,33 +1328,33 @@ def check_export_property(type, properties):
     for property in properties:
         if 'name' in property and 'value' in property:
             if str(property['name']).strip() == '' or str(property['value']).strip() == '':
-                return {'status': 'error', 'error': 'Invalid property.'}
+                return {'status': 401, 'statusString': 'Invalid property.'}
             if property['name'] in property_list:
-                return {'status': 'error', 'error': 'Duplicate properties are not allowed.'}
+                return {'status': 401, 'statusString': 'Duplicate properties are not allowed.'}
             property_list.append(property['name'])
         else:
-            return {'status': 'error', 'error': 'Invalid property.'}
+            return {'status': 401, 'statusString': 'Invalid property.'}
 
     if str(type).lower() == 'kafka':
         if 'metadata.broker.list' not in property_list:
-            return {'status': 'error', 'error': 'Default property(metadata.broker.list) of kafka not present.'}
+            return {'status': 401, 'statusString': 'Default property(metadata.broker.list) of kafka not present.'}
     if str(type).lower() == 'elasticsearch':
         if 'endpoint' not in property_list:
-            return {'status': 'error', 'error': 'Default property(endpoint) of elasticsearch not present.'}
+            return {'status': 401, 'statusString': 'Default property(endpoint) of elasticsearch not present.'}
     if str(type).lower() == 'file':
         if 'type' not in property_list or 'nonce' not in property_list \
                 or 'outdir' not in property_list:
-            return {'status': 'error', 'error': 'Default properties(type, nonce, outdir) of file not present.'}
+            return {'status': 401, 'statusString': 'Default properties(type, nonce, outdir) of file not present.'}
     if str(type).lower() == 'http':
         if 'endpoint' not in property_list:
-            return {'status': 'error', 'error': 'Default property(endpoint) of  http not present.'}
+            return {'status': 401, 'statusString': 'Default property(endpoint) of  http not present.'}
     if str(type).lower() == 'jdbc':
         if 'jdbcdriver' not in property_list or 'jdbcurl' not in property_list:
-            return {'status': 'error', 'error': 'Default properties(jdbcdriver, jdbcurl) of jdbc not present.'}
+            return {'status': 401, 'statusString': 'Default properties(jdbcdriver, jdbcurl) of jdbc not present.'}
     if str(type).lower() == 'rabbitmq':
         if 'broker.host' not in property_list and 'amqp.uri' not in property_list:
-            return {'status': 'error', 'error': 'Default property(either amqp.uri or broker.host) of '
+            return {'status': 401, 'statusString': 'Default property(either amqp.uri or broker.host) of '
                                                 'rabbitmq not present.'}
         elif 'broker.host' in property_list and 'amqp.uri' in property_list:
-            return {'status': 'error', 'error': 'Both broker.host and amqp.uri cannot be included as rabbibmq property.'}
-    return {'status': 'success'}
+            return {'status': 401, 'statusString': 'Both broker.host and amqp.uri cannot be included as rabbibmq property.'}
+    return {'status': 200, 'statusString': 'success'}
