@@ -166,10 +166,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isOrderDeterministic() {
-        return isOrderDeterministicHelper(m_orderColumns);
-    }
-
-    private boolean isOrderDeterministicHelper(List<ParsedColInfo> orderColumns) {
 
         switch (m_unionType) {
         case EXCEPT:
@@ -189,29 +185,35 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             // for the whole statement to be order deterministic since both EXCEPT and INTERSECT
             // produce results that are subsets of rows produced by the left child of the
             // set operator.
-            return orderIsDeterminedByOrderColumns(m_children.get(0), orderColumns);
+            return orderIsDeterminedByOrderColumns(m_children.get(0), m_orderColumns);
 
         case UNION:
         case UNION_ALL:
 
-            // Check all but the left child of the union.
-            for (int i = 1; i < m_children.size(); ++i) {
-                if (! m_children.get(i).isOrderDeterministic()) {
-                    return false;
-                }
-            }
+            if (m_orderColumns.isEmpty()) {
 
-            AbstractParsedStmt leftChild = m_children.get(0);
-            if (leftChild.isOrderDeterministic()) {
+                // The outer ORDER BY on a UNION can undo any ordering imposed on the
+                // children of the union.  E.g.,
+                //
+                // ((select a, b from t order by a, b)
+                //   union
+                //  (select a, b from r order by a, b)
+                // ) order by a
+                //
+                // The above statement is non-deterministic.
+                //
+                // So, only check child-level determinism if there is no outer ORDER BY.
+
+                for (int i = 0; i < m_children.size(); ++i) {
+                    if (! m_children.get(i).isOrderDeterministic()) {
+                        return false;
+                    }
+                }
+
                 return true;
             }
 
-            // Even if left child is not deterministic, it might be made so by
-            // an ORDER BY applied to the output of the union.  All the rows produced by
-            // the UNION are sorted of course, but the order by columns refer to columns in the
-            // leftmost select statement.  (The ORDER BY might also cause select statements that
-            // are not the leftmost to be deterministic, but this is tricky to ascertain.)
-            return orderIsDeterminedByOrderColumns(m_children.get(0), orderColumns);
+            return orderIsDeterminedByOrderColumns(this, m_orderColumns);
 
         default:
             return false;
@@ -237,6 +239,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             case INTERSECT:
             case INTERSECT_ALL:
                 return orderIsDeterminedByOrderColumns(setOpStmt.m_children.get(0), orderColumns);
+
+            case UNION:
+            case UNION_ALL:
+                // We can return true here if the order by columns
+                // list all the columns on the select list of the leftmost statement.
+                // Otherwise, we must return false.
+                return setOpStmt.getLeftmostSelectStmt().orderByColumnsDetermineAllDisplayColumnsForUnion(orderColumns);
+
             default:
                 return false;
 

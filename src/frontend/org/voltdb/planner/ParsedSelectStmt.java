@@ -1872,6 +1872,34 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return result;
     }
 
+    /**
+     * This is a very simple version of the above method for when an ORDER BY
+     * clause appears on a UNION.  Does the ORDER BY clause reference every item on the
+     * display list?  If so, then the order is deterministic.
+     *
+     * Note that in this method we don't do more sophisticated analysis (like using
+     * value equivalence, or knowledge of unique indexes) because we want to prove that
+     * *every* child of a UNION is deterministic, not just this one.
+     *
+     * @param orderColumns  ORDER BY columns on the UNION
+     * @return  true if all items on display list are in the UNION's ORDER BY
+     */
+    public boolean orderByColumnsDetermineAllDisplayColumnsForUnion(List<ParsedColInfo> orderColumns) {
+        Set<AbstractExpression> orderExprs = new HashSet<>();
+        for (ParsedColInfo col : orderColumns) {
+            orderExprs.add(col.expression);
+        }
+
+
+        for (ParsedColInfo col : m_displayColumns) {
+            if (! orderExprs.contains(col.expression)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private boolean hasAOneRowResult()
     {
         if ( ( ! isGrouped() ) && displaysAgg()) {
@@ -2113,5 +2141,4 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         return null;
     }
-
 }

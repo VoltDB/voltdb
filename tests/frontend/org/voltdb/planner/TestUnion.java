@@ -333,82 +333,77 @@ public class TestUnion extends PlannerTestCase {
         }
     }
 
+    private boolean stmtIsDeterministic(String stmt) {
+        CompiledPlan plan = compileAdHocPlan(stmt);
+        return plan.isOrderDeterministic();
+    }
+
+    private void assertIsDeterministic(String stmt) {
+        assertTrue("Expected stmt\n"
+                + "   " + stmt + "\n"
+                + "to be deterministic, but it was not.", stmtIsDeterministic(stmt));
+    }
+
+    private void assertIsNonDeterministic(String stmt) {
+        assertFalse("Expected stmt\n"
+                + "    " + stmt + "\n"
+                + "to be non-deterministic, but it was."
+                ,stmtIsDeterministic(stmt));
+    }
+
     public void testUnionDeterminism() {
-        {
-            CompiledPlan plan = compileAdHocPlan("select B, DESC from T2 UNION select A, DESC from T1");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(false, isDeterministic);
-        }
-        {
-            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(false, isDeterministic);
-        }
-        {
-            // This is deterministic, but it's a limitation of our planner that we resolve the union's order by columns
-            // on the leftmost select statement.  It's difficult to check the RHS of the UNION, since it's possible
-            // column names are different there.
-            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(false, isDeterministic);
-        }
-        {
-            // Adding an internal order by to the RHS of the union makes the planner able to tell this is
-            // deterministic.
-            CompiledPlan plan = compileAdHocPlan("select B, DESC from T2 UNION (select A, DESC from T1 order by a, desc) "
-                    + "order by B asc, DESC desc");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(true, isDeterministic);
-        }
+
+        assertIsNonDeterministic("select B, DESC from T2 UNION select A, DESC from T1");
+        assertIsNonDeterministic("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
+
+        // Ordering by all columns should be deterministic.
+        assertIsDeterministic("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
+
+        // Should not be deterministic:
+        //   Ordering by (a, b) makes a deterministic order on LHS, but
+        //   RHS cannot be said to be deterministic
+        assertIsNonDeterministic("(select a, b, c from t7 union  select a, b, c from t8) order by a, b");
+
+        // This is deterministic: primary key on T7 (a, b) makes both sides of union deterministic.
+        assertIsDeterministic("((select a, b, c from t7 order by a, b) union (select a, b, c from t7 order by a, b))");
+
+        // As above, but add a non-deterministic sort to the top of the plan: no longer deterministic.
+        assertIsNonDeterministic("((select a, b, c from t7 order by a, b) union (select a, b, c from t7 order by a, b)) order by a");
     }
 
     public void testOtherSetOpDeterminism()
     {
-        CompiledPlan plan;
-
         // Output of non-union set ops is considered to be non-deterministic,
         // since they use boost unordered containers in the EE.
         // This is true even if sub-selects are sorted.
 
-        plan = compileAdHocPlan("(select a from t1 order by a) intersect select b from t2");
-        assertFalse(plan.isOrderDeterministic());
-
-        plan = compileAdHocPlan("(select a from t1 order by a) intersect all select b from t2");
-
-        assertFalse(plan.isOrderDeterministic());
-        plan = compileAdHocPlan("(select a from t1 order by a ) except select b from t2");
-        assertFalse(plan.isOrderDeterministic());
-
-        plan = compileAdHocPlan("(select a from t1 order by a) except all select b from t2");
-        assertFalse(plan.isOrderDeterministic());
+        assertIsNonDeterministic("(select a from t1 order by a) intersect select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) intersect all select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) except select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) except all select b from t2");
 
         // A statement-level order by clause will the above statements deterministic.
-        plan = compileAdHocPlan("(select a from t1 intersect select b from t2) order by a");
-        assertTrue(plan.isOrderDeterministic());
+        assertIsDeterministic("(select a from t1 intersect     select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 intersect all select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 except        select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 except all    select b from t2) order by a");
 
         // More examples composing the various set operators.
 
         // union on LHS of intersect
-        plan = compileAdHocPlan("((select a from t1 order by a) union (select b from t2 order by b)) "
+        assertIsNonDeterministic("((select a from t1 order by a) union (select b from t2 order by b)) "
                 + "intersect select b from t2");
-        assertFalse(plan.isOrderDeterministic());
 
-        // This is marked as deterministic even though it is, because the planner is not
-        // sophisticated enough to handle this case.
-        plan = compileAdHocPlan("(((select a from t1) union (select b from t2 order by b)) "
+        assertIsDeterministic("(((select a from t1) union (select b from t2 order by b)) "
                 + "intersect select b from t2) order by a");
-        assertFalse(plan.isOrderDeterministic());
 
         // intersect on LHS of union
         // Not deterministic because LHS of union is not determinstic.
-        plan = compileAdHocPlan("((select a from t1) intersect (select b from t2)) "
+        assertIsNonDeterministic("((select a from t1) intersect (select b from t2)) "
                 + "union (select b from t2 order by b)");
-        assertFalse(plan.isOrderDeterministic());
 
-        // This is deterministic because both sides of the union are determinstic.
-        plan = compileAdHocPlan("((select a from t1) intersect (select b from t2) order by a) "
+        assertIsDeterministic("((select a from t1) intersect (select b from t2) order by a) "
                 + "union (select b from t2 order by b)");
-        assertTrue(plan.isOrderDeterministic());
     }
 
     public void testInvalidOrderBy() {
