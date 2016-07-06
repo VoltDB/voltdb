@@ -41,6 +41,7 @@ import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -160,7 +161,7 @@ public class SnapshotCompletionMonitor {
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
         String path = jsonObj.getString(SnapshotUtil.JSON_PATH);
-        SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(jsonObj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        SnapthotPathType stype = SnapthotPathType.valueOf(jsonObj.getString(SnapshotUtil.JSON_PATH_TYPE));
         String nonce = jsonObj.getString(SnapshotUtil.JSON_NONCE);
         boolean truncation = jsonObj.getBoolean("isTruncation");
         boolean didSucceed = jsonObj.getBoolean("didSucceed");

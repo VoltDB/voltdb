@@ -26,6 +26,7 @@ import org.voltdb.VoltTable;
 
 import com.google_voltpatches.common.base.Charsets;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 public class SnapshotCheckResponseMessage extends VoltMessage {
 
@@ -34,7 +35,7 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
     private byte [] m_nonce;
     private VoltTable m_response;
     private byte[] m_stypeBytes;
-    private SnapshotUtil.SnapthotPathType m_stype;
+    private SnapthotPathType m_stype;
 
     /** Empty constructor for de-serialization */
     SnapshotCheckResponseMessage()
@@ -42,7 +43,7 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         super();
     }
 
-    public SnapshotCheckResponseMessage(String path, SnapshotUtil.SnapthotPathType stype, String nonce, VoltTable response)
+    public SnapshotCheckResponseMessage(String path, SnapthotPathType stype, String nonce, VoltTable response)
     {
         super();
         m_path = path.getBytes(Charsets.UTF_8);
@@ -56,7 +57,7 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
     public String getPath() { return new String(m_path, Charsets.UTF_8); }
     public String getNonce() { return new String(m_nonce, Charsets.UTF_8); }
     public VoltTable getResponse() { return m_response; }
-    public SnapshotUtil.SnapthotPathType getSnapshotPathType() { return m_stype; };
+    public SnapthotPathType getSnapshotPathType() { return m_stype; };
 
     @Override
     public int getSerializedSize()
@@ -79,7 +80,7 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         m_nonce = new byte[buf.getInt()];
         buf.get(m_nonce);
         m_response = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
-        m_stype = SnapshotUtil.SnapthotPathType.valueOf(new String(m_stypeBytes, Charsets.UTF_8));
+        m_stype = SnapthotPathType.valueOf(new String(m_stypeBytes, Charsets.UTF_8));
     }
 
     @Override

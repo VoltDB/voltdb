@@ -40,6 +40,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.utils.VoltFile;
 
@@ -236,7 +237,7 @@ public class SnapshotScanAgent extends OpsAgent
                     m_messenger.getHostId(),
                     m_hostname,
                     "",
-                    SnapshotUtil.SnapthotPathType.SNAP_PATH.toString(),
+                    SnapthotPathType.SNAP_PATH.toString(),
                     "",
                     0,
                     0,
@@ -272,11 +273,11 @@ public class SnapshotScanAgent extends OpsAgent
                             if (partitions.startsWith(",")) {
                                 partitions = partitions.substring(1);
                             }
-                            SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+                            SnapthotPathType stype = SnapthotPathType.SNAP_PATH;
                             if (f.getParent().equalsIgnoreCase(VoltDB.instance().getCommandLogSnapshotPath())) {
-                                stype = SnapshotUtil.SnapthotPathType.SNAP_CL;
+                                stype = SnapthotPathType.SNAP_CL;
                             } else if (f.getParent().equalsIgnoreCase(VoltDB.instance().getSnapshotPath())) {
-                                stype = SnapshotUtil.SnapthotPathType.SNAP_AUTO;
+                                stype = SnapthotPathType.SNAP_AUTO;
                             }
                             results.add(new SnapshotResultRow(
                                     m_messenger.getHostId(),
@@ -305,11 +306,11 @@ public class SnapshotScanAgent extends OpsAgent
                         SNAP_LOG.warn(e);
                     }
                 } else {
-                    SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+                    SnapthotPathType stype = SnapthotPathType.SNAP_PATH;
                     if (f.getParent().equalsIgnoreCase(VoltDB.instance().getCommandLogSnapshotPath())) {
-                        stype = SnapshotUtil.SnapthotPathType.SNAP_CL;
+                        stype = SnapthotPathType.SNAP_CL;
                     } else if (f.getParent().equalsIgnoreCase(VoltDB.instance().getSnapshotPath())) {
-                        stype = SnapshotUtil.SnapthotPathType.SNAP_AUTO;
+                        stype = SnapthotPathType.SNAP_AUTO;
                     }
                     results.add(new SnapshotResultRow(
                             m_messenger.getHostId(),

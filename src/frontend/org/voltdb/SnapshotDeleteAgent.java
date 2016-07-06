@@ -28,6 +28,7 @@ import org.voltcore.network.Connection;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -134,7 +135,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         if (paths.length != nonces.length) {
             return "A path must be provided for every nonce";
         }
-        String stype = SnapshotUtil.SnapthotPathType.SNAP_PATH.toString();
+        String stype = SnapthotPathType.SNAP_PATH.toString();
         if (params.size() > 2) {
             stype = (String )(ParameterConverter.tryToMakeCompatible(
                         String.class,
@@ -178,7 +179,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         for (int i = 0; i < length; i++) {
             nonces[i] = obj.getJSONArray("nonces").getString(i);
         }
-        final SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(obj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        final SnapthotPathType stype = SnapthotPathType.valueOf(obj.getString(SnapshotUtil.JSON_PATH_TYPE));
 
         new Thread("Async snapshot deletion thread") {
             @Override
@@ -189,9 +190,9 @@ public class SnapshotDeleteAgent extends OpsAgent
                     String path = paths[ii];
                     //When user calla @SnapshotDelete this will not be set to AUTO so we will delete what user requested.
                     //If its SNAP_AUTO thenits coming from periodic delete task.
-                    if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+                    if (stype == SnapthotPathType.SNAP_AUTO) {
                         path = VoltDB.instance().getSnapshotPath();
-                    } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+                    } else if (stype == SnapthotPathType.SNAP_CL) {
                         path = VoltDB.instance().getCommandLogSnapshotPath();
                     }
                     List<File> relevantFiles = retrieveRelevantFiles(path, nonces[ii]);

@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -65,7 +64,7 @@ import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -1364,7 +1363,7 @@ SnapshotCompletionInterest, Promotable
          * Use the individual snapshot directories instead of voltroot, because
          * they can be set individually
          */
-        Map<String, SnapshotUtil.SnapthotPathType> paths = new HashMap<String, SnapshotUtil.SnapthotPathType>();
+        Map<String, SnapthotPathType> paths = new HashMap<String, SnapthotPathType>();
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             if (m_clSnapshotPath != null) {
                 paths.put(m_clSnapshotPath, SnapthotPathType.SNAP_CL);

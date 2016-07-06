@@ -54,6 +54,7 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -498,11 +499,11 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(pathType);
-        if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+        SnapthotPathType stype = SnapthotPathType.valueOf(pathType);
+        if (stype == SnapthotPathType.SNAP_AUTO) {
             file_path = VoltDB.instance().getSnapshotPath();
             SNAP_LOG.info("Using local auto snapshot path: " + file_path);
-        } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+        } else if (stype == SnapthotPathType.SNAP_CL) {
             file_path = VoltDB.instance().getCommandLogSnapshotPath();
             SNAP_LOG.info("Using local CL snapshot path: " + file_path);
         }

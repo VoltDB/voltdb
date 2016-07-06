@@ -30,7 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotFilter;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 
 /**

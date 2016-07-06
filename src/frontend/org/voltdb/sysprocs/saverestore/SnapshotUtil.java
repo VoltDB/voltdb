@@ -118,11 +118,6 @@ public class SnapshotUtil {
         new ColumnInfo("ERR_MSG", VoltType.STRING)
     };
 
-    public static enum SnapthotPathType {
-        SNAP_PATH, // For direct path based
-        SNAP_CL,
-        SNAP_AUTO,
-    }
 
     public static final VoltTable constructNodeResultsTable()
     {
@@ -1388,7 +1383,7 @@ public class SnapshotUtil {
                                        final String nonce,
                                        final boolean blocking,
                                        final SnapshotFormat format,
-                                       final SnapshotUtil.SnapthotPathType stype,
+                                       final SnapthotPathType stype,
                                        final String data,
                                        final SnapshotResponseHandler handler,
                                        final boolean notifyChanges)
@@ -1593,7 +1588,7 @@ public class SnapshotUtil {
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
                 if (VoltDB.instance().isLegacy()) {
-                    jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_PATH);
+                    jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_PATH);
                 }
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
                 jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, params[0]);

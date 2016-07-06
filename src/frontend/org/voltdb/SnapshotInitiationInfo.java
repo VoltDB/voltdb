@@ -22,6 +22,7 @@ import java.net.URI;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 /**
  * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
@@ -35,14 +36,14 @@ public class SnapshotInitiationInfo
     private SnapshotFormat m_format;
     private String m_data;
     private boolean m_truncationRequest;
-    private SnapshotUtil.SnapthotPathType m_stype;
+    private SnapthotPathType m_stype;
 
     /**
      * Construct the object given the parameters directly.
      * @param data any additional JSON blob params.  Currently only provided by VoltDB internals
      */
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
-            SnapshotFormat format, SnapshotUtil.SnapthotPathType stype, String data)
+            SnapshotFormat format, SnapthotPathType stype, String data)
     {
         m_path = path;
         m_nonce = nonce;
@@ -115,7 +116,7 @@ public class SnapshotInitiationInfo
         m_nonce = (String)params[1];
         m_blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
         m_format = SnapshotFormat.NATIVE;
-        m_stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+        m_stype = SnapthotPathType.SNAP_PATH;
     }
 
     /**
@@ -166,8 +167,8 @@ public class SnapshotInitiationInfo
             }
         }
 
-        m_stype = SnapshotUtil.SnapthotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE,
-                SnapshotUtil.SnapthotPathType.SNAP_PATH.toString()));
+        m_stype = SnapthotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE,
+                SnapthotPathType.SNAP_PATH.toString()));
         m_path = jsObj.getString("uripath");
         if (m_path.isEmpty()) {
             throw new Exception("uripath cannot be empty");

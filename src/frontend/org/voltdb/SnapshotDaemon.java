@@ -76,6 +76,7 @@ import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -477,10 +478,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         int ii = 0;
         for (TruncationSnapshotAttempt attempt : toDelete) {
             paths[ii] = attempt.path;
-            SnapshotUtil.SnapthotPathType stype = SnapshotUtil.SnapthotPathType.valueOf(attempt.pathType);
-            if (stype == SnapshotUtil.SnapthotPathType.SNAP_CL) {
+            SnapthotPathType stype = SnapthotPathType.valueOf(attempt.pathType);
+            if (stype == SnapthotPathType.SNAP_CL) {
                 paths[ii] = VoltDB.instance().getCommandLogSnapshotPath();
-            } else if (stype == SnapshotUtil.SnapthotPathType.SNAP_AUTO) {
+            } else if (stype == SnapthotPathType.SNAP_AUTO) {
                 paths[ii] = VoltDB.instance().getSnapshotPath();
             }
             nonces[ii++] = attempt.nonce;
@@ -490,7 +491,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             new Object[] {
                 paths,
                 nonces,
-                SnapshotUtil.SnapthotPathType.SNAP_CL.toString()
+                SnapthotPathType.SNAP_CL.toString()
                 };
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -692,7 +693,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             sData = jsData.toString();
             jsObj.put(SnapshotUtil.JSON_PATH, snapshotPath );
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
-            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_CL);
+            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_CL);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             jsObj.put("data", sData);
         } catch (JSONException e) {
@@ -1265,9 +1266,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String path;
         private final String nonce;
         private final Long txnId;
-        private final SnapshotUtil.SnapthotPathType stype;
+        private final SnapthotPathType stype;
 
-        private Snapshot(String path, SnapshotUtil.SnapthotPathType stype, String nonce, Long txnId) {
+        private Snapshot(String path, SnapthotPathType stype, String nonce, Long txnId) {
             this.path = path;
             this.stype = stype;
             this.nonce = nonce;
@@ -1358,10 +1359,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         JSONObject jsObj = new JSONObject();
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, m_path);
-            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString());
+            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_AUTO.toString());
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            m_snapshots.offer(new Snapshot(m_path, SnapshotUtil.SnapthotPathType.SNAP_AUTO, nonce, now));
+            m_snapshots.offer(new Snapshot(m_path, SnapthotPathType.SNAP_AUTO, nonce, now));
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1556,7 +1557,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
                     final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, SnapshotUtil.SnapthotPathType.SNAP_AUTO, nonce, txnId));
+                    m_snapshots.add(new Snapshot(path, SnapthotPathType.SNAP_AUTO, nonce, txnId));
                 }
             }
         }
@@ -1589,7 +1590,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 new Object[] {
                     pathsToDelete,
                     noncesToDelete,
-                    SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString()
+                    SnapthotPathType.SNAP_AUTO.toString()
                     };
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -1901,7 +1902,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         snapshotAttempt = new TruncationSnapshotAttempt();
                         snapshotAttempt.path = event.path;
                         snapshotAttempt.nonce = event.nonce;
-                        snapshotAttempt.pathType = SnapshotUtil.SnapthotPathType.SNAP_CL.toString();
+                        snapshotAttempt.pathType = SnapthotPathType.SNAP_CL.toString();
                         m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;
