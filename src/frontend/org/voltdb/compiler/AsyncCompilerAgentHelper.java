@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import java.io.IOException;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -38,6 +39,7 @@ public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private final LicenseApi m_licenseApi;
+    private static Pattern PATH_DELETER = Pattern.compile("(?i)\\<paths\\>(.*)\\<\\/paths\\>", Pattern.DOTALL|Pattern.MULTILINE);
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;
@@ -207,9 +209,14 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
 
-            retval.deploymentString = deploymentString;
+            //In non legacy mode discard the path element.
+            if (VoltDB.instance().isLegacy()) {
+                retval.deploymentString = deploymentString;
+            } else {
+                retval.deploymentString = PATH_DELETER.matcher(deploymentString).replaceAll("");
+            }
             retval.deploymentHash =
-                CatalogUtil.makeDeploymentHash(deploymentString.getBytes(Constants.UTF8ENCODING));
+                CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify
