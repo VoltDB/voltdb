@@ -43,12 +43,11 @@ import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
-import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.MiscUtils;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -341,13 +340,12 @@ public class TestUpdateDeployment extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
-        Properties props = new Properties();
-        props.putAll(ImmutableMap.<String, String>of(
+        Properties props = buildProperties(
                 "type", "csv",
                 "batched", "false",
                 "with-schema", "true",
                 "complain", "true",
-                "outdir", "/tmp/" + System.getProperty("user.name")));
+                "outdir", "/tmp/" + System.getProperty("user.name"));
         project.addExport(true /* enabled */, "custom", props);
         // build the jarfile
         boolean compile = config.compile(project);
