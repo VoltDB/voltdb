@@ -19,6 +19,8 @@ from tabulate import tabulate
 COMMUNITY = os.environ.get('community', None)
 PRO = os.environ.get('pro', None)
 
+ADMIN_CHANNEL = 'D1JG6N2A2'
+
 TL_QUERY = ("""
   SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
@@ -156,7 +158,7 @@ class JenkinsBot(object):
                 logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 logfile.write(' ' + message + '\n')
         else:
-            self.post_message('D1JG6N2A2', 'Log file too large.')
+            self.post_message(ADMIN_CHANNEL, 'Log file too large.')
 
     def connect(self):
         token = os.environ.get('token', None)
@@ -252,6 +254,7 @@ class JenkinsBot(object):
                 time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
                 self.log('Turning off the bot')
+                self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
                 return
             except IndexError as error:
                 self.log(error)
@@ -267,6 +270,7 @@ class JenkinsBot(object):
                 if not self.connect():
                     self.log('Could not connect to Slack')
                     self.log('Turning off the bot')
+                    self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
                     return
 
     def query_and_response(self, query, params, channels, filename, retry=False):
