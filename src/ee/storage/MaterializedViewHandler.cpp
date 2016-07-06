@@ -37,6 +37,7 @@ namespace voltdb {
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
         m_dirty = false;
+        catchUpWithExistingData();
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
@@ -76,6 +77,8 @@ namespace voltdb {
                                           catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                           VoltDBEngine *engine) {
         m_destTable = destTable;
+        m_index = m_destTable->primaryKeyIndex();
+        m_groupByColumnCount = mvHandlerInfo->groupByColumnCount();
         // Delete the existing handler if exists. When the existing handler is destructed,
         // it will automatically removes itself from all the viewsToTrigger lists of its source tables.
         delete m_destTable->m_mvHandler;
@@ -119,12 +122,55 @@ namespace voltdb {
         }
     }
 
-    void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable) {
+    // If the source table(s) is not empty when the view is created, we need to execute the plan directly
+    // to catch up with the existing data.
+    void MaterializedViewHandler::catchUpWithExistingData() {
+        if (! m_destTable->isPersistentTableEmpty()) {
+            return;
+        }
+        bool hasNonEmptySourceTable = false;
+        for (auto sourceTable : m_sourceTables) {
+            if ( ! sourceTable->isPersistentTableEmpty()) {
+                hasNonEmptySourceTable = true;
+                break;
+            }
+        }
+        if (! hasNonEmptySourceTable) {
+            return;
+        }
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
+        Table *delta = ec->executeExecutors(executorList);
+        TableIterator ti = delta->iterator();
+        TableTuple tuple(delta->schema());
+        while (ti.next(tuple)) {
+            m_destTable->insertTuple(tuple);
+        }
+        ec->cleanupExecutorsForSubquery(executorList);
+    }
 
+    void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable) {
+        // Within the lifespan of this ScopedDeltaTableContext, the source table will enter delta table mode.
+        ScopedDeltaTableContext dtContext(sourceTable);
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
+        Table *delta = ec->executeExecutors(executorList);
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleInsert()" << endl;
+            cout << "Delta table:" << endl << sourceTable->m_deltaTable->debug() << endl;
+            cout << "Result:\n" << delta->debug() << endl;
+        }
+
+        ec->cleanupExecutorsForSubquery(executorList);
     }
 
     void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable) {
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleDelete()" << endl; }
 
     }
+
+    // std::string MaterializedViewHandler::debug() const {
+    //     // To be implemented.
+    // }
 
 } // namespace voltdb

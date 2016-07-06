@@ -208,6 +208,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
     friend class MaterializedViewHandler;
+    friend class ScopedDeltaTableContext;
 
 private:
     // no default ctor, no copy, no assignment

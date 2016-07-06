@@ -465,13 +465,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             assert(destEmptyTable);
             new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
         }
-        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
-            PersistentTable * targetTable = originalView->targetTable();
-            TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
-            PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
-            assert(targetEmptyTable);
-            MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
-        }
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -543,7 +536,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
     }
 
     // If the delta table has data in it, delete the data first.
-    if (m_deltaTable->m_tupleCount > 0) {
+    if (! m_deltaTable->isPersistentTableEmpty()) {
         TableIterator ti(m_deltaTable, m_deltaTable->m_data.begin());
         TableTuple tuple(m_deltaTable->m_schema);
         ti.next(tuple);
@@ -555,7 +548,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
     targetForDelta.copyForPersistentInsert(source);
 
     try {
-        insertTupleCommon(source, targetForDelta, fallible);
+        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
     }
     catch (ConstraintFailureException &e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
@@ -565,8 +558,6 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
         m_deltaTable->deleteTupleStorage(targetForDelta);
         throw;
     }
-
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_name << " PersistentTable::insertTupleIntoDeltaTable() after insert:" << endl << m_deltaTable->debug() << endl; }
 }
 
 /*

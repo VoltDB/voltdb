@@ -228,6 +228,7 @@ public class MaterializedViewProcessor {
 
                 compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
                 compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
+                mvHandlerInfo.setGroupbycolumncount(stmt.m_groupByColumns.size());
 
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);

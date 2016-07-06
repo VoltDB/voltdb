@@ -29,6 +29,22 @@ namespace voltdb {
 
 class VoltDBEngine;
 
+class ScopedDeltaTableContext {
+public:
+    ScopedDeltaTableContext(PersistentTable *table)
+        : m_table(table) {
+        assert(m_table->m_deltaTable);
+        assert( ! m_table->m_deltaTableActive);
+        m_table->m_deltaTableActive = true;
+    }
+
+    ~ScopedDeltaTableContext() {
+        m_table->m_deltaTableActive = false;
+    }
+private:
+    PersistentTable *m_table;
+};
+
 class MaterializedViewHandler {
 public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
@@ -44,13 +60,16 @@ public:
     void pollute() { m_dirty = true; }
     void handleTupleInsert(PersistentTable *sourceTable);
     void handleTupleDelete(PersistentTable *sourceTable);
+    void catchUpWithExistingData();
+    // std::string debug() const;
 
 private:
     std::vector<PersistentTable*> m_sourceTables;
     PersistentTable *m_destTable;
+    TableIndex *m_index;
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
-    std::vector<int32_t> m_columnTypes;
+    std::size_t m_groupByColumnCount;
     bool m_dirty;
 
     void install(PersistentTable *destTable,
