@@ -73,7 +73,7 @@ public abstract class ClientFactory {
             //Estimate Time Updater stop updates.
             EstTimeUpdater.stop();
             //stop ReverseDNSCache.
-            ReverseDNSCache.close();
+            ReverseDNSCache.stop();
         }
     }
 }

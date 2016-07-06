@@ -18,6 +18,7 @@
 package org.voltcore.network;
 
 import java.net.InetAddress;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
 
@@ -72,17 +74,36 @@ public class ReverseDNSCache {
             m_es = new ThreadPoolExecutor(1, 16, 1, TimeUnit.SECONDS,
                    new SynchronousQueue<Runnable>(),
                    CoreUtils.getThreadFactory("Reverse DNS lookups"));
+            try {
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {}
+                }).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException("Unable to prime ReverseDNSCache", e);
+            }
         }
     }
 
-    public static synchronized void close() throws InterruptedException{
-        m_es.shutdown();
-        try {
-            m_es.awaitTermination(365, TimeUnit.DAYS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Unable to shutdown ReverseDNSCache", e);
+    public static synchronized void stop() throws InterruptedException{
+        if (m_es != null) {
+            try {
+                // Submit and wait on an empty logger task to flush the queue.
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {}
+                }).get();
+            } catch (Exception e) {
+                Throwables.getRootCause(e).printStackTrace();
+            }
+            m_es.shutdown();
+            try {
+                m_es.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Unable to shutdown ReverseDNSCache", e);
+            }
+            m_es = null;
         }
-        m_es = null;
     }
 
     public static void submit(Runnable r) {

@@ -31,7 +31,7 @@ public class EstTimeUpdater {
     public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
 
     public static volatile boolean pause = false;
-    public static volatile AtomicBoolean done = new AtomicBoolean(true);
+    public static final AtomicBoolean done = new AtomicBoolean(true);
 
     private final static Runnable updaterRunnable = new Runnable() {
         @Override
