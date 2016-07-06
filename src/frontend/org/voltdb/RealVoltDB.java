@@ -176,11 +176,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "<!-- This file is an auto-generated default deployment configuration. -->",
         "<deployment>",
         "    <cluster hostcount=\"1\" />",
+        /* this is where paths would be added at line 4 (starting from 0) */
         "    <httpd enabled=\"true\">",
         "        <jsonapi enabled=\"true\" />",
         "    </httpd>",
         "</deployment>"
     };
+    private static final int insertPathsAtLine = 4;
 
     private final Properties m_pathList = new Properties();
 
