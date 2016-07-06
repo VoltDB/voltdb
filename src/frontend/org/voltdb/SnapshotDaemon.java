@@ -798,6 +798,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         if (snapshotAttempt == null) {
                             snapshotAttempt = new TruncationSnapshotAttempt();
                             m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
+                            snapshotAttempt.pathType = SnapthotPathType.SNAP_CL.toString();
                         }
                         snapshotAttempt.nonce = nonce;
                         snapshotAttempt.path = snapshotPath;
