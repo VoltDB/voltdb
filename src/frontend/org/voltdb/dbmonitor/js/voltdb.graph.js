@@ -1210,24 +1210,12 @@
             var cpuDetailsArr = []
             var cpuDetailsArrMin = []
             var cpuDetailsArrDay = []
-            if(localStorage.cpuDetails != undefined)
-                cpuDetailsArr = JSON.parse(localStorage.cpuDetails)
-            var cpuDetailsMod = []
-
-            if(monitor.cpuFirstData){
-                for(var i = 0; i< cpuDetailsArr.length; i++){
-                    monitor.cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
-                        "y": cpuDetailsArr[i].percentUsed
-                    })
-                }
-            }
 
             if(localStorage.cpuDetailsMin != undefined)
                 cpuDetailsArrMin = JSON.parse(localStorage.cpuDetailsMin)
 
             if(localStorage.cpuDetailsDay != undefined)
                 cpuDetailsArrDay = JSON.parse(localStorage.cpuDetailsDay)
-
 
 //            var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
@@ -1236,8 +1224,20 @@
             var cpuDetail = cpuDetails;
 
 
-            if ($.isEmptyObject(cpuDetail) || cpuDetail == undefined || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == undefined)
+            if ($.isEmptyObject(cpuDetail) || cpuDetail == undefined || !cpuDetail.hasOwnProperty(currentServer) || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == undefined)
                 return;
+
+            if(localStorage.cpuDetails != undefined)
+                cpuDetailsArr = JSON.parse(localStorage.cpuDetails)
+
+            if(monitor.cpuFirstData){
+                for(var i = 0; i< cpuDetailsArr.length; i++){
+                    sliceFirstData(monitor.cpuData, dataView.Seconds);
+                    monitor.cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
+                        "y": cpuDetailsArr[i].percentUsed
+                    })
+                }
+            }
 
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
@@ -1313,8 +1313,8 @@
             var sliderValue = $( "#slider-range-min" ).slider( "value" )
             var slicedData = []
             var interval = (sliderValue * 60) / timeUnit
-            if (data.length > interval){
-                slicedData = data.slice(1,  (data.length - (data.length - interval)) -1 )
+            if (data.length >= interval){
+                slicedData = data.slice(1,  (data.length - (data.length - interval)))
             } else {
                 slicedData = data
             }
