@@ -933,6 +933,7 @@
 
             // Compute latency statistics
             jQuery.each(latency, function (id, val) {
+
                 var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
                 var latStats = convert2Histogram(strLatStats);
@@ -949,6 +950,19 @@
 
                 monitor.latHistogram[id] = latStats;
             });
+
+            if (VoltDbUi.latencyDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.latencyDetails.length == 360){
+                    VoltDbUI.latencyDetails.shift();
+                }
+
+                VoltDbUi.latencyDetails.push({
+                    timestamp: timeStamp,
+                    uncompressedHistogram: maxLatency
+                });
+                localStorage.latencyDetails = JSON.stringify(VoltDbUi.latencyDetails)
+//                console.log(localStorage.memoryDetails);
+            }
 
             var lat = maxLatency;
             if (lat < 0)
@@ -1011,6 +1025,21 @@
             var dataMemMin = monitor.memDataMin;
             var dataMemDay = monitor.memDataDay;
             var memDetails = memoryDetails;
+            var x = 0;
+            var y = 0;
+
+            if (VoltDbUi.memoryDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.memoryDetails.length == 360){
+                    VoltDbUI.memoryDetails.shift();
+                }
+
+                VoltDbUi.memoryDetails.push({
+                    TIMESTAMP: memDetails[currentServer].TIMESTAMP,
+                    PHYSICALMEMORY: memDetails[currentServer].PHYSICALMEMORY
+                });
+                localStorage.memoryDetails = JSON.stringify(VoltDbUi.memoryDetails)
+//                console.log(localStorage.memoryDetails);
+            }
 
             if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
                 return;
@@ -1082,12 +1111,25 @@
             memMinCount++;
         };
 
-         this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
+        this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var datatrans = monitor.tpsData;
             var datatransMin = monitor.tpsDataMin;
             var datatransDay = monitor.tpsDataDay;
             var transacDetail = transactionDetails;
+
+             if (VoltDbUi.transactionDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.transactionDetails.length == 360){
+                    VoltDbUI.transactionDetails.shift();
+                }
+//                console.log(transacDetail)
+                VoltDbUi.transactionDetails.push({
+                    timestamp: transacDetail["TimeStamp"],
+                    currentTimerTick: transacDetail["currentTimerTick"]
+                });
+                localStorage.transactionDetails = JSON.stringify(VoltDbUi.transactionDetails)
+//                console.log(localStorage.transactionDetails);
+            }
 
             if ($.isEmptyObject(transacDetail) || transacDetail == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["TimeStamp"] == undefined || transacDetail["currentTimerTick"] == undefined)
                 return;
@@ -1099,7 +1141,6 @@
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
-
                 if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
                     calculatedValue = 0;
 
@@ -1158,18 +1199,51 @@
         };
 
 
+        this.timeUnit = {
+            sec: 5,
+            min: 30,
+            day: 300
+        }
+
         this.RefreshCpu = function (cpuDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
+            var cpuDetailsArr = []
+            var cpuDetailsArrMin = []
+            var cpuDetailsArrDay = []
+            debugger;
+            if(localStorage.cpuDetails != undefined)
+                cpuDetailsArr = JSON.parse(localStorage.cpuDetails)
+            var cpuDetailsMod = []
+
+            if(monitor.cpuFirstData){
+                for(var i = 0; i< cpuDetailsArr.length; i++){
+                    monitor.cpuData.slice(1)
+                    monitor.cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
+                        "y": cpuDetailsArr[i].percentUsed
+                    })
+                }
+            }
+
+            if(localStorage.cpuDetailsMin != undefined)
+                cpuDetailsArrMin = JSON.parse(localStorage.cpuDetailsMin)
+
+            if(localStorage.cpuDetailsDay != undefined)
+                cpuDetailsArrDay = JSON.parse(localStorage.cpuDetailsDay)
+
+
+//            var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
             var cpuDataMin = monitor.cpuDataMin;
             var cpuDataDay = monitor.cpuDataHrs;
             var cpuDetail = cpuDetails;
+
 
             if ($.isEmptyObject(cpuDetail) || cpuDetail == undefined || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
 
             if (timeStamp >= monitor.cpuMaxTimeStamp) {
                 if (percentageUsage < 0)
@@ -1181,8 +1255,10 @@
                     cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
                     if (timeStamp == monitor.cpuMaxTimeStamp) {
                         cpuDataMin.push({ "x": new Date(timeStamp), "y": cpuDataMin[cpuDataMin.length - 1].y });
+                        MonitorGraphUI.saveLocalStorage(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.min  )
                     } else {
                         cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                        MonitorGraphUI.saveLocalStorage(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.min  )
                     }
                     MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
                     cpuSecCount = 0;
@@ -1191,18 +1267,26 @@
                     cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
                     if (timeStamp == monitor.cpuMaxTimeStamp) {
                         cpuDataDay.push({ "x": new Date(timeStamp), "y": cpuDataDay[cpuDataDay.length - 1].y });
+                        MonitorGraphUI.saveLocalStorage(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.day  )
                     } else {
                         cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                        MonitorGraphUI.saveLocalStorage(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.day )
                     }
                     MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
                     cpuMinCount = 0;
                 }
                 cpuData = sliceFirstData(cpuData, dataView.Seconds);
+                debugger;
                 if (timeStamp == monitor.cpuMaxTimeStamp) {
                     cpuData.push({ "x": new Date(timeStamp), "y": cpuData[cpuData.length - 1].y });
+                    MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
                 } else {
                     cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                    MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
                 }
+                localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
+                localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
+                localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
                 MonitorGraphUI.Monitors.cpuData = cpuData;
                 monitor.cpuFirstData = false;
 
@@ -1228,6 +1312,18 @@
             cpuMinCount++;
         };
 
+        this.saveLocalStorage = function(data, newItem, timeUnit){
+            var sliderValue = 1
+
+            var interval = (sliderValue * 60) / timeUnit
+
+            if (data.length >= interval){
+                data.slice(data.length - interval)
+            }
+
+            data.push(newItem);
+        }
+
         function getPartitionData() {
             var monitor = MonitorGraphUI.Monitors;
             monitor.partitionData = getEmptyDataForPartition();
@@ -1244,6 +1340,19 @@
             var partitionDataMin = monitor.partitionDataMin;
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
+
+
+             if (VoltDbUi.partitionDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.partitionDetails.length == 360){
+                    VoltDbUI.partitionDetails.shift();
+                }
+                VoltDbUi.partitionDetails.push({
+                    timestamp: partitionDetails["partitionDetail"]["timeStamp"],
+                    currentTimerTick: partitionDetails["partitionDetail"]["timeStamp"]
+                });
+                localStorage.partitionDetails = JSON.stringify(VoltDbUi.partitionDetails)
+//                console.log(localStorage.partitionDetails);
+            }
 
             if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
                 return;
@@ -1330,6 +1439,19 @@
             var drDataDay = monitor.drReplicationDataDay;
             var drDetail = drDetails;
 
+             if (VoltDbUi.drDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.drDetails.length == 360){
+                    VoltDbUI.drDetails.shift();
+                }
+                VoltDbUi.drDetails.push({
+                    timestamp: drDetail["DR_GRAPH"].TIMESTAMP,
+                    replicationRate: drDetail["DR_GRAPH"].REPLICATION_RATE_1M
+                });
+                localStorage.drDetails = JSON.stringify(VoltDbUi.drDetails)
+//                console.log(localStorage.drDetails);
+            }
+
+
             if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
                 return;
 
@@ -1394,6 +1516,19 @@
             var cmdLogDataMin = monitor.cmdLogDataMin;
             var cmdLogDataDay = monitor.cmdLogDataDay;
             var cmdLogDetail = cmdLogDetails;
+
+
+             if (VoltDbUi.cmdLogDetails.length <= 360){  //Retain data for 30 minutes
+                if (VoltDbUi.cmdLogDetails.length == 360){
+                    VoltDbUI.cmdLogDetails.shift();
+                }
+                VoltDbUi.cmdLogDetails.push({
+                    timestamp: cmdLogDetail[currentServer].TIMESTAMP,
+                    outStandingTxn: cmdLogDetail[currentServer].OUTSTANDING_TXNS
+                });
+                localStorage.cmdLogDetails = JSON.stringify(VoltDbUi.cmdLogDetails)
+//                console.log(localStorage.cmdLogDetails);
+            }
 
             if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;

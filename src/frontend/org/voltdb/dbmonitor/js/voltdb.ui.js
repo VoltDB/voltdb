@@ -8,7 +8,7 @@ $(document).ready(function () {
 
     //clear the localStorage for DataTables in DR Section
     $.each(localStorage, function(key, value){
-        if(key != 'queries' && key != 'queryNameList' ){
+        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'){
             localStorage.removeItem(key)
         }
     });
@@ -2530,7 +2530,13 @@ var adjustGraphSpacing = function () {
             SQLQueryRender.populateTablesAndViews();
         };
         this.hasPermissionToView = true;
-
+        this.memoryDetails = [];
+        this.transactionDetails = [];
+        this.cpuDetails = [];
+        this.partitionDetails = [];
+        this.drDetails = [];
+        this.cmdLogDetails = [];
+        this.latencyDetails = []
         this.getCookie = function (name) {
             return $.cookie(name + "_" + VoltDBConfig.GetPortId());
         },
