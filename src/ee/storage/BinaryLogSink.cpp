@@ -519,17 +519,21 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     }
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
-    do {
-        rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                          txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
-        type = static_cast<DRRecordType>(taskInfo->readByte());
-        if (type == DR_RECORD_HASH_DELIMITER) {
-            assert(isMultiHash);
-            partitionHash = taskInfo->readInt();
-            skipWrongHashRows = !engine->isLocalSite(partitionHash);
+    if (type != DR_RECORD_END_TXN) {
+        do {
+            rowCount += apply(taskInfo, type, tables, pool, engine,
+                    remoteClusterId, txnStart, sequenceNumber, uniqueId,
+                    skipWrongHashRows);
             type = static_cast<DRRecordType>(taskInfo->readByte());
-        }
-    } while (type != DR_RECORD_END_TXN);
+            if (type == DR_RECORD_HASH_DELIMITER) {
+                assert(isMultiHash);
+                partitionHash = taskInfo->readInt();
+                skipWrongHashRows = !engine->isLocalSite(partitionHash);
+                type = static_cast<DRRecordType>(taskInfo->readByte());
+            }
+        } while (type != DR_RECORD_END_TXN);
+    } else { // FIXME empty BEGIN/END binary log entry for multi-partition transaction
+    }
     int64_t tempSequenceNumber = taskInfo->readLong();
     if (tempSequenceNumber != sequenceNumber) {
         throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
