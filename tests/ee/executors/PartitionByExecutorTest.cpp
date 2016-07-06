@@ -310,6 +310,14 @@ const char *plan_strings[] = {
     "                {\n"
     "                    \"COLUMN_NAME\": \"B\",\n"
     "                    \"EXPRESSION\": {\n"
+    "                        \"COLUMN_IDX\": 2,\n"
+    "                        \"TYPE\": 32,\n"
+    "                        \"VALUE_TYPE\": 5\n"
+    "                    }\n"
+    "                },\n"
+    "                {\n"
+    "                    \"COLUMN_NAME\": \"C\",\n"
+    "                    \"EXPRESSION\": {\n"
     "                        \"COLUMN_IDX\": 3,\n"
     "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 5\n"
@@ -342,6 +350,14 @@ const char *plan_strings[] = {
     "                {\n"
     "                    \"SORT_DIRECTION\": \"ASC\",\n"
     "                    \"SORT_EXPRESSION\": {\n"
+    "                        \"COLUMN_IDX\": 2,\n"
+    "                        \"TYPE\": 32,\n"
+    "                        \"VALUE_TYPE\": 5\n"
+    "                    }\n"
+    "                },\n"
+    "                {\n"
+    "                    \"SORT_DIRECTION\": \"ASC\",\n"
+    "                    \"SORT_EXPRESSION\": {\n"
     "                        \"COLUMN_IDX\": 3,\n"
     "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 5\n"
@@ -350,12 +366,8 @@ const char *plan_strings[] = {
     "                {\n"
     "                    \"SORT_DIRECTION\": \"ASC\",\n"
     "                    \"SORT_EXPRESSION\": {\n"
-    "                        \"PARTITION_BY_EXPRESSIONS\": [{\n"
-    "                            \"COLUMN_IDX\": 0,\n"
-    "                            \"TYPE\": 32,\n"
-    "                            \"VALUE_TYPE\": 5\n"
-    "                        }],\n"
-    "                        \"TYPE\": 70,\n"
+    "                        \"COLUMN_IDX\": 0,\n"
+    "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 6\n"
     "                    }\n"
     "                }\n"
@@ -369,7 +381,7 @@ const char *plan_strings[] = {
     "            }],\n"
     "            \"CHILDREN_IDS\": [3],\n"
     "            \"GROUPBY_EXPRESSIONS\": [{\n"
-    "                \"COLUMN_IDX\": 1,\n"
+    "                \"COLUMN_IDX\": 0,\n"
     "                \"TYPE\": 32,\n"
     "                \"VALUE_TYPE\": 5\n"
     "            }],\n"
@@ -392,7 +404,7 @@ const char *plan_strings[] = {
     "                    }\n"
     "                },\n"
     "                {\n"
-    "                    \"COLUMN_NAME\": \"A\",\n"
+    "                    \"COLUMN_NAME\": \"B\",\n"
     "                    \"EXPRESSION\": {\n"
     "                        \"COLUMN_IDX\": 1,\n"
     "                        \"TYPE\": 32,\n"
@@ -400,17 +412,9 @@ const char *plan_strings[] = {
     "                    }\n"
     "                },\n"
     "                {\n"
-    "                    \"COLUMN_NAME\": \"B\",\n"
+    "                    \"COLUMN_NAME\": \"C\",\n"
     "                    \"EXPRESSION\": {\n"
     "                        \"COLUMN_IDX\": 2,\n"
-    "                        \"TYPE\": 32,\n"
-    "                        \"VALUE_TYPE\": 5\n"
-    "                    }\n"
-    "                },\n"
-    "                {\n"
-    "                    \"COLUMN_NAME\": \"B\",\n"
-    "                    \"EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 3,\n"
     "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 5\n"
     "                    }\n"
@@ -418,7 +422,7 @@ const char *plan_strings[] = {
     "            ],\n"
     "            \"PLAN_NODE_TYPE\": \"PARTITIONBY\",\n"
     "            \"SORT_COLUMNS\": [{\"SORT_EXPRESSION\": {\n"
-    "                \"COLUMN_IDX\": 3,\n"
+    "                \"COLUMN_IDX\": 1,\n"
     "                \"TYPE\": 32,\n"
     "                \"VALUE_TYPE\": 5\n"
     "            }}]\n"
@@ -431,7 +435,7 @@ const char *plan_strings[] = {
     "                {\n"
     "                    \"SORT_DIRECTION\": \"ASC\",\n"
     "                    \"SORT_EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 1,\n"
+    "                        \"COLUMN_IDX\": 0,\n"
     "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 5\n"
     "                    }\n"
@@ -439,7 +443,7 @@ const char *plan_strings[] = {
     "                {\n"
     "                    \"SORT_DIRECTION\": \"ASC\",\n"
     "                    \"SORT_EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 3,\n"
+    "                        \"COLUMN_IDX\": 1,\n"
     "                        \"TYPE\": 32,\n"
     "                        \"VALUE_TYPE\": 5\n"
     "                    }\n"
@@ -460,14 +464,6 @@ const char *plan_strings[] = {
     "                        }\n"
     "                    },\n"
     "                    {\n"
-    "                        \"COLUMN_NAME\": \"A\",\n"
-    "                        \"EXPRESSION\": {\n"
-    "                            \"COLUMN_IDX\": 0,\n"
-    "                            \"TYPE\": 32,\n"
-    "                            \"VALUE_TYPE\": 5\n"
-    "                        }\n"
-    "                    },\n"
-    "                    {\n"
     "                        \"COLUMN_NAME\": \"B\",\n"
     "                        \"EXPRESSION\": {\n"
     "                            \"COLUMN_IDX\": 1,\n"
@@ -476,9 +472,9 @@ const char *plan_strings[] = {
     "                        }\n"
     "                    },\n"
     "                    {\n"
-    "                        \"COLUMN_NAME\": \"B\",\n"
+    "                        \"COLUMN_NAME\": \"C\",\n"
     "                        \"EXPRESSION\": {\n"
-    "                            \"COLUMN_IDX\": 1,\n"
+    "                            \"COLUMN_IDX\": 2,\n"
     "                            \"TYPE\": 32,\n"
     "                            \"VALUE_TYPE\": 5\n"
     "                        }\n"
@@ -618,7 +614,7 @@ protected:
 TEST_F(PartitionByExecutorTest, testPartitionBy) {
     const int NUM_ROWS = 15;
     const int NUM_INPUT_COLS   = 3;
-    const int NUM_OUTPUT_COLS1 = NUM_INPUT_COLS + 1;
+    const int NUM_OUTPUT_COLS = NUM_INPUT_COLS + 1;
 
     int32_t input[NUM_ROWS][NUM_INPUT_COLS] = {
             {  1,  10,  101},
@@ -637,7 +633,7 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  3,  20,  202},
             {  3,  30,  301}
     };
-    int32_t output[NUM_ROWS][NUM_OUTPUT_COLS1] = {
+    int32_t output[NUM_ROWS][NUM_OUTPUT_COLS] = {
             {  1,  10,  101,   1},
             {  1,  10,  102,   1},
             {  1,  20,  201,   3},
@@ -654,30 +650,12 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  3,  20,  202,   3},
             {  3,  30,  301,   5}
     };
-    const int NUM_OUTPUT_COLS2 = NUM_INPUT_COLS + 2;
-    int32_t output2[NUM_ROWS][NUM_OUTPUT_COLS2] = {
-            {  1,  10,  101,   1,    1},
-            {  1,  10,  102,   1,    1},
-            {  1,  20,  201,   3,    3},
-            {  1,  20,  202,   3,    3},
-            {  1,  30,  301,   5,    5},
-            {  2,  10,  101,   1,    1},
-            {  2,  10,  102,   1,    1},
-            {  2,  20,  201,   3,    3},
-            {  2,  20,  202,   3,    3},
-            {  2,  30,  301,   5,    5},
-            {  3,  10,  101,   1,    1},
-            {  3,  10,  102,   1,    1},
-            {  3,  20,  201,   3,    3},
-            {  3,  20,  202,   3,    3},
-            {  3,  30,  301,   5,    5}
-    };
     initialize(catalog_string, random_seed);
     initializeTableOfInt(m_AAA, NUM_ROWS, NUM_INPUT_COLS, (int32_t *)input);
     executeFragment(100, plan_strings[0]);
-    executeFragment(101, plan_strings[1]);
-    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS1);
-    validateResult((int32_t *)output2, NUM_ROWS, NUM_OUTPUT_COLS2);
+    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS);
+    executeFragment(100, plan_strings[1]);
+    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS);
 }
 
 int main() {

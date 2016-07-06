@@ -181,7 +181,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
     public void testRankTestGenRankInOrderBy() throws Exception {
         AbstractPlanNode node;
         try {
-            node = compile("select A, B, RANK() OVER (PARTITION BY A ORDER BY B) AS R FROM AAA ORDER BY A, B, R;");
+            node = compile("select A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) AS R FROM AAA ORDER BY A, B, R;");
             assertTrue(true);
         } catch (Exception ex) {
             assertTrue("Unexpected exception in compilation", false);

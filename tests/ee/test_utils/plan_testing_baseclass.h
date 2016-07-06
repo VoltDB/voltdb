@@ -245,8 +245,4 @@ protected:
     boost::shared_array<char>m_parameter_buffer;
     bool                     m_isinitialized;
 };
-
-
-
-
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */
