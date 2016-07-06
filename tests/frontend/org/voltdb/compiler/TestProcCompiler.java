@@ -111,7 +111,7 @@ public class TestProcCompiler extends TestCase {
 
         // Test that a stored procedure with more than the max allowable predicates
         // results in an error and does not crash or hang the system.
-        String sql = getQueryForFoo(1800);
+        String sql = getQueryForFoo(2000);
         builder.addStmtProcedure("StmtForStackOverFlow", sql, null);
 
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));

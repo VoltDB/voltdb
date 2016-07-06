@@ -29,11 +29,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.fail;
-import junit.framework.TestCase;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.TestCase;
 
 public class TestInternalPort extends TestCase {
 
@@ -62,8 +61,6 @@ public class TestInternalPort extends TestCase {
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
-            config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setInternalPort(rport);
             //We dont expect the process to initialize as its goint to wait for leader.
             config.setExpectedToInitialize(false);
             config.setHasLocalServer(false);
@@ -71,9 +68,12 @@ public class TestInternalPort extends TestCase {
             boolean success = config.compile(builder);
             assertTrue(success);
 
+            config.portGenerator.enablePortProvider();
+            config.portGenerator.pprovider.setInternalPort(rport);
+
             config.startUp();
             pf = config.m_pipes.get(0);
-            Thread.currentThread().sleep(10000);
+            Thread.sleep(10000);
         } catch (IOException ex) {
             fail(ex.getMessage());
         } finally {
@@ -98,7 +98,7 @@ public class TestInternalPort extends TestCase {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;
-        final CharSequence cs = "Connecting to the VoltDB cluster leader";
+        final CharSequence cs = "Beginning inter-node communication on port " + Integer.toString(rport);
         while ((line = bi.readLine()) != null) {
             System.out.println(line);
             if (line.contains(cs)) {
@@ -107,5 +107,6 @@ public class TestInternalPort extends TestCase {
             }
         }
         assertFalse(failed);
+        bi.close();
     }
 }

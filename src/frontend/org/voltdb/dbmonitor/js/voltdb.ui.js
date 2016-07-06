@@ -5,7 +5,13 @@ var table = '';
 $(document).ready(function () {
     $("#helppopup").load("help.htm", function () {
     });
-    localStorage.clear(); //clear the localStorage for DataTables in DR Section
+
+    //clear the localStorage for DataTables in DR Section
+    $.each(localStorage, function(key, value){
+        if(key != 'queries' && key != 'queryNameList' ){
+            localStorage.removeItem(key)
+        }
+    });
 
     var rv = -1;
     if (VoltDbUI.getCookie("username") != undefined && VoltDbUI.getCookie("username") != 'null') {
@@ -283,14 +289,23 @@ $(document).ready(function () {
 
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
-                    $("#runBTn").button().click();
+                    var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                    var element_id = element.split('-')[1]
+                    var btn_id = "#runBTn-" + element_id
+
+                    if ($(btn_id).attr('disabled') != "disabled")
+                        $(btn_id).button().click();
                 });
 
 
             } else {
                 shortcut.add("F5", function () {
-                    if ($("#runBTn").attr('disabled') != "disabled")
-                        $("#runBTn").button().click();
+                    var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                    var element_id = element.split('-')[1]
+                    var btn_id = "#runBTn-" + element_id
+
+                    if ($(btn_id).attr('disabled') != "disabled")
+                        $(btn_id).button().click();
                 });
             }
         } else {
@@ -732,6 +747,7 @@ var loadPage = function (serverName, portid) {
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
                 var licInfo = $.parseJSON(licenseInfo);
+                $("#addNewConfigLink").show();
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
@@ -741,6 +757,7 @@ var loadPage = function (serverName, portid) {
                 $("#tdCommandLogging").html(licInfo.commandlogging == undefined ? '' : licInfo.commandlogging.toString());
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
+                $("#addNewConfigLink").hide();
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
             }
@@ -838,7 +855,10 @@ var loadPage = function (serverName, portid) {
                             VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
                             //show master/replica table
                             voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
-                                VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
+                                if(drConsumerDetails.hasOwnProperty('STATE'))
+                                    VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
+                                else
+                                    VoltDbUI.drConsumerState = 'DISABLE'
 
                                 if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                     var userPreference = getUserPreferences();

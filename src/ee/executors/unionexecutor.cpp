@@ -364,10 +364,9 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     // Since we're are assuming that all of the tables have the same number of columns with
     // the same format. Therefore, we will just grab the first table in the list
     //
-    node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(),
-                                                          node->getInputTable(0)->name(),
-                                                          node->getInputTable(0),
-                                                          limits));
+    node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable(0)->name(),
+                                                            node->getInputTable(0),
+                                                            limits));
 
     m_setOperator.reset(detail::SetOperator::getSetOperator(node));
     return true;

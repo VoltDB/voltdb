@@ -17,6 +17,8 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.VoltDB.CONFIG_DIR;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -222,7 +224,7 @@ public class Collector {
     }
 
     private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + "config_log" + File.separator;
+        String configLogDirPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator;
 
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";

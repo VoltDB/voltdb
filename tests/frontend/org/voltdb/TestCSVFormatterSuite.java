@@ -35,17 +35,38 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-
 /**
  * End to end CSV formatter tests using the injected socket importer.
- *
- */
-
+ **/
 public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
 
     public TestCSVFormatterSuite(final String name) {
         super(name);
+    }
+
+    private VoltTable tryForResult(Client client, CountDownLatch latch) throws Exception {
+        String query = "SELECT * FROM importCSVTable ORDER BY clm_integer;";
+        VoltTable table;
+        // For the quickest victory, race to read the result,
+        // hoping to lose that race to the writer.
+        table = client.callProcedure("@AdHoc", query).getResults()[0];
+        if (table.getRowCount() > 0) {
+            return table;
+        }
+        // The writer was too slow.
+        // Make sure it at least sent the data before trying again.
+        latch.await();
+        table = client.callProcedure("@AdHoc", query).getResults()[0];
+        if (table.getRowCount() > 0) {
+            return table;
+        }
+        // The writer was still too slow in processing the sent data
+        // -- or maybe it's having a problem?
+        // Purposely wait a little before trying one last time --
+        // and returning whatever data is found.
+        Thread.sleep(500);
+        table = client.callProcedure("@AdHoc", query).getResults()[0];
+        return table;
     }
 
     public void testCustomNULL() throws Exception {
@@ -58,32 +79,37 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
         }
 
         //Both \N and \\N as csv input are treated as NULL
-        String[] myData = { "1,1,1,11111111,test,1.10,1.11,,,\n", "2,2,1,11111111,\"test\",1.10,1.11,,,\n",
-                "3,3,1,11111111,testme,1.10,1.11,,,\n", "4,4,1,11111111,iamtest,1.10,1.11,,,\n",
+        String[] myData = {
+                "1,1,1,11111111,test,1.10,1.11,,,\n",
+                "2,2,1,11111111,\"test\",1.10,1.11,,,\n",
+                "3,3,1,11111111,testme,1.10,1.11,,,\n",
+                "4,4,1,11111111,iamtest,1.10,1.11,,,\n",
                 "5,5,5,5,\\N,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n" };
 
-        CountDownLatch latch = new CountDownLatch(1);
-        (new SocketDataPusher("localhost", 7001, latch, myData)).start();
+        CountDownLatch latch = pushDataAsync(7001, myData);
+        VoltTable ts_table = tryForResult(client, latch);
 
-        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
-                .getResults()[0];
+        assertEquals(5, ts_table.getRowCount());
+
         int i = 0;
         int nulls = 0;
         while (ts_table.advanceRow()) {
             String value = ts_table.getString(4);
             if (i < 2) {
-                assertEquals(value, null);
+                assertNull(value);
                 nulls++;
-            } else if (i == 4) {
+            }
+            else if (i == 4) {
                 // this test case should fail once we stop replacing the \N as NULL
-                assertEquals(value, null);
+                assertNull(value);
                 nulls++;
-            } else {
+            }
+            else {
                 assertNotNull(value);
             }
             i++;
         }
-        assertEquals(nulls, 3);
+        assertEquals(3, nulls);
         client.close();
     }
 
@@ -103,11 +129,8 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
                 "3,1,1,1,rearspace   ,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n",
                 "4,1,1,1,\" inquotespace \"   ,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n" };
 
-        CountDownLatch latch = new CountDownLatch(1);
-        (new SocketDataPusher("localhost", 7001, latch, myData)).start();
-
-        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
-                .getResults()[0];
+        CountDownLatch latch = pushDataAsync(7001, myData);
+        VoltTable ts_table = tryForResult(client, latch);
         assertEquals(1, ts_table.getRowCount());
     }
 
@@ -124,11 +147,8 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
                 "1,1,1,1,\"Jesus loves you\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n",
                 //invalid line: unmatched quote
                 "1,1,1,1,\"Jesus\"loves you\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n", };
-        CountDownLatch latch = new CountDownLatch(1);
-        (new SocketDataPusher("localhost", 7001, latch, myData)).start();
-
-        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
-                .getResults()[0];
+        CountDownLatch latch = pushDataAsync(7001, myData);
+        VoltTable ts_table = tryForResult(client, latch);
         assertEquals(1, ts_table.getRowCount());
     }
 
@@ -148,11 +168,8 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
                 "\"4\",\"1\",\"1\",\"1\",\"a word\",\"1.10\",\"1.11\",\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"\n",
                 "5,\"5\",\"5\",\"5\",,,,,,\n", "\"5\",5,\"5\",\"5\",,,,,,\n", "\"5\",\"5\",,,,,,,,\n", };
 
-        CountDownLatch latch = new CountDownLatch(1);
-        (new SocketDataPusher("localhost", 7002, latch, myData)).start();
-
-        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
-                .getResults()[0];
+        CountDownLatch latch = pushDataAsync(7002, myData);
+        VoltTable ts_table = tryForResult(client, latch);
         assertEquals(2, ts_table.getRowCount());
     }
 
@@ -168,11 +185,8 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
         String[] myData = {
                 "12,10.05,  test" };
 
-        CountDownLatch latch = new CountDownLatch(1);
-        (new SocketDataPusher("localhost", 7002, latch, myData)).start();
-
-        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
-                .getResults()[0];
+        CountDownLatch latch = pushDataAsync(7002, myData);
+        VoltTable ts_table = tryForResult(client, latch);
 
         while (ts_table.advanceRow()) {
             String value = ts_table.getString(3);
@@ -199,33 +213,35 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
         project.addPartitionInfo("importCSVTable", "clm_integer");
 
         // configure socket importer 1
-        Properties props = new Properties();
-        props.putAll(ImmutableMap.<String, String> of("port", "7001", "decode", "true", "procedure",
-                "importCSVTable.insert"));
+        Properties props = buildProperties(
+                "port", "7001",
+                "decode", "true",
+                "procedure", "importCSVTable.insert");
 
-        Properties formatConfig = new Properties();
-        formatConfig.setProperty("nullstring", "test");
-        formatConfig.setProperty("separator", ",");
-        formatConfig.setProperty("blank", "empty");
-        formatConfig.setProperty("escape", "\\");
-        formatConfig.setProperty("quotechar", "\"");
-        formatConfig.setProperty("nowhitespace", "true");
+        Properties formatConfig = buildProperties(
+                "nullstring", "test",
+                "separator", ",",
+                "blank", "empty",
+                "escape", "\\",
+                "quotechar", "\"",
+                "nowhitespace", "true");
 
         project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
 
         // configure socket importer 2
-        props = new Properties();
-        props.putAll(ImmutableMap.<String, String> of("port", "7002", "decode", "true", "procedure",
-                "importCSVTable.insert"));
+        props = buildProperties(
+                "port", "7002",
+                "decode", "true",
+                "procedure", "importCSVTable.insert");
 
-        formatConfig = new Properties();
-        formatConfig.setProperty("nullstring", "test");
-        formatConfig.setProperty("separator", ",");
-        formatConfig.setProperty("blank", "error");
-        formatConfig.setProperty("escape", "\\");
-        formatConfig.setProperty("quotechar", "\"");
-        formatConfig.setProperty("strictquotes", "true");
-        formatConfig.setProperty("trimunquoted", "false");
+        formatConfig = buildProperties(
+                "nullstring", "test",
+                "separator", ",",
+                "blank", "error",
+                "escape", "\\",
+                "quotechar", "\"",
+                "strictquotes", "true",
+                "trimunquoted", "false");
         project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
 
         project.addPartitionInfo("importCSVTable", "clm_integer");

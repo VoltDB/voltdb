@@ -21,28 +21,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <string>
+#include "harness.h"
+
+#include "common/debuglog.h"
+#include "common/executorcontext.hpp"
+#include "common/NValue.hpp"
+#include "common/tabletuple.h"
+#include "common/TupleSchema.h"
+#include "common/types.h"
+#include "common/ValueFactory.hpp"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
+#include "storage/BinaryLogSinkWrapper.h"
+#include "storage/DRTupleStream.h"
+#include "storage/persistenttable.h"
+#include "storage/tablefactory.h"
+#include "storage/tableiterator.h"
+#include "storage/temptable.h"
+
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "harness.h"
-#include "common/executorcontext.hpp"
-#include "common/TupleSchema.h"
-#include "common/debuglog.h"
-#include "common/types.h"
-#include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
-#include "storage/BinaryLogSinkWrapper.h"
-#include "storage/persistenttable.h"
-#include "storage/tableiterator.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-#include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
-#include "catalog/database.h"
+#include <string>
 
 using namespace voltdb;
 using namespace std;
@@ -254,9 +254,9 @@ class TableAndIndexTest : public Test {
                 districtTableReplica->addIndex(replicaIndex);
             }
 
-            districtTempTable = dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
-                                                 &limits));
+            districtTempTable = TableFactory::buildCopiedTempTable("DISTRICT TEMP",
+                                                                   districtTable,
+                                                                   &limits);
 
             warehouseTable = static_cast<PersistentTable*>(TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                                             warehouseTupleSchema,
@@ -271,9 +271,9 @@ class TableAndIndexTest : public Test {
                 warehouseTable->addIndex(index);
             }
 
-            warehouseTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable,
-                                                 &limits));
+            warehouseTempTable = TableFactory::buildCopiedTempTable("WAREHOUSE TEMP",
+                                                                    warehouseTable,
+                                                                    &limits);
 
             customerTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                customerTupleSchema, customerColumnNames,
@@ -296,9 +296,9 @@ class TableAndIndexTest : public Test {
                 customerTableReplica->addIndex(replicaIndex);
             }
 
-            customerTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable,
-                                                 &limits));
+            customerTempTable = TableFactory::buildCopiedTempTable("CUSTOMER TEMP",
+                                                                   customerTable,
+                                                                   &limits);
         }
 
         ~TableAndIndexTest() {
@@ -315,21 +315,21 @@ class TableAndIndexTest : public Test {
         }
 
         void addPrimaryKeys() {
-            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
-            TableIndex *pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(districtReplicaIndex1Scheme);
+            TableIndex *pkeyIndex = TableIndexFactory::getInstance(districtIndex1Scheme);
+            TableIndex *pkeyIndexReplica = TableIndexFactory::getInstance(districtReplicaIndex1Scheme);
             assert(pkeyIndex);
             districtTable->addIndex(pkeyIndex);
             districtTable->setPrimaryKeyIndex(pkeyIndex);
             districtTableReplica->addIndex(pkeyIndexReplica);
             districtTableReplica->setPrimaryKeyIndex(pkeyIndexReplica);
 
-            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
+            pkeyIndex = TableIndexFactory::getInstance(warehouseIndex1Scheme);
             assert(pkeyIndex);
             warehouseTable->addIndex(pkeyIndex);
             warehouseTable->setPrimaryKeyIndex(pkeyIndex);
 
-            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
-            pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(customerReplicaIndex1Scheme);
+            pkeyIndex = TableIndexFactory::getInstance(customerIndex1Scheme);
+            pkeyIndexReplica = TableIndexFactory::getInstance(customerReplicaIndex1Scheme);
             assert(pkeyIndex);
             customerTable->addIndex(pkeyIndex);
             customerTable->setPrimaryKeyIndex(pkeyIndex);
@@ -776,7 +776,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(.0825)));
     temp_tuple->setNValue(9, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
     temp_tuple->setNValue(10, ValueFactory::getIntegerValue(static_cast<int32_t>(21)));
-    districtTempTable->insertTupleNonVirtual(*temp_tuple);
+    districtTempTable->insertTempTuple(*temp_tuple);
 
     temp_tuple = &warehouseTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
@@ -794,7 +794,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(6, cachedStringValues.back());
     temp_tuple->setNValue(7, ValueFactory::getDoubleValue(static_cast<double>(.1234)));
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
-    warehouseTempTable->insertTupleNonVirtual(*temp_tuple);
+    warehouseTempTable->insertTempTuple(*temp_tuple);
 
     temp_tuple = &customerTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(42)));
@@ -828,37 +828,29 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(0)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->insertTupleNonVirtual(*temp_tuple);
+    customerTempTable->insertTempTuple(*temp_tuple);
 
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
     TableIterator districtIterator = districtTempTable->iterator();
     while (districtIterator.next(districtTuple)) {
-        if (!districtTable->insertTuple(districtTuple)) {
-            cout << "Failed to insert tuple from input table '"
-                 << districtTempTable->name() << "' into target table '"
-                 << districtTable->name() << "'" << endl;
-        }
+        districtTable->insertTuple(districtTuple);
     }
-    districtTempTable->deleteAllTuplesNonVirtual(true);
+    districtTempTable->deleteAllTempTupleDeepCopies();
 
     TableTuple warehouseTuple = TableTuple(warehouseTempTable->schema());
     TableIterator warehouseIterator = warehouseTempTable->iterator();
     while (warehouseIterator.next(warehouseTuple)) {
-        if (!warehouseTable->insertTuple(warehouseTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        warehouseTable->insertTuple(warehouseTuple);
     }
-    warehouseTempTable->deleteAllTuplesNonVirtual(true);
+    warehouseTempTable->deleteAllTempTupleDeepCopies();
 
     TableTuple customerTuple = TableTuple(customerTempTable->schema());
     TableIterator customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
-        if (!customerTable->insertTuple(customerTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        customerTable->insertTuple(customerTuple);
     }
-    customerTempTable->deleteAllTuplesNonVirtual(true);
+    customerTempTable->deleteAllTempTupleDeepCopies();
 
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(43)));
     temp_tuple->setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
@@ -891,16 +883,14 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(1)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->insertTupleNonVirtual(*temp_tuple);
+    customerTempTable->insertTempTuple(*temp_tuple);
 
     customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
-        if (!customerTable->insertTuple(customerTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        customerTable->insertTuple(customerTuple);
     }
-    customerTempTable->deleteAllTuplesNonVirtual(true);
+    customerTempTable->deleteAllTempTupleDeepCopies();
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
         (*i).free();
