@@ -32,6 +32,8 @@ import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
@@ -99,6 +101,9 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
+        EstTimeUpdater.start();
+        VoltLogger.startAsynchronousLogging();
+        ReverseDNSCache.start();
     }
 
     /** Encapsulates VoltDB configuration parameters */

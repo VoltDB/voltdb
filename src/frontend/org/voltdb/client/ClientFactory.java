@@ -39,10 +39,11 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
-        VoltLogger.startAsynchronousLogging();
-        EstTimeUpdater.start();
-        ReverseDNSCache.start();
-        ACTIVE_CLIENT_COUNT.incrementAndGet();
+        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
+            VoltLogger.startAsynchronousLogging();
+            EstTimeUpdater.start();
+            ReverseDNSCache.start();
+        }
         return new ClientImpl(new ClientConfig());
     }
 
@@ -56,14 +57,15 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
-        VoltLogger.startAsynchronousLogging();
-        EstTimeUpdater.start();
-        ReverseDNSCache.start();
-        ACTIVE_CLIENT_COUNT.incrementAndGet();
+        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
+            VoltLogger.startAsynchronousLogging();
+            EstTimeUpdater.start();
+            ReverseDNSCache.start();
+        }
         return new ClientImpl(config);
     }
 
-    public static void notifyClientClose() throws InterruptedException {
+    public static void decreaseClientNum() throws InterruptedException {
         // the client is the last alive client. Before exit, close all the static resources and threads.
         if (ACTIVE_CLIENT_COUNT.decrementAndGet() == 0) {
             //Shut down the logger.
