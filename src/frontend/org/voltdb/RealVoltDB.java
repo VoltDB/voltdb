@@ -569,7 +569,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (determination.startAction.doesRejoin()) {
                     action = "Rejoining a running cluster";
                 } else if (determination.startAction.doesRecover()) {
-                    action = "Restating the database cluster from the command logs";
+                    action = "Restarting the database cluster from the command logs";
                 }
                 hostLog.info(action);
                 consoleLog.info(action);

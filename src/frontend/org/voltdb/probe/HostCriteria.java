@@ -77,6 +77,7 @@ public class HostCriteria {
 
     protected final boolean m_paused;
     protected final UUID m_configHash;
+    /** coordinators and host count digest */
     protected final UUID m_meshHash;
     protected final boolean m_enterprise;
     protected final StartAction m_startAction;
