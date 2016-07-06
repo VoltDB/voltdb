@@ -17,7 +17,7 @@
 import ast
 from collections import defaultdict
 from flask import Flask, render_template, jsonify, abort, make_response, request, Response
-from flask.ext.cors import CORS
+from flask_cors import CORS
 from flask.views import MethodView
 import json
 import os
