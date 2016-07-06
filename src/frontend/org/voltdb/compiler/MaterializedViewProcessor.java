@@ -635,8 +635,29 @@ public class MaterializedViewProcessor {
                                                     MaterializedViewHandlerInfo mvHandlerInfo)
                                                     throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
+        // Here we are compiling the query twice:
+        //   In the first round, we will use inferPartitioning.
+        // The purpose is to use the planner to check if the join query is plannable.
+        // Some multi-partition join queries are not plannable because they are not
+        // joining tables on the partition columns.
+        //   In the second round, we will use forceSP to get the single partition
+        // version of the query plan.
+        Statement createQueryInfer = mvHandlerInfo.getCreatequery().add("createQueryInfer");
         Statement createQuery = mvHandlerInfo.getCreatequery().add("createQuery");
+        createQueryInfer.setSqltext(query);
         createQuery.setSqltext(query);
+        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                          m_hsql,
+                          db.getCatalog(),
+                          db,
+                          estimates,
+                          createQueryInfer,
+                          xmlquery,
+                          createQueryInfer.getSqltext(),
+                          null, // no user-supplied join order
+                          DeterminismMode.FASTER,
+                          StatementPartitioning.inferPartitioning());
+        mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
                           db.getCatalog(),
@@ -647,7 +668,7 @@ public class MaterializedViewProcessor {
                           createQuery.getSqltext(),
                           null, // no user-supplied join order
                           DeterminismMode.FASTER,
-                          StatementPartitioning.inferPartitioning());
+                          StatementPartitioning.forceSP());
     }
 
     /**
