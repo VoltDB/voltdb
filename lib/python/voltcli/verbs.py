@@ -400,7 +400,8 @@ class ServerBundle(JavaBundle):
                  supports_multiple_daemons=False,
                  check_environment_config=False,
                  force_voltdb_create=False,
-                 supports_paused=False):
+                 supports_paused=False,
+                 is_legacy_verb=True):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -415,6 +416,9 @@ class ServerBundle(JavaBundle):
         self.check_environment_config = check_environment_config
         self.force_voltdb_create = force_voltdb_create
         self.supports_paused = supports_paused
+        # this flag indicates whether or not the command is a
+        # legacy command: create, recover, rejoin, join
+        self.is_legacy_verb= is_legacy_verb
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -423,19 +427,24 @@ class ServerBundle(JavaBundle):
                              '''requirements to skip when start voltdb:
                  thp - Checking for Transparent Huge Pages (THP) has been disabled.  Use of THP can cause VoltDB to run out of memory. Do not disable this check on production systems.''',
                              default = None))
+        if self.is_legacy_verb:
+            verb.add_options(
+                cli.StringOption('-d', '--deployment', 'deployment',
+                                 'specify the location of the deployment file',
+                                 default = None))
         verb.add_options(
-            cli.StringOption('-d', '--deployment', 'deployment',
-                             'specify the location of the deployment file',
+            cli.StringOption('-D', '--dbroot', 'voltdbroot',
+                             'specify the location of voltdbroot',
                              default = None))
         verb.add_options(
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
-        if self.default_host:
+        if self.is_legacy_verb and self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
                 default='localhost:3021'))
-        else:
+        elif self.is_legacy_verb:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
         if self.supports_live:
@@ -505,13 +514,13 @@ class ServerBundle(JavaBundle):
             if not catalog is None:
                 final_args.extend(['catalog', catalog])
 
-        if runner.opts.deployment:
+        if self.is_legacy_verb and runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.placementgroup:
             final_args.extend(['placementgroup', runner.opts.placementgroup])
-        if runner.opts.host:
+        if self.is_legacy_verb and runner.opts.host:
             final_args.extend(['host', runner.opts.host])
-        else:
+        elif not self.subcommand in ('initialize', 'probe'):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
@@ -533,12 +542,14 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
-        if self.subcommand in ('create', 'recover'):
-            if runner.opts.paused:
-                final_args.extend(['paused'])
-        if self.subcommand in ('create'):
+        if runner.opts.voltdbroot:
+            final_args.extend(['voltdbroot', runner.opts.voltdbroot])
+        if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])
+        if self.subcommand in ('create', 'probe', 'recover'):
+            if runner.opts.paused:
+                final_args.extend(['paused'])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}

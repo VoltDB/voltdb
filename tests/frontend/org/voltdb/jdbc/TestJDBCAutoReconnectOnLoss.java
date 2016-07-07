@@ -23,9 +23,10 @@
 
 package org.voltdb.jdbc;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -33,8 +34,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
@@ -43,18 +44,23 @@ import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 public class TestJDBCAutoReconnectOnLoss {
 
-    static String TEST_JAR;
-    static ServerThread SERVER;
-    static Connection CONNECTION;
-    static VoltProjectBuilder BUILDER;
+    String m_testjar;
+
     static final String  DRIVER_URL="jdbc:voltdb://localhost:21212?autoreconnect=true";
     static final String  TEST_SQL = "select  count(*) from TT";
 
-    @BeforeClass
-    public static void setUp() throws Exception {
+    VoltProjectBuilder m_builder;
+    ServerThread m_server;
+    Connection m_connection;
+
+    @Before
+    public void setUp() throws Exception {
+
+        VoltFile.initNewSubrootForThisProcess();
 
         String ddl =
             "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
@@ -62,58 +68,58 @@ public class TestJDBCAutoReconnectOnLoss {
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
             "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
+        m_builder = new VoltProjectBuilder();
+        m_builder.addLiteralSchema(ddl);
+        m_builder.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
+        m_builder.addProcedures(ArbitraryDurationProc.class);
+        m_builder.addPartitionInfo("TT", "A1");
+        m_builder.addPartitionInfo("ORDERS", "A1");
+        m_builder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
+        m_builder.addStmtProcedure("SelectB", "SELECT * FROM TT;");
 
-        BUILDER = new VoltProjectBuilder();
-        BUILDER.addLiteralSchema(ddl);
-        BUILDER.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        BUILDER.addProcedures(ArbitraryDurationProc.class);
-        BUILDER.addPartitionInfo("TT", "A1");
-        BUILDER.addPartitionInfo("ORDERS", "A1");
-        BUILDER.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
-        BUILDER.addStmtProcedure("SelectB", "SELECT * FROM TT;");
-        boolean success = BUILDER.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(BUILDER.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcreconnecttest.xml"));
-        TEST_JAR = Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar");
+        assertTrue("failed to compile catalog", m_builder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0));
+
+        MiscUtils.copyFile(m_builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcreconnecttest.xml"));
+        m_testjar = Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar");
 
         startServer();
         connect();
     }
 
 
-    @AfterClass
-    public static void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         stopServer();
-        File f = new File(TEST_JAR);
-        f.delete();
+        VoltFile.resetSubrootForThisProcess();
     }
 
-    private static void stopServer() throws SQLException {
+    private void stopServer() throws SQLException {
 
-        if (SERVER != null) {
-            try { SERVER.shutdown(); } catch (InterruptedException e) { }
-            SERVER = null;
+        if (m_server != null) {
+            try { m_server.shutdown(); } catch (InterruptedException e) { }
+            try { m_server.join(); } catch (InterruptedException e) { }
+            m_server = null;
         }
     }
 
-    private static void startServer()
+    private void startServer()
     {
-        SERVER = new ServerThread(TEST_JAR, BUILDER.getPathToDeployment(),
+        m_server = new ServerThread(m_testjar, m_builder.getPathToDeployment(),
                                   BackendTarget.NATIVE_EE_JNI);
-        SERVER.start();
-        SERVER.waitForInitialization();
+        m_server.start();
+        m_server.waitForInitialization();
     }
 
-    private static void connect() throws ClassNotFoundException, SQLException
+    private void connect() throws ClassNotFoundException, SQLException
     {
         Class.forName("org.voltdb.jdbc.Driver");
-        CONNECTION =  DriverManager.getConnection(DRIVER_URL, new Properties());
+        m_connection =  DriverManager.getConnection(DRIVER_URL, new Properties());
     }
 
     @Test
     public void testAutoReconnect() throws Exception {
 
-        Statement query = CONNECTION.createStatement();
+        Statement query = m_connection.createStatement();
         ResultSet results = query.executeQuery(TEST_SQL);
         assertTrue(results.next());
         results.close();
@@ -123,7 +129,7 @@ public class TestJDBCAutoReconnectOnLoss {
         Thread.sleep(4000);
 
         try{
-            query = CONNECTION.createStatement();
+            query = m_connection.createStatement();
             query.executeQuery(TEST_SQL);
             fail("No connection");
         } catch (SQLException e){
@@ -132,20 +138,17 @@ public class TestJDBCAutoReconnectOnLoss {
 
         startServer();
 
-        query = CONNECTION.createStatement();
+        query = m_connection.createStatement();
         results = query.executeQuery(TEST_SQL);
         assertTrue(results.next());
 
         results.close();
         query.close();
-        CONNECTION.close();
-        stopServer();
+        m_connection.close();
     }
 
     @Test
     public void testConnectionPool() throws Exception {
-
-        startServer();
 
         org.apache.tomcat.jdbc.pool.DataSource ds = new org.apache.tomcat.jdbc.pool.DataSource();
         ds.setDriverClassName("org.voltdb.jdbc.Driver");
@@ -184,6 +187,5 @@ public class TestJDBCAutoReconnectOnLoss {
         query.close();
         conn.close();
         ds.close();
-        tearDown();
     }
 }

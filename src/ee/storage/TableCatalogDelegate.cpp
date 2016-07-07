@@ -32,6 +32,7 @@
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
@@ -417,8 +418,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
                                                     drEnabled);
-    PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(table);
-    if (!persistenttable) {
+    PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
+    if ( ! persistentTable) {
         return table;
     }
 
@@ -426,15 +427,15 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     if (pkey_index_id.size() != 0) {
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
         assert(pkeyIndex);
-        persistenttable->addIndex(pkeyIndex);
-        persistenttable->setPrimaryKeyIndex(pkeyIndex);
+        persistentTable->addIndex(pkeyIndex);
+        persistentTable->setPrimaryKeyIndex(pkeyIndex);
     }
 
     // add other indexes
     BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         assert(index);
-        persistenttable->addIndex(index);
+        persistentTable->addIndex(index);
     }
 
     return table;
@@ -454,8 +455,7 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     // configure for stats tables
     PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
     if (persistenttable) {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        persistenttable->configureIndexStats(databaseId);
+        persistenttable->configureIndexStats();
     }
     m_table->incrementRefcount();
 }
@@ -668,6 +668,9 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
     // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
     // there needs to be a way to handle cases where the target table HAS been redefined already and
     // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+    // At this point, the materialized view makes a best effort to use the
+    // current/latest version of the table -- particularly, because it will have made off with the
+    // "old" version's primary key index, which is used in the MaterializedViewInsertTrigger constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
     // an obsolete target table need to be brought forward to reference the replacement table.
     // See initMaterializedViews
@@ -738,8 +741,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
 
     // configure for stats tables
     if (newPersistentTable) {
-        int32_t databaseId = catalogDatabase.relativeIndex();
-        newPersistentTable->configureIndexStats(databaseId);
+        newPersistentTable->configureIndexStats();
     }
 }
 

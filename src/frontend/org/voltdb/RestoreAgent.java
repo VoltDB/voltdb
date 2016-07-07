@@ -1006,7 +1006,7 @@ SnapshotCompletionInterest, Promotable
         List<String> children = waitOnVoltZK_restore();
 
         // If not recovering, nothing to do.
-        if (m_action == StartAction.CREATE) {
+        if (m_action.doesRequireEmptyDirectories()) {
             return null;
         }
 

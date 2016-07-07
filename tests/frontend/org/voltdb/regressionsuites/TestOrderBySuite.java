@@ -583,6 +583,28 @@ public class TestOrderBySuite extends RegressionSuite {
         assertEquals(6, vt.get(0, VoltType.INTEGER));
         assertEquals("Chris", vt.get(1, VoltType.STRING));
         assertEquals(24, vt.get(2, VoltType.INTEGER));
+
+        vt =  client.callProcedure("@AdHoc", "select sum(A_INT), A_INLINE_STR, sum(PKEY) from O1 group by A_INLINE_STR order by A_INLINE_STR offset 2" ).getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Chris", vt.get(1, VoltType.STRING));
+        assertEquals(24, vt.get(2, VoltType.INTEGER));
+
+        vt =  client.callProcedure("@AdHoc", "select sum(A_INT), A_INLINE_STR, sum(PKEY) from O1 group by A_INLINE_STR order by A_INLINE_STR limit 1" ).getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Alice", vt.get(1, VoltType.STRING));
+        assertEquals(6, vt.get(2, VoltType.INTEGER));
+
+        vt =  client.callProcedure("@AdHoc", "select sum(A_INT), A_INLINE_STR, sum(PKEY) from O1 group by A_INLINE_STR order by A_INLINE_STR limit 1 offset 1" ).getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(6, vt.get(0, VoltType.INTEGER));
+        assertEquals("Betty", vt.get(1, VoltType.STRING));
+        assertEquals(15, vt.get(2, VoltType.INTEGER));
+
     }
 
     private void subtestOrderByCountStarAlias()
@@ -846,6 +868,14 @@ public class TestOrderBySuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{4}, {3}, {2}};
         validateTableOfLongs(vt, expected);
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC LIMIT 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{7}, {6}, {5}};
+        sql = "SELECT PKEY FROM O1 ORDER BY PKEY DESC OFFSET 5";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{2}, {1}};
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // IDX_O1_A_INT_PKEY index provides the right order for the coordinator. Merge Receive
         sql = "SELECT A_INT, PKEY FROM O1 ORDER BY A_INT DESC, PKEY DESC LIMIT 3";
@@ -963,12 +993,22 @@ public class TestOrderBySuite extends RegressionSuite {
         //            from partitioned
         //            group by indexed_non_partition_key1, indexed_non_partition_key2
         //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
+        sql = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 1 offset 1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1, 2, 5}};
+        validateTableOfLongs(vt, expected);
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+
+        sql = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 offset 2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expected = new long[][] {{1, 4, 7}};
+        validateTableOfLongs(vt, expected);
+
         sql = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2 limit 2";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1, 1, 7}, {1, 2, 5}};
         validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
         // Merge Receive without aggregation at coordinator
         //            select indexed_non_partition_key1, indexed_non_partition_key2, col, max(col)

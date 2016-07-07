@@ -22,20 +22,22 @@
  */
 
 #include "harness.h"
+
+#include "common/serializeio.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
-#include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
-#include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
+#include "storage/DRTupleStream.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
-#include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
-#include <vector>
-#include <string>
+
 #include <stdint.h>
+#include <string>
+#include <vector>
 
 using namespace voltdb;
 
@@ -133,7 +135,7 @@ public:
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);

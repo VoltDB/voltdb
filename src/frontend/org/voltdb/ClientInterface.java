@@ -288,7 +288,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 catch (IOException e) {
                     String msg = "Client interface failed to bind to"
                             + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
-                    MiscUtils.printPortsInUse(hostLog);
+                    CoreUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
