@@ -3778,6 +3778,7 @@ label.errorTimeOut {
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
 /********************jquery us css override end*****************/
+.errorHeightFix { line-height:12px!important; position:relative; top:-6px;}
 
 
 /*********************************************media Qu********************/
