@@ -1587,7 +1587,7 @@ public class SnapshotUtil {
             JSONObject jsObj = new JSONObject();
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
-                if (VoltDB.instance().isLegacy()) {
+                if (VoltDB.instance().isRunningWithOldVerbs()) {
                     jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_PATH);
                 }
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
@@ -1604,5 +1604,15 @@ public class SnapshotUtil {
                                           params.length + " parameters provided",
                                           task.getClientHandle());
         }
+    }
+
+    //Return path based on type if type is not CL or AUTO return provided path.
+    public static String getRealPath(SnapthotPathType stype, String path) {
+        if (stype == SnapthotPathType.SNAP_CL) {
+            return VoltDB.instance().getCommandLogSnapshotPath();
+        } else if (stype == SnapthotPathType.SNAP_AUTO) {
+            return VoltDB.instance().getSnapshotPath();
+        }
+        return path;
     }
 }

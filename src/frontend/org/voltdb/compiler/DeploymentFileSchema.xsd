@@ -107,7 +107,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>
@@ -124,7 +127,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>
@@ -141,7 +147,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>
@@ -158,7 +167,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>
@@ -175,7 +187,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>
@@ -192,7 +207,10 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.VoltDB.instance().getPath(this, getKey());
+            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+               return getPath();
+            }
+            return org.voltdb.VoltDB.instance().getPath(getKey());
         }
         ]]>
                     </ci:code>

@@ -478,12 +478,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         int ii = 0;
         for (TruncationSnapshotAttempt attempt : toDelete) {
             paths[ii] = attempt.path;
-            SnapthotPathType stype = SnapthotPathType.valueOf(attempt.pathType);
-            if (stype == SnapthotPathType.SNAP_CL) {
-                paths[ii] = VoltDB.instance().getCommandLogSnapshotPath();
-            } else if (stype == SnapthotPathType.SNAP_AUTO) {
-                paths[ii] = VoltDB.instance().getSnapshotPath();
-            }
+            paths[ii] = SnapshotUtil.getRealPath(SnapthotPathType.valueOf(attempt.pathType), paths[ii]);
             nonces[ii++] = attempt.nonce;
         }
 
@@ -590,7 +585,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     loggingLog.error("Error during scan and group of truncation snapshots");
                 }
             }
-        }, 0, 1, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.HOURS);
         try {
             // TRAIL [TruncSnap:1] elected as leader
             truncationRequestExistenceCheck();

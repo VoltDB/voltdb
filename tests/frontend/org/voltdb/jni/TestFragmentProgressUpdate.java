@@ -25,7 +25,6 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 

@@ -30,6 +30,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Disk space monitoring related functionality of resource monitoring.
@@ -192,19 +193,19 @@ public class DiskResourceChecker
         }
     }
 
-    private static File getPathForFeature(FeatureNameType featureName)
+    private static VoltFile getPathForFeature(FeatureNameType featureName)
     {
         switch(featureName) {
         case COMMANDLOG :
-            return new File(VoltDB.instance().getCommandLogPath());
+            return new VoltFile(VoltDB.instance().getCommandLogPath());
         case COMMANDLOGSNAPSHOT :
-            return new File(VoltDB.instance().getCommandLogSnapshotPath());
+            return new VoltFile(VoltDB.instance().getCommandLogSnapshotPath());
         case DROVERFLOW:
-            return new File(VoltDB.instance().getDROverflowPath());
+            return new VoltFile(VoltDB.instance().getDROverflowPath());
         case EXPORTOVERFLOW:
-            return new File(VoltDB.instance().getExportOverflowPath());
+            return new VoltFile(VoltDB.instance().getExportOverflowPath());
         case SNAPSHOTS:
-            return new File(VoltDB.instance().getSnapshotPath());
+            return new VoltFile(VoltDB.instance().getSnapshotPath());
         default: // Not a valid feature or one that is supported for disk limit monitoring.
                  // Should not happen unless we forget to add a newly supported feature here.
             return null;
@@ -215,7 +216,7 @@ public class DiskResourceChecker
     private static class FeatureDiskLimitConfig
     {
         final FeatureNameType m_featureName;
-        final File m_path;
+        final VoltFile m_path;
         final double m_diskSizeLimit;
         final int m_diskSizeLimitPerc;
 

@@ -186,7 +186,7 @@ SnapshotCompletionInterest, Promotable
                                 " in " + m_snapshotToRestore.path);
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
-                        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.stype);
+                        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.pathType);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
@@ -239,7 +239,7 @@ SnapshotCompletionInterest, Promotable
         public final Set<String> digestTables = new HashSet<String>();
         // Track the tables for which we found files on the node reporting this SnapshotInfo
         public final Set<String> fileTables = new HashSet<String>();
-        public final SnapthotPathType stype;
+        public final SnapthotPathType pathType;
 
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
@@ -260,14 +260,14 @@ SnapshotCompletionInterest, Promotable
             this.hostId = hostId;
             this.instanceId = instanceId;
             this.digestTables.addAll(digestTables);
-            this.stype = snaptype;
+            this.pathType = snaptype;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
         {
             txnId = jo.getLong("txnId");
             path = jo.getString(SnapshotUtil.JSON_PATH);
-            stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
+            pathType = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
             newPartitionCount = jo.getInt("newPartitionCount");
@@ -314,7 +314,7 @@ SnapshotCompletionInterest, Promotable
                 stringer.object();
                 stringer.key("txnId").value(txnId);
                 stringer.key("path").value(path);
-                stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(stype.name());
+                stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType.name());
                 stringer.key("nonce").value(nonce);
                 stringer.key("partitionCount").value(partitionCount);
                 stringer.key("newPartitionCount").value(newPartitionCount);

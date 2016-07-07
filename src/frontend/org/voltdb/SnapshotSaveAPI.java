@@ -499,14 +499,7 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        SnapthotPathType stype = SnapthotPathType.valueOf(pathType);
-        if (stype == SnapthotPathType.SNAP_AUTO) {
-            file_path = VoltDB.instance().getSnapshotPath();
-            SNAP_LOG.info("Using local auto snapshot path: " + file_path);
-        } else if (stype == SnapthotPathType.SNAP_CL) {
-            file_path = VoltDB.instance().getCommandLogSnapshotPath();
-            SNAP_LOG.info("Using local CL snapshot path: " + file_path);
-        }
+        file_path = SnapshotUtil.getRealPath(SnapthotPathType.valueOf(pathType), file_path);
 
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,

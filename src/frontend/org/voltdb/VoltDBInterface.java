@@ -54,9 +54,9 @@ public interface VoltDBInterface
     public String getExportOverflowPath();
     public String getDROverflowPath();
 
-    public boolean isLegacy();
+    public boolean isRunningWithOldVerbs();
 
-    public String getPath(Object base, String name);
+    public String getPath(String name);
 
     /**
      * Initialize all the global components, then initialize all the m_sites.

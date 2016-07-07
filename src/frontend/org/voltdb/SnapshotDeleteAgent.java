@@ -187,14 +187,9 @@ public class SnapshotDeleteAgent extends OpsAgent
                 StringBuilder sb = new StringBuilder();
                 sb.append("Deleting files: ");
                 for (int ii = 0; ii < paths.length; ii++) {
-                    String path = paths[ii];
-                    //When user calla @SnapshotDelete this will not be set to AUTO so we will delete what user requested.
-                    //If its SNAP_AUTO thenits coming from periodic delete task.
-                    if (stype == SnapthotPathType.SNAP_AUTO) {
-                        path = VoltDB.instance().getSnapshotPath();
-                    } else if (stype == SnapthotPathType.SNAP_CL) {
-                        path = VoltDB.instance().getCommandLogSnapshotPath();
-                    }
+                    //When user calls @SnapshotDelete this will be set to SNAP_PATH so we will delete what user requested.
+                    //If its SNAP_AUTO then its coming from periodic delete task.
+                    String path = SnapshotUtil.getRealPath(stype, paths[ii]);
                     List<File> relevantFiles = retrieveRelevantFiles(path, nonces[ii]);
                     if (relevantFiles != null) {
                         for (final File f : relevantFiles) {

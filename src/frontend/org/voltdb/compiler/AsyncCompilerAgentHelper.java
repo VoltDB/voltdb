@@ -210,7 +210,7 @@ public class AsyncCompilerAgentHelper
             }
 
             //In non legacy mode discard the path element.
-            if (VoltDB.instance().isLegacy()) {
+            if (VoltDB.instance().isRunningWithOldVerbs()) {
                 retval.deploymentString = deploymentString;
             } else {
                 retval.deploymentString = PATH_DELETER.matcher(deploymentString).replaceAll("");

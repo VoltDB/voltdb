@@ -63,7 +63,6 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 
 public class MockVoltDB implements VoltDBInterface
@@ -356,7 +355,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isLegacy() { return voltconfig.m_startAction.isLegacy(); };
+    public boolean isRunningWithOldVerbs() { return voltconfig.m_startAction.isLegacy(); };
 
     @Override
     public void initialize(Configuration config)
@@ -493,17 +492,17 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public String getCommandLogSnapshotPath() {
-        return "";
+        return "command_log_snapshot";
     }
 
     @Override
     public String getCommandLogPath() {
-        return "";
+        return "command_log";
     }
 
     @Override
     public String getSnapshotPath() {
-        return "";
+        return "snapshots";
     }
 
     @Override
@@ -517,22 +516,16 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public String getExportOverflowPath() {
-        return "";
+        return "export_overflow";
     }
 
     @Override
     public String getDROverflowPath() {
-        return "";
+        return "dr_overflow";
     }
 
-    public String getPath(Object base, String name) {
-        try {
-            Method m = base.getClass().getMethod("getPath");
-            return (String )m.invoke(base);
-        } catch (Exception ex) {
-            //Should never happen
-            ex.printStackTrace();
-        }
+    @Override
+    public String getPath(String name) {
         return "";
     }
 
