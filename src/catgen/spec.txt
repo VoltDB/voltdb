@@ -145,6 +145,7 @@ begin MaterializedViewHandlerInfo       "Information used to build and update a 
   Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
   Statement* createQuery                "The SELECT statement that defines the view"
   TableRef* sourceTables                "Source table(s) of this materialized view"
+  Table? destTable                      "The table which will be updated when the source table is updated"
   int groupByColumnCount                "Number of group by columns"
 end
 

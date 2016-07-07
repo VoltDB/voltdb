@@ -679,7 +679,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
     }
 
     for (auto viewToTrigger : m_viewsToTrigger) {
-        viewToTrigger->handleTupleInsert(this);
+        viewToTrigger->handleTupleInsert(this, fallible);
     }
 
     // handle any materialized views
@@ -814,7 +814,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     for (auto viewToTrigger : m_viewsToTrigger) {
-        viewToTrigger->handleTupleDelete(this);
+        viewToTrigger->handleTupleDelete(this, fallible);
     }
 
     // handle any materialized views, hide the tuple from the scan temporarily.
@@ -890,7 +890,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     for (auto viewToTrigger : m_viewsToTrigger) {
-        viewToTrigger->handleTupleInsert(this);
+        viewToTrigger->handleTupleInsert(this, fallible);
     }
 
     // handle any materialized views
@@ -990,7 +990,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     insertTupleIntoDeltaTable(target, fallible);
     for (auto viewToTrigger : m_viewsToTrigger) {
-        viewToTrigger->handleTupleDelete(this);
+        viewToTrigger->handleTupleDelete(this, fallible);
     }
 
     // handle any materialized views, hide the tuple from the scan temporarily.

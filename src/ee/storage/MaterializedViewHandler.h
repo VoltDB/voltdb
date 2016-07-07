@@ -22,6 +22,7 @@
 #include <map>
 
 #include "catalog/materializedviewhandlerinfo.h"
+#include "common/tabletuple.h"
 #include "execution/ExecutorVector.h"
 #include "persistenttable.h"
 
@@ -58,9 +59,8 @@ public:
     PersistentTable *destTable() const { return m_destTable; }
     bool isDirty() { return m_dirty; }
     void pollute() { m_dirty = true; }
-    void handleTupleInsert(PersistentTable *sourceTable);
-    void handleTupleDelete(PersistentTable *sourceTable);
-    void catchUpWithExistingData();
+    void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
+    void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
     // std::string debug() const;
 
 private:
@@ -69,16 +69,31 @@ private:
     TableIndex *m_index;
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
-    std::size_t m_groupByColumnCount;
+    int m_groupByColumnCount;
+    int m_aggColumnCount;
+    std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
+    TableTuple m_existingTuple;
+    TableTuple m_updatedTuple;
+    StandAloneTupleStorage m_updatedTupleStorage;
+    // vector of target table indexes to update.
+    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
+    // aggregated columns, but there might be some other mostly harmless ones in there that are based
+    // solely on the immutable primary key (GROUP BY columns).
+    std::vector<TableIndex*> m_updatableIndexList;
 
     void install(PersistentTable *destTable,
                  catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                  VoltDBEngine *engine);
+    void setUpAggregateInfo(catalog::MaterializedViewHandlerInfo *mvHandlerInfo);
     void setUpCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                           VoltDBEngine *engine);
     void setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                             VoltDBEngine *engine);
+    void setUpBackedTuples();
+    void catchUpWithExistingData();
+    bool findExistingTuple(const TableTuple &deltaTuple);
+    void mergeTupleForInsert(const TableTuple &deltaTuple);
 };
 
 } // namespace voltdb

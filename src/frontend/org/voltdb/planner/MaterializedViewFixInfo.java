@@ -141,10 +141,11 @@ public class MaterializedViewFixInfo {
         int numOfGroupByColumns = 0;
         for (Column col : table.getColumns()) {
             ExpressionType aggType = ExpressionType.get(col.getAggregatetype());
-            if (aggType == ExpressionType.VALUE_TUPLE ||
-                    aggType == ExpressionType.VALUE_PARAMETER ||
-                    aggType == ExpressionType.INVALID) {
-                numOfGroupByColumns++;
+            switch (aggType) {
+                case VALUE_TUPLE:
+                case VALUE_PARAMETER:
+                case INVALID:
+                    numOfGroupByColumns++;
             }
         }
 

@@ -171,6 +171,7 @@ public class MaterializedViewProcessor {
                 // Materialized view on joined tables
                 // Add mvHandlerInfo to the destTable:
                 MaterializedViewHandlerInfo mvHandlerInfo = destTable.getMvhandlerinfo().add("mvHandlerInfo");
+                mvHandlerInfo.setDesttable(destTable);
                 for (Table srcTable : stmt.m_tableList) {
                     // Now we do not support having a view on persistent tables joining streamed tables.
                     if (exportTableNames.contains(srcTable.getTypeName())) {
@@ -711,6 +712,9 @@ public class MaterializedViewProcessor {
             if (CatalogUtil.isTableExportOnly(db, srcTable)) continue;
 
             MaterializedViewInfo matviewinfo = srcTable.getViews().get(viewName);
+            if (matviewinfo == null) {
+                return;
+            }
 
             boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();

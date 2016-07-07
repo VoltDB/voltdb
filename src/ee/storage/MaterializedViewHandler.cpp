@@ -16,10 +16,12 @@
  */
 
 #include "MaterializedViewHandler.h"
+#include "catalog/column.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
 #include "catalog/tableref.h"
 #include "common/executorcontext.hpp"
+#include "indexes/tableindex.h"
 #include "TableCatalogDelegate.hpp"
 
 
@@ -34,8 +36,10 @@ namespace voltdb {
                                                      catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                      VoltDBEngine *engine) {
         install(destTable, mvHandlerInfo, engine);
+        setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
+        setUpBackedTuples();
         m_dirty = false;
         catchUpWithExistingData();
     }
@@ -78,6 +82,12 @@ namespace voltdb {
                                           VoltDBEngine *engine) {
         m_destTable = destTable;
         m_index = m_destTable->primaryKeyIndex();
+        const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
+        BOOST_FOREACH(TableIndex *index, targetIndexes) {
+            if (index != m_index) {
+                m_updatableIndexList.push_back(index);
+            }
+        }
         m_groupByColumnCount = mvHandlerInfo->groupByColumnCount();
         // Delete the existing handler if exists. When the existing handler is destructed,
         // it will automatically removes itself from all the viewsToTrigger lists of its source tables.
@@ -90,6 +100,38 @@ namespace voltdb {
             PersistentTable *sourceTable = sourceTcd->getPersistentTable();
             assert(sourceTable);
             addSourceTable(sourceTable);
+        }
+    }
+
+    void MaterializedViewHandler::setUpAggregateInfo(catalog::MaterializedViewHandlerInfo *mvHandlerInfo) {
+        const catalog::CatalogMap<catalog::Column>& columns = mvHandlerInfo->destTable()->columns();
+        m_aggColumnCount = columns.size() - m_groupByColumnCount - 1;
+        m_aggTypes.resize(m_aggColumnCount);
+        for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
+                colIterator != columns.end(); colIterator++) {
+            const catalog::Column *destCol = colIterator->second;
+            if (destCol->index() < m_groupByColumnCount + 1) {
+                continue;
+            }
+            // The index into the per-agg metadata starts as a materialized view column index
+            // but needs to be shifted down for each column that has no agg option
+            // -- that is, -1 for each "group by" AND -1 for the COUNT(*).
+            std::size_t aggIndex = destCol->index() - m_groupByColumnCount - 1;
+            m_aggTypes[aggIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
+            switch(m_aggTypes[aggIndex]) {
+                case EXPRESSION_TYPE_AGGREGATE_SUM:
+                case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                case EXPRESSION_TYPE_AGGREGATE_MIN:
+                case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    break; // legal value
+                default: {
+                    char message[128];
+                    snprintf(message, 128, "Error in materialized view aggregation %d expression type %s",
+                             (int)aggIndex, expressionToString(m_aggTypes[aggIndex]).c_str());
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                                  message);
+                }
+            }
         }
     }
 
@@ -140,31 +182,128 @@ namespace voltdb {
         }
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
-        Table *delta = ec->executeExecutors(executorList);
-        TableIterator ti = delta->iterator();
-        TableTuple tuple(delta->schema());
+        Table *viewContent = ec->executeExecutors(executorList);
+        TableIterator ti = viewContent->iterator();
+        TableTuple tuple(viewContent->schema());
         while (ti.next(tuple)) {
             m_destTable->insertTuple(tuple);
         }
         ec->cleanupExecutorsForSubquery(executorList);
     }
 
-    void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable) {
-        // Within the lifespan of this ScopedDeltaTableContext, the source table will enter delta table mode.
+    void MaterializedViewHandler::setUpBackedTuples() {
+        m_existingTuple = TableTuple(m_destTable->schema());
+        m_updatedTupleStorage.init(m_destTable->schema());
+        m_updatedTuple = m_updatedTupleStorage.tuple();
+    }
+
+    bool MaterializedViewHandler::findExistingTuple(const TableTuple &deltaTuple) {
+        // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
+        // We directly return the only row in the view. See ENG-7872.
+        if (m_groupByColumnCount == 0) {
+            TableIterator iterator = m_destTable->iterator();
+            iterator.next(m_existingTuple);
+            // Please note that if there is no group by columns, the view shall always have one row.
+            // This row will be initialized when the view is constructed. We have special code path for that. -yzhang
+            assert( ! m_existingTuple.isNullTuple());
+            return true;
+        }
+
+        IndexCursor indexCursor(m_index->getTupleSchema());
+        // determine if the row exists (create the empty one if it doesn't)
+        m_index->moveToKeyByTuple(&deltaTuple, indexCursor);
+        m_existingTuple = m_index->nextValueAtKey(indexCursor);
+        return ! m_existingTuple.isNullTuple();
+    }
+
+    void MaterializedViewHandler::mergeTupleForInsert(const TableTuple &deltaTuple) {
+        // set up the group-by columns
+        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+            // note that if the tuple is in the mv's target table,
+            // tuple values should be pulled from the existing tuple in
+            // that table. This works around a memory ownership issue
+            // related to out-of-line strings.
+            NValue value = m_existingTuple.getNValue(colindex);
+            m_updatedTuple.setNValue(colindex, value);
+        }
+        // COUNT(*)
+        NValue oldCount = m_existingTuple.getNValue(m_groupByColumnCount);
+        NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
+        m_updatedTuple.setNValue(m_groupByColumnCount, oldCount.op_add(deltaCount));
+        // Aggregations
+        int aggOffset = m_groupByColumnCount + 1;
+        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
+            NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
+            NValue newValue = deltaTuple.getNValue(aggOffset+aggIndex);
+            if (newValue.isNull()) {
+                newValue = existingValue;
+            }
+            else {
+                switch(m_aggTypes[aggIndex]) {
+                    case EXPRESSION_TYPE_AGGREGATE_SUM:
+                    case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                        if (!existingValue.isNull()) {
+                            newValue = existingValue.op_add(newValue);
+                        }
+                        break;
+                    case EXPRESSION_TYPE_AGGREGATE_MIN:
+                        // ignore any new value that is not strictly an improvement
+                        if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
+                            newValue = existingValue;
+                        }
+                        break;
+                    case EXPRESSION_TYPE_AGGREGATE_MAX:
+                        // ignore any new value that is not strictly an improvement
+                        if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
+                            newValue = existingValue;
+                        }
+                        break;
+                    default:
+                        assert(false); // Should have been caught when the matview was loaded.
+                        // no break
+                }
+            }
+            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+        }
+    }
+
+    void MaterializedViewHandler::handleTupleInsert(PersistentTable *sourceTable, bool fallible) {
+        // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
         ScopedDeltaTableContext dtContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         Table *delta = ec->executeExecutors(executorList);
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleInsert()" << endl;
-            cout << "Delta table:" << endl << sourceTable->m_deltaTable->debug() << endl;
-            cout << "Result:\n" << delta->debug() << endl;
         }
-
+        TableIterator ti = delta->iterator();
+        TableTuple deltaTuple(delta->schema());
+        while (ti.next(deltaTuple)) {
+            bool found = findExistingTuple(deltaTuple);
+            if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+                cout << "Delta tuple: \n" << deltaTuple.debug("delta result") << endl;
+                if (found) {
+                    cout << "Found in view:\n" << m_existingTuple.debug("existing tuple") << endl;
+                }
+                else {
+                    cout << "Not found in view.\n";
+                }
+            }
+            if (found) {
+                mergeTupleForInsert(deltaTuple);
+                // Shouldn't need to update group-key-only indexes such as the primary key
+                // since their keys shouldn't ever change, but do update other indexes.
+                m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                            m_updatableIndexList, fallible);
+            }
+            else {
+                m_destTable->insertPersistentTuple(deltaTuple, fallible);
+            }
+        }
         ec->cleanupExecutorsForSubquery(executorList);
     }
 
-    void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable) {
+    void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleDelete()" << endl; }
 
     }
