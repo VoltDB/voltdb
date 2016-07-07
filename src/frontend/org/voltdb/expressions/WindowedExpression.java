@@ -120,7 +120,7 @@ public class WindowedExpression extends AbstractExpression {
     }
 
     private Collection<? extends AbstractExpression> copyPartitionByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> copy = new ArrayList<>();
         for (AbstractExpression ae : m_partitionByExpressions) {
             copy.add((AbstractExpression)ae.clone());
         }
@@ -128,7 +128,7 @@ public class WindowedExpression extends AbstractExpression {
     }
 
     private Collection<? extends AbstractExpression> copyOrderByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> copy = new ArrayList<>();
         for (AbstractExpression ae : m_orderByExpressions) {
             copy.add((AbstractExpression)ae.clone());
         }
@@ -157,19 +157,24 @@ public class WindowedExpression extends AbstractExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         assert (m_orderByExpressions.size() == m_orderByDirections.size());
-        /*
-         * Serialize the partition expressions.  The orderby
-         * expressions which are not redundant with the PartitionBy
-         * expressions will be serialized in the orderby node which preceeds
-         * the PartitionByPlanNode.
-         */
-        stringer.key(Members.PARTITION_BY_EXPRESSIONS.name()).array();
-        for (int idx = 0; idx < m_partitionByExpressions.size(); idx += 1) {
-            stringer.object();
-            m_partitionByExpressions.get(idx).toJSONString(stringer);
-            stringer.endObject();
+        // Be careful.  This node may have changed to be a
+        // non-windowed expression.  Don't serialize the partition by and sort
+        // expressions unless we are really a windowed
+        if (getExpressionType().getExpressionClass() == WindowedExpression.class) {
+            /*
+             * Serialize the partition expressions.  The orderby
+             * expressions which are not redundant with the PartitionBy
+             * expressions will be serialized in the orderby node which preceeds
+             * the PartitionByPlanNode.
+             */
+            stringer.key(Members.PARTITION_BY_EXPRESSIONS.name()).array();
+            for (int idx = 0; idx < m_partitionByExpressions.size(); idx += 1) {
+                stringer.object();
+                m_partitionByExpressions.get(idx).toJSONString(stringer);
+                stringer.endObject();
+            }
+            stringer.endArray();
         }
-        stringer.endArray();
     }
 
     @Override

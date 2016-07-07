@@ -146,8 +146,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
-    private boolean m_hasWindowedExpression = false;
     private boolean m_hasAverage = false;
+    private ParsedColInfo      m_windowedColInfo = null;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
 
@@ -704,6 +704,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseDisplayColumn(int index, VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
+        // This index calculation is only used for sanity checking
+        // materialized views (which use the parsed select statement but
+        // don't go through the planner pass that does more involved
+        // column index resolution).
+        col.index = index;
+
+        // Parse the expression.  We may substitute for this later
+        // on, but it's a place to start.
         AbstractExpression colExpr = parseExpressionTree(child);
         if (colExpr instanceof ConstantValueExpression) {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
@@ -714,41 +722,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
         }
-        ExpressionUtil.finalizeValueTypes(colExpr);
-
-        // Check for windowed expressions.
-        List<AbstractExpression> windowedExprs = colExpr.findAllSubexpressionsOfClass(WindowedExpression.class);
-        if (windowedExprs != null && !windowedExprs.isEmpty()) {
-            if (m_hasWindowedExpression || windowedExprs.size() > 1) {
-                throw new PlanningErrorException(
-                        "At most one windowed display column is supported.");
-            }
-            m_hasWindowedExpression = true;
-            WindowedExpression we = (WindowedExpression)windowedExprs.get(0);
-            List<AbstractExpression> orderByExpressions = we.getOrderByExpressions();
-            //
-            // This could be an if statement, but I think it's better to
-            // leave this as a pattern in case we decide to implement more
-            // legality conditions for other windowed operators.
-            //
-            switch (we.getExpressionType()) {
-            case AGGREGATE_WINDOWED_RANK:
-                if (orderByExpressions.size() == 0) {
-                    throw new PlanningErrorException("The RANK windowed aggregate operator needs an order by expression.");
-                }
-                if (orderByExpressions.size() > 1) {
-                    // This is perhaps slightly misleading, since we will not
-                    // offer syntax for selecting any other units.
-                    throw new PlanningErrorException("Aggregate windowed expressions with range " +
-                                                     "window frame units can have only one order by expression.");
-                }
-                VoltType valType = orderByExpressions.get(0).getValueType();
-                if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
-                    throw new PlanningErrorException("Aggregate windowed expressions with RANGE " +
-                                                     "window frame units can have only integer or TIMESTAMP value types.");
-                }
-            }
-        }
 
         if (colExpr.getValueType() == VoltType.BOOLEAN) {
             throw new PlanningErrorException(
@@ -756,6 +729,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     "consider using CASE WHEN to decode the BOOLEAN expression " +
                     "into a value of some other type.");
         }
+
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
         if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
             AbstractExpression expr = new OperatorExpression();;
@@ -775,41 +749,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // switch the new expression for CAST
             colExpr = expr;
         }
+        ExpressionUtil.finalizeValueTypes(colExpr);
 
-        if (child.name.equals("columnref")) {
-            col.expression = colExpr;
-            col.columnName = child.attributes.get("column");
-            col.tableName = child.attributes.get("table");
-            col.tableAlias = child.attributes.get("tablealias");
-            if (col.tableAlias == null) {
-                col.tableAlias = col.tableName;
-            }
-        }
-        else if (child.name.equals("tablesubquery")) {
-            // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
-            ScalarValueExpression sve = (ScalarValueExpression)colExpr;
+        calculateColumnNames(child, col, colExpr);
 
-            col.columnName = child.attributes.get("alias");
-            col.tableName = sve.getSubqueryScan().getTableName();
-            col.tableAlias = sve.getSubqueryScan().getTableAlias();
-            col.expression = colExpr;
-        }
-        else {
-            col.expression = colExpr;
-            // XXX hacky, assume all non-column refs come from a temp table
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
-            col.columnName = "";
-        }
-        col.alias = child.attributes.get("alias");
-        if (col.alias == null) {
-            col.alias = col.columnName;
-        }
-        // This index calculation is only used for sanity checking
-        // materialized views (which use the parsed select statement but
-        // don't go through the planner pass that does more involved
-        // column index resolution).
-        col.index = index;
+        // If we have a windowed expression, make a column
+        // out of it.  We will put this in the display list,
+        // but the windowed expression is handled separately.
+        //
+        // Note that the value types must be finalized and the
+        // column and table names and aliases computed before
+        // we call this.
+        colExpr = handleWindowedExpression(col, colExpr);
+
+        // Remember the column expression.
+        col.expression = colExpr;
 
         insertAggExpressionsToAggResultColumns(m_aggregationList, col);
         if (m_aggregationList.size() >= 1) {
@@ -832,8 +786,114 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_displayColumns.add(col);
     }
 
+    private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col, AbstractExpression colExpr) {
+        // Calculate the names.
+        if (child.name.equals("columnref")) {
+            col.columnName = child.attributes.get("column");
+            col.tableName = child.attributes.get("table");
+            col.tableAlias = child.attributes.get("tablealias");
+            if (col.tableAlias == null) {
+                col.tableAlias = col.tableName;
+            }
+        }
+        else if (child.name.equals("tablesubquery")) {
+            // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
+            ScalarValueExpression sve = (ScalarValueExpression)colExpr;
+
+            col.columnName = child.attributes.get("alias");
+            col.tableName = sve.getSubqueryScan().getTableName();
+            col.tableAlias = sve.getSubqueryScan().getTableAlias();
+        }
+        else {
+            // XXX hacky, assume all non-column refs come from a temp table
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+        }
+        col.alias = child.attributes.get("alias");
+        if (col.alias == null) {
+            col.alias = col.columnName;
+        }
+    }
+
+    /**
+     * If there are windowed expressions in the
+     * @param col
+     * @param colExpr
+     * @return
+     */
+    private AbstractExpression handleWindowedExpression(ParsedColInfo col, AbstractExpression colExpr) {
+        // Check for windowed expressions.
+        List<AbstractExpression> windowedExprs = colExpr.findAllSubexpressionsOfClass(WindowedExpression.class);
+        if (windowedExprs != null && !windowedExprs.isEmpty()) {
+            if (hasWindowedExpression() || windowedExprs.size() > 1) {
+                throw new PlanningErrorException(
+                        "At most one windowed display column is supported.");
+            }
+            // Save the windowed expression.  We'll need it later.
+            // But replace the expression we just parsed with a
+            // TVE.  Leaving the windowed expression in the display
+            // list just confuses things.  The index is always 0.
+            // We don't really care about the table and column names.
+            WindowedExpression windowedExpression = (WindowedExpression)windowedExprs.get(0);
+            m_windowedColInfo = new ParsedColInfo();
+            m_windowedColInfo.tableName = col.tableName;
+            m_windowedColInfo.tableAlias = col.tableAlias;
+            m_windowedColInfo.columnName = col.columnName;
+            m_windowedColInfo.alias = col.alias;
+            // These names are not really important.  They are just
+            // placeholders.  But we get them from the column anyway.
+            //
+            // The index is always zero.
+           AbstractExpression newTVE = null;
+            if (windowedExpression == colExpr) {
+                m_windowedColInfo.expression = windowedExpression;
+                // If the windowed exprssion is the top level, we want to
+                // replace it with a new TVE.
+                colExpr = new TupleValueExpression(col.tableName, col.tableAlias,
+                                                   col.columnName, col.alias, 0);
+                colExpr.setValueType(windowedExpression.getValueType());
+                colExpr.setValueSize(windowedExpression.getValueSize());
+                newTVE = colExpr;
+            } else {
+                m_windowedColInfo.expression = (AbstractExpression)windowedExpression.clone();
+                // Otherwise, we want to make windowedExpression look like
+                // a TVE, but we don't want to change colExpr.  The value
+                // type and size will be right already.
+                newTVE = windowedExpression;
+                newTVE.setExpressionType(ExpressionType.VALUE_TUPLE);
+            }
+            newTVE.setValueType(windowedExpression.getValueType());
+            newTVE.setValueSize(windowedExpression.getValueSize());
+            List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
+            //
+            // This could be an if statement, but I think it's better to
+            // leave this as a pattern in case we decide to implement more
+            // legality conditions for other windowed operators.
+            //
+            switch (windowedExpression.getExpressionType()) {
+            case AGGREGATE_WINDOWED_RANK:
+                if (orderByExpressions.size() == 0) {
+                    throw new PlanningErrorException("The RANK windowed aggregate operator needs an order by expression.");
+                }
+                if (orderByExpressions.size() > 1) {
+                    // This is perhaps slightly misleading, since we will not
+                    // offer syntax for selecting any other units.
+                    throw new PlanningErrorException("Aggregate windowed expressions with range " +
+                                                     "window frame units can have only one order by expression.");
+                }
+                VoltType valType = orderByExpressions.get(0).getValueType();
+                if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
+                    throw new PlanningErrorException("Aggregate windowed expressions with RANGE " +
+                                                     "window frame units can have only integer or TIMESTAMP value types.");
+                }
+            }
+        }
+        return colExpr;
+    }
+
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
-        if (m_hasWindowedExpression) {
+        if (hasWindowedExpression()) {
             throw new PlanningErrorException(
                     "Use of both windowed operations and GROUP BY is not supported.");
         }
@@ -1526,7 +1586,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean hasWindowedExpression() {
-        return m_hasWindowedExpression;
+        return m_windowedColInfo != null;
     }
 
     public boolean hasAggregateExpression() {
@@ -2108,13 +2168,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @return
      */
     public ParsedColInfo getWindowedColinfo() {
-        for (ParsedColInfo colInfo : m_displayColumns) {
-            AbstractExpression colExpr = colInfo.expression;
-            if (colExpr instanceof WindowedExpression) {
-                return colInfo;
-            }
-        }
-        return null;
+        return m_windowedColInfo;
     }
 
 }
