@@ -381,7 +381,7 @@ public class Inits {
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            result = CatalogUtil.compileDeployment(catalog, m_deployment, false, true);
+            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 VoltDB.crashLocalVoltDB(result);
             }
@@ -436,7 +436,7 @@ public class Inits {
         @Override
         public void run() {
             final org.voltdb.catalog.CommandLog logConfig = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
-            if (logConfig == null) return;
+            assert logConfig != null;
 
             if (logConfig.getEnabled()) {
                 if (m_config.m_isEnterprise) {

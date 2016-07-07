@@ -999,7 +999,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             boolean usingCommandLog = m_config.m_isEnterprise
                     && (m_catalogContext.cluster.getLogconfig() != null)
-                    && (m_catalogContext.cluster.getLogconfig() != null)
                     && (m_catalogContext.cluster.getLogconfig().get("log") != null)
                     && m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
 
@@ -1788,7 +1787,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
         }
-
     }
 
     private void stageInitializedMarker(Configuration config) {
@@ -2050,7 +2048,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @SuppressWarnings("unused")
             Database db = cluster.getDatabases().add("database");
 
-            String result = CatalogUtil.compileDeployment(catalog, deployment, true, true);
+            String result = CatalogUtil.compileDeployment(catalog, deployment, true);
             if (result != null) {
                 // Any other non-enterprise deployment errors will be caught and handled here
                 // (such as <= 0 host count)

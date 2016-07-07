@@ -604,16 +604,6 @@ public abstract class CatalogUtil {
         return errMsg;
     }
 
-    public static String compileDeploymentString(Catalog catalog, String deploymentString,
-                     boolean isPlaceHolderCatalog, boolean isUAC) {
-
-        DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
-        if (deployment == null) {
-            return "Error parsing deployment string";
-        }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, isUAC);
-    }
-
     public static String compileDeployment(Catalog catalog, String deploymentURL,
             boolean isPlaceHolderCatalog)
     {
@@ -621,7 +611,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return "Error parsing deployment file: " + deploymentURL;
         }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, true);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
 
@@ -632,13 +622,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return "Error parsing deployment string";
         }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, true);
-    }
-
-    public static String compileDeployment(Catalog catalog,
-            DeploymentType deployment,
-            boolean isPlaceHolderCatalog) {
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, true);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
     /**
@@ -650,7 +634,7 @@ public abstract class CatalogUtil {
      */
     public static String compileDeployment(Catalog catalog,
             DeploymentType deployment,
-            boolean isPlaceHolderCatalog, boolean doBuildPaths)
+            boolean isPlaceHolderCatalog)
     {
         String errmsg = null;
 
@@ -690,10 +674,7 @@ public abstract class CatalogUtil {
             //I would not have needed this if validateResourceMonitor didnt go through VoltDB
             VoltDB.instance().loadLegacyPathProperties(deployment);
 
-            //Make sure directories are fine. if we are not compiling for UAC
-            if (doBuildPaths) {
-                setupPaths(deployment.getPaths());
-            }
+            setupPaths(deployment.getPaths());
             validateResourceMonitorInfo(deployment);
         }
         catch (Exception e) {

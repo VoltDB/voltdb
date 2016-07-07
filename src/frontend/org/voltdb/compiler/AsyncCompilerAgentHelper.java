@@ -203,7 +203,7 @@ public class AsyncCompilerAgentHelper
             }
 
             //compile deployment but dont rebuild paths.
-            result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false, false);
+            result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
