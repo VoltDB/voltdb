@@ -19,6 +19,7 @@ from tabulate import tabulate
 COMMUNITY = os.environ.get('community', None)
 PRO = os.environ.get('pro', None)
 
+# Channel to message in case something goes wrong
 ADMIN_CHANNEL = 'D1JG6N2A2'
 
 TL_QUERY = ("""
@@ -70,35 +71,6 @@ RIGHT JOIN `junit-builds` AS jr
            jr.name=%(job)s
 """)
 
-PL_QUERY = ("""
-  SELECT job AS 'Job name',
-         name AS 'Test name',
-         fails AS 'Fails',
-         total AS 'Total',
-         fails/total*100. AS "Fail %",
-         latest AS 'Latest Failure'
-    FROM
-        (
-           SELECT job,
-                  name,
-                  (
-                   SELECT COUNT(*)
-                     FROM `junit-builds` AS jr
-                    WHERE jr.name = tf.job
-                  ) AS total,
-                  COUNT(*) AS fails,
-                  MAX(tf.stamp) AS latest
-             FROM `junit-test-failures` AS tf
-            WHERE NOT status='FIXED' AND
-                  job=%(job)s AND
-                  NOW() - INTERVAL 30 DAY <= tf.stamp
-         GROUP BY job,
-                  name,
-                  total
-        ) AS intermediate
-ORDER BY 5 DESC
-""")
-
 L_QUERY = ("""
   SELECT job AS 'Job name',
          name AS 'Test name',
@@ -113,7 +85,8 @@ L_QUERY = ("""
                   (
                    SELECT COUNT(*)
                      FROM `junit-builds` AS jr
-                    WHERE jr.name = tf.job
+                    WHERE jr.name = tf.job AND
+                          NOW() - INTERVAL 30 DAY <= jr.stamp
                   ) AS total,
                   COUNT(*) AS fails,
                   MAX(tf.stamp) AS latest
@@ -180,13 +153,15 @@ class JenkinsBot(object):
         Establishes session and responds to commands
         """
 
-        help_text = ['See which tests are failing the most since this build:\n\ttest-leaderboard <job> <build>\n',
-                     'See which tests are failing in the past x days:\n\tdays <job> <days>\n',
+        help_text = ['*Help*\n',
+                     'See which tests are failing the most since this build:\n\ttest-leaderboard <job> <build #>\n',
+                     'See which tests are failing in the past x days:\n\tdays <job> <days> \n',
                      'Failing the most in this build range:\n\tbuild-range <job> <build #>-<build #>\n',
-                     'Most recent failure on master:\n\ttest-on-master <job> <testname> (testname is full test name '
-                     'including the suite)\n',
+                     'Most recent failure on master:\n\ttest-on-master <job> <testname> (ex. testname: org.voltdb.iv2'
+                         '..)\n',
                      'All failures for a job:\n\tall-failures <job>\n',
                      'For any <job>, you can specify "pro" or "com" for the master jobs\n',
+                     'Examples: test-leaderboard pro 860, days com 14\n',
                      'help\n']
 
         while True:
@@ -256,7 +231,7 @@ class JenkinsBot(object):
                 return
             except IndexError as error:
                 self.log(error)
-                self.post_message(channel, 'Incorrect number of arguments\n\n' + ''.join(help_text))
+                self.post_message(channel, 'Incorrect number or formatting of arguments\n\n' + ''.join(help_text))
             except Exception as error:
                 self.log('Something unexpected went wrong')
                 self.log(error)
@@ -292,6 +267,7 @@ class JenkinsBot(object):
                     table[i] = list(row)
                     table[i][0] = table[i][0].replace('branch-2-', '')
                     table[i][1] = table[i][1].replace('org.voltdb.', '')
+                    table[i][1] = table[i][1].replace('org.voltcore.', '')
 
             self.client.api_call(
                 'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
