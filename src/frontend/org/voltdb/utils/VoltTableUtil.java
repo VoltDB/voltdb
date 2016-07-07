@@ -19,6 +19,9 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,14 +29,15 @@ import java.util.List;
 import java.util.TimeZone;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
-
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 
@@ -54,6 +58,9 @@ public class VoltTableUtil {
     // VoltTable status code to indicate null dependency table. Joining SPI replies to fragment
     // task messages with this.
     public static byte NULL_DEPENDENCY_STATUS = -1;
+    
+    private static VoltTableUtilConfig config = null;
+    private static VoltTable m_vt;
 
     private static final ThreadLocal<SimpleDateFormat> m_sdf = new ThreadLocal<SimpleDateFormat>() {
         @Override
@@ -232,5 +239,79 @@ public class VoltTableUtil {
                     vt.getColumnType(ii));
         }
         return columns;
+    }
+    
+    private static SQLCommandOutputFormatter m_outputFormatter = new SQLCommandOutputFormatterDefault();
+    
+    public static void printVoltTableFromFile(String fileName) throws IOException {
+    	VoltTable vt = getTableFromFile(fileName);
+    	m_outputFormatter.printTable(System.out, vt, true);
+    }
+    
+    /**
+     * Load a volt table from a file
+     * @param fileTable table containing a the name of a volt table file
+     * @return a volt table 
+     */
+    public static VoltTable getTableFromFileTable(VoltTable fileTable) {
+        String fileName = fileTable.fetchRow(0).getString("filenames");
+        return getTableFromFile(fileName);
+    }
+
+    /**
+     * 
+     * @param fileName name of a volt table file
+     * @return a volt table loaded with the file's table
+     */
+    public static VoltTable getTableFromFile(String fileName) {
+        byte[] bytes = null;
+        try {
+            bytes = Files.readAllBytes(Paths.get(fileName));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (bytes == null) {
+            return null;
+        }
+        ByteBuffer buf = ByteBuffer.wrap(bytes);
+
+        VoltTable vt = new VoltTable();
+        vt.initFromBuffer(buf);
+        return vt;
+    }
+    
+    /**
+     * Configuration options.
+     */
+    public static class VoltTableUtilConfig extends CLIConfig {
+
+        @Option(shortOpt = "f", desc = "location of Volt Table input file")
+        String file = "";
+        
+        /**
+         * Usage
+         */
+        @Override
+        public void printUsage() {
+            System.out
+                    .println("Usage: volttableutil [args]");
+            super.printUsage();
+        }
+    }
+    
+    /**
+     * volttableutil main.
+     *
+     * @param args
+     * @throws IOException
+     * @throws InterruptedException
+     *
+     */
+    public static void main(String[] args) throws IOException,
+            InterruptedException {
+    	final VoltTableUtilConfig cfg = new VoltTableUtilConfig();
+        cfg.parse(VoltTableUtil.class.getName(), args);
+        
+        printVoltTableFromFile(cfg.file);
     }
 }

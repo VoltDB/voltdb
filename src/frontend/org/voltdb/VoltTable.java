@@ -340,7 +340,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      * Do nothing constructor that does no initialization or allocation.
      */
-    VoltTable() {
+    public VoltTable() {
         // m_extraMetadata is final and must be set to null
         this((ExtraMetadata) null);
     }
@@ -1894,7 +1894,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         buf.put(dup);
     }
 
-    void initFromBuffer(ByteBuffer buf) {
+    public void initFromBuffer(ByteBuffer buf) {
         // Note: some of the snapshot and save/restore code makes assumptions
         // about the binary layout of tables.
 
