@@ -37,10 +37,18 @@ public:
         assert(m_table->m_deltaTable);
         assert( ! m_table->m_deltaTableActive);
         m_table->m_deltaTableActive = true;
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << "Delta table for " << m_table->name() << " has been activated." << endl;
+#endif
     }
 
     ~ScopedDeltaTableContext() {
         m_table->m_deltaTableActive = false;
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << "Delta table for " << m_table->name() << " has been deactivated." << endl;
+#endif
     }
 private:
     PersistentTable *m_table;
@@ -61,7 +69,6 @@ public:
     void pollute() { m_dirty = true; }
     void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
     void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
-    // std::string debug() const;
 
 private:
     std::vector<PersistentTable*> m_sourceTables;

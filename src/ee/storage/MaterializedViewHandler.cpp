@@ -45,21 +45,30 @@ namespace voltdb {
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::~MaterializedViewHandler() " << endl; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << m_destTable->name() << " MaterializedViewHandler::~MaterializedViewHandler() " << endl;
+#endif
         for (int i=m_sourceTables.size()-1; i>=0; i--) {
             dropSourceTable(m_sourceTables[i]);
         }
     }
 
     void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::addSourceTable() " << sourceTable->name()  << endl; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << m_destTable->name() << " MaterializedViewHandler::addSourceTable() " << sourceTable->name()  << endl;
+#endif
         sourceTable->addViewToTrigger(this);
         m_sourceTables.push_back(sourceTable);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->name() << " MaterializedViewHandler::dropSourceTable() " << sourceTable->name()  << endl; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << m_destTable->name() << " MaterializedViewHandler::dropSourceTable() " << sourceTable->name()  << endl;
+#endif
         assert( ! m_sourceTables.empty());
         sourceTable->dropViewToTrigger(this);
         PersistentTable* lastTable = m_sourceTables.back();
@@ -140,7 +149,7 @@ namespace voltdb {
         catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
         m_createQueryExecutorVector = ExecutorVector::fromCatalogStatement(engine, createQueryStatement);
         m_createQueryExecutorVector->getRidOfSendExecutor();
-// #ifdef VOLT_TRACE_ENABLED
+#ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
             const std::string& hexString = createQueryStatement->explainplan();
             assert(hexString.length() % 2 == 0);
@@ -150,7 +159,7 @@ namespace voltdb {
             catalog::Catalog::hexDecodeString(hexString, explanation);
             cout << m_destTable->name() << " MaterializedViewHandler::setUpCreateQuery()\n" << explanation << endl;
         }
-// #endif
+#endif
     }
 
     void MaterializedViewHandler::setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
@@ -217,6 +226,10 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::mergeTupleForInsert(const TableTuple &deltaTuple) {
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << m_destTable->m_name << " MaterializedViewHandler::mergeTupleForInsert()" << endl;
+#endif
         // set up the group-by columns
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             // note that if the tuple is in the mv's target table,
@@ -273,13 +286,15 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         Table *delta = ec->executeExecutors(executorList);
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
             cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleInsert()" << endl;
-        }
+#endif
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
         while (ti.next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);
+#ifdef VOLT_TRACE_ENABLED
             if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
                 cout << "Delta tuple: \n" << deltaTuple.debug("delta result") << endl;
                 if (found) {
@@ -289,6 +304,7 @@ namespace voltdb {
                     cout << "Not found in view.\n";
                 }
             }
+#endif
             if (found) {
                 mergeTupleForInsert(deltaTuple);
                 // Shouldn't need to update group-key-only indexes such as the primary key
@@ -304,12 +320,31 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleDelete()" << endl; }
-
+//         // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
+//         ScopedDeltaTableContext dtContext(sourceTable);
+//         ExecutorContext* ec = ExecutorContext::getExecutorContext();
+//         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
+//         Table *delta = ec->executeExecutors(executorList);
+// #ifdef VOLT_TRACE_ENABLED
+//         if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+//             cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleDelete()" << endl;
+// #endif
+//         TableIterator ti = delta->iterator();
+//         TableTuple deltaTuple(delta->schema());
+//         while (ti.next(deltaTuple)) {
+//             bool found = findExistingTuple(deltaTuple);
+// #ifdef VOLT_TRACE_ENABLED
+//             if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+//                 cout << "Delta tuple: \n" << deltaTuple.debug("delta result") << endl;
+//                 if (found) {
+//                     cout << "Found in view:\n" << m_existingTuple.debug("existing tuple") << endl;
+//                 }
+//                 else {
+//                     cout << "Not found in view.\n";
+//                 }
+//             }
+// #endif
+//         }
     }
-
-    // std::string MaterializedViewHandler::debug() const {
-    //     // To be implemented.
-    // }
 
 } // namespace voltdb

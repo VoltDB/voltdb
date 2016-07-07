@@ -669,7 +669,10 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp)
 
     // delete tables in the set
     BOOST_FOREACH (std::string path, deletions) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processCatalogDeletes() " << path << endl; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+          cout << "processCatalogDeletes() " << path << endl;
+#endif
         VOLT_TRACE("delete path:");
 
         std::map<std::string, TableCatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
@@ -773,7 +776,10 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
         if (!tcd) {
             VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
-            if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processCatalogAdditions() completely new table " << catalogTable->name() << endl; }
+#ifdef VOLT_TRACE_ENABLED
+            if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+              cout << "processCatalogAdditions() add completely new table " << catalogTable->name() << endl;
+#endif
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////

@@ -62,7 +62,6 @@ Table *TableCatalogDelegate::getTable() const {
     // If a persistent table has an active delta table, return the delta table instead of the whole table.
     PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(m_table);
     if (persistentTable && persistentTable->isDeltaTableActive()) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Returning deltaTable!" << endl; }
         return persistentTable->deltaTable();
     }
     return m_table;

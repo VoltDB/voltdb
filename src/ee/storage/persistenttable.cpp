@@ -375,7 +375,10 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     }
     else {
         // Joined table view.
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTableRelease joined table " << originalTable->m_name << endl; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << "PersistentTable::truncateTableRelease joined table " << originalTable->m_name << endl;
+#endif
         BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, originalTable->m_viewsToTrigger) {
             PersistentTable *destTable = viewToTrigger->destTable();
             destTable->decrementRefcount();
@@ -387,14 +390,12 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     if (isPersistentTableEmpty() == true) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << " isPersistentTableEmpty\n"; }
         return;
     }
 
     // If the table has only one tuple-storage block, it may be better to truncate
     // table by iteratively deleting table rows. Evalute if this is the case
     // based on the block and tuple block load factor
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": m_data.size() = " << m_data.size() << endl; }
     if (m_data.size() == 1) {
         // threshold cutoff in terms of block load factor at which truncate is
         // better than tuple-by-tuple delete. Cut-off values are based on worst
@@ -442,7 +443,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     if (m_viewsToTrigger.size() == 0) {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": not a joined table view source.\n"; }
         // add matView
         BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
             PersistentTable * targetTable = originalView->targetTable();
@@ -455,7 +455,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         }
     }
     else {
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "PersistentTable::truncateTable() " << m_name << ": a joined table view source.\n"; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << "PersistentTable::truncateTable() " << m_name << ": a joined table view source.\n";
+#endif
         BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, m_viewsToTrigger) {
             PersistentTable *destTable = viewToTrigger->destTable();
             TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
@@ -1907,7 +1910,10 @@ void PersistentTable::addViewToTrigger(MaterializedViewHandler *viewToTrigger) {
         TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
                                              *engine->getCatalogTable(m_name));
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Delta table for " << m_name << " is created.\n"; }
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
+            cout << "Delta table for " << m_name << " is created.\n";
+#endif
     }
     m_viewsToTrigger.push_back(viewToTrigger);
 }
