@@ -37,6 +37,7 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
@@ -104,6 +105,7 @@ public class VoltDB {
         EstTimeUpdater.start();
         VoltLogger.startAsynchronousLogging();
         ReverseDNSCache.start();
+        ClientFactory.increaseClientCountToOne();
     }
 
     /** Encapsulates VoltDB configuration parameters */

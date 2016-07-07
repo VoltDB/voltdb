@@ -76,4 +76,10 @@ public abstract class ClientFactory {
             ReverseDNSCache.stop();
         }
     }
+
+    public static void increaseClientCountToOne() {
+        if (ACTIVE_CLIENT_COUNT.get() == 0) {
+            ACTIVE_CLIENT_COUNT.set(1);
+        }
+    }
 }

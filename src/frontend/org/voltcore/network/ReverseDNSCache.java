@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
 
@@ -87,15 +86,6 @@ public class ReverseDNSCache {
 
     public static synchronized void stop() throws InterruptedException{
         if (m_es != null) {
-            try {
-                // Submit and wait on an empty logger task to flush the queue.
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {}
-                }).get();
-            } catch (Exception e) {
-                Throwables.getRootCause(e).printStackTrace();
-            }
             m_es.shutdown();
             try {
                 m_es.awaitTermination(365, TimeUnit.DAYS);
