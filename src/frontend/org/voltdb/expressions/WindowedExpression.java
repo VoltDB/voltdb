@@ -24,7 +24,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
 
@@ -66,14 +65,14 @@ public class WindowedExpression extends AbstractExpression {
             ExpressionType operationType,  // RANK, MAX, etc.
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
-            List<SortDirectionType>  orderByDirections,
-            Database db, boolean isDecending, boolean isPercentRank)
+            List<SortDirectionType>  orderByDirections)
     {
         super(operationType);
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);
         m_orderByDirections.addAll(orderByDirections);
-
+        setValueType(VoltType.BIGINT);
+        setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
     }
 
 

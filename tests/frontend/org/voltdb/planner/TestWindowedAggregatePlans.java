@@ -150,7 +150,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
 
     }
 
-    public void notestOrderByAndPartitionByExpressions() throws Exception {
+    public void testOrderByAndPartitionByExpressions() throws Exception {
         AbstractPlanNode node;
         try {
             node = compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) FROM AAA;");
@@ -170,7 +170,8 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
     public void testRankTestGen() throws Exception {
         AbstractPlanNode node;
         try {
-            node = compile("select A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;");
+            String rankExpressionSQL = "select A, B, C, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;";
+            node = compile(rankExpressionSQL);
             assertTrue(true);
         } catch (Exception ex) {
             assertTrue("Unexpected exception in compilation", false);
@@ -179,9 +180,10 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
 
     // This is also not a test.  It's used to generate a plan for the PartitionByExecutor test.
     public void testRankTestGenRankInOrderBy() throws Exception {
+        String orderedRankExpressionSQL = "select A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) * 2 AS R FROM AAA ORDER BY A, B, C, R;";
         AbstractPlanNode node;
         try {
-            node = compile("select A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) AS R FROM AAA ORDER BY A, B, R;");
+            node = compile(orderedRankExpressionSQL);
             assertTrue(true);
         } catch (Exception ex) {
             assertTrue("Unexpected exception in compilation", false);

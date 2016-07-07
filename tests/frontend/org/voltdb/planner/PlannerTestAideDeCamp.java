@@ -187,6 +187,7 @@ public class PlannerTestAideDeCamp {
             // TODO Auto-generated catch block
             e2.printStackTrace();
             System.exit(-1);
+            return null;
         }
 
         //
@@ -208,4 +209,7 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public String getCatalogString() {
+        return db.getCatalog().serialize();
+    }
 }

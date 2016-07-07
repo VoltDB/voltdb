@@ -66,6 +66,9 @@ import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractParsedStmt {
 
+    public static final String TEMP_TABLE_NAME = "VOLT_TEMP_TABLE";
+    public static final String WINDOWED_AGGREGATE_COLUMN_NAME = "WINAGG_COLUMN";
+
     protected String m_contentDeterminismMessage = null;
 
      // Internal statement counter
@@ -516,14 +519,28 @@ public abstract class AbstractParsedStmt {
         return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
     }
 
+    // It turns out to be interesting to store this as a list.  We
+    // really only want one of them, but it helps to check for multiple
+    // windowed expressions in a different place than parsing.
+    protected List<WindowedExpression> m_windowedExpressions = new ArrayList<>();
+
+    public List<WindowedExpression> getWindowedExpressions() {
+        return m_windowedExpressions;
+    }
+    /**
+     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Windowed Expression is squirreled away in the m_windowedExpression
+     * object, though, because we will need it later.
+     *
+     * @param exprNode
+     * @return
+     */
     private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
         // Parse individual rank expressions
         List<AbstractExpression> partitionbyExprs = new ArrayList<>();
         List<AbstractExpression> orderbyExprs = new ArrayList<>();
         List<SortDirectionType>  orderbyDirs  = new ArrayList<>();
         boolean areAllDecending = false;
-
-        boolean isPercentRank = Boolean.valueOf(exprNode.attributes.get("isPercentRank"));
 
         for (VoltXMLElement ele : exprNode.children) {
             if (ele.name.equals("partitionbyList")) {
@@ -553,11 +570,16 @@ public abstract class AbstractParsedStmt {
         WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
                                                              partitionbyExprs,
                                                              orderbyExprs,
-                                                             orderbyDirs,
-                                                             m_db,
-                                                             areAllDecending,
-                                                             isPercentRank);
-        return rankExpr;
+                                                             orderbyDirs);
+        // Only offset 0 is useful.  But we keep the index anyway.
+        int offset = m_windowedExpressions.size();
+        m_windowedExpressions.add(rankExpr);
+        TupleValueExpression tve = new TupleValueExpression(TEMP_TABLE_NAME,                TEMP_TABLE_NAME,
+                                                            WINDOWED_AGGREGATE_COLUMN_NAME, WINDOWED_AGGREGATE_COLUMN_NAME);
+        tve.setColumnIndex(offset);
+        tve.setValueType(rankExpr.getValueType());
+        tve.setValueSize(rankExpr.getValueSize());
+        return tve;
     }
 
    /**
@@ -739,6 +761,10 @@ public abstract class AbstractParsedStmt {
         }
         else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
+        }
+        if (exprNode.attributes.containsKey("valuetype")) {
+            String valueType = exprNode.attributes.get("valuetype");
+            expr.setValueType(VoltType.typeFromString(valueType));
         }
         return expr;
     }

@@ -147,7 +147,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
     private boolean m_hasAverage = false;
-    private ParsedColInfo      m_windowedColInfo = null;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
 
@@ -553,8 +552,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // Try to check complexAggs earlier
             m_hasComplexAgg = true;
             // Aggregation column use the the hacky stuff
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.tableName = TEMP_TABLE_NAME;
+            col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "";
             if (!m_aggResultColumns.contains(col)) {
                 m_aggResultColumns.add(col);
@@ -753,14 +752,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         calculateColumnNames(child, col, colExpr);
 
-        // If we have a windowed expression, make a column
-        // out of it.  We will put this in the display list,
-        // but the windowed expression is handled separately.
-        //
-        // Note that the value types must be finalized and the
-        // column and table names and aliases computed before
-        // we call this.
-        colExpr = handleWindowedExpression(col, colExpr);
+        // If we have seen any windowed expressions we will have
+        // saved them in m_windowedExpressions by now.  We need to
+        // verify their validity.
+        verifyWindowedExpressions();
 
         // Remember the column expression.
         col.expression = colExpr;
@@ -806,8 +801,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else {
             // XXX hacky, assume all non-column refs come from a temp table
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.tableName = TEMP_TABLE_NAME;
+            col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "";
         }
         col.alias = child.attributes.get("alias");
@@ -817,60 +812,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
-     * If there are windowed expressions in the
-     * @param col
-     * @param colExpr
+     * Verify the validity of the windowed expressions.
+     *
      * @return
      */
-    private AbstractExpression handleWindowedExpression(ParsedColInfo col, AbstractExpression colExpr) {
+    private void verifyWindowedExpressions() {
         // Check for windowed expressions.
-        List<AbstractExpression> windowedExprs = colExpr.findAllSubexpressionsOfClass(WindowedExpression.class);
-        if (windowedExprs != null && !windowedExprs.isEmpty()) {
-            if (hasWindowedExpression() || windowedExprs.size() > 1) {
-                throw new PlanningErrorException(
-                        "At most one windowed display column is supported.");
+        if (m_windowedExpressions.size() > 0) {
+            if (m_windowedExpressions.size() > 1) {
+                throw new PlanningErrorException("At most one windowed display column is supported.");
             }
-            // Save the windowed expression.  We'll need it later.
-            // But replace the expression we just parsed with a
-            // TVE.  Leaving the windowed expression in the display
-            // list just confuses things.  The index is always 0.
-            // We don't really care about the table and column names.
-            WindowedExpression windowedExpression = (WindowedExpression)windowedExprs.get(0);
-            m_windowedColInfo = new ParsedColInfo();
-            m_windowedColInfo.tableName = col.tableName;
-            m_windowedColInfo.tableAlias = col.tableAlias;
-            m_windowedColInfo.columnName = col.columnName;
-            m_windowedColInfo.alias = col.alias;
-            // These names are not really important.  They are just
-            // placeholders.  But we get them from the column anyway.
-            //
-            // The index is always zero.
-           AbstractExpression newTVE = null;
-            if (windowedExpression == colExpr) {
-                m_windowedColInfo.expression = windowedExpression;
-                // If the windowed exprssion is the top level, we want to
-                // replace it with a new TVE.
-                colExpr = new TupleValueExpression(col.tableName, col.tableAlias,
-                                                   col.columnName, col.alias, 0);
-                colExpr.setValueType(windowedExpression.getValueType());
-                colExpr.setValueSize(windowedExpression.getValueSize());
-                newTVE = colExpr;
-            } else {
-                m_windowedColInfo.expression = (AbstractExpression)windowedExpression.clone();
-                // Otherwise, we want to make windowedExpression look like
-                // a TVE, but we don't want to change colExpr.  The value
-                // type and size will be right already.
-                newTVE = windowedExpression;
-                newTVE.setExpressionType(ExpressionType.VALUE_TUPLE);
-            }
-            newTVE.setValueType(windowedExpression.getValueType());
-            newTVE.setValueSize(windowedExpression.getValueSize());
-            List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
             //
             // This could be an if statement, but I think it's better to
             // leave this as a pattern in case we decide to implement more
             // legality conditions for other windowed operators.
             //
+            WindowedExpression windowedExpression = m_windowedExpressions.get(0);
+            List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
             switch (windowedExpression.getExpressionType()) {
             case AGGREGATE_WINDOWED_RANK:
                 if (orderByExpressions.size() == 0) {
@@ -889,7 +847,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
             }
         }
-        return colExpr;
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
@@ -931,8 +888,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else {
             // XXX hacky, assume all non-column refs come from a temp table
-            groupbyCol.tableName = "VOLT_TEMP_TABLE";
-            groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
+            groupbyCol.tableName = TEMP_TABLE_NAME;
+            groupbyCol.tableAlias = TEMP_TABLE_NAME;
             groupbyCol.columnName = "";
             m_hasComplexGroupby = true;
         }
@@ -979,7 +936,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         AbstractExpression order_exp = order_col.expression;
         assert(order_exp != null);
-
         // guards against subquery inside of order by clause
         if (order_exp.hasSubquerySubexpression()) {
             throw new PlanningErrorException(
@@ -1047,8 +1003,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 m_hasAverage = true;
             }
 
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.tableName = TEMP_TABLE_NAME;
+            col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "";
 
             if (!m_aggResultColumns.contains(col)) {
@@ -1339,8 +1295,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.expression = ConstantValueExpression.makeExpression(VoltType.NUMERIC, "1");
             ExpressionUtil.finalizeValueTypes(col.expression);
 
-            col.tableName = "VOLT_TEMP_TABLE";
-            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.tableName = TEMP_TABLE_NAME;
+            col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "$$_EXISTS_$$";
             col.alias = "$$_EXISTS_$$";
             col.index = 0;
@@ -1586,7 +1542,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean hasWindowedExpression() {
-        return m_windowedColInfo != null;
+        return m_windowedExpressions.size() > 0;
     }
 
     public boolean hasAggregateExpression() {
@@ -2160,15 +2116,4 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
-
-    /**
-     * Walk through the display columns and pick out
-     * the only windowed expression.
-     *
-     * @return
-     */
-    public ParsedColInfo getWindowedColinfo() {
-        return m_windowedColInfo;
-    }
-
 }

@@ -152,7 +152,10 @@ public:
         return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
     }
 
-    void initializeTableOfInt(voltdb::Table *table, int nRows, int nCols, int32_t *vals) {
+    void initializeTableOfInt(std::string tableName, voltdb::PersistentTable *&table, int &table_id, int nRows, int nCols, int32_t *vals) {
+        table = getPersistentTableAndId(tableName.c_str(), &table_id);
+        assert(table != NULL);
+
         for (int row = 0; row < nRows; row += 1) {
             voltdb::TableTuple &tuple = table->tempTuple();
             for (int col = 0; col < nCols; col += 1) {

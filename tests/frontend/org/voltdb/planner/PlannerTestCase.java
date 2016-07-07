@@ -265,6 +265,9 @@ public class PlannerTestCase extends TestCase {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
     }
 
+    public String getCatalogString() {
+        return m_aide.getCatalogString();
+    }
 
     Database getDatabase() {
         return m_aide.getDatabase();

@@ -25,6 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -39,13 +40,6 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     private enum Members {
         ORDER_BY_EXPRS
     };
-    public final SchemaColumn getWindowedSchemaColumn() {
-        return m_windowedSchemaColumn;
-    }
-
-    public final WindowedExpression getWindowedExpression() {
-        return (WindowedExpression)m_windowedSchemaColumn.getExpression();
-    }
 
     @Override
     public void generateOutputSchema(Database db)
@@ -59,20 +53,21 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         m_children.get(0).generateOutputSchema(db);
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
         // The first column is the aggregate.
-        TupleValueExpression tve = new TupleValueExpression(m_windowedSchemaColumn.getTableName(),
-                                                            m_windowedSchemaColumn.getTableAlias(),
-                                                            m_windowedSchemaColumn.getColumnName(),
-                                                            m_windowedSchemaColumn.getColumnAlias());
+        TupleValueExpression tve = new TupleValueExpression(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                            AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                            AbstractParsedStmt.WINDOWED_AGGREGATE_COLUMN_NAME,
+                                                            AbstractParsedStmt.WINDOWED_AGGREGATE_COLUMN_NAME,
+                                                            0);
         tve.setExpressionType(ExpressionType.VALUE_TUPLE);
-        tve.setValueType(m_windowedSchemaColumn.getType());
-        tve.setValueSize(m_windowedSchemaColumn.getSize());
+        tve.setValueType(m_windowedExpression.getValueType());
+        tve.setValueSize(m_windowedExpression.getValueSize());
         // This doesn't really matter, since we will be
         // generating this.  But it can't be negative.
         tve.setColumnIndex(0);
-        SchemaColumn aggCol = new SchemaColumn(m_windowedSchemaColumn.getTableName(),
-                                               m_windowedSchemaColumn.getTableAlias(),
-                                               m_windowedSchemaColumn.getColumnName(),
-                                               m_windowedSchemaColumn.getColumnAlias(),
+        SchemaColumn aggCol = new SchemaColumn(tve.getTableName(),
+                                               tve.getTableAlias(),
+                                               tve.getColumnName(),
+                                               tve.getColumnAlias(),
                                                tve);
         getOutputSchema().addColumn(aggCol);
         // Just copy the input columns to the output schema.
@@ -82,12 +77,14 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         m_hasSignificantOutputSchema = true;
     }
 
-    public final void setWindowedColumn(SchemaColumn  windowedSchemaColumn) {
-        m_windowedSchemaColumn = windowedSchemaColumn;
-        assert(windowedSchemaColumn.getExpression() instanceof WindowedExpression);
-        WindowedExpression we = (WindowedExpression)windowedSchemaColumn.getExpression();
+    public final WindowedExpression getWindowedExpression() {
+        return m_windowedExpression;
+    }
+
+    public final void setWindowedExpression(WindowedExpression winExpr) {
+        m_windowedExpression = winExpr;
         m_aggregateOutputColumns.add(0);
-        m_aggregateTypes.add(we.getExpressionType());
+        m_aggregateTypes.add(winExpr.getExpressionType());
         m_aggregateDistinct.add(0);
         // This could be the first order by expression.  We currently
         // just support RANGE units, so there is only one order by expression.
@@ -99,7 +96,7 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         // to the plan node, as if we were doing it right.  We will fix it
         // up, which is to say, we will break it, in the EE.
         m_aggregateExpressions.add(null);
-        for (AbstractExpression expr : we.getPartitionByExpressions()) {
+        for (AbstractExpression expr : winExpr.getPartitionByExpressions()) {
             m_groupByExpressions.add(expr);
         }
     }
@@ -121,14 +118,14 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        WindowedExpression we = new WindowedExpression();
-        AbstractExpression.loadSortListFromJSONArray(we.getOrderByExpressions(), null, jobj);
-        we.setExpressionType(m_aggregateTypes.get(0));
+        WindowedExpression winExpr = new WindowedExpression();
+        AbstractExpression.loadSortListFromJSONArray(winExpr.getOrderByExpressions(), null, jobj);
+        winExpr.setExpressionType(m_aggregateTypes.get(0));
         // WE don't really care about the column and table
         // names and aliases.  These are not the ones from the
         // original expression, but we'll never use them to
         // look up things again.
-        m_windowedSchemaColumn = new SchemaColumn("WTN", "WTA", "WCN", "WCA", we);
+        m_windowedExpression = winExpr;
     }
 
     @Override
@@ -158,5 +155,5 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         return answer;
     }
 
-    private SchemaColumn       m_windowedSchemaColumn = null;
+    private WindowedExpression     m_windowedExpression = null;
 }

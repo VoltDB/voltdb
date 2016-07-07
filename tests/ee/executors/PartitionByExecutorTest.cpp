@@ -51,32 +51,17 @@
 
 #include "harness.h"
 
-#include "catalog/catalog.h"
 #include "catalog/cluster.h"
-#include "catalog/constraint.h"
-#include "catalog/database.h"
 #include "catalog/table.h"
-#include "common/tabletuple.h"
-#include "common/valuevector.h"
-#include "execution/VoltDBEngine.h"
-#include "expressions/abstractexpression.h"
-#include "indexes/tableindex.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/persistenttable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/tableutil.h"
 #include "test_utils/plan_testing_baseclass.h"
 #include "test_utils/LoadTableFrom.hpp"
 
-#include <cstdlib>
-#include <ctime>
-#include <unistd.h>
-#include <boost/shared_ptr.hpp>
 
 namespace {
-uint32_t random_seed = 0;
 const char *plan_strings[] = {
     //  Plan for this query:
     //      select ID, A, B, RANK() OVER ( PARTITION BY A ORDER BY B ) from AAA;
@@ -593,7 +578,9 @@ public:
      */
     PartitionByExecutorTest(uint32_t random_seed = (unsigned int)time(NULL))
         : m_AAA(NULL),
-          m_AAA_id(-1) {}
+          m_AAA_id(-1) {
+        initialize(catalog_string, random_seed);
+    }
 
     void initialize(const char *catalog_string,
                     uint32_t    random_seed = (uint32_t)time(NULL)) {
@@ -601,22 +588,10 @@ public:
         //
         // Get the tables we need.
         //
-        m_AAA = getPersistentTableAndId("AAA", &m_AAA_id);
-        assert(m_AAA);
-    }
+        const int NUM_ROWS_AAA   = 15;
+        const int NUM_COLS_AAA   = 3;
 
-    ~PartitionByExecutorTest() { }
-protected:
-    voltdb::PersistentTable *m_AAA;
-    int                      m_AAA_id;
-};
-
-TEST_F(PartitionByExecutorTest, testPartitionBy) {
-    const int NUM_ROWS = 15;
-    const int NUM_INPUT_COLS   = 3;
-    const int NUM_OUTPUT_COLS = NUM_INPUT_COLS + 1;
-
-    int32_t input[NUM_ROWS][NUM_INPUT_COLS] = {
+        int32_t input_AAA[NUM_ROWS_AAA][NUM_COLS_AAA] = {
             {  1,  10,  101},
             {  1,  10,  102},
             {  1,  20,  201},
@@ -632,8 +607,21 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  3,  20,  201},
             {  3,  20,  202},
             {  3,  30,  301}
-    };
-    int32_t output[NUM_ROWS][NUM_OUTPUT_COLS] = {
+        };
+        initializeTableOfInt("AAA", m_AAA, m_AAA_id, NUM_ROWS_AAA, NUM_COLS_AAA, (int32_t *)input_AAA);
+    }
+
+    ~PartitionByExecutorTest() { }
+protected:
+    voltdb::PersistentTable *m_AAA;
+    int                      m_AAA_id;
+};
+
+TEST_F(PartitionByExecutorTest, testPartitionBy) {
+    const int NUM_ROWS = 15;
+    const int NUM_COLS =  4;
+
+    int32_t output[NUM_ROWS][NUM_COLS] = {
             {  1,  10,  101,   1},
             {  1,  10,  102,   1},
             {  1,  20,  201,   3},
@@ -650,12 +638,33 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  3,  20,  202,   3},
             {  3,  30,  301,   5}
     };
-    initialize(catalog_string, random_seed);
-    initializeTableOfInt(m_AAA, NUM_ROWS, NUM_INPUT_COLS, (int32_t *)input);
     executeFragment(100, plan_strings[0]);
-    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS);
+    validateResult((int32_t *)output, NUM_ROWS, NUM_COLS);
+}
+
+TEST_F(PartitionByExecutorTest, testOrderedPartitionBy) {
+    const int NUM_ROWS = 15;
+    const int NUM_COLS =  4;
+
+    int32_t output[NUM_ROWS][NUM_COLS] = {
+            {  1,  10,  101,   1},
+            {  1,  10,  102,   1},
+            {  1,  20,  201,   3},
+            {  1,  20,  202,   3},
+            {  1,  30,  301,   5},
+            {  2,  10,  101,   1},
+            {  2,  10,  102,   1},
+            {  2,  20,  201,   3},
+            {  2,  20,  202,   3},
+            {  2,  30,  301,   5},
+            {  3,  10,  101,   1},
+            {  3,  10,  102,   1},
+            {  3,  20,  201,   3},
+            {  3,  20,  202,   3},
+            {  3,  30,  301,   5}
+    };
     executeFragment(100, plan_strings[1]);
-    validateResult((int32_t *)output, NUM_ROWS, NUM_OUTPUT_COLS);
+    validateResult((int32_t *)output, NUM_ROWS, NUM_COLS);
 }
 
 int main() {
