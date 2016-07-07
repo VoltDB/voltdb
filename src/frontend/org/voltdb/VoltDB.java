@@ -17,29 +17,40 @@
 
 package org.voltdb;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
+import java.util.UUID;
 
+import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
 
 /**
@@ -48,13 +59,12 @@ import com.google_voltpatches.common.net.HostAndPort;
 public class VoltDB {
 
     /** Global constants */
+    public static final int DISABLED_PORT = Constants.UNDEFINED;
+    public static final int UNDEFINED = Constants.UNDEFINED;
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
-    public static final int DEFAULT_INTERNAL_PORT = 3021;
-    public static final int DEFAULT_ZK_PORT = 7181;
     public static final int DEFAULT_IPC_PORT = 10000;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
-    public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
@@ -62,6 +72,13 @@ public class VoltDB {
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
+
+    // Staged filenames for advanced deployments
+    public static final String INITIALIZED_MARKER = ".initialized";
+    public static final String STAGED_MESH = "_MESH";
+    public static final String CONFIG_DIR = "config";
+    public static final String DEFAULT_CLUSTER_NAME = "database";
+    public static final String DBROOT = Constants.DBROOT;
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -131,31 +148,30 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        public String m_zkInterface = "127.0.0.1:" + VoltDB.DEFAULT_ZK_PORT;
+        public String m_zkInterface = "127.0.0.1:" + org.voltcore.common.Constants.DEFAULT_ZK_PORT;
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
         public String m_clientInterface = "";
 
         /** override for the admin port number in the deployment file */
-        public int m_adminPort = -1;
+        public int m_adminPort = DISABLED_PORT;
         public String m_adminInterface = "";
 
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
 
         /** port number to use to build intra-cluster mesh */
-        public int m_internalPort = DEFAULT_INTERNAL_PORT;
-        public String m_internalPortInterface = DEFAULT_INTERNAL_INTERFACE;
+        public int m_internalPort = org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT;
 
         /** interface to listen to clients on (default: any) */
         public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
 
         /** interface to use for backchannel comm (default: any) */
-        public String m_internalInterface = DEFAULT_INTERNAL_INTERFACE;
+        public String m_internalInterface = org.voltcore.common.Constants.DEFAULT_INTERNAL_INTERFACE;
 
         /** port number to use for DR channel (override in the deployment file) */
-        public int m_drAgentPortStart = -1;
+        public int m_drAgentPortStart = DISABLED_PORT;
         public String m_drInterface = "";
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
@@ -222,7 +238,14 @@ public class VoltDB {
 
         /** Placement group */
         public String m_placementGroup = null;
+
         public boolean m_isPaused = false;
+
+        private final static void referToDocAndExit() {
+            System.out.println("Please refer to VoltDB documentation for command line usage.");
+            System.out.flush();
+            exit(-1);
+        }
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -241,8 +264,32 @@ public class VoltDB {
         /** Allow starting voltdb with non-empty managed directories. */
         public boolean m_forceVoltdbCreate = false;
 
+        /** cluster name designation */
+        public String m_clusterName = DEFAULT_CLUSTER_NAME;
+
+        /** command line provided voltdbroot */
+        public File m_voltdbRoot = new VoltFile(DBROOT);
+
+        /** configuration UUID */
+        public final UUID m_configUUID = UUID.randomUUID();
+
+        /** holds a list of comma separated mesh formation coordinators */
+        public String m_meshBrokers = null;
+
+        /** holds a set of mesh formation coordinators */
+        public NavigableSet<String> m_coordinators = ImmutableSortedSet.of();
+
+        /** number of hosts that participate in a VoltDB cluster */
+        public int m_hostCount = UNDEFINED;
+
+        /** allow elastic joins */
+        public boolean m_enableAdd = false;
+
+        /** apply safe mode strategy when recovering */
+        public boolean m_safeMode = false;
+
         public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
+            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
         }
 
         public Configuration(PortGenerator ports) {
@@ -255,6 +302,7 @@ public class VoltDB {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
+            m_coordinators = MeshProber.hosts(m_internalPort);
         }
 
         public Configuration(String args[]) {
@@ -275,9 +323,7 @@ public class VoltDB {
                     // VoltDB to offer help that isn't possibly quite wrong.
                     // You can probably get here using the legacy voltdb3 script. The usage
                     // is now a comment in that file.
-                    System.out.println("Please refer to VoltDB documentation for command line usage.");
-                    System.out.flush();
-                    System.exit(-1);
+                    referToDocAndExit();
                 }
 
                 if (arg.equals("noloadlib")) {
@@ -328,7 +374,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
-                        m_internalPortInterface = hap.getHostText();
+                        m_internalInterface = hap.getHostText();
                         m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
@@ -355,11 +401,32 @@ public class VoltDB {
                     //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
-                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ZK_PORT);
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
                         m_zkInterface = hap.getHostText() + ":" + hap.getPort();
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
+                } else if (arg.equals("mesh")) {
+                    StringBuilder sbld = new StringBuilder(64);
+                    while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
+                        sbld.append(args[i]);
+                    }
+                    if (i < args.length) {
+                        sbld.append(args[i]);
+                    }
+                    m_meshBrokers = sbld.toString();
+                } else if (arg.startsWith("mesh ")) {
+                    int next = i + 1;
+                    StringBuilder sbld = new StringBuilder(64).append(arg.substring("mesh ".length()));
+                    while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
+                        sbld.append(args[i]);
+                    }
+                    if (i > next && i < args.length) {
+                        sbld.append(args[i]);
+                    }
+                    m_meshBrokers = sbld.toString();
+                } else if (arg.equals("hostcount")) {
+                    m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {
@@ -417,14 +484,27 @@ public class VoltDB {
                     m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
 
+                else if (arg.equals("initialize")) {
+                    m_startAction = StartAction.INITIALIZE;
+                }
+                else if (arg.equals("probe")) {
+                    m_startAction = StartAction.PROBE;
+                    if (   args.length > i + 1
+                            && args[i+1].trim().equals("safemode")) {
+                            i += 1;
+                            m_safeMode = true;
+                        }
+                }
                 else if (arg.equals("create")) {
                     m_startAction = StartAction.CREATE;
-                } else if (arg.equals("recover")) {
+                }
+                else if (arg.equals("recover")) {
                     m_startAction = StartAction.RECOVER;
                     if (   args.length > i + 1
                         && args[i+1].trim().equals("safemode")) {
                         m_startAction = StartAction.SAFE_RECOVER;
                         i += 1;
+                        m_safeMode = true;
                     }
                 } else if (arg.equals("rejoin")) {
                     m_startAction = StartAction.REJOIN;
@@ -434,9 +514,10 @@ public class VoltDB {
                     m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
-                }
-
-                else if (arg.equals("replica")) {
+                    m_enableAdd = true;
+                } else if (arg.equals("noadd")) {
+                    m_enableAdd = false;
+                } else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -489,16 +570,30 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
-                else if (arg.equalsIgnoreCase("force"))
+                else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
-                else if (arg.equalsIgnoreCase("paused")) {
+                } else if (arg.equalsIgnoreCase("paused")) {
                     //Start paused.
                     m_isPaused = true;
-                } else {
-                    hostLog.fatal("Unrecognized option to VoltDB: " + arg);
-                    System.out.println("Please refer to VoltDB documentation for command line usage.");
-                    System.out.flush();
-                    System.exit(-1);
+                } else if (arg.equalsIgnoreCase("voltdbroot")) {
+                    m_voltdbRoot = new VoltFile(args[++i]);
+                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                    }
+                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
+                        System.err.println("FATAL: Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
+                        referToDocAndExit();
+                    }
+                    try {
+                        CatalogUtil.validateDirectory(DBROOT, m_voltdbRoot);
+                    } catch (RuntimeException e) {
+                        System.err.println("FATAL: " + e.getMessage());
+                        referToDocAndExit();
+                    }
+                }
+                else {
+                    System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
+                    referToDocAndExit();
                 }
             }
 
@@ -506,13 +601,17 @@ public class VoltDB {
                 m_httpPortInterface = m_publicInterface;
             }
 
+            // set file logger root file directory. From this point on you can use loggers
+            if (m_startAction != null && !m_startAction.isLegacy()) {
+                VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
+            }
+
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
-                System.out.println("Please refer to VoltDB documentation for command line usage.");
-                System.out.flush();
-                System.exit(-1);
+                hostLog.fatal("You must specify a startup action, either initialize, probe, create, recover, rejoin, collect, or compile.");
+                referToDocAndExit();
             }
+
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
@@ -526,9 +625,109 @@ public class VoltDB {
              * the start action is not rejoin and leader is null, supply the
              * only valid leader value ("localhost").
              */
-            if (m_leader == null && m_pathToDeployment == null &&
-                !m_startAction.doesRejoin()) {
+            if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
+            }
+
+            if (m_startAction == StartAction.PROBE) {
+                checkInitializationMarker();
+            } else if (m_startAction == StartAction.JOIN && isInitialized()) {
+                m_startAction = StartAction.PROBE;
+                m_enableAdd = true;
+                checkInitializationMarker();
+            } else if (m_startAction == StartAction.INITIALIZE) {
+                if (isInitialized() && !m_forceVoltdbCreate) {
+                    hostLog.fatal(m_voltdbRoot + " is already initialized"
+                            + "\nUse the start command to start the initialized database or use init --force"
+                            + " to initialize a new database overwriting existing files.");
+                    referToDocAndExit();
+                }
+            } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                if (m_leader != null) {
+                    m_meshBrokers = m_leader;
+                }
+            }
+            if (m_meshBrokers != null) {
+                m_coordinators = MeshProber.hosts(m_meshBrokers);
+                if (m_leader == null) {
+                    m_leader = m_coordinators.first();
+                }
+            }
+            if (m_startAction == StartAction.PROBE && m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
+                m_hostCount = m_coordinators.size();
+            }
+        }
+
+        private boolean isInitialized() {
+            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
+        }
+
+        /**
+         * Checks for the initialization marker on initialized voltdbroot directory
+         */
+        private void checkInitializationMarker() {
+
+            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
+            File configCFH = null;
+            File optCFH = null;
+
+            if (m_pathToDeployment != null && !m_pathToDeployment.trim().isEmpty()) {
+                try {
+                    configCFH = deploymentFH.getCanonicalFile();
+                } catch (IOException e) {
+                    hostLog.fatal("Could not resolve file location " + deploymentFH, e);
+                    referToDocAndExit();
+                }
+                try {
+                    optCFH = new VoltFile(m_pathToDeployment).getCanonicalFile();
+                } catch (IOException e) {
+                    hostLog.fatal("Could not resolve file location " + optCFH, e);
+                    referToDocAndExit();
+                }
+                if (!configCFH.equals(optCFH)) {
+                    hostLog.fatal("In probe startup mode you may only specify " + deploymentFH + " for deployment");
+                    referToDocAndExit();
+                }
+            } else {
+                m_pathToDeployment = deploymentFH.getPath();
+            }
+
+            if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
+                hostLog.fatal("Probe startup mode requires an already initialized VoltDB instance");
+                referToDocAndExit();
+            }
+
+            String stagedName = null;
+            try (BufferedReader br = new BufferedReader(new FileReader(inzFH))) {
+                stagedName = br.readLine();
+            } catch (IOException e) {
+                hostLog.fatal("Unable to access initialization marker at " + inzFH, e);
+                referToDocAndExit();
+            }
+
+            if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
+                hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
+                referToDocAndExit();
+            } else {
+                m_clusterName = stagedName;
+            }
+            try {
+                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                    File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
+                    if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
+                        try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
+                            m_meshBrokers = br.readLine();
+                        } catch (IOException e) {
+                            hostLog.fatal("Unable to read cluster name given at initialization from " + inzFH, e);
+                            referToDocAndExit();
+                        }
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                hostLog.fatal("Unable to validate mesh argument \"" + m_meshBrokers + "\"", e);
+                referToDocAndExit();
             }
         }
 
@@ -542,11 +741,10 @@ public class VoltDB {
             boolean isValid = true;
 
             if (m_startAction == null) {
-                    isValid = false;
-                    hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
-                }
-
-            if (m_leader == null) {
+                isValid = false;
+                hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
+            }
+            if (m_leader == null && m_startAction != StartAction.INITIALIZE) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
@@ -559,21 +757,35 @@ public class VoltDB {
                 msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
-
+            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE));
             // require deployment file location
-            if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
-                    && m_startAction != StartAction.JOIN) {
+            if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
-                if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
+                if (m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
                 }
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            if (m_isPaused && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
+            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
+            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+            }
+            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+                isValid = false;
+                hostLog.fatal("Coordinator hosts are missing");
+            }
+
+            if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
+                isValid = false;
+                hostLog.fatal("Option \"hostcount\" may only be specified when the start action is probe");
+            }
+            if (m_startAction == StartAction.JOIN && !m_enableAdd) {
+                isValid = false;
+                hostLog.fatal("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
             return isValid;
         }
@@ -1016,6 +1228,24 @@ public class VoltDB {
     @Override
     public Object clone() throws CloneNotSupportedException {
         throw new CloneNotSupportedException();
+    }
+
+    public static class SimulatedExitException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final int status;
+        public SimulatedExitException(int status) {
+            this.status = status;
+        }
+        public int getStatus() {
+            return status;
+        }
+    }
+
+    public static void exit(int status) {
+        if (isThisATest() || ignoreCrash) {
+            throw new SimulatedExitException(status);
+        }
+        System.exit(status);
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();

@@ -48,8 +48,9 @@
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
 #include "executors/abstractexecutor.h"
-#include "executors/executorutil.h"
 #include "plannodes/abstractplannode.h"
+#include "plannodes/abstractplannode.h"
+#include "executors/executorfactory.h"
 
 #include "boost/foreach.hpp"
 

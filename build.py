@@ -261,8 +261,10 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
+ abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
+ executorfactory.cpp
  executorutil.cpp
  indexcountexecutor.cpp
  indexscanexecutor.cpp
@@ -367,6 +369,7 @@ CTX.INPUT['storage'] = """
  TableStreamer.cpp
  TableStreamerContext.cpp
  tableutil.cpp
+ tabletuplefilter.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleBlock.cpp

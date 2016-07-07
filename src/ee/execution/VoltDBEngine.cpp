@@ -70,7 +70,6 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "executors/abstractexecutor.h"
-#include "executors/executorutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"
@@ -160,8 +159,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_templateSingleLongTable(NULL),
       m_topend(topend),
       m_executorContext(NULL),
-      m_drPartitionedConflictExportTable(NULL),
-      m_drReplicatedConflictExportTable(NULL),
+      m_drPartitionedConflictStreamedTable(NULL),
+      m_drReplicatedConflictStreamedTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_compatibleDRStream(NULL),
@@ -717,8 +716,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
     std::map<std::string, catalog::Column*>::const_iterator outerIter;
     for (outerIter = t1->columns().begin();
          outerIter != t1->columns().end();
-         outerIter++)
-    {
+         outerIter++) {
         int index = outerIter->second->index();
         int size = outerIter->second->size();
         int32_t type = outerIter->second->type();
@@ -849,17 +847,17 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
              * which will cause it to notify the topend export data source
              * that no more data is coming for the previous generation
              */
-            StreamedTable *streamedtable = tcd->getStreamedTable();
-            if (streamedtable) {
-                streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+            StreamedTable *streamedTable = tcd->getStreamedTable();
+            if (streamedTable) {
+                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 if (!tcd->exportEnabled()) {
                     // Evaluate export enabled or not and cache it on the tcd.
                     tcd->evaluateExport(*m_database, *catalogTable);
                     // If enabled hook up streamer
-                    if (tcd->exportEnabled() && streamedtable->enableStream()) {
+                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
                         //Reset generation after stream wrapper is created.
-                        streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        m_exportingTables[catalogTable->signature()] = streamedtable;
+                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                        m_exportingTables[catalogTable->signature()] = streamedTable;
                     }
                 }
 
@@ -870,7 +868,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 
                 const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
 
-                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
+                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedTable->views(),
                         views.begin(), views.end(),
                         survivingInfos, survivingViews, obsoleteViews);
 
@@ -891,12 +889,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     }
                     // This is not a leak -- the view metadata is self-installing into the new table.
                     // Also, it guards its targetTable from accidental deletion with a refcount bump.
-                    MaterializedViewTriggerForStreamInsert::build(streamedtable, targetTable, currInfo);
+                    MaterializedViewTriggerForStreamInsert::build(streamedTable, targetTable, currInfo);
                     obsoleteViews.push_back(survivingViews[ii]);
                 }
 
                 BOOST_FOREACH (MaterializedViewTriggerForStreamInsert * toDrop, obsoleteViews) {
-                    streamedtable->dropMaterializedView(toDrop);
+                    streamedTable->dropMaterializedView(toDrop);
                 }
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
@@ -980,8 +978,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
-                                                      persistentTable->name(),
-                                                      foundIndex->relativeIndex());
+                                                      persistentTable->name());
                 }
             }
 
@@ -1197,11 +1194,10 @@ void VoltDBEngine::rebuildTableCollections()
         m_tables[relativeIndexOfTable] = localTable;
         m_tablesByName[tcd->getTable()->name()] = localTable;
 
-        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                                              relativeIndexOfTable,
-                                              localTable->getTableStats());
+        TableStats* stats;
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
+            stats = persistentTable->getTableStats();
             if (!tcd->materialized()) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 m_tablesBySignatureHash[hash] = persistentTable;
@@ -1215,11 +1211,18 @@ void VoltDBEngine::rebuildTableCollections()
                                                       index->getIndexStats());
             }
         }
+        else {
+            stats = tcd->getStreamedTable()->getTableStats();
+        }
+        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                              relativeIndexOfTable,
+                                              stats);
+
     }
-    resetExportConflictTables();
+    resetDRConflictStreamedTables();
 }
 
-void VoltDBEngine::resetExportConflictTables()
+void VoltDBEngine::resetDRConflictStreamedTables()
 {
     if (getIsActiveActiveDREnabled()) {
         // These tables that go by well-known names SHOULD exist in an active-active
@@ -1227,17 +1230,17 @@ void VoltDBEngine::resetExportConflictTables()
         // VoltDBEngine implementations, so avoid asserting that they exist.
         // DO assert that if the well-known streamed table exists, it has the right type.
         Table* wellKnownTable = getTable(DR_PARTITIONED_CONFLICT_TABLE_NAME);
-        m_drPartitionedConflictExportTable =
+        m_drPartitionedConflictStreamedTable =
             dynamic_cast<StreamedTable*>(wellKnownTable);
-        assert(m_drPartitionedConflictExportTable == wellKnownTable);
+        assert(m_drPartitionedConflictStreamedTable == wellKnownTable);
         wellKnownTable = getTable(DR_REPLICATED_CONFLICT_TABLE_NAME);
-        m_drReplicatedConflictExportTable =
+        m_drReplicatedConflictStreamedTable =
             dynamic_cast<StreamedTable*>(wellKnownTable);
-        assert(m_drReplicatedConflictExportTable == wellKnownTable);
+        assert(m_drReplicatedConflictStreamedTable == wellKnownTable);
     }
     else {
-        m_drPartitionedConflictExportTable = NULL;
-        m_drReplicatedConflictExportTable = NULL;
+        m_drPartitionedConflictStreamedTable = NULL;
+        m_drReplicatedConflictStreamedTable = NULL;
     }
 }
 

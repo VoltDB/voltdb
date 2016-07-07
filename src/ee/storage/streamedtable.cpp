@@ -28,16 +28,20 @@
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include <sstream>
+#include <algorithm>    // std::find
 #include <cassert>
 #include <cstdio>
-#include <algorithm>    // std::find
+#include <sstream>
 
 using namespace voltdb;
 
 StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
-    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
-      m_sequenceNo(0), m_partitionColumn(partitionColumn)
+    : Table(1)
+    , m_stats(this)
+    , m_executorContext(ExecutorContext::getExecutorContext())
+    , m_wrapper(NULL)
+    , m_sequenceNo(0)
+    , m_partitionColumn(partitionColumn)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
@@ -46,8 +50,12 @@ StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
 }
 
 StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
-    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
-    m_sequenceNo(0), m_partitionColumn(-1)
+    : Table(1)
+    , m_stats(this)
+    , m_executorContext(ExecutorContext::getExecutorContext())
+    , m_wrapper(wrapper)
+    , m_sequenceNo(0)
+    , m_partitionColumn(-1)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
@@ -75,13 +83,11 @@ bool StreamedTable::enableStream() {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view)
-{
+void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view) {
     m_views.push_back(view);
 }
 
-void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView)
-{
+void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView) {
     assert( ! m_views.empty());
     MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
     if (targetView != lastView) {
@@ -96,8 +102,7 @@ void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert*
     delete targetView;
 }
 
-StreamedTable::~StreamedTable()
-{
+StreamedTable::~StreamedTable() {
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
     for (int i = 0; i < m_views.size(); i++) {
@@ -151,7 +156,8 @@ bool StreamedTable::insertTuple(TableTuple &source)
             return true;
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
-    } else {
+    }
+    else {
         // handle any materialized views even though we dont have any connector.
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
@@ -160,14 +166,12 @@ bool StreamedTable::insertTuple(TableTuple &source)
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
-{
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
 }
 
-void StreamedTable::flushOldTuples(int64_t timeInMillis)
-{
+void StreamedTable::flushOldTuples(int64_t timeInMillis) {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
                                  m_executorContext->m_lastCommittedSpHandle);
@@ -183,8 +187,7 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
     }
 }
 
-void StreamedTable::undo(size_t mark)
-{
+void StreamedTable::undo(size_t mark) {
     if (m_wrapper) {
         m_wrapper->rollbackTo(mark, SIZE_MAX);
         //Decrementing the sequence number should make the stream of tuples
@@ -192,10 +195,6 @@ void StreamedTable::undo(size_t mark)
         //then having gaps.
         m_sequenceNo--;
     }
-}
-
-TableStats *StreamedTable::getTableStats() {
-    return &stats_;
 }
 
 size_t StreamedTable::allocatedBlockCount() const {

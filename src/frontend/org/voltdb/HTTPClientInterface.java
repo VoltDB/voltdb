@@ -39,6 +39,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
@@ -342,6 +343,10 @@ public class HTTPClientInterface {
 
     public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
         return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, procName, args);
+    }
+
+    public boolean callProcedure(final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(user, adminMode, timeout, cb, procName, args);
     }
 
     Configuration getVoltDBConfig() {

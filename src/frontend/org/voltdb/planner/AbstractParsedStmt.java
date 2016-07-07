@@ -620,7 +620,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      * Add a table to the statement cache.
-     * @param tableName
+     * @param table
      * @param tableAlias
      * @return the cache entry
      */
@@ -636,7 +636,7 @@ public abstract class AbstractParsedStmt {
 
     /**
      * Add a sub-query to the statement cache.
-     * @param subQuery
+     * @param subquery
      * @param tableAlias
      * @return the cache entry
      */
@@ -1123,10 +1123,6 @@ public abstract class AbstractParsedStmt {
 
             JoinType joinType = JoinType.get(tableNode.attributes.get("jointype"));
             assert(joinType != JoinType.INVALID);
-            if (joinType == JoinType.FULL) {
-                throw new PlanningErrorException("VoltDB does not support full outer joins");
-            }
-
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
        }

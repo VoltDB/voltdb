@@ -216,6 +216,7 @@ private:
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
 
+    // default iterator
     TableIterator m_iter;
 
     virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
@@ -302,7 +303,7 @@ public:
 
     TableIndex *primaryKeyIndex() const { return m_pkeyIndex; }
 
-    void configureIndexStats(CatalogId databaseId);
+    void configureIndexStats();
 
     // mutating indexes
     void addIndex(TableIndex *index);
@@ -525,13 +526,17 @@ public:
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
     MaterializedViewHandler *materializedViewHandler() const { return m_mvHandler; }
-
     Table* deltaTable() const { return m_deltaTable; }
     bool isDeltaTableActive() { return m_deltaTableActive; }
 
+    // STATS
+    TableStats* getTableStats() {  return &m_stats; };
+
+    std::vector<uint64_t> getBlockAddresses() const;
+
 private:
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
+    PersistentTable(int partitionColumn, const char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -669,7 +674,6 @@ private:
 
     // STATS
     PersistentTableStats m_stats;
-    TableStats* getTableStats();
 
     // STORAGE TRACKING
 
