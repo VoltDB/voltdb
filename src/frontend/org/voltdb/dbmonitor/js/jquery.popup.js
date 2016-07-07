@@ -358,6 +358,15 @@
 		        });
 		    }
 
+            var warningLastTabBtn = $("a[id='btnWarningLastTabOk']");
+		    if (warningLastTabBtn != undefined) {
+		        warningLastTabBtn.unbind('click');
+		        warningLastTabBtn.bind('click', function (e) {
+		            p.close();
+		            e.preventDefault();
+		        });
+		    }
+
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content
