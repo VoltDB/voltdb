@@ -19,7 +19,7 @@ $(document).ready(function () {
 
     //clear the localStorage for DataTables in DR Section
     $.each(localStorage, function(key, value){
-        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'){
+        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails' && key != 'memoryDetails' && key != 'transDetails' && key != 'partitionDetails' && key != 'latency'){
             localStorage.removeItem(key)
         }
     });
