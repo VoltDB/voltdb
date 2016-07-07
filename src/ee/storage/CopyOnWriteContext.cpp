@@ -40,9 +40,8 @@ CopyOnWriteContext::CopyOnWriteContext(
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
-             m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
-                                                               "COW of " + table.name(),
-                                                               &table, NULL)),
+             m_backedUpTuples(TableFactory::buildCopiedTempTable("COW of " + table.name(),
+                                                                 &table, NULL)),
              m_pool(2097152, 320),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
@@ -342,7 +341,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
         }
         else {
             m_updates++;
-            m_backedUpTuples->insertTupleNonVirtualWithDeepCopy(tuple, &m_pool);
+            m_backedUpTuples->insertTempTupleDeepCopy(tuple, &m_pool);
         }
     } else {
         tuple.setDirtyFalse();

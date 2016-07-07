@@ -84,10 +84,10 @@
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include <sstream>
+#include <algorithm>    // std::find
 #include <cassert>
 #include <cstdio>
-#include <algorithm>    // std::find
+#include <sstream>
 
 namespace voltdb {
 void* keyTupleStorage = NULL;
@@ -112,7 +112,7 @@ private:
     TableTuple &m_target;
 };
 
-PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
+PersistentTable::PersistentTable(int partitionColumn, const char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
     m_allowNulls(),
@@ -152,7 +152,6 @@ void PersistentTable::initializeWithColumns(TupleSchema *schema,
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
     if (hiddenColumnCount == 1) {
         m_drTimestampColumnIndex = 0; // The first hidden column
-
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.
     }
@@ -391,12 +390,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const double blockLoadFactor = m_data.begin().data()->loadFactor();
         if ((!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) ||
             (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) {
-            return deleteAllTuples(true, fallible);
+            deleteAllTuples(true, fallible);
+            return;
         }
     }
     // For MAT view don't optimize, needs more work - ENG-10323.
     if (m_isMaterialized) {
-        return deleteAllTuples(true);
+        deleteAllTuples(true);
+        return;
     }
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
@@ -1048,7 +1049,7 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType)
         if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
             // Looking up a tuple by values should not include any internal
             // hidden column values, which are appended to the end of the
-            // tuple
+            // tuple.
             tuple_length = m_schema->offsetOfHiddenColumns();
         }
         else {
@@ -1238,10 +1239,6 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
     }
 }
 
-TableStats* PersistentTable::getTableStats() {
-    return &m_stats;
-}
-
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
     TupleSerializer &tupleSerializer,
@@ -1280,9 +1277,8 @@ bool PersistentTable::activateStream(
  * Use custom TableStreamer provided.
  * Return true on success or false if it was already active.
  */
-bool PersistentTable::activateWithCustomStreamer(
-        TupleSerializer &tupleSerializer,
-        TableStreamType streamType,
+bool PersistentTable::activateWithCustomStreamer(TupleSerializer &tupleSerializer,
+                                                 TableStreamType streamType,
         boost::shared_ptr<TableStreamerInterface> tableStreamer,
         CatalogId tableId,
         std::vector<std::string> &predicateStrings,
@@ -1713,6 +1709,15 @@ void PersistentTable::computeSmallestUniqueIndex() {
     }
 }
 
+std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
+    std::vector<uint64_t> blockAddresses;
+    blockAddresses.reserve(m_data.size());
+    for (TBMap::const_iterator i = m_data.begin(); i != m_data.end(); ++i) {
+        blockAddresses.push_back((uint64_t)i->second->address());
+    }
+    return blockAddresses;
+}
+
 #ifdef DEBUG
 static bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
     BOOST_FOREACH(TableIndex *existingIndex, indexes) {
@@ -1795,14 +1800,12 @@ void PersistentTable::setPrimaryKeyIndex(TableIndex *index) {
     m_pkeyIndex = index;
 }
 
-void PersistentTable::configureIndexStats(CatalogId databaseId) {
+void PersistentTable::configureIndexStats() {
     // initialize stats for all the indexes for the table
     BOOST_FOREACH(TableIndex *index, m_indexes) {
         index->getIndexStats()->configure(index->getName() + " stats",
-                                          name(),
-                                          databaseId);
+                                          name());
     }
-
 }
 
 } // namespace voltdb

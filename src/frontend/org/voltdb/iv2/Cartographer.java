@@ -34,7 +34,6 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -561,5 +560,4 @@ public class Cartographer extends StatsSource
         }
         return true;
     }
-
 }
