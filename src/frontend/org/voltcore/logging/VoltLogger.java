@@ -19,6 +19,7 @@ package org.voltcore.logging;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -89,10 +90,32 @@ public class VoltLogger {
             }
             // Any logging that falls after the official shutdown flush of the
             // asynch logger can just fall back to synchronous on the caller thread.
+            m_asynchLoggerPool.shutdown();
+            try {
+                m_asynchLoggerPool.awaitTermination(365, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Unable to shutdown VoltLogger", e);
+            }
             m_asynchLoggerPool = null;
         }
     }
 
+    public static synchronized void startAsynchronousLogging(){
+        if (m_asynchLoggerPool == null && !Boolean.getBoolean("DISABLE_ASYNC_LOGGING")) {
+            m_asynchLoggerPool = new ThreadPoolExecutor(
+               1, 1, 0L, TimeUnit.MILLISECONDS,
+               new LinkedBlockingQueue<Runnable>(),
+               new LoggerThreadFactory());
+            try {
+                m_asynchLoggerPool.submit(new Runnable() {
+                    @Override
+                    public void run() {}
+                }).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException("Unable to prime asynchronous logging", e);
+            }
+        }
+    }
 
     /**
      * Abstraction of core functionality shared between Log4j and

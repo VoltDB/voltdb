@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.management.ManagementFactory;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -58,8 +59,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
-import jsr166y.LinkedTransferQueue;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 
@@ -73,6 +72,8 @@ import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import jsr166y.LinkedTransferQueue;
 
 public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
@@ -975,6 +976,7 @@ public class CoreUtils {
     }
 
     public static final class RetryException extends Exception {
+        private static final long serialVersionUID = 3651804109132974056L;
         public RetryException() {};
         public RetryException(Throwable cause) {
             super(cause);
@@ -1150,4 +1152,50 @@ public class CoreUtils {
         return entries;
     }
 
+    /**
+     * @return the process pid if is available from the JVM's runtime bean
+     */
+    public static String getPID() {
+        String name = ManagementFactory.getRuntimeMXBean().getName();
+        int atat = name.indexOf('@');
+        if (atat == -1) {
+            return "(unavailable)";
+        }
+        return name.substring(0, atat);
+    }
+
+    /**
+     * Log (to the fatal logger) the list of ports in use.
+     * Uses "lsof -i" internally.
+     *
+     * @param log VoltLogger used to print output or warnings.
+     */
+    public static synchronized void printPortsInUse(VoltLogger log) {
+        try {
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = br.readLine();
+            log.fatal("Logging ports that are bound for listening, " +
+                      "this doesn't include ports bound by outgoing connections " +
+                      "which can also cause a failure to bind");
+            log.fatal("The PID of this process is " + getPID());
+            if (str != null) {
+                log.fatal(str);
+            }
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    log.fatal(str);
+                }
+            }
+        }
+        catch (Exception e) {
+            log.fatal("Unable to list ports in use at this time.");
+        }
+    }
 }

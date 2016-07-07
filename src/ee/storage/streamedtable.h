@@ -30,8 +30,6 @@ class MaterializedViewInfo;
 }
 
 namespace voltdb {
-
-// forward decl.
 class ExecutorContext;
 class ExportTupleStream;
 class MaterializedViewTriggerForStreamInsert;
@@ -120,17 +118,22 @@ public:
         return m_sequenceNo;
     }
 
-private:
-    // Stats
-    voltdb::TableStats *getTableStats();
+    // STATS
+    TableStats* getTableStats() {  return &m_stats; };
 
+    // No Op
+    std::vector<uint64_t> getBlockAddresses() const {
+        return std::vector<uint64_t>();
+    }
+
+private:
     // Just say 0
     size_t allocatedBlockCount() const;
 
     TBPtr allocateNextBlock();
     virtual void nextFreeTuple(TableTuple *tuple);
 
-    voltdb::StreamedTableStats stats_;
+    voltdb::StreamedTableStats m_stats;
     ExecutorContext *m_executorContext;
     ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
@@ -140,7 +143,6 @@ private:
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
-
 };
 
 }

@@ -257,7 +257,7 @@ public class MaterializedViewFixInfo {
 
         collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
-        AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
+        AbstractExpression aggPostExpr = ExpressionUtil.combinePredicates(aggPostExprs);
         // Add post filters for the reAggregation node.
         m_reAggNode.setPostPredicate(aggPostExpr);
 
@@ -390,10 +390,10 @@ public class MaterializedViewFixInfo {
             return null;
         }
 
-        // Collect all TVEs that need to be do re-aggregation in coordinator.
+        // Collect all TVEs that need re-aggregation in the coordinator.
         List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
         // Check where clause.
-        List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
+        List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
             List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
@@ -417,7 +417,7 @@ public class MaterializedViewFixInfo {
                 aggPostExprs.add(expr);
             }
         }
-        AbstractExpression remaningFilters = ExpressionUtil.combine(remaningExprs);
+        AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(remaningExprs);
         // Update new filters for the scanNode.
         return remaningFilters;
     }

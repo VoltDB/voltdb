@@ -26,8 +26,6 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -35,6 +33,8 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltDB extends TestCase {
 
@@ -106,13 +106,13 @@ public class TestVoltDB extends TestCase {
         String args21[] = {"create", "internalport", "localhost:7777"};
         VoltDB.Configuration cfg21 = new VoltDB.Configuration(args21);
         assertEquals(7777, cfg21.m_internalPort);
-        assertEquals("localhost", cfg21.m_internalPortInterface);
+        assertEquals("localhost", cfg21.m_internalInterface);
 
         //with override
         String args22[] = {"create", "internalinterface", "xxxxxx", "internalport", "localhost:7777"};
         VoltDB.Configuration cfg22 = new VoltDB.Configuration(args22);
         assertEquals(7777, cfg22.m_internalPort);
-        assertEquals("localhost", cfg22.m_internalPortInterface);
+        assertEquals("localhost", cfg22.m_internalInterface);
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that

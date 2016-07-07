@@ -79,12 +79,9 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Our output table should look exactly like our input table
         //
-        node->
-            setOutputTable(TableFactory::
-                       getCopiedTempTable(node->databaseId(),
-                                          node->getInputTable()->name(),
-                                          node->getInputTable(),
-                                          limits));
+        node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable()->name(),
+                                                                node->getInputTable(),
+                                                                limits));
         // pickup an inlined limit, if one exists
         limit_node =
             dynamic_cast<LimitPlanNode*>(node->
@@ -178,7 +175,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
             VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                        input_table->debug().c_str());
-            output_table->insertTupleNonVirtual(*it);
+            output_table->insertTempTuple(*it);
             pmp.countdownProgress();
             tuple_ctr += 1;
         }

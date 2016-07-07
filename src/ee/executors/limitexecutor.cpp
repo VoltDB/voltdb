@@ -75,10 +75,9 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         assert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTable()->name(),
-                                              node->getInputTable(),
-                                              limits));
+                           buildCopiedTempTable(node->getInputTable()->name(),
+                                                node->getInputTable(),
+                                                limits));
     }
     return true;
 }
