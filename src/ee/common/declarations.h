@@ -52,7 +52,7 @@
  */
 namespace voltdb {
 
-class CopyOnWriteContext;
+class SnapshotContext;
 class CopyOnWriteIterator;
 class AbstractDRTupleStream;
 class PersistentTable;

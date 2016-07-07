@@ -58,7 +58,7 @@ public class VoltTableUtil {
     // VoltTable status code to indicate null dependency table. Joining SPI replies to fragment
     // task messages with this.
     public static byte NULL_DEPENDENCY_STATUS = -1;
-    
+
     private static VoltTableUtilConfig config = null;
     private static VoltTable m_vt;
 
@@ -240,18 +240,18 @@ public class VoltTableUtil {
         }
         return columns;
     }
-    
+
     private static SQLCommandOutputFormatter m_outputFormatter = new SQLCommandOutputFormatterDefault();
-    
+
     public static void printVoltTableFromFile(String fileName) throws IOException {
-    	VoltTable vt = getTableFromFile(fileName);
-    	m_outputFormatter.printTable(System.out, vt, true);
+        VoltTable vt = getTableFromFile(fileName);
+        m_outputFormatter.printTable(System.out, vt, true);
     }
-    
+
     /**
      * Load a volt table from a file
      * @param fileTable table containing a the name of a volt table file
-     * @return a volt table 
+     * @return a volt table
      */
     public static VoltTable getTableFromFileTable(VoltTable fileTable) {
         String fileName = fileTable.fetchRow(0).getString("filenames");
@@ -259,7 +259,7 @@ public class VoltTableUtil {
     }
 
     /**
-     * 
+     *
      * @param fileName name of a volt table file
      * @return a volt table loaded with the file's table
      */
@@ -279,7 +279,7 @@ public class VoltTableUtil {
         vt.initFromBuffer(buf);
         return vt;
     }
-    
+
     /**
      * Configuration options.
      */
@@ -287,7 +287,7 @@ public class VoltTableUtil {
 
         @Option(shortOpt = "f", desc = "location of Volt Table input file")
         String file = "";
-        
+
         /**
          * Usage
          */
@@ -298,7 +298,7 @@ public class VoltTableUtil {
             super.printUsage();
         }
     }
-    
+
     /**
      * volttableutil main.
      *
@@ -309,9 +309,9 @@ public class VoltTableUtil {
      */
     public static void main(String[] args) throws IOException,
             InterruptedException {
-    	final VoltTableUtilConfig cfg = new VoltTableUtilConfig();
+        final VoltTableUtilConfig cfg = new VoltTableUtilConfig();
         cfg.parse(VoltTableUtil.class.getName(), args);
-        
+
         printVoltTableFromFile(cfg.file);
     }
 }

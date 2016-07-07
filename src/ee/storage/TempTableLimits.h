@@ -36,6 +36,11 @@ public:
         , m_logLatch(false)
     { }
 
+    void restoreSuspendedTransactionLimits(int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
+        m_currMemoryInBytes = currMemoryInBytes;
+        m_peakMemoryInBytes = peakMemoryInBytes;
+    }
+
     /**
      * Track an increase in the amount of memory accumulated in temp tables.
      * Log once at INFO level to the SQL instance if the log threshold is set and it is crossed.
@@ -46,6 +51,8 @@ public:
 
     int64_t getAllocated() const { return m_currMemoryInBytes; }
     int64_t getPeakMemoryInBytes() const { return m_peakMemoryInBytes; }
+    int64_t getLogThreshold() const { return m_logThreshold; }
+    int64_t getMemoryLimit() const { return m_memoryLimit; }
     void resetPeakMemory() { m_peakMemoryInBytes = m_currMemoryInBytes; }
 
 private:

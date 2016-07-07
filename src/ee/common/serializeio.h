@@ -223,6 +223,13 @@ public:
         current_ -= bytes;
     }
 
+    /** Move the read position to a specific position*/
+    void setPosition(const char * pos) {
+        assert(pos < end_);
+        // Validate that new pos is not before the beginning of the buffer?
+        current_ = pos;
+    }
+
     bool hasRemaining() {
         return current_ < end_;
     }

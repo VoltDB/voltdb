@@ -27,7 +27,7 @@ class PersistentTable;
 class PersistentTableSurgeon;
 
 class CopyOnWriteIterator : public TupleIterator {
-    friend class CopyOnWriteContext;
+    friend class ScanCopyOnWriteContext;
 
 public:
 

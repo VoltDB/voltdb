@@ -25,6 +25,7 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.ParameterSet;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -175,6 +176,11 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
+    }
+
+    @Override
+    public boolean activateCopyOnWriteContext(int tableId, CopyOnWriteType type) {
+        return false;
     }
 
     @Override

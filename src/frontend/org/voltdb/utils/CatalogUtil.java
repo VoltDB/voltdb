@@ -112,6 +112,7 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.LongReadsType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -649,6 +650,9 @@ public abstract class CatalogUtil {
             //Set the snapshot schedule
             setSnapshotInfo( catalog, deployment.getSnapshot());
 
+            //Set the long running read properties
+            setLongReadsInfo( catalog, deployment.getLongreads());
+
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
 
@@ -869,6 +873,11 @@ public abstract class CatalogUtil {
             SnapshotType snap = new SnapshotType();
             snap.setEnabled(false);
             deployment.setSnapshot(snap);
+        }
+        //longreads
+        if (deployment.getLongreads() == null) {
+            LongReadsType reads = new LongReadsType();
+            deployment.setLongreads(reads);
         }
         //Security
         if (deployment.getSecurity() == null) {
@@ -1676,6 +1685,17 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Set the long reads settings in the catalog from the deployment file
+     * @param catalog The catalog to be updated.
+     * @param longReadsSettings A reference to the <longreads> element of the deployment.xml file.
+     */
+    private static void setLongReadsInfo(Catalog catalog, LongReadsType longReadsSettings) {
+        final Cluster cluster = catalog.getClusters().get("cluster");
+        cluster.setLongreadstuplecount(longReadsSettings.getTuplecount());
+
+    }
+
+    /**
      * Set voltroot path, and set the path overrides for export overflow, partition, etc.
      * @param catalog The catalog to be updated.
      * @param paths A reference to the <paths> element of the deployment.xml file.
@@ -2344,6 +2364,16 @@ public abstract class CatalogUtil {
             }
         }
         return tableName;
+    }
+
+    public static int getTableIdFromName(Database catalog, String tableName) {
+        int tableId = -1;
+        for (Table table: catalog.getTables()) {
+            if (table.getTypeName().equals(tableName)) {
+                tableId = table.getRelativeIndex();
+            }
+        }
+        return tableId;
     }
 
     // Calculate the width of an index:

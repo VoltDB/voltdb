@@ -62,6 +62,7 @@ import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
+import org.voltdb.compiler.deploymentfile.LongReadsType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
@@ -271,6 +272,8 @@ public class VoltProjectBuilder {
     private String m_snapshotFrequency = null;
     private String m_pathToDeployment = null;
     private String m_voltRootPath = null;
+
+    private int m_lrrTupleCount = 1000;
 
     private boolean m_ppdEnabled = false;
     private String m_ppdPrefix = "none";
@@ -620,6 +623,10 @@ public class VoltProjectBuilder {
         m_snapshotRetain = retain;
         m_snapshotPrefix = prefix;
         m_snapshotPath = path;
+    }
+
+    public void setLongReadSettings(int tupleCount) {
+        m_lrrTupleCount = tupleCount;
     }
 
     public void setPartitionDetectionEnabled(boolean ppdEnabled) {
@@ -1024,6 +1031,11 @@ public class VoltProjectBuilder {
             snapshot.setPrefix(m_snapshotPrefix);
             snapshot.setRetain(m_snapshotRetain);
         }
+
+        // <longreads>
+        LongReadsType longreads = factory.createLongReadsType();
+        deployment.setLongreads(longreads);
+        longreads.setTuplecount(m_lrrTupleCount);
 
         SecurityType security = factory.createSecurityType();
         deployment.setSecurity(security);

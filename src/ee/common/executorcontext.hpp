@@ -35,6 +35,8 @@ extern const int64_t VOLT_EPOCH_IN_MILLIS;
 
 class AbstractExecutor;
 class AbstractDRTupleStream;
+class SavedContext;
+class TempTable;
 class VoltDBEngine;
 
 /*
@@ -88,6 +90,7 @@ class ExecutorContext {
         m_uniqueId = uniqueId;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
+        m_isResumed = false;
     }
 
     // data available via tick()
@@ -117,6 +120,10 @@ class ExecutorContext {
         m_executorsMap = executorsMap;
         assert(m_subqueryContextMap.empty());
     }
+
+    void restorePausedTables(int subqueryId, int pausedExecutorId, TempTable * tempTable);
+
+    void loadState(SavedContext * savedContext);
 
     static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
         return (clusterId << 49) | (uniqueId >> 14);
@@ -174,6 +181,11 @@ class ExecutorContext {
 
     void incrOutFileCount() {
         ++m_outFileCount;
+    }
+
+    /** Executed executors in last fragment */
+    int32_t executedCtr() {
+        return m_executedCtr;
     }
 
     /** Current or most recent sp handle */
@@ -237,13 +249,16 @@ class ExecutorContext {
         std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
 #endif
             m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
+#ifdef DEBUG
         assert(result.second);
+#endif
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 
-    Table* executeExecutors(int subqueryId);
-    Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+    int executeExecutors(int subqueryId);
+    int executeExecutors(const std::vector<AbstractExecutor*>& executorList,
                             int subqueryId);
+    Table * getLastTable(const std::vector<AbstractExecutor*>& executorList);
 
     Table* getSubqueryOutputTable(int subqueryId) const;
 
@@ -295,9 +310,12 @@ class ExecutorContext {
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
 
+    bool m_isResumed;
+
     std::string m_highVolumeDirPath;
     std::string m_outFileName;
     int m_outFileCount;
+    int m_executedCtr;
 
   public:
     int64_t m_lastCommittedSpHandle;

@@ -65,6 +65,7 @@
 #include "common/LegacyHashinator.h"
 #include "common/InterruptException.h"
 #include "common/RecoveryProtoMessage.h"
+#include "common/SavedContext.hpp"
 #include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
@@ -138,7 +139,8 @@ typedef boost::multi_index::multi_index_container<
 class EnginePlanSet : public PlanSet { };
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-    : m_currentIndexInBatch(0),
+    : m_savedContext(NULL),
+      m_currentIndexInBatch(0),
       m_allTuplesScanned(0),
       m_tuplesProcessedInBatch(0),
       m_tuplesProcessedInFragment(0),
@@ -165,6 +167,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_compatibleDRStream(NULL),
       m_compatibleDRReplicatedStream(NULL),
       m_currExecutorVec(NULL),
+      m_lastParamStart(0),
       m_tuplesModifiedStack()
 {
 }
@@ -244,6 +247,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drReplicatedStream,
                                             drClusterId,
                                             highVolumeDirPath);
+    m_savedContext = new SavedContext();
+    m_lastParamStart = 0;
     return true;
 }
 
@@ -377,6 +382,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 {
     // count failures
     int failures = 0;
+    int returnCode = ENGINE_ERRORCODE_SUCCESS;
+    bool unpause = (m_savedContext != NULL) && (m_savedContext->m_txnId == txnId);
 
     setUndoToken(undoToken);
 
@@ -384,9 +391,22 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
     m_tuplesProcessedSinceReport = 0;
+    m_currentIndexInBatch = 0;
 
-    for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
+    if (unpause) {
+        loadState();
+        serialize_in.setPosition(m_lastParamStart);
+        //* for debug */ std::cout << "Loaded txn: " << txnId <<
+        //* for debug */        " idx: " << m_currentIndexInBatch <<
+        //* for debug */        " processedSinceReport: " << m_tuplesProcessedSinceReport <<
+        //* for debug */        " allScanned: " << m_allTuplesScanned <<
+        //* for debug */        std::endl;
 
+    }
+
+    for (; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
+
+        m_lastParamStart = serialize_in.getRawPointer();
         m_usedParamcnt = serialize_in.readShort();
         if (m_usedParamcnt < 0) {
             throwFatalException("parameter count is negative: %d", m_usedParamcnt);
@@ -397,16 +417,24 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
             m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
         }
 
-        // success is 0 and error is 1.
-        if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
-                                inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
-                                txnId,
-                                spHandle,
-                                lastCommittedSpHandle,
-                                uniqueId,
-                                m_currentIndexInBatch == 0,
-                                m_currentIndexInBatch == (numFragments - 1))) {
+        // success is 0 and error is 1; pause is 2
+        returnCode = executePlanFragment(planfragmentIds[m_currentIndexInBatch],
+                inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
+                txnId,
+                spHandle,
+                lastCommittedSpHandle,
+                uniqueId,
+                m_currentIndexInBatch == 0,
+                m_currentIndexInBatch == (numFragments - 1),
+                unpause);
+        unpause = false;
+        if (returnCode == ENGINE_ERRORCODE_ERROR) {
             ++failures;
+            break;
+        }
+        else if (returnCode == ENGINE_ERRORCODE_PAUSE) {
+            // Save state, break
+            saveState();
             break;
         }
 
@@ -417,8 +445,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
-
-    return failures;
+    return returnCode;
 }
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
@@ -428,7 +455,8 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
                                       bool first,
-                                      bool last)
+                                      bool last,
+                                      bool unpause)
 {
     assert(planfragmentId != 0);
 
@@ -471,6 +499,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
+
     // count the number of plan fragments executed
     ++m_pfCount;
 
@@ -478,8 +507,17 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     try {
         setExecutorVectorForFragmentId(planfragmentId);
         assert(m_currExecutorVec);
+        if (unpause) {
+            TempTableLimits limits = m_currExecutorVec->limits();
+            limits.restoreSuspendedTransactionLimits(m_savedContext->m_currMemoryInBytes,
+                    m_savedContext->m_peakMemoryInBytes);
+            m_executorContext->restorePausedTables(0,m_savedContext->m_executedCtr, m_savedContext->m_tmpOutputTable);
+        }
+
         // Launch the target plan through its top-most executor list.
-        m_executorContext->executeExecutors(0);
+        if (m_executorContext->executeExecutors(0) == ENGINE_ERRORCODE_PAUSE) {
+            return ENGINE_ERRORCODE_PAUSE;
+        }
         m_executorContext->cleanupAllExecutors();
     }
     catch (const SerializableEEException &e) {
@@ -517,6 +555,34 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
+}
+
+/**
+ * Save state for pausing transactions
+ */
+void VoltDBEngine::saveState() {
+    m_savedContext->initialize(
+            m_allTuplesScanned,
+            m_tuplesProcessedInBatch,
+            m_tuplesProcessedInFragment,
+            m_tuplesProcessedSinceReport,
+            m_currentIndexInBatch,
+            m_lastParamStart,
+            m_currExecutorVec,
+            m_executorContext);
+}
+
+/**
+ * Load state from SavedContext to resume a paused transaction
+ */
+void VoltDBEngine::loadState() {
+    m_allTuplesScanned = m_savedContext->m_allTuplesScanned;
+    m_tuplesProcessedInBatch = m_savedContext->m_tuplesProcessedInBatch;
+    m_tuplesProcessedInFragment = m_savedContext->m_tuplesProcessedInFragment;
+    m_tuplesProcessedSinceReport = m_savedContext->m_tuplesProcessedSinceReport;
+    m_currentIndexInBatch = m_savedContext->m_currentIndexInBatch;
+    m_lastParamStart = m_savedContext->m_inputParamPosition;
+    m_executorContext->loadState(m_savedContext);
 }
 
 void VoltDBEngine::resetExecutionMetadata() {
@@ -659,7 +725,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  * processCatalogAdditions(..) for dumb reasons.
  */
 void
-VoltDBEngine::processCatalogDeletes(int64_t timestamp )
+VoltDBEngine::processCatalogDeletes(int64_t timestamp)
 {
     std::vector<std::string> deletion_vector;
     m_catalog->getDeletedPaths(deletion_vector);
@@ -783,7 +849,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
         catalog::Table *catalogTable = labeledTable.second;
-
         // get the delegate for the table... add the table if it's null
         TableCatalogDelegate* tcd = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
         if (!tcd) {
@@ -1585,6 +1650,37 @@ void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 void VoltDBEngine::updateExecutorContextUndoQuantumForTest()
 {
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
+}
+
+bool VoltDBEngine::activateCopyOnWriteContext(
+        const CatalogId tableId,
+        const CopyOnWriteType cowType) {
+    Table* found = getTable(tableId);
+    if (! found) {
+        return false;
+    }
+
+    PersistentTable *table = dynamic_cast<PersistentTable*>(found);
+    if (table == NULL) {
+        assert(table != NULL);
+        return false;
+    }
+
+    // Crank up the necessary persistent table streaming mechanism(s).
+    if (!table->activateCopyOnWriteContext(cowType, m_partitionId, tableId)) {
+        return false;
+    }
+
+    // counts as a snapshotting table for this purpose
+    if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
+        assert(false);
+        return false;
+    }
+
+    table->incrementRefcount();
+    m_snapshottingTables[tableId] = table;
+
+    return true;
 }
 
 /**

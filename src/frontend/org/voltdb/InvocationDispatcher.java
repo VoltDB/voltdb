@@ -1673,6 +1673,11 @@ public final class InvocationDispatcher {
                 isShortCircuitRead = true;
             }
         }
+        boolean isReadOnlySlow = invocation.getProcName().equals("@ReadOnlySlow");
+        // Force read only slow queries to not use replicas
+        if (isReadOnlySlow) {
+            isShortCircuitRead = false;
+        }
 
         if (initiatorHSId == null) {
             hostLog.error("Failed to find master initiator for partition: "

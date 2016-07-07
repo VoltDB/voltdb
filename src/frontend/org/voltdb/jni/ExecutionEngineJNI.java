@@ -25,6 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -323,6 +324,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         try {
             checkErrorCode(errorCode);
+            if (errorCode == ERRORCODE_PAUSE) {
+                return new VoltTable[0];
+            }
             FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
             // get a copy of the result buffers and make the tables
             // use the copy
@@ -494,6 +498,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
         return nativeSetLogLevels(pointer, logLevels);
+    }
+
+    @Override
+    public boolean activateCopyOnWriteContext(int tableId, CopyOnWriteType type) {
+        return nativeActivateCopyOnWriteContext(pointer, tableId, type.ordinal());
     }
 
     @Override

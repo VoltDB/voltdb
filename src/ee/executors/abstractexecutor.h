@@ -75,6 +75,8 @@ class AbstractExecutor {
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
 
+    bool isSuspendable();
+
     /**
      * Returns the plannode that generated this executor.
      */
@@ -108,6 +110,14 @@ class AbstractExecutor {
         return true;
     }
 
+    void setOutputTempTable(TempTable * tempTable) {
+        m_tmpOutputTable = tempTable;
+    }
+
+    TempTable * getOutputTempTable() {
+        return m_tmpOutputTable;
+    }
+
     // Compares two tuples based on the provided sets of expressions and sort directions
     struct TupleComparer
     {
@@ -135,6 +145,9 @@ class AbstractExecutor {
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
+
+    /** Is the executor suspendable? */
+    virtual bool p_isSuspendable() {return false;}
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
@@ -171,6 +184,12 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 
     // run the executor
     return p_execute(params);
+}
+
+inline bool AbstractExecutor::isSuspendable()
+{
+    assert(m_abstractNode);
+    return p_isSuspendable();
 }
 
 }

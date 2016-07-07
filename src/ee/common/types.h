@@ -400,6 +400,10 @@ enum TableStreamType {
     TABLE_STREAM_NONE = -1
 };
 
+enum CopyOnWriteType {
+    COPY_ON_WRITE_SCAN
+};
+
 // Serialization special values returned by serializeMore(), etc. instead
 // of the normal count. There's only one possible value for now.
 enum TableStreamSerializationError {

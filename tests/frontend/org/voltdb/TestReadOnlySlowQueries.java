@@ -195,9 +195,7 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
             assertEquals(1, modCount.asScalarLong());
             files = env.m_client.callProcedure("@ReadOnlySlow", "SELECT * FROM BLAH;").getResults()[0];
             assertEquals(1, files.getRowCount());
-            System.out.println(files.toString());
             result = LRRHelper.getTableFromFileTable(files);
-            System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
 
             modCount = env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.123012', 5, 3.14, 'green');").getResults()[0];
@@ -205,13 +203,10 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
             assertEquals(1, modCount.getRowCount());
             assertEquals(1, modCount.asScalarLong());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
-            System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
             files = env.m_client.callProcedure("@ReadOnlySlow", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
             assertEquals(1, files.getRowCount());
-            System.out.println(files.toString());
             result = LRRHelper.getTableFromFileTable(files);
-            System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
 
 

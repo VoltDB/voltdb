@@ -324,7 +324,7 @@ class Distributer {
      */
     private static boolean isLongOp(String procName) {
         if (procName.startsWith("@")) {
-            if (procName.equals("@UpdateApplicationCatalog") || procName.equals("@SnapshotSave")) {
+            if (procName.equals("@UpdateApplicationCatalog") || procName.equals("@SnapshotSave") || procName.equals("@ReadOnlySlow")) {
                 return true;
             }
         }

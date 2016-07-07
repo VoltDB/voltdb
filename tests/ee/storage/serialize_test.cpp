@@ -110,8 +110,8 @@ class TableSerializeTest : public Test {
             }
 
         }
-        ~TableSerializeTest() {
-            table_->deleteAllTuples(true);
+        virtual ~TableSerializeTest() {
+            table_->deleteAllTempTupleDeepCopies();
             delete table_;
         }
 
@@ -165,10 +165,10 @@ class TableSerializeTest : public Test {
             EXPECT_EQ(1, count);
         }
 
-    protected:
+   protected:
         CatalogId database_id;
         CatalogId table_id;
-        Table* table_;
+        TempTable* table_;
         std::vector<std::string> columnNames;
         std::vector<std::string> nullColumnNames;
 };

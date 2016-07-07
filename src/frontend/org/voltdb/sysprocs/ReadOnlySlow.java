@@ -19,28 +19,44 @@ package org.voltdb.sysprocs;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableStreamType;
+import org.voltdb.TableStreamer;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.planner.CorePlan;
+import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.base.Charsets;
 
 
 public class ReadOnlySlow extends VoltSystemProcedure {
+
+    private Set<String> pauseableTableNames = new HashSet<String>();
 
     /* (non-Javadoc)
      * @see org.voltdb.VoltSystemProcedure#init()
@@ -155,6 +171,40 @@ public class ReadOnlySlow extends VoltSystemProcedure {
             return statement.extractedParamArray();
         }
     }
+    /**
+     * If there are any plan nodes that are pauseable, create a
+     * COW Context for each of the tables.
+     * It might be easier to pass table names or IDs with the planned statement
+     * Than to pick them up here?
+     */
+    void getPauseableTables(SystemProcedureExecutionContext ctx, CorePlan plan) {
+
+        JSONObject obj;
+        try {
+            obj = new JSONObject(new String(plan.aggregatorFragment));
+
+            JSONArray planNodes = obj.getJSONArray("PLAN_NODES");
+            for (int i = 0; i < planNodes.length(); i++) {
+                JSONObject planNode = planNodes.getJSONObject(i);
+                if (((String) planNode.getString("PLAN_NODE_TYPE")).equals("SEQSCAN")
+                        && planNode.has("PAUSEABLE") && planNode.getBoolean("PAUSEABLE")) {
+                    String name = planNode.getString("TARGET_TABLE_NAME");
+                    pauseableTableNames.add(name);
+                }
+            }
+        } catch (JSONException e) {
+        }
+
+    }
+
+    void activateCOWForPausing(SystemProcedureExecutionContext ctx) {
+        int ctr = 0;
+        for (String name : pauseableTableNames) {
+            int tableId = CatalogUtil.getTableIdFromName(ctx.getDatabase(),name);
+            ctr++;
+            ctx.activateCopyOnWriteContext(tableId, CopyOnWriteType.COPY_ON_WRITE_SCAN);
+        }
+    }
 
     /**
      * System procedure run hook.
@@ -195,6 +245,7 @@ public class ReadOnlySlow extends VoltSystemProcedure {
                         new String(statement.sql, Constants.UTF8ENCODING));
                 throw new VoltAbortException(msg);
             }
+            getPauseableTables(ctx,statement.core);
 
             // Don't cache the statement text, since ad hoc statements
             // that differ only by constants reuse the same plan, statement text may change.
@@ -221,7 +272,11 @@ public class ReadOnlySlow extends VoltSystemProcedure {
             Object[] params = paramsForStatement(statement, userparams);
             voltQueueSQL(stmt, params);
         }
-
-        return voltExecuteSQL(true);
+        // XXX Is there a more efficient way to do this so we don't need to try to activate
+        // every time we resume a transaction?
+        activateCOWForPausing(ctx);
+        // If query is paused, no volt tables will be returned
+        VoltTable[] result = voltExecuteSQL(true);
+        return result;
     }
 }

@@ -805,11 +805,13 @@ public class ProcedureRunner {
             results = slowPath(batch, isFinalSQL);
         }
 
-        // check expectations
-        int i = 0; for (QueuedSQL qs : batch) {
-            Expectation.check(m_procedureName, qs.stmt,
-                    i, qs.expectation, results[i]);
-            i++;
+        if (results.length > 0) {
+            // check expectations
+            int i = 0; for (QueuedSQL qs : batch) {
+                Expectation.check(m_procedureName, qs.stmt,
+                        i, qs.expectation, results[i]);
+                i++;
+            }
         }
 
         // clear the queued sql list for the next call

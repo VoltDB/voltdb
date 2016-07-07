@@ -81,7 +81,7 @@ class Table {
     friend class TableFactory;
     friend class TableIterator;
     friend class TableTupleFilter;
-    friend class CopyOnWriteContext;
+    friend class SnapshotContext;
     friend class ExecutionEngine;
     friend class TableStats;
     friend class StatsSource;
@@ -121,6 +121,9 @@ class Table {
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
     virtual TableIterator& iteratorDeletingAsWeGo() = 0;
+    // Optional (only necessary for persistent tables)
+    virtual bool advanceCOWIterator(TableTuple &tuple) {return false;}
+    virtual void cleanupTuple(TableTuple tuple) { }
 
     // ------------------------------------------------------------------
     // OPERATIONS

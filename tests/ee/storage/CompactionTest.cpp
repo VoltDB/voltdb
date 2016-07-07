@@ -65,7 +65,13 @@ static int32_t m_primaryKeyIndex = 0;
  */
 class CompactionTest : public Test {
 public:
-    CompactionTest() {
+
+    enum CoWTestType {
+        SNAPSHOT = 0,
+        LRR = 1
+    };
+
+    CompactionTest() : m_table(NULL) {
         m_primaryKeyIndex = 0;
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
@@ -121,7 +127,9 @@ public:
 
     ~CompactionTest() {
         delete m_engine;
-        delete m_table;
+        if (m_table != NULL) {
+            delete m_table;
+        }
     }
 
     void initTable() {
@@ -260,6 +268,198 @@ public:
         }
     }
 
+    bool doForcedCompaction(PersistentTable *table) {
+        return table->doForcedCompaction();
+    }
+
+    int getDataSize(PersistentTable *table) {
+        return table->m_data.size();
+    }
+
+    TableIndex * getTableIndex(PersistentTable *table, int index) {
+        return m_table->m_indexes[index];
+    }
+
+    void streamThroughTuplesSnapshot(int tupleCountToStream, stx::btree_set<int32_t> &COWTuples) {
+        int insertedCOWTuples = 0;
+#ifdef MEMCHECK
+        int serializationBufferSize = 22700;
+#else
+        int serializationBufferSize = 131072;
+#endif
+        char serializationBuffer[serializationBufferSize];
+        while (true) {
+            TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
+            TupleOutputStream &out = outs.at(0);
+            std::vector<int> retPositions;
+            m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
+            const int serialized = static_cast<int>(out.position());
+            if (out.position() == 0) {
+                break;
+            }
+            int ii = 12;//skip partition id and row count and first tuple length
+            while (ii < (serialized - 4)) {
+                int32_t value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                const bool inserted =
+                COWTuples.insert(value).second;
+                if (!inserted) {
+                    printf("Failed with pkey %d\n", value);
+                }
+                ASSERT_TRUE(inserted);
+                insertedCOWTuples++;
+                ii += 68;
+            }
+            if (insertedCOWTuples > tupleCountToStream) {
+                break;
+            }
+        }
+    }
+
+    void streamThroughTuplesLRR(int tupleCountToStream, stx::btree_set<int32_t> &COWTuples) {
+        int insertedCOWTuples = 0;
+         TableTuple tuple(m_table->schema());
+         while (true) {
+             if (!m_table->advanceCOWIterator(tuple)) {
+                  break;
+             }
+             const bool inserted = COWTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1)).second;
+             if (!inserted) {
+                 printf("Failed\n");
+             }
+             ASSERT_TRUE(inserted);
+             insertedCOWTuples++;
+             m_table->cleanupTuple(tuple);
+             if (insertedCOWTuples > tupleCountToStream) {
+                break;
+             }
+         }
+    }
+
+    void CompactionWithCopyOnWrite(CoWTestType type) {
+        initTable();
+    #ifdef MEMCHECK
+        int tupleCount = 1000;
+    #else
+        int tupleCount = 645260;
+    #endif
+        addRandomUniqueTuples( m_table, tupleCount);
+
+    #ifdef MEMCHECK
+        ASSERT_EQ( tupleCount, getDataSize(m_table));
+    #else
+        ASSERT_EQ(20, getDataSize(m_table));
+    #endif
+
+        stx::btree_set<int32_t> pkeysNotDeleted[3];
+        std::vector<int32_t> pkeysToDelete[3];
+        for (int ii = 0; ii < tupleCount; ii ++) {
+            int foo = ii % 3;
+            pkeysToDelete[foo].push_back(ii);
+            if (ii % 3 == 0) {
+                //All keys deleted
+            } else if (ii % 3 == 1) {
+                pkeysNotDeleted[0].insert(ii);
+            } else {
+                pkeysNotDeleted[0].insert(ii);
+                pkeysNotDeleted[1].insert(ii);
+            }
+        }
+        //std::cout << pkeysToDelete[0].size() << "," << pkeysToDelete[1].size() << "," << pkeysToDelete[2].size() << std::endl;
+
+        stx::btree_set<int32_t> COWTuples;
+        DefaultTupleSerializer serializer;
+        char config[5];
+        ::memset(config, 0, 5);
+        ReferenceSerializeInputBE input(config, 5);
+        if (type == SNAPSHOT) {
+            m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        }
+        else if (type == LRR) {
+            m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+        }
+
+
+        for (int qq = 0; qq < 3; qq++) {
+            if (type == SNAPSHOT) {
+                streamThroughTuplesSnapshot((tupleCount / 3), COWTuples);
+            }
+            else if (type == LRR) {
+                streamThroughTuplesLRR((tupleCount / 3), COWTuples);
+            }
+
+
+            voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
+            TableTuple key(pkeyIndex->getKeySchema());
+            boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
+            key.moveNoHeader(backingStore.get());
+
+            IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+            for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
+                key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+                ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+                TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
+                m_table->deleteTuple(tuple, true);
+            }
+
+            //std::cout << "Allocated tuple count before idle compactions " << m_table->allocatedTupleCount() << std::endl;
+            m_table->doIdleCompaction();
+            m_table->doIdleCompaction();
+            //std::cout << "Allocated tuple count after idle compactions " << m_table->allocatedTupleCount() << std::endl;
+
+            doForcedCompaction(m_table);
+
+            stx::btree_set<int32_t> pkeysFoundAfterDelete;
+            TableIterator& iter = m_table->iterator();
+            TableTuple tuple(m_table->schema());
+            while (iter.next(tuple)) {
+                int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                key.setNValue(0, ValueFactory::getIntegerValue(pkey));
+                for (int ii = 0; ii < 4; ii++) {
+                    ASSERT_TRUE(getTableIndex(m_table, ii)->moveToKey(&key, indexCursor));
+                    TableTuple indexTuple = getTableIndex(m_table, ii)->nextValueAtKey(indexCursor);
+                    ASSERT_EQ(indexTuple.address(), tuple.address());
+                }
+                pkeysFoundAfterDelete.insert(pkey);
+            }
+
+            std::vector<int32_t> diff;
+            std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
+            std::set_difference(pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), ii);
+            for (int ii = 0; ii < diff.size(); ii++) {
+                printf("Key that was not deleted, but wasn't found is %d\n", diff[ii]);
+            }
+
+            diff.clear();
+            ii = std::insert_iterator<std::vector<int32_t> >(diff, diff.begin());
+            std::set_difference( pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), ii);
+            for (int ii = 0; ii < diff.size(); ii++) {
+                printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
+            }
+
+            //        ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
+            //        ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
+            //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
+            //        ASSERT_EQ( m_table->m_data.size(), 13);
+            //
+            //        for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+            //            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+            //            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+            //            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            //            m_table->deleteTuple(tuple, true);
+            //        }
+
+        }
+        doForcedCompaction(m_table);
+        ASSERT_EQ( m_table->m_data.size(), 1);
+        ASSERT_EQ( m_table->activeTupleCount(), 0);
+        for (int ii = 0; ii < tupleCount; ii++) {
+            ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());
+        }
+        if (type == LRR) {
+            m_table->deactivateCopyOnWriteContext();
+        }
+    }
+
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;
@@ -292,9 +492,9 @@ TEST_F(CompactionTest, BasicCompaction) {
     addRandomUniqueTuples( m_table, tupleCount);
 
 #ifdef MEMCHECK
-    ASSERT_EQ( tupleCount, m_table->m_data.size());
+    ASSERT_EQ( tupleCount, getDataSize(m_table));
 #else
-    ASSERT_EQ(20, m_table->m_data.size());
+    ASSERT_EQ(20, getDataSize(m_table));
 #endif
 
     stx::btree_set<int32_t> pkeysNotDeleted;
@@ -321,7 +521,7 @@ TEST_F(CompactionTest, BasicCompaction) {
         m_table->deleteTuple(tuple, true);
     }
 
-    m_table->doForcedCompaction();
+    doForcedCompaction(m_table);
 
     stx::btree_set<int32_t> pkeysFoundAfterDelete;
     TableIterator& iter = m_table->iterator();
@@ -330,8 +530,8 @@ TEST_F(CompactionTest, BasicCompaction) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
         key.setNValue(0, ValueFactory::getIntegerValue(pkey));
         for (int ii = 0; ii < 4; ii++) {
-            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
-            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
+            ASSERT_TRUE(getTableIndex(m_table, ii)->moveToKey(&key, indexCursor));
+            TableTuple indexTuple = getTableIndex(m_table, ii)->nextValueAtKey(indexCursor);
             ASSERT_EQ(indexTuple.address(), tuple.address());
         }
         pkeysFoundAfterDelete.insert(pkey);
@@ -355,9 +555,9 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
     //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
 #ifdef MEMCHECK
-    ASSERT_EQ( m_table->m_data.size(), 500);
+    ASSERT_EQ( getDataSize(m_table), 500);
 #else
-    ASSERT_EQ( m_table->m_data.size(), 13);
+    ASSERT_EQ( getDataSize(m_table), 13);
 #endif
 
     for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
@@ -366,155 +566,17 @@ TEST_F(CompactionTest, BasicCompaction) {
         TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
-    m_table->doForcedCompaction();
-    ASSERT_EQ( m_table->m_data.size(), 1);
+    doForcedCompaction(m_table);
+    ASSERT_EQ( getDataSize(m_table), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
-TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
-    initTable();
-#ifdef MEMCHECK
-    int tupleCount = 1000;
-#else
-    int tupleCount = 645260;
-#endif
-    addRandomUniqueTuples( m_table, tupleCount);
+TEST_F(CompactionTest, CompactionWithCopyOnWriteSnapshot) {
+    CompactionWithCopyOnWrite(SNAPSHOT);
+}
 
-#ifdef MEMCHECK
-    ASSERT_EQ( tupleCount, m_table->m_data.size());
-#else
-    ASSERT_EQ(20, m_table->m_data.size());
-#endif
-
-    stx::btree_set<int32_t> pkeysNotDeleted[3];
-    std::vector<int32_t> pkeysToDelete[3];
-    for (int ii = 0; ii < tupleCount; ii ++) {
-        int foo = ii % 3;
-        pkeysToDelete[foo].push_back(ii);
-        if (ii % 3 == 0) {
-            //All keys deleted
-        } else if (ii % 3 == 1) {
-            pkeysNotDeleted[0].insert(ii);
-        } else {
-            pkeysNotDeleted[0].insert(ii);
-            pkeysNotDeleted[1].insert(ii);
-        }
-    }
-    //std::cout << pkeysToDelete[0].size() << "," << pkeysToDelete[1].size() << "," << pkeysToDelete[2].size() << std::endl;
-
-    stx::btree_set<int32_t> COWTuples;
-    int totalInsertedCOWTuples = 0;
-    DefaultTupleSerializer serializer;
-    char config[5];
-    ::memset(config, 0, 5);
-    ReferenceSerializeInputBE input(config, 5);
-    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
-
-    for (int qq = 0; qq < 3; qq++) {
-#ifdef MEMCHECK
-        int serializationBufferSize = 22700;
-#else
-        int serializationBufferSize = 131072;
-#endif
-        char serializationBuffer[serializationBufferSize];
-        while (true) {
-            TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
-            TupleOutputStream &out = outs.at(0);
-            std::vector<int> retPositions;
-            m_table->streamMore(outs, TABLE_STREAM_SNAPSHOT, retPositions);
-            const int serialized = static_cast<int>(out.position());
-            if (out.position() == 0) {
-                break;
-            }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
-                int32_t value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                const bool inserted =
-                COWTuples.insert(value).second;
-                if (!inserted) {
-                    printf("Failed in iteration %d, total inserted %d, with pkey %d\n", qq, totalInsertedCOWTuples, value);
-                }
-                ASSERT_TRUE(inserted);
-                totalInsertedCOWTuples++;
-                ii += 68;
-            }
-            if (qq == 0) {
-                if (totalInsertedCOWTuples > (tupleCount / 3)) {
-                    break;
-                }
-            } else if (qq == 1) {
-                if (totalInsertedCOWTuples > ((tupleCount / 3) * 2)) {
-                    break;
-                }
-            }
-        }
-
-        voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
-        TableTuple key(pkeyIndex->getKeySchema());
-        boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
-        key.moveNoHeader(backingStore.get());
-
-        IndexCursor indexCursor(pkeyIndex->getTupleSchema());
-        for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
-            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-            ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
-            TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
-            m_table->deleteTuple(tuple, true);
-        }
-
-        //std::cout << "Allocated tuple count before idle compactions " << m_table->allocatedTupleCount() << std::endl;
-        m_table->doIdleCompaction();
-        m_table->doIdleCompaction();
-        //std::cout << "Allocated tuple count after idle compactions " << m_table->allocatedTupleCount() << std::endl;
-        m_table->doForcedCompaction();
-
-        stx::btree_set<int32_t> pkeysFoundAfterDelete;
-        TableIterator& iter = m_table->iterator();
-        TableTuple tuple(m_table->schema());
-        while (iter.next(tuple)) {
-            int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-            key.setNValue(0, ValueFactory::getIntegerValue(pkey));
-            for (int ii = 0; ii < 4; ii++) {
-                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
-                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
-                ASSERT_EQ(indexTuple.address(), tuple.address());
-            }
-            pkeysFoundAfterDelete.insert(pkey);
-        }
-
-        std::vector<int32_t> diff;
-        std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
-        std::set_difference(pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), ii);
-        for (int ii = 0; ii < diff.size(); ii++) {
-            printf("Key that was not deleted, but wasn't found is %d\n", diff[ii]);
-        }
-
-        diff.clear();
-        ii = std::insert_iterator<std::vector<int32_t> >(diff, diff.begin());
-        std::set_difference( pkeysFoundAfterDelete.begin(), pkeysFoundAfterDelete.end(), pkeysNotDeleted[qq].begin(), pkeysNotDeleted[qq].end(), ii);
-        for (int ii = 0; ii < diff.size(); ii++) {
-            printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
-        }
-
-        //        ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
-        //        ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
-        //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
-        //        ASSERT_EQ( m_table->m_data.size(), 13);
-        //
-        //        for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
-        //            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        //            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        //            TableTuple tuple = pkeyIndex->nextValueAtKey();
-        //            m_table->deleteTuple(tuple, true);
-        //        }
-
-    }
-    m_table->doForcedCompaction();
-    ASSERT_EQ( m_table->m_data.size(), 1);
-    ASSERT_EQ( m_table->activeTupleCount(), 0);
-    for (int ii = 0; ii < tupleCount; ii++) {
-        ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());
-    }
+TEST_F(CompactionTest, CompactionWithCopyOnWriteLRR) {
+    CompactionWithCopyOnWrite(LRR);
 }
 
 /*
@@ -555,6 +617,8 @@ TEST_F(CompactionTest, TestENG897) {
     ReferenceSerializeInputBE input(config, 5);
 
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    //std::cout << "Activated COW" << std::endl;
+
     for (int ii = 0; ii < 16130; ii++) {
         if (ii % 2 == 0) {
             continue;

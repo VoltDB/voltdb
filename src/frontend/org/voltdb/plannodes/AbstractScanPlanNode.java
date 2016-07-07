@@ -43,14 +43,16 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractScanPlanNode extends AbstractPlanNode {
-
-    public enum Members {
-        PREDICATE,
-        TARGET_TABLE_NAME,
-        TARGET_TABLE_ALIAS,
-        SUBQUERY_INDICATOR,
-        PREDICATE_FALSE;
-    }
+    private final static String PAUSEABLE = "PAUSEABLE";
+    private final static String PAUSELIMIT = "PAUSELIMIT";
+    private final static String PREDICATE = "PREDICATE";
+    private final static String TARGET_TABLE_NAME = "TARGET_TABLE_NAME";
+    private final static String TARGET_TABLE_ALIAS = "TARGET_TABLE_ALIAS";
+    private final static String SUBQUERY_INDICATOR = "SUBQUERY_INDICATOR";
+    private final static String PREDICATE_FALSE = "PREDICATE_FALSE";
+    // True if plan node is pause-able
+    boolean m_pauseable = false;
+    int m_pauseLimit = 0;
 
     // Store the columns from the table as an internal NodeSchema
     // for consistency of interface
@@ -77,6 +79,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         super();
         m_targetTableName = tableName;
         m_targetTableAlias = tableAlias;
+    }
+
+    public boolean isPauseable() {
+        return m_pauseable;
+    }
+
+    public void setPausable(boolean pausable, int limit) {
+        m_pauseable = pausable;
+        m_pauseLimit = limit;
     }
 
     @Override
@@ -448,26 +459,42 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         if (m_predicate != null) {
             if (ConstantValueExpression.isBooleanFalse(m_predicate)) {
-                stringer.key(Members.PREDICATE_FALSE.name()).value("TRUE");
+                stringer.key(PREDICATE_FALSE).value("TRUE");
             }
-            stringer.key(Members.PREDICATE.name());
+            stringer.key(PREDICATE);
             stringer.value(m_predicate);
         }
-        stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
-        stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
+        stringer.key(TARGET_TABLE_NAME).value(m_targetTableName);
+        stringer.key(TARGET_TABLE_ALIAS).value(m_targetTableAlias);
         if (m_isSubQuery) {
-            stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
+            stringer.key(SUBQUERY_INDICATOR).value("TRUE");
+        }
+        if (m_pauseable) {
+            stringer.key(PAUSEABLE).value(true);
+        }
+        if (m_pauseLimit > 0) {
+            stringer.key(PAUSELIMIT).value(m_pauseLimit);
         }
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name(), m_tableScan);
-        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-        m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
+        m_predicate = AbstractExpression.fromJSONChild(jobj, PREDICATE, m_tableScan);
+        m_targetTableName = jobj.getString( TARGET_TABLE_NAME );
+        m_targetTableAlias = jobj.getString( TARGET_TABLE_ALIAS );
         if (jobj.has("SUBQUERY_INDICATOR")) {
-            m_isSubQuery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+            m_isSubQuery = "TRUE".equals(jobj.getString( SUBQUERY_INDICATOR ));
+        }
+        if (jobj.has(PAUSEABLE)) {
+            m_pauseable = jobj.getBoolean(PAUSEABLE);
+        } else {
+            m_pauseable = false;
+        }
+        if (jobj.has(PAUSELIMIT)) {
+            m_pauseLimit = jobj.getInt(PAUSELIMIT);
+        } else {
+            m_pauseLimit = 0;
         }
     }
 
@@ -487,6 +514,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             return prefix + m_predicate.explain(getTableNameForExplain());
         }
         return "";
+    }
+
+    protected String explainType() {
+        String explainer = "";
+        if (m_pauseable) {
+            explainer += " , PAUSABLE ";
+        }
+        if (m_pauseLimit > 0) {
+            explainer += " WITH PAUSELIMIT " + m_pauseLimit + " TUPLES";
+        }
+        return explainer;
     }
 
     protected String getTableNameForExplain() {

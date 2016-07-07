@@ -41,6 +41,7 @@
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
+      <xs:element name="longreads" type="longReadsType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
@@ -346,6 +347,11 @@
     <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="2" />
     <xs:attribute name="prefix" type="xs:string" use="optional" default="AUTOSNAP" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- <longreads> -->
+  <xs:complexType name="longReadsType">
+    <xs:attribute name="tuplecount" type="xs:int" use="optional" default="1000" />
   </xs:complexType>
 
   <!-- <export> -->

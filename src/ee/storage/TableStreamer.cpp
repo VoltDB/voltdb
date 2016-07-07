@@ -20,9 +20,9 @@
 #include <boost/shared_ptr.hpp>
 #include "common/serializeio.h"
 #include "storage/persistenttable.h"
-#include "storage/CopyOnWriteContext.h"
 #include "storage/ElasticContext.h"
 #include "storage/ElasticIndexReadContext.h"
+#include "storage/SnapshotContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "logging/LogManager.h"
@@ -100,7 +100,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
                     context.reset(
-                        new CopyOnWriteContext(m_table, surgeon, serializer, m_partitionId,
+                        new SnapshotContext(m_table, surgeon, serializer, m_partitionId,
                                                predicateStrings, m_table.activeTupleCount()));
                     break;
 

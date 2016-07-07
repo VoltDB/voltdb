@@ -39,11 +39,17 @@ public class InitiateResponseMessage extends VoltMessage {
     private long m_initiatorHSId;
     private long m_coordinatorHSId;
     private long m_clientInterfaceHandle;
-    private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
     private boolean m_readOnly;
     private ClientResponseImpl m_response;
+
+    // Paused transactions
+    private boolean m_isLRR;
+    private boolean m_paused;
+    private boolean m_isSinglePartition;
+    private long m_uniqueId;
+    private long m_connectionId;
 
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
     private boolean m_mispartitioned;
@@ -139,6 +145,26 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_recovering;
     }
 
+    public boolean isPaused() {
+        return m_paused;
+    }
+
+    public boolean isLRR() {
+        return m_isLRR;
+    }
+
+    public boolean isSinglePartition() {
+        return m_isSinglePartition;
+    }
+
+    public long getUniqueId() {
+        return m_uniqueId;
+    }
+
+    public long getConnectionId() {
+        return m_connectionId;
+    }
+
     public void setRecovering(boolean recovering) {
         m_recovering = recovering;
     }
@@ -171,6 +197,15 @@ public class InitiateResponseMessage extends VoltMessage {
     public void setResults(ClientResponseImpl r) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
+    }
+
+    public void setPaused(StoredProcedureInvocation invocation, boolean singlePartition, long uniqueId, long connectionId) {
+        m_isLRR = true;
+        m_paused = (m_response.getResults().length == 0);
+        m_invocation = invocation;
+        m_isSinglePartition = singlePartition;
+        m_uniqueId = uniqueId;
+        m_connectionId = connectionId;
     }
 
     public boolean isReadOnly() {

@@ -57,6 +57,7 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -79,7 +80,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // then we want to just set our OutputTable pointer to be the
     // pointer of our TargetTable. This prevents us from just
     // reading through the entire TargetTable and copying all of
-    // the tuples. We are guarenteed that no Executor will ever
+    // the tuples. We are guaranteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
     if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
@@ -103,6 +104,10 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
 
+    m_highVolume = node->isPauseable();
+
+    m_limit = node->getLimit();
+
     return true;
 }
 
@@ -112,7 +117,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Seq Scan :\n %s", output_table->debug().c_str());
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", m_tmpOutputTable->debug().c_str());
         return true;
     }
 
@@ -198,8 +203,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
 
-        while (postfilter.isUnderLimit() && iterator.next(tuple))
+        bool yield = false;
+        int ctr = 0;
+
+        while (!yield && postfilter.isUnderLimit() && getNextTupleInScan(iterator, input_table, tuple))
         {
+            ++ctr;
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());
@@ -229,15 +238,26 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 }
                 pmp.countdownProgress();
             }
+            if(m_highVolume) {
+                input_table->cleanupTuple(tuple);
+                // Suspend this executor if we've hit the tuple processing limit
+                if (ctr >= m_limit) {
+                    yield = true;
+                }
+            }
         }
 
-        if (m_aggExec != NULL) {
+        if (!yield && m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
+        }
+        if (yield) {
+            //* for debug */std::cout << "SeqScanExecutor paused after : " << ctr << " tuples processed" << std::endl;
+            return false;
         }
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
-    //* for debug */    " output table " << (void*)output_table <<
-    //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
+    //* for debug */    " output table " << (void*)m_tmpOutputTable <<
+    //* for debug */    " put " << m_tmpOutputTable->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 
@@ -254,4 +274,23 @@ void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tu
     //
     assert(m_tmpOutputTable);
     m_tmpOutputTable->insertTempTuple(tuple);
+}
+
+bool SeqScanExecutor::getNextTupleInScan(TableIterator& iterator, Table* input_table, TableTuple& tuple) {
+    bool success = false;
+    if (m_highVolume) {
+        assert(dynamic_cast<PersistentTable*>(input_table));
+        PersistentTable* p_input_table = static_cast<PersistentTable*>(input_table);
+        success = p_input_table->advanceCOWIterator(tuple);
+        if (!success) {
+            // Clean out this stream -- assumes we only read each table once
+            p_input_table->deactivateCopyOnWriteContext();
+        }
+    } else {
+        success = iterator.next(tuple);
+    }
+    //* for debug */if (success) {
+    //* for debug */   std::cout << "Scanned tuple " << tuple.debugNoHeader() << std::endl;
+    //* for debug */}
+    return success;
 }

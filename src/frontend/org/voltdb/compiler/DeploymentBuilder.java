@@ -115,6 +115,8 @@ public class DeploymentBuilder {
 
     private Integer m_maxTempTableMemory = 100;
 
+    private Integer m_lrrTupleCount = 1000;
+
     private boolean m_elenabled;      // true if enabled; false if disabled
 
     // whether to allow DDL over adhoc or use full catalog updates

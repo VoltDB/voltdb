@@ -346,7 +346,9 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     params[colindex] = oldValue;
     // executing the stored plan.
     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
-    Table *tbl = context->executeExecutors(executorList, 0);
+
+    context->executeExecutors(executorList, 0);
+    Table * tbl = context->getLastTable(executorList);
     assert(tbl);
     // get the fallback value from the returned table.
     TableIterator iterator = tbl->iterator();

@@ -70,6 +70,10 @@ public:
 
     bool isEmptyScan() const { return m_isEmptyScan; }
 
+    bool isPauseable() const { return m_pauseable; }
+
+    int getLimit() const { return m_limit; }
+
 protected:
     AbstractScanPlanNode() { }
 
@@ -91,6 +95,10 @@ protected:
     bool m_isSubQuery;
     // True if this scan has a predicate that always evaluates to FALSE
     bool m_isEmptyScan;
+    // True if this scan is part of a high volume query
+    bool m_pauseable;
+    // Number of tuples to read before suspending execution
+    int m_limit;
 };
 
 } // namespace voltdb

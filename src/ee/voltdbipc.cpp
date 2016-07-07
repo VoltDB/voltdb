@@ -58,6 +58,7 @@ public:
         kErrorCode_None = -1, // not in the java
         kErrorCode_Success = 0,
         kErrorCode_Error = 1,
+        kErrorCode_Pause = 2,
         /*
          * The following are not error codes but requests for information or functionality
          * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
@@ -184,6 +185,8 @@ private:
 
     void sendException( int8_t errorCode);
 
+    int8_t activateCopyOnWriteContext(struct ipc_command *cmd);
+
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
     void exportAction(struct ipc_command *cmd);
@@ -264,7 +267,7 @@ struct undo_token {
 }__attribute__((packed));
 
 /*
- * Header for a ActivateCopyOnWrite request
+ * Header for a ActivateSnapshot request
  */
 typedef struct {
     struct ipc_command cmd;
@@ -273,6 +276,15 @@ typedef struct {
     int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
+
+/*
+ * Header for a ActivateCopyOnWrite request
+ */
+typedef struct {
+    struct ipc_command cmd;
+    voltdb::CatalogId tableId;
+    voltdb::CopyOnWriteType cowType;
+}__attribute__((packed)) activate_copyonwrite;
 
 /*
  * Header for a Copy On Write Serialize More request
@@ -450,6 +462,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         break;
       case 13:
         result = setLogLevels(cmd);
+        break;
+      case 15:
+        result = activateCopyOnWriteContext(cmd);
         break;
       case 16:
         result = quiesce(cmd);
@@ -728,7 +743,7 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 }
 
 void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
-    int errors = 0;
+    int errorCode = kErrorCode_None;
 
     querypfs *queryCommand = (querypfs*) cmd;
 
@@ -761,7 +776,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
 
     try {
-        errors = m_engine->executePlanFragments(numFrags,
+        errorCode = m_engine->executePlanFragments(numFrags,
                                                 fragmentIds,
                                                 inputDepIds,
                                                 serialize_in,
@@ -776,13 +791,18 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     }
 
     // write the results array back across the wire
-    if (errors == 0) {
+    if (errorCode == kErrorCode_Success) {
         // write the results array back across the wire
         const int32_t size = m_engine->getResultsSize();
         char *resultBuffer = m_engine->getReusedResultBuffer();
         resultBuffer[0] = kErrorCode_Success;
         writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
-    } else {
+    }
+    else if (errorCode == kErrorCode_Pause) {
+        char *resultBuffer = m_engine->getReusedResultBuffer();
+        resultBuffer[0] = kErrorCode_Pause;
+    }
+    else {
         sendException(kErrorCode_Error);
     }
 }
@@ -1191,6 +1211,24 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
+}
+
+int8_t VoltDBIPC::activateCopyOnWriteContext(struct ipc_command *cmd) {
+    activate_copyonwrite *activateCommand = (activate_copyonwrite*) cmd;
+    const voltdb::CatalogId tableId = ntohl(activateCommand->tableId);
+    const voltdb::CopyOnWriteType cowType =
+            static_cast<voltdb::CopyOnWriteType>(ntohl(activateCommand->cowType));
+
+    try {
+        if (m_engine->activateCopyOnWriteContext(tableId, cowType)) {
+            return kErrorCode_Success;
+        } else {
+            return kErrorCode_Error;
+        }
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
+    return kErrorCode_Error;
 }
 
 int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {

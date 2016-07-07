@@ -346,7 +346,7 @@ CTX.INPUT['storage'] = """
  CompatibleDRTupleStream.cpp
  ConstraintFailureException.cpp
  constraintutil.cpp
- CopyOnWriteContext.cpp
+ ScanCopyOnWriteContext.cpp
  CopyOnWriteIterator.cpp
  DRTupleStream.cpp
  ElasticContext.cpp
@@ -359,6 +359,7 @@ CTX.INPUT['storage'] = """
  persistenttable.cpp
  PersistentTableStats.cpp
  RecoveryContext.cpp
+ SnapshotContext.cpp
  streamedtable.cpp
  StreamedTableStats.cpp
  table.cpp

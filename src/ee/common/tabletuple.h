@@ -89,7 +89,7 @@ class TableTuple {
     friend class ElasticScanner;
     friend class PoolBackedTupleStorage;
     friend class CopyOnWriteIterator;
-    friend class CopyOnWriteContext;
+    friend class ScanCopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
     friend class SetAndRestorePendingDeleteFlag;

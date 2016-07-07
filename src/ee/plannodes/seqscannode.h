@@ -57,7 +57,7 @@ class AbstractExpression;
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
 public:
-    SeqScanPlanNode()  { }
+    SeqScanPlanNode() { }
     ~SeqScanPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;

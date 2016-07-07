@@ -130,6 +130,12 @@ abstract public class ProcedureTask extends TransactionTask
                 if ((!task.isReadOnly()) && task.isSinglePartition()) {
                     m_txnState.storeResults(cr);
                 }
+                if(task.getStoredProcedureName().equals("@ReadOnlySlow")) {
+                    response.setPaused(task.getStoredProcedureInvocation(),
+                            task.isSinglePartition(),
+                            task.getUniqueId(),
+                            task.getConnectionId());
+                }
             } else {
                 // mis-partitioned invocation, reject it and let the ClientInterface restart it
                 response.setMispartitioned(true, task.getStoredProcedureInvocation(),

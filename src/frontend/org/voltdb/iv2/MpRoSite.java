@@ -28,6 +28,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
@@ -221,6 +222,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public void updateHashinator(TheHashinator hashinator)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public boolean activateCopyOnWriteContext(int tableId, CopyOnWriteType type)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }

@@ -14,35 +14,37 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef COPYONWRITECONTEXT_H_
-#define COPYONWRITECONTEXT_H_
+#ifndef SCANCOPYONWRITECONTEXT_H_
+#define SCANCOPYONWRITECONTEXT_H_
 
 #include <string>
 #include <vector>
 #include <utility>
-#include "common/TupleSerializer.h"
-#include "common/TupleOutputStreamProcessor.h"
-#include "storage/persistenttable.h"
-#include "storage/TableStreamer.h"
-#include "storage/TableStreamerContext.h"
+#include "storage/TupleBlock.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
 namespace voltdb {
 class TupleIterator;
 class TempTable;
-class ParsedPredicate;
-class TupleOutputStreamProcessor;
 class PersistentTableSurgeon;
+class PersistentTable;
 
-class CopyOnWriteContext : public TableStreamerContext {
-
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
-                                              TableStreamType, const std::vector<std::string>&);
-
+class ScanCopyOnWriteContext {
 public:
+
+    /**
+     * Construct a copy on write context for the specified table that will
+     * serialize tuples using the provided serializer.
+     */
+    ScanCopyOnWriteContext(PersistentTable &table,
+                       PersistentTableSurgeon &surgeon,
+                       int64_t totalTuples);
+
+    virtual ~ScanCopyOnWriteContext();
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
@@ -53,57 +55,62 @@ public:
      */
     void markTupleDirty(TableTuple tuple, bool newTuple);
 
-    virtual ~CopyOnWriteContext();
-
     /**
      * Activation handler.
      */
-    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
+    void handleActivation();
 
     /**
-     * Mandatory TableStreamContext override.
+     * Do surgery
      */
-    virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
-                                     std::vector<int> &retPositions);
+    bool advanceIterator(TableTuple &tuple);
+
+    bool cleanupTuple(TableTuple &tuple, bool deleteTuple);
+
+    bool cleanup();
+
+    void completePassIfDone(bool hasMore);
 
     /**
      * Optional block compaction handler.
      */
-    virtual void notifyBlockWasCompactedAway(TBPtr block);
+    void notifyBlockWasCompactedAway(TBPtr block);
 
     /**
      * Optional tuple insert handler.
      */
-    virtual bool notifyTupleInsert(TableTuple &tuple);
+    bool notifyTupleInsert(TableTuple &tuple);
 
     /**
      * Optional tuple update handler.
      */
-    virtual bool notifyTupleUpdate(TableTuple &tuple);
+    bool notifyTupleUpdate(TableTuple &tuple);
 
     /**
      * Optional tuple delete handler.
      */
-    virtual bool notifyTupleDelete(TableTuple &tuple);
+    bool notifyTupleDelete(TableTuple &tuple);
+
+    bool isTableScanFinished() {
+        return m_finishedTableScan;
+    }
+
+    int64_t getTuplesRemaining() {
+        return m_tuplesRemaining;
+    }
 
 private:
-
-    /**
-     * Construct a copy on write context for the specified table that will
-     * serialize tuples using the provided serializer.
-     * Private so that only TableStreamer::activateStream() can call.
-     */
-    CopyOnWriteContext(PersistentTable &table,
-                       PersistentTableSurgeon &surgeon,
-                       TupleSerializer &serializer,
-                       int32_t partitionId,
-                       const std::vector<std::string> &predicateStrings,
-                       int64_t totalTuples);
 
     /**
      * Temp table for copies of tuples that were dirtied.
      */
     boost::scoped_ptr<TempTable> m_backedUpTuples;
+
+    /**
+     * Table we are maintaining a COW context for, and its surgeon
+     */
+    PersistentTable &m_table;
+    PersistentTableSurgeon &m_surgeon;
 
     /**
      * Memory pool for string allocations
@@ -134,4 +141,4 @@ private:
 
 }
 
-#endif /* COPYONWRITECONTEXT_H_ */
+#endif /* SCANCOPYONWRITECONTEXT_H_ */

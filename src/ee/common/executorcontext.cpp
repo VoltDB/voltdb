@@ -15,10 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+#include "common/SavedContext.hpp"
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
+#include "storage/DRTupleStream.h"
+#include "storage/DRTupleStreamUndoAction.h"
 
 #include "boost/foreach.hpp"
 
@@ -96,6 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_highVolumeDirPath(highVolumeDirPath),
     m_outFileName(""),
     m_outFileCount(0),
+    m_executedCtr(0),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -128,30 +132,40 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 
-Table* ExecutorContext::executeExecutors(int subqueryId)
+
+int ExecutorContext::executeExecutors(int subqueryId)
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     return executeExecutors(executorList, subqueryId);
 }
 
-Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+int ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
                                          int subqueryId)
 {
     // Walk through the list and execute each plannode.
     // The query planner guarantees that for a given plannode,
     // all of its children are positioned before it in this list,
     // therefore dependency tracking is not needed here.
-    size_t ttl = executorList.size();
     int ctr = 0;
 
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
+            if (m_isResumed && ctr < m_executedCtr) {
+                ++ctr;
+                continue;
+            }
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(*m_staticParams)) {
+                if (executor->isSuspendable()) {
+                    // If this is paused, save all context info, including ctr
+                    m_executedCtr = ctr;
+                    return ENGINE_ERRORCODE_PAUSE;
+                }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
+
             }
             ++ctr;
         }
@@ -187,7 +201,29 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         }
         throw;
     }
+
+    return ENGINE_ERRORCODE_SUCCESS;
+}
+
+Table * ExecutorContext::getLastTable(const std::vector<AbstractExecutor*>& executorList) {
+    size_t ttl = executorList.size();
     return executorList[ttl-1]->getPlanNode()->getOutputTable();
+}
+
+void ExecutorContext::restorePausedTables(int subqueryId, int pausedExecutorId, TempTable * tempTable) {
+    std::vector<AbstractExecutor*> executors = getExecutors(subqueryId);
+    executors[pausedExecutorId]->setOutputTempTable(tempTable);
+}
+
+void ExecutorContext::loadState(SavedContext * savedContext) {
+    assert(m_txnId == savedContext->m_txnId);
+    m_executedCtr = savedContext->m_executedCtr;
+    m_currentTxnTimestamp = savedContext->m_currentTxnTimestamp;
+    m_currentDRTimestamp = savedContext->m_currentDRTimestamp;
+    m_outFileName = savedContext->m_outFileName;
+    m_outFileCount = savedContext->m_outFileCount;
+    m_uniqueId = savedContext->m_uniqueId;
+    m_isResumed = true;
 }
 
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const

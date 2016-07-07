@@ -4,6 +4,7 @@ begin Cluster                      "A set of connected hosts running one or more
   int localepoch                   "The number of seconds since the epoch that we're calling our local epoch"
   bool securityEnabled             "Whether security and authentication should be enabled/disabled"
   int httpdportno                  "The port number httpd will listen on. A 0 value implies 8080."
+  int longreadsTupleCount          "The number of tuples to process before suspending a long running read."
   bool jsonapi                     "Is the http/json interface enabled?"
   bool networkpartition            "Is network partition detection enabled?"
   string voltRoot                  "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"

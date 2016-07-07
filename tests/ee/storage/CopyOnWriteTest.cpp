@@ -1228,6 +1228,72 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
     ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
 }
 
+// Simple test that performs LRR activation on empty table, inserts tuples and iterates through table
+TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenLRRActivateFinish) {
+    initTable(1, 0);
+    int initTupleCount = 10;
+    int addedTupleCount = 4;
+    addRandomUniqueTuples( m_table, initTupleCount);
+
+    char config[4];
+    ::memset(config, 0, 4);
+    // activate snapshot
+    m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+    // insert tuples
+    addRandomUniqueTuples(m_table, addedTupleCount);
+    // do work - start reading the table
+    int count = 0;
+    TableTuple tuple;
+    while(m_table->advanceCOWIterator(tuple))
+    {
+        count++;
+    }
+    ASSERT_EQ(initTupleCount, count);
+    // check the # tuple insertion count is reflected correctly
+    ASSERT_EQ(initTupleCount+addedTupleCount, m_table->visibleTupleCount());
+    m_table->deactivateCopyOnWriteContext();
+}
+
+TEST_F(CopyOnWriteTest, BigLRRTest) {
+    initTable(1, 0);
+    int tupleCount = TUPLE_COUNT;
+    addRandomUniqueTuples( m_table, tupleCount);
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
+        T_ValueSet originalTuples;
+        getTableValueSet(originalTuples);
+
+        char config[4];
+        ::memset(config, 0, 4);
+
+        m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+
+        T_ValueSet COWTuples;
+        int totalInserted = 0;
+        bool done = false;
+        while (!done) {
+            for (int i = 0; i < 1000; i++) {
+                TableTuple tuple(m_table->schema());
+                if (!m_table->advanceCOWIterator(tuple)) {
+                    done = true;
+                    break;
+                }
+                const bool inserted = COWTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1)).second;
+                if (!inserted) {
+                    printf("Failed in iteration %d, total inserted %d\n", qq, totalInserted);
+                }
+                //std::cout << "Inserted " << totalInserted << " " << tuple.debugNoHeader() << std::endl;
+                ASSERT_TRUE(inserted);
+                totalInserted++;
+                m_table->cleanupTuple(tuple);
+            }
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
+                doRandomTableMutation(m_table);
+            }
+        }
+        m_table->deactivateCopyOnWriteContext();
+    }
+}
+
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
@@ -1620,11 +1686,17 @@ public:
                                TableStreamType streamType,
                                std::vector<int> &retPositions) { return 0; }
 
+    virtual void removeStream(TableStreamType streamType) { return; }
+
     virtual int32_t getPartitionID() const { return m_partitionId; }
 
     virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
 
     virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) { return TableStreamerContextPtr(); }
+
+    virtual bool advanceIterator(TableTuple &tuple) { return false; }
+
+    virtual bool cleanupTuple(TableTuple tuple) { return false; }
 
     virtual bool notifyTupleInsert(TableTuple &tuple) { return false; }
 
@@ -1794,6 +1866,8 @@ public:
                                std::vector<int> &retPositions) {
         return m_context->handleStreamMore(outputStreams, retPositions);
     }
+
+    virtual void removeStream(TableStreamType streamType) { return; }
 
     virtual bool notifyTupleInsert(TableTuple &tuple) {
         return m_context->notifyTupleInsert(tuple);

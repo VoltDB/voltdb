@@ -80,6 +80,8 @@ public interface SystemProcedureExecutionContext {
      */
     public void updateHashinator(TheHashinator hashinator);
 
+    boolean activateCopyOnWriteContext(int tableId, CopyOnWriteType type);
+
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);

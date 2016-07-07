@@ -47,7 +47,6 @@
 
 #include "AbstractDRTupleStream.h"
 #include "ConstraintFailureException.h"
-#include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
 #include "MaterializedViewTriggerForWrite.h"
 #include "PersistentTableStats.h"
@@ -88,6 +87,7 @@
 #include <cassert>
 #include <cstdio>
 #include <sstream>
+#include "SnapshotContext.h"
 
 namespace voltdb {
 void* keyTupleStorage = NULL;
@@ -578,7 +578,8 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
+    if ((m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target))
+            && (m_copyOnWriteContext == NULL || !m_copyOnWriteContext->notifyTupleInsert(target))) {
         target.setDirtyFalse();
     }
 
@@ -709,6 +710,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
+    }
+    if (m_copyOnWriteContext != NULL) {
+        m_copyOnWriteContext->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -947,8 +951,9 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target) {
     // A snapshot (background scan) in progress can still cause a hold-up.
     // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.
-    if (   m_tableStreamer != NULL
-        && ! m_tableStreamer->notifyTupleDelete(target)) {
+    if (   (m_tableStreamer != NULL
+        && ! m_tableStreamer->notifyTupleDelete(target))
+            || (m_copyOnWriteContext != NULL && ! m_copyOnWriteContext->notifyTupleDelete(target))) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
         // This "already pending delete" guard prevents any
@@ -1265,6 +1270,24 @@ template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows);
 
+/** Prepare table for a long running read. */
+bool PersistentTable::activateCopyOnWriteContext(
+    CopyOnWriteType cowType,
+    int32_t partitionId,
+    CatalogId tableId) {
+    if (m_copyOnWriteContext == NULL) {
+        m_copyOnWriteContext.reset(new ScanCopyOnWriteContext(*this, m_surgeon, activeTupleCount()));
+    } else {
+        return false;
+    }
+    m_copyOnWriteContext->handleActivation();
+    return true;
+}
+
+void PersistentTable::deactivateCopyOnWriteContext() {
+    m_copyOnWriteContext.reset();
+}
+
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
     TupleSerializer &tupleSerializer,
@@ -1272,6 +1295,7 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInputBE &serializeIn) {
+
     /*
      * Allow multiple stream types for the same partition by holding onto the
      * TableStreamer object. TableStreamer enforces which multiple stream type
@@ -1391,7 +1415,12 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         // do not find block in not pending snapshot container
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-        m_tableStreamer->notifyBlockWasCompactedAway(block);
+        if (m_tableStreamer != NULL) {
+            m_tableStreamer->notifyBlockWasCompactedAway(block);
+        }
+        if (m_copyOnWriteContext != NULL) {
+            m_copyOnWriteContext->notifyBlockWasCompactedAway(block);
+        }
         return;
     }
     // else check that block is in pending snapshot container

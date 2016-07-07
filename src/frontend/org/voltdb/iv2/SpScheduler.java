@@ -27,8 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -154,6 +157,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
+    // used to reschedule LRR paused transactions
+    private long m_quietUntil = 0;
+    private final Random m_random = new Random();
+    private boolean m_executingLRR = false;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -400,6 +408,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
+        }
+
+        // We can only handle one LRR at a time
+        if (message.getStoredProcedureName().equals("@ReadOnlySlow")) {
+            if (m_executingLRR) {
+
+                final InitiateResponseMessage response = new InitiateResponseMessage(message);
+                response.setResults(new ClientResponseImpl(ClientResponse.USER_ABORT,
+                            new VoltTable[0],
+                            "Concurrent @ReadOnlySlow calls are not supported."));
+                // Initiator should be client mailbox?
+                m_mailbox.send(response.getInitiatorHSId(), response);
+                return;
+            }
+            m_executingLRR = true;
         }
 
         /**
@@ -677,6 +700,31 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private void reschedulePausedTransaction(Iv2InitiateTaskMessage message) {
+        final long now = System.currentTimeMillis();
+        final long quietUntil = m_quietUntil;
+        if (now > quietUntil) {
+            doLocalInitiateOffer(message);
+        }
+        else {
+            //Schedule it to happen after the quiet period has elapsed
+            VoltDB.instance().schedulePriorityWork(
+                    new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            doLocalInitiateOffer(message);
+                        }
+                    },
+                    quietUntil - now,
+                    0,
+                    TimeUnit.MILLISECONDS);
+        }
+        m_quietUntil =
+                System.currentTimeMillis() +
+                        (5) + ((long)(m_random.nextDouble() * 15));
+    }
+
     // Pass a response through the duplicate counters.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
@@ -686,6 +734,31 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
         boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+        // If this is a long running read and it's paused, then don't send to the client
+        // Instead, we should reschedule the transaction
+        if (message.isPaused()) {
+            Iv2InitiateTaskMessage msg = new Iv2InitiateTaskMessage(
+                    message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(),
+                    m_repairLogTruncationHandle,
+                    message.getTxnId(),
+                    message.getUniqueId(),
+                    message.isReadOnly(),
+                    message.isSinglePartition(),
+                    message.getInvocation(),
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId(),
+                    false);
+
+            msg.setSpHandle(message.getSpHandle());
+            reschedulePausedTransaction(msg);
+            return;
+        }
+
+        if (message.isLRR()) {
+            m_executingLRR = false;
+        }
 
         // All short-circuit reads will have no duplicate counter.
         // Avoid all the lookup below.
@@ -1009,6 +1082,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    /**
+     * Should only receive these messages at replicas, when told by the leader
+     */
     public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
         // Should only receive these messages at replicas, call the internal log write with

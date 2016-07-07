@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
@@ -92,6 +93,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Error codes exported for JNI methods. */
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
+    public static final int ERRORCODE_PAUSE = 2;
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
     public static final int ERRORCODE_PROGRESS_UPDATE = 111;
@@ -168,7 +170,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Utility method to verify return code and throw as required */
     final protected void checkErrorCode(final int errorCode) {
-        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
+        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN) && (errorCode != ERRORCODE_PAUSE)) {
             throwExceptionForError(errorCode);
         }
     }
@@ -505,6 +507,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
+    public abstract boolean activateCopyOnWriteContext(final int tableId,
+            CopyOnWriteType type);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
@@ -943,6 +947,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return true for success false for failure
      */
     protected native boolean nativeSetLogLevels(long pointer, long logLevels);
+
+    /**
+     * Active a table stream of the specified type for a table.
+     * @param pointer Pointer to an engine instance
+     * @param tableId Catalog ID of the table
+     * @param type type of copy on write context to activate
+     * @return <code>true</code> on success and <code>false</code> on failure
+     */
+    protected native boolean nativeActivateCopyOnWriteContext(long pointer, int tableId, int type);
 
     /**
      * Active a table stream of the specified type for a table.

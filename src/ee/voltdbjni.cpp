@@ -591,7 +591,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         // all fragments' parameters are in this buffer
         ReferenceSerializeInputBE serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
 
-        int failures = engine->executePlanFragments(num_fragments,
+        int errorCode = engine->executePlanFragments(num_fragments,
                                                     fragmentIdsBuffer,
                                                     input_dep_ids ? depIdsBuffer : NULL,
                                                     serialize_in,
@@ -600,12 +600,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     lastCommittedSpHandle,
                                                     uniqueId,
                                                     undoToken);
-
-        if (failures > 0) {
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+        if (errorCode == 0) {
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+        }
+        else if (errorCode == 2) {
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_PAUSE;
         }
         else {
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
     }
     catch (const FatalException &e) {
@@ -959,6 +961,35 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
             bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
+            return success;
+        } catch (SerializableEEException &e) {
+            engine->resetReusedResultOutputBuffer();
+            e.serialize(engine->getExceptionOutputSerializer());
+        }
+    } catch (const FatalException& e) {
+        topend->crashVoltDB(e);
+    }
+
+    return false;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeActivateCopyOnWriteContext
+ * Signature: (JIII)Z
+ */
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateCopyOnWriteContext(
+        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint type)
+{
+    VOLT_DEBUG("nativeActivateCopyOnWriteContext in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+
+
+    try {
+        try {
+            voltdb::CopyOnWriteType cowType = static_cast<voltdb::CopyOnWriteType>(type);
+            bool success = engine->activateCopyOnWriteContext(tableId, cowType);
             return success;
         } catch (SerializableEEException &e) {
             engine->resetReusedResultOutputBuffer();

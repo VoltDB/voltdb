@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -113,6 +114,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         undoUndoToken(11),
         CustomPlanFragment(12),
         SetLogLevels(13),
+        ActivateCopyOnWriteContext(15),
         Quiesce(16),
         ActivateTableStream(17),
         TableStreamSerializeMore(18),
@@ -1206,6 +1208,37 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new IOException("Unable to send dependency table to client. Attempted blocking write of " +
                     message.capacity() + " but not all of it was written");
         }
+    }
+
+    @Override
+    public boolean activateCopyOnWriteContext(
+            int tableId,
+            CopyOnWriteType type) {
+        m_data.clear();
+        m_data.putInt(Commands.ActivateTableStream.m_id);
+        m_data.putInt(tableId);
+        m_data.putInt(type.ordinal());
+
+        try {
+            m_data.flip();
+            m_connection.write();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+
+        int result = ExecutionEngine.ERRORCODE_ERROR;
+        try {
+            result = m_connection.readStatusByte();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+
+        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+            return false;
+        }
+        return true;
     }
 
     @Override

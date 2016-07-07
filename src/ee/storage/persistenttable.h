@@ -66,13 +66,11 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
-#include "storage/ElasticIndex.h"
-#include "storage/CopyOnWriteIterator.h"
+#include "storage/ScanCopyOnWriteContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithCopyOnWrite;
+class CompactionTest;
 class CopyOnWriteTest;
 
 namespace catalog {
@@ -92,6 +90,7 @@ class MaterializedViewTriggerForWrite;
 class PersistentTableSurgeon {
     friend class PersistentTable;
     friend class ::CopyOnWriteTest;
+    friend class ::CompactionTest;
 
 public:
 
@@ -203,8 +202,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class TableFactory;
     friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
-    friend class ::CompactionTest_BasicCompaction;
-    friend class ::CompactionTest_CompactionWithCopyOnWrite;
+    friend class ::CompactionTest;
     friend class CoveringCellIndexTest_TableCompaction;
 
 private:
@@ -245,6 +243,14 @@ public:
         m_iter.reset(m_data.begin());
         m_iter.setTempTableDeleteAsGo(false);
         return m_iter;
+    }
+
+    bool advanceCOWIterator(TableTuple &tuple) {
+        return m_copyOnWriteContext->advanceIterator(tuple);
+    }
+
+    void cleanupTuple(TableTuple tuple) {
+        m_copyOnWriteContext->cleanupTuple(tuple, false);
     }
 
 
@@ -372,6 +378,16 @@ public:
         m_tempTuple.copy(source);
         return m_tempTuple;
     }
+
+    /**
+     * Prepare table for a long running read.
+     * Return true on success or false if it was already active.
+     */
+    bool activateCopyOnWriteContext(CopyOnWriteType cowType,
+                        int32_t partitionId,
+                        CatalogId tableId);
+
+    void deactivateCopyOnWriteContext();
 
     /**
      * Prepare table for streaming from serialized data.
@@ -688,8 +704,11 @@ private:
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
-    // Provides access to all table streaming apparati, including COW and recovery.
+    // Provides access to all table streaming apparati, including snapshot (COW) and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
+
+    // Provides access to a copy on write context used by a long running read
+    boost::shared_ptr<ScanCopyOnWriteContext> m_copyOnWriteContext;
 
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
@@ -722,6 +741,7 @@ private:
     std::vector<TableIndex*> m_indexes;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
+
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

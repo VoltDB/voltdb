@@ -301,9 +301,15 @@ public class ClientInterfaceHandleManager
         }
 
         final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
+        final Deque<Iv2InFlight> stillInflight = new ArrayDeque<Iv2InFlight>();
         while (perPartDeque.peekFirst() != null) {
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
+                // this may be a long running read query, which is OK if out of order
+                if (inFlight.m_procName.equals("@ReadOnlySlow")) {
+                    stillInflight.addLast(inFlight);
+                    continue;
+                }
                 // lost txn, do something eventually
                 tmLog.debug("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
                         " for partition: " + partitionId + " while searching for handle " +
@@ -326,11 +332,19 @@ public class ClientInterfaceHandleManager
                 tmLog.debug("CI clientData lookup missing handle: " + ciHandle
                         + ". Next expected client data handle is: " + inFlight.m_ciHandle);
                 perPartDeque.addFirst(inFlight);
+                // If there was an in flight transaction that we bypassed, add them back here
+                while (stillInflight.peekLast() != null) {
+                    perPartDeque.addFirst(stillInflight.pollLast());
+                }
                 break;
             }
             else {
                 m_acg.reduceBackpressure(inFlight.m_messageSize);
                 m_outstandingTxns--;
+                // If there was an in flight transaction that we bypassed, add them back here
+                while (stillInflight.peekLast() != null) {
+                    perPartDeque.addFirst(stillInflight.pollLast());
+                }
                 return inFlight;
             }
         }

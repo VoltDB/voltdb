@@ -909,7 +909,6 @@ public class SQLCommand
         Collections.synchronizedMap(new HashMap<String, List<Boolean>>());
     private static void loadSystemProcedures()
     {
-        // TODO: Remove @ReadOnlySlow
         Procedures.put("@ReadOnlySlow",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@Pause",

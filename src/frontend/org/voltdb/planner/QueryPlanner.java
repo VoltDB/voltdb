@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -35,9 +36,11 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
 
@@ -52,7 +55,7 @@ public class QueryPlanner {
     String m_procName;
     HSQLInterface m_HSQL;
     DatabaseEstimates m_estimates;
-    Cluster m_cluster;
+    static Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
     StatementPartitioning m_partitioning;
@@ -265,7 +268,7 @@ public class QueryPlanner {
         //  On failure, try the plan again without parameterization
 
         if (m_paramzInfo != null) {
-        	assert(!m_isHighVolume);
+            assert(!m_isHighVolume);
             try {
                 // compile the plan with new parameters
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
@@ -439,6 +442,7 @@ public class QueryPlanner {
             if (m_isHighVolume) {
                 bestPlan.setHighVolume(true);
                 sendNode.setHighVolume(true);
+                makeLeafSeqScansPauseable(bestPlan.rootPlanGraph);
             }
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -501,6 +505,15 @@ public class QueryPlanner {
 
         plan.subPlanGraph = sendNode;
         return;
+    }
+
+    public static void makeLeafSeqScansPauseable(AbstractPlanNode root) {
+        ArrayList<AbstractPlanNode> scanNodes = root.findAllNodesOfType(PlanNodeType.SEQSCAN);
+        for (AbstractPlanNode node : scanNodes) {
+            if (node.getParentCount() == 0) {
+                ((SeqScanPlanNode)node).setPausable(true, m_cluster.getLongreadstuplecount());
+            }
+        }
     }
 
     public static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {

@@ -41,6 +41,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CopyOnWriteType;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
@@ -393,6 +394,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public boolean activateCopyOnWriteContext(final int tableId, CopyOnWriteType type)
+        {
+            return m_ee.activateCopyOnWriteContext(tableId, type);
+        }
+
+        @Override
         public boolean activateTableStream(final int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
             return m_ee.activateTableStream(tableId, type, undo ? getNextUndoToken(m_currentTxnId) : Long.MAX_VALUE, predicates);
@@ -641,6 +648,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return (now - 5) > m_lastTxnTime;
             }
         });
+
     }
 
     /** Create a native VoltDB execution engine */

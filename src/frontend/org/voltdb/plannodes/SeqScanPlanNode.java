@@ -118,7 +118,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
             tableName += " (" + m_targetTableAlias +")";
         }
-        return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+        return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainType() + explainPredicate("\n" + indent + " filter by ");
     }
 
 }

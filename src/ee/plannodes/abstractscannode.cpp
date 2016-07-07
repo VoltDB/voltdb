@@ -91,6 +91,18 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
             //TODO: throw something
         }
     }
+
+    if (obj.hasNonNullKey("PAUSEABLE")) {
+        m_pauseable = obj.valueForKey("PAUSEABLE").asBool();
+    }
+    else {
+        m_pauseable = false;
+    }
+    if (obj.hasNonNullKey("PAUSELIMIT")) {
+        m_limit = obj.valueForKey("PAUSELIMIT").asInt();
+    } else {
+        m_limit = 1;
+    }
 }
 
 } // namespace voltdb
