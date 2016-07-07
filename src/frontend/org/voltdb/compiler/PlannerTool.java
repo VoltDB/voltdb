@@ -206,62 +206,60 @@ public class PlannerTool {
             String parsedToken = null;
             try {
                 planner.parse();
-                parsedToken = planner.parameterize();
+                if (!isHighVolume) {
+                	parsedToken = planner.parameterize();
+					// check the parameters count
+					// check user input question marks with input parameters
+					int inputParamsLengh = userParams == null ? 0 : userParams.length;
+					if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
+						wrongNumberParameters = true;
+						if (!isExplainMode) {
+							throw new PlanningErrorException(
+									String.format("Incorrect number of parameters passed: expected %d, passed %d",
+											planner.getAdhocUserParamsCount(), inputParamsLengh));
+						}
+					}
+					hasUserQuestionMark = planner.getAdhocUserParamsCount() > 0;
+					// do not put wrong parameter explain query into cache
+					if (!wrongNumberParameters && partitioning.isInferred()) {
+						// if cacheable, check the cache for a matching pre-parameterized plan
+						// if plan found, build the full plan using the parameter data in the
+						// QueryPlanner.
+						assert (parsedToken != null);
+						extractedLiterals = planner.extractedParamLiteralValues();
+						List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
+						if (boundVariants != null) {
+							assert (!boundVariants.isEmpty());
+							BoundPlan matched = null;
+							for (BoundPlan boundPlan : boundVariants) {
+								if (boundPlan.allowsParams(extractedLiterals)) {
+									matched = boundPlan;
+									break;
+								}
+							}
+							if (matched != null) {
+								CorePlan core = matched.m_core;
+								ParameterSet params = null;
+								if (planner.compiledAsParameterizedPlan()) {
+									params = planner.extractedParamValues(core.parameterTypes);
+								} else if (hasUserQuestionMark) {
+									params = ParameterSet.fromArrayNoCopy(userParams);
+								} else {
+									// No constants AdHoc queries
+									params = ParameterSet.emptyParameterSet();
+								}
 
-                // check the parameters count
-                // check user input question marks with input parameters
-                int inputParamsLengh = userParams == null ? 0: userParams.length;
-                if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
-                    wrongNumberParameters = true;
-                    if (!isExplainMode) {
-                        throw new PlanningErrorException(String.format(
-                                "Incorrect number of parameters passed: expected %d, passed %d",
-                                planner.getAdhocUserParamsCount(), inputParamsLengh));
-                    }
-                }
-                hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
-
-                // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred() && !isHighVolume) {
-                    // if cacheable, check the cache for a matching pre-parameterized plan
-                    // if plan found, build the full plan using the parameter data in the
-                    // QueryPlanner.
-                    assert(parsedToken != null);
-                    extractedLiterals = planner.extractedParamLiteralValues();
-                    List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
-                    if (boundVariants != null) {
-                        assert( ! boundVariants.isEmpty());
-                        BoundPlan matched = null;
-                        for (BoundPlan boundPlan : boundVariants) {
-                            if (boundPlan.allowsParams(extractedLiterals)) {
-                                matched = boundPlan;
-                                break;
-                            }
-                        }
-                        if (matched != null) {
-                            CorePlan core = matched.m_core;
-                            ParameterSet params = null;
-                            if (planner.compiledAsParameterizedPlan()) {
-                                params = planner.extractedParamValues(core.parameterTypes);
-                            } else if (hasUserQuestionMark) {
-                                params = ParameterSet.fromArrayNoCopy(userParams);
-                            } else {
-                                // No constants AdHoc queries
-                                params = ParameterSet.emptyParameterSet();
-                            }
-
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
-                                                                                   core,
-                                                                                   params,
-                                                                                   null);
-                            ahps.setBoundConstants(matched.m_constants);
-                            // parameterized plan from the cache does not have exception
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
-                            cacheUse = CacheUse.HIT2;
-                            return ahps;
-                        }
-                    }
-                }
+								AdHocPlannedStatement ahps = new AdHocPlannedStatement(
+										sql.getBytes(Constants.UTF8ENCODING), core, params, null);
+								ahps.setBoundConstants(matched.m_constants);
+								// parameterized plan from the cache does not have exception
+								m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
+								cacheUse = CacheUse.HIT2;
+								return ahps;
+							}
+						}
+					} 
+				}
 
                 // If not caching or there was no cache hit, do the expensive full planning.
                 plan = planner.plan();
@@ -303,10 +301,9 @@ public class PlannerTool {
                 // to -1 and to null, respectively.
                 core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
                 core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
-
-
-                assert(parsedToken != null);
+               
                 if (!isHighVolume) {
+                	assert(parsedToken != null);
                     // Again, plans with inferred partitioning are the only ones supported in the cache.
                     m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
                 }

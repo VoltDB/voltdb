@@ -265,6 +265,7 @@ public class QueryPlanner {
         //  On failure, try the plan again without parameterization
 
         if (m_paramzInfo != null) {
+        	assert(!m_isHighVolume);
             try {
                 // compile the plan with new parameters
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
