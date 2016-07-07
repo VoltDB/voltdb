@@ -86,6 +86,7 @@ public class TestClientClose extends TestCase {
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
         client.close();
+        ClientFactory.decreaseClientNum();
         Thread.sleep(2000);
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
         int postNumClientReaper = 0;
