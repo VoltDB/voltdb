@@ -1756,6 +1756,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
+     * Returns true if the specified set of "display columns" passed in by caller
+     * will be determistically ordered if sorting by the specified set of columns
+     * from an "ORDER BY" clause.  Note that the ORDER BY columns could be from an
+     * set operator (UNION, INTERSECT, etc) that has this select statement as a child.
      *
      * @param displayColumns  The set of display columns whose order we care about
      * @param orderColumns    The columns that we are ordering by

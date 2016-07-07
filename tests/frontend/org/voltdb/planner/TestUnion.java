@@ -372,6 +372,14 @@ public class TestUnion extends PlannerTestCase {
 
         // As above, but add a non-deterministic sort to the top of the plan: no longer deterministic.
         assertIsNonDeterministic("((select a, b, c from t7 order by a, b) union (select a, b, c from t7 order by a, b)) order by a");
+
+        // This is deterministic since the primary key on T7 (a, b) defines order on both sides,
+        // And both sides are identical.  But our planner is not yet smart enough to figure this out.
+        assertIsNonDeterministic("((select a, b, c from t7) union (select a, b, c from t7)) order by a, b");
+
+        // This is query is correctly marked as non-deterministic even though there is a PK on
+        // both sides that we are ordering by, because the third item on the select list is different.
+        assertIsNonDeterministic("((select a, b, cast(c as bigint) from t7) union (select a, b, c + 1 from t7)) order by a, b");
     }
 
     public void testOtherSetOpDeterminism()
