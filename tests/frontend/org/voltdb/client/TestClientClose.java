@@ -62,6 +62,7 @@ public class TestClientClose extends TestCase {
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();
+            ClientFactory.ACTIVE_CLIENT_COUNT.set(0);
         }
         catch (Exception e) {
             e.printStackTrace();

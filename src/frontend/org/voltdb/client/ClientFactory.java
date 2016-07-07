@@ -29,7 +29,7 @@ import org.voltcore.utils.EstTimeUpdater;
  */
 public abstract class ClientFactory {
 
-    private static AtomicInteger ACTIVE_CLIENT_COUNT = new AtomicInteger(0);
+    static AtomicInteger ACTIVE_CLIENT_COUNT = new AtomicInteger(0);
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -67,6 +67,10 @@ public abstract class ClientFactory {
 
     public static void decreaseClientNum() throws InterruptedException {
         // the client is the last alive client. Before exit, close all the static resources and threads.
+        int count = ACTIVE_CLIENT_COUNT.get();
+        if (count <= 0) {
+            return;
+        }
         if (ACTIVE_CLIENT_COUNT.decrementAndGet() == 0) {
             //Shut down the logger.
             VoltLogger.shutdownAsynchronousLogging();
@@ -75,11 +79,13 @@ public abstract class ClientFactory {
             //stop ReverseDNSCache.
             ReverseDNSCache.stop();
         }
+        count = ACTIVE_CLIENT_COUNT.get();
+        if (count < 0) {
+            ACTIVE_CLIENT_COUNT.compareAndSet(count,0);
+        }
     }
 
     public static void increaseClientCountToOne() {
-        if (ACTIVE_CLIENT_COUNT.get() == 0) {
-            ACTIVE_CLIENT_COUNT.set(1);
-        }
+        ACTIVE_CLIENT_COUNT.compareAndSet(0,1);
     }
 }
