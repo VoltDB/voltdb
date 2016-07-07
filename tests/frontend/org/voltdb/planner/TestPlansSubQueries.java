@@ -1556,6 +1556,12 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "   P3 X, P4 Y " +
                 "WHERE X.A = Y.A and T1.A = X.A",  "T1.A");
 
+        // Ambiguous column aliases with and without the subquery optimization
+        failToCompile("select * from (select A AC, C AC from R1) T where AC > 0",
+                "user lacks privilege or object not found: AC");
+        failToCompile("select * from (select A AC, C AC from R1  LIMIT 10) T where AC > 0",
+                "user lacks privilege or object not found: AC");
+
         //
         // (6) Subquery with partition table join with partition table on outer level
         //
@@ -2318,6 +2324,19 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSubquerySimplification(sql, equivalentSql);
 
         // Multiple Nested FROM subqueries
+        sql = "select * from (select * from (select * from R1 R1A) T1) T2";
+        equivalentSql = "select * from R1 T2";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select * from (select * from (select * from R1 R1A) T1 LIMIT 10) T2";
+        equivalentSql = "select * from (select * from R1 T1 LIMIT 10)T2";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // Multiple Nested FROM subqueries with ambiguous columns
+        sql = "select a from (select * from (select d as a, c, a as d from R1) T1) T2;";
+        equivalentSql = "select T2.D A from R1 T2";
+        checkSubquerySimplification(sql, equivalentSql);
+
         sql = "select T2.AAA AAAA from (select T1.AA AAA from (select R1A.A AA from R1 R1A) T1) T2";
         equivalentSql = "select T2.A AAAA from R1 T2";
         checkSubquerySimplification(sql, equivalentSql);
@@ -2366,10 +2385,14 @@ public class TestPlansSubQueries extends PlannerTestCase {
         sql = "select T1.A, T1.C from (select A, C from P1) T1 left join P2 on T1.A = P2.A ";
         equivalentSql = "select T1.A, T1.C from P1 T1 left join P2 on T1.A = P2.A ";
         checkSubquerySimplification(sql, equivalentSql, ignoreList);
-//
+
         // Display column Expressions
         sql = "select A1 A11 from (select A + 1 A1 from R1 where R1.C = 0) T1";
         equivalentSql = "select T1.A + 1 A11 from R1 T1 where T1.C = 0";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select * from (select a + c + d as acd, a * c * d as acd from R1) T1;";
+        equivalentSql = "select a + c + d as acd, a * c * d as acd from R1 T1";
         checkSubquerySimplification(sql, equivalentSql);
 
         sql = "select AC AC1 from (select A + C AC from R1 where R1.C = 0) T1";
