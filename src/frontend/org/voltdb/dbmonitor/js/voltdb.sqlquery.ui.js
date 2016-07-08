@@ -613,10 +613,9 @@ $(document).ready(function () {
             localArray = []
             if(localStorage.queries != undefined){
                 $.each($.parseJSON(localStorage.queries), function(key){
-                    localArray.push(key)
+                    localArray.push(key.split('_').splice(1).join())
                 })
             }
-
             if($.inArray('Query' + tab_counter, localArray) != -1 ||
             $.inArray('Query' + tab_counter, SQLQueryRender.queryNameList) != -1){
                 tab_counter++
