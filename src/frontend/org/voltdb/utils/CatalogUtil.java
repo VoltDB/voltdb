@@ -160,8 +160,6 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
-    public static String BAD_PASSWORD_WARN = null;
-
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
@@ -169,11 +167,13 @@ public abstract class CatalogUtil {
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
+    private static final String BAD_PASSWORD_WARN = "Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.";
 
     private static boolean m_exportEnabled = false;
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
+
     static {
         try {
             // This schema shot the sheriff.
@@ -620,13 +620,6 @@ public abstract class CatalogUtil {
         return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
-    public static String compileDeployment(Catalog catalog,
-            DeploymentType deployment,
-            boolean isPlaceHolderCatalog)
-    {
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog, false);
-    }
-
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
@@ -636,7 +629,7 @@ public abstract class CatalogUtil {
      */
     public static String compileDeployment(Catalog catalog,
             DeploymentType deployment,
-            boolean isPlaceHolderCatalog, boolean startUp)
+            boolean isPlaceHolderCatalog)
     {
         String errmsg = null;
 
@@ -666,7 +659,7 @@ public abstract class CatalogUtil {
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
             if (!isPlaceHolderCatalog) {
-                setUsersInfo(catalog, deployment.getUsers(), startUp);
+                setUsersInfo(catalog, deployment.getUsers());
             }
 
             // set the HTTPD info
@@ -1843,11 +1836,13 @@ public abstract class CatalogUtil {
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
      * @param users A reference to the <users> element of the deployment.xml file.
+     * @throws UsersInfoException
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users, boolean startUp) {
+    private static void setUsersInfo(Catalog catalog, UsersType users) throws UsersInfoException {
         if (users == null) {
             return;
         }
+
         // The database name is not available in deployment.xml (it is defined
         // in project.xml). However, it must always be named "database", so
         // I've temporarily hardcoded it here until a more robust solution is
@@ -1855,8 +1850,13 @@ public abstract class CatalogUtil {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
+        int maskInvalidAdminNum = 0;
+        int adminNum = 0;
         for (UsersType.User user : users.getUser()) {
-
+            Set<String> roles = extractUserRoles(user);
+            if (roles.contains("administrator")) {
+                adminNum++;
+            }
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
@@ -1867,13 +1867,12 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                BAD_PASSWORD_WARN = "Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.";
-                if (startUp) {
-                    hostLog.fatal(BAD_PASSWORD_WARN);
-                    System.exit(-1);
-                } else {
-                    hostLog.warn(BAD_PASSWORD_WARN);
+                if (roles.contains("administrator")) {
+                    maskInvalidAdminNum++;
                 }
+                // if one user has invalid password, give a warn and skip.
+                hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file");
+                continue;
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1891,7 +1890,7 @@ public abstract class CatalogUtil {
             catUser.setSha256shadowpassword(hashedPW256);
 
             // process the @groups and @roles comma separated list
-            for (final String role : extractUserRoles(user)) {
+            for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
@@ -1904,6 +1903,10 @@ public abstract class CatalogUtil {
                             "and may not have the expected database permissions.");
                 }
             }
+        }
+        // if all administrators have invalid password, throws an exception.
+        if (maskInvalidAdminNum == adminNum) {
+            throw new UsersInfoException("No administrator user has valid password.");
         }
     }
 

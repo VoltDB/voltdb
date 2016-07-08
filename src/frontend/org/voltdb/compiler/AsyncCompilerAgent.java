@@ -43,7 +43,6 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -325,10 +324,6 @@ public class AsyncCompilerAgent {
     private void dispatchCatalogChangeWork(CatalogChangeWork work)
     {
         final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
-        if (CatalogUtil.BAD_PASSWORD_WARN != null) {
-            result.errorMsg = CatalogUtil.BAD_PASSWORD_WARN;
-            CatalogUtil.BAD_PASSWORD_WARN = null;
-        }
         if (result.errorMsg != null) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
         }
