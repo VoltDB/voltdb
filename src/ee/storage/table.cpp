@@ -271,7 +271,7 @@ size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
     return bytes;
 }
 
-template<class T> bool Table::serializeColumnHeaderTo(SerializeOutput<T> &serialize_io) {
+template<class T> bool Table::serializeColumnHeaderTo(T &serialize_io) {
 
     /* NOTE:
        VoltDBEngine uses a binary template to create tables of single integers.
@@ -336,12 +336,11 @@ template<class T> bool Table::serializeColumnHeaderTo(SerializeOutput<T> &serial
     return true;
 
 }
-template bool Table::serializeColumnHeaderTo<ReferenceSerializeOutput>(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
-template bool Table::serializeColumnHeaderTo<CopySerializeOutput>(SerializeOutput<CopySerializeOutput> &serialize_io);
-template bool Table::serializeColumnHeaderTo<SerializeOutputFile>(SerializeOutput<SerializeOutputFile> &serialize_io);
+template bool Table::serializeColumnHeaderTo<TypedSerializeOutput<SerializeOutputBuffer>>(TypedSerializeOutput<SerializeOutputBuffer> &serialize_io);
+template bool Table::serializeColumnHeaderTo<TypedSerializeOutput<SerializeOutputFile>>(TypedSerializeOutput<SerializeOutputFile> &serialize_io);
 
 
-template<class T> bool Table::serializeTo(SerializeOutput<T> &serialize_io) {
+template<class T> bool Table::serializeTo(T &serialize_io) {
     // The table is serialized as:
     // [(int) total size]
     // [(int) header size] [num columns] [column types] [column names]
@@ -377,12 +376,10 @@ template<class T> bool Table::serializeTo(SerializeOutput<T> &serialize_io) {
 
     return true;
 }
-template bool Table::serializeTo<ReferenceSerializeOutput>(SerializeOutput<ReferenceSerializeOutput> &serialize_io);
-template bool Table::serializeTo<FallbackSerializeOutput>(SerializeOutput<FallbackSerializeOutput> &serialize_io);
-template bool Table::serializeTo<CopySerializeOutput>(SerializeOutput<CopySerializeOutput> &serialize_io);
-template bool Table::serializeTo<SerializeOutputFile>(SerializeOutput<SerializeOutputFile> &serialize_io);
+template bool Table::serializeTo<TypedSerializeOutput<SerializeOutputBuffer>>(TypedSerializeOutput<SerializeOutputBuffer> &serialize_io);
+template bool Table::serializeTo<TypedSerializeOutput<SerializeOutputFile>>(TypedSerializeOutput<SerializeOutputFile> &serialize_io);
 
-bool Table::serializeToWithoutTotalSize(SerializeOutput<ReferenceSerializeOutput> &serialize_io) {
+bool Table::serializeToWithoutTotalSize(TypedSerializeOutput<ReferenceSerializeOutputBuffer> &serialize_io) {
     if (!serializeColumnHeaderTo(serialize_io))
         return false;
 
@@ -404,7 +401,7 @@ bool Table::serializeToWithoutTotalSize(SerializeOutput<ReferenceSerializeOutput
  * Serialized the table, but only includes the tuples specified (columns data and all).
  * Used by the exception stuff Ariel put in.
  */
-bool Table::serializeTupleTo(SerializeOutput<ReferenceSerializeOutput> &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
+bool Table::serializeTupleTo(TypedSerializeOutput<ReferenceSerializeOutputBuffer> &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
     //assert(m_schema->equals(tuples[0].getSchema()));
 
     std::size_t pos = serialize_io.reserveBytes(sizeof(int));
@@ -447,7 +444,7 @@ bool Table::equals(voltdb::Table *other) {
 
 template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
                                    Pool *stringPool,
-                                   SerializeOutput<T> *uniqueViolationOutput,
+                                   T *uniqueViolationOutput,
                                    bool shouldDRStreamRow) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
@@ -486,18 +483,14 @@ template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serializ
         }
     }
 }
-template void Table::loadTuplesFromNoHeader <ReferenceSerializeOutput> (SerializeInputBE &serialize_io,
+template void Table::loadTuplesFromNoHeader <TypedSerializeOutput<SerializeOutputBuffer>> (SerializeInputBE &serialize_io,
                                    Pool *stringPool,
-                                   SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                                   bool shouldDRStreamRow);
-template void Table::loadTuplesFromNoHeader <FallbackSerializeOutput> (SerializeInputBE &serialize_io,
-                                   Pool *stringPool,
-                                   SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                                   TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
                                    bool shouldDRStreamRow);
 
 template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                            Pool *stringPool,
-                           SerializeOutput<T> *uniqueViolationOutput,
+                           T *uniqueViolationOutput,
                            bool shouldDRStreamRow) {
     /*
      * directly receives a VoltTable buffer.
@@ -558,13 +551,9 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
-template void Table::loadTuplesFrom <ReferenceSerializeOutput> (SerializeInputBE &serialize_io,
+template void Table::loadTuplesFrom <TypedSerializeOutput<SerializeOutputBuffer>> (SerializeInputBE &serialize_io,
                            Pool *stringPool,
-                           SerializeOutput<ReferenceSerializeOutput> *uniqueViolationOutput,
-                           bool shouldDRStreamRow);
-template void Table::loadTuplesFrom <FallbackSerializeOutput> (SerializeInputBE &serialize_io,
-                           Pool *stringPool,
-                           SerializeOutput<FallbackSerializeOutput> *uniqueViolationOutput,
+                           TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
                            bool shouldDRStreamRow);
 
 }

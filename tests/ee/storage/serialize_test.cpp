@@ -116,7 +116,7 @@ class TableSerializeTest : public Test {
         }
 
         template <class T> size_t serializeTable(T* serializer) {
-            SerializeOutput<T> serialize_out(serializer);
+            TypedSerializeOutput<T> serialize_out(serializer);
             table_->serializeTo(serialize_out);
             return serializer->size();
         }
@@ -183,7 +183,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
         VOLT_DEBUG(" %s", tuple.debug(table_.get()).c_str());
     }*/
     // Serialize the table
-    CopySerializeOutput serializer;
+    CopySerializeOutputBuffer serializer;
     size_t size = serializeTable(&serializer);
 
     // Deserialize the table: verify that it matches the existing table
@@ -191,7 +191,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -199,7 +199,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     }
 
     // Serialize the table a second time, verify that it's the same
-    CopySerializeOutput serializer2;
+    CopySerializeOutputBuffer serializer2;
     size_t size2 = serializeTable(&serializer2);
     ASSERT_EQ(size, size2);
     const void *data1 = serializer.data();
@@ -229,7 +229,7 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -265,7 +265,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     TableTuple& tuple = setupNullStrings();
 
     // Serialize the table
-    CopySerializeOutput serializer;
+    CopySerializeOutputBuffer serializer;
     serializeTable(&serializer);
 
     // Deserialize the table: verify that it matches the existing table
@@ -273,7 +273,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
 
     checkNullStrings(deserialized, tuple);
 
@@ -302,7 +302,7 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
 
     checkNullStrings(deserialized, tuple);
     delete deserialized;

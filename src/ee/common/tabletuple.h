@@ -424,7 +424,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    template<class T> void serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns = false);
+    template<class T> void serializeTo(voltdb::TypedSerializeOutput<T> &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -961,7 +961,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-template<class T> inline void TableTuple::serializeTo(voltdb::SerializeOutput<T> &output, bool includeHiddenColumns) {
+template<class T> inline void TableTuple::serializeTo(voltdb::TypedSerializeOutput<T> &output, bool includeHiddenColumns) {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {

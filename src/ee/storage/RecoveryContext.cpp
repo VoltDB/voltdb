@@ -43,7 +43,7 @@ RecoveryContext::RecoveryContext(
  * RECOVERY_MSG_TYPE_COMPLETE indicating that all tuple data and updates to shipped data
  * have been sent.
  */
-bool RecoveryContext::nextMessage(SerializeOutput<ReferenceSerializeOutput> * out) {
+bool RecoveryContext::nextMessage(TypedSerializeOutput<ReferenceSerializeOutputBuffer> * out) {
     if (m_recoveryPhase == RECOVERY_MSG_TYPE_COMPLETE) {
         return false;
     }

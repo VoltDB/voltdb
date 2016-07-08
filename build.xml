@@ -1546,7 +1546,7 @@ NATIVE EE STUFF
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <env key="EETESTSUITE" value="storage"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <arg line="build.py ${build} test" />
     </exec>

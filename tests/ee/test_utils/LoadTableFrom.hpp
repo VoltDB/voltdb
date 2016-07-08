@@ -65,7 +65,7 @@ bool debug_print = false;
 TempTable *loadTableFrom(const char *buffer,
                      size_t size,
                      Pool * pool= NULL,
-                     ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                     ReferenceSerializeOutputBuffer *uniqueViolationOutput = NULL,
                      bool shouldDRStreamRows = false)
 {
     ReferenceSerializeInputBE result(buffer, size);
@@ -118,7 +118,7 @@ TempTable *loadTableFrom(const char *buffer,
                                        schema, // Transfers ownership to the table.
                                        columnNames,
                                        NULL);
-    table->loadTuplesFromNoHeader<ReferenceSerializeOutput>(result);
+    table->loadTuplesFromNoHeader<TypedOutput<SerializeOutput>>(result);
     return table;
 }
 }

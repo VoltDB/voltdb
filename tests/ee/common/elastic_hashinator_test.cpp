@@ -36,8 +36,8 @@ class ElasticHashinatorTest : public Test {
 TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
-    ReferenceSerializeOutput serializer(config.get(), 4 + (12 * 3));
-    SerializeOutput<ReferenceSerializeOutput> output(&serializer);
+    ReferenceSerializeOutputBuffer serializer(config.get(), 4 + (12 * 3));
+    TypedSerializeOutput<ReferenceSerializeOutputBuffer> output(&serializer);
 
     output.writeInt(3);
     output.writeInt(std::numeric_limits<int32_t>::min());
@@ -85,8 +85,8 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 TEST_F(ElasticHashinatorTest, TestNValueHashToken)
 {
     boost::scoped_array<char> config(new char[4 + (12 * 3)]);
-    ReferenceSerializeOutput serializer(config.get(), 4 + (12 * 3));
-    SerializeOutput<ReferenceSerializeOutput> output(&serializer);
+    ReferenceSerializeOutputBuffer serializer(config.get(), 4 + (12 * 3));
+    TypedSerializeOutput<ReferenceSerializeOutputBuffer> output(&serializer);
 
     output.writeInt(3);
     output.writeInt(std::numeric_limits<int32_t>::min());

@@ -209,8 +209,8 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> serialize_out(&serializer);
+    CopySerializeOutputBuffer serializer;
+    TypedSerializeOutput<CopySerializeOutputBuffer> serialize_out(&serializer);
     m_table->serializeTo(serialize_out);
 
     m_engine->setUndoToken(INT64_MIN + 2);
@@ -232,7 +232,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);
@@ -255,8 +255,8 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> serialize_out(&serializer);
+    CopySerializeOutputBuffer serializer;
+    TypedSerializeOutput<CopySerializeOutputBuffer> serialize_out(&serializer);
     m_table->serializeTo(serialize_out);
 
     m_engine->setUndoToken(INT64_MIN + 2);
@@ -278,7 +278,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     // de-duplicated with executorcontext data
     m_engine->updateExecutorContextUndoQuantumForTest();
 
-    m_table->loadTuplesFrom<ReferenceSerializeOutput>(serialize_in, NULL, NULL);
+    m_table->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
 
     tableutil::getRandomTuple(m_table, tuple);

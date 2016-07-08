@@ -26,5 +26,5 @@ InterruptException::InterruptException(std::string message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
 }
 
-void InterruptException::p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const {
+void InterruptException::p_serialize(TypedSerializeOutput<ReferenceSerializeOutputBuffer> *output) const {
 }

@@ -25,8 +25,8 @@ namespace voltdb {
 class Pool;
 class TupleSchema;
 class TupleSerializer;
-template <class SO> class SerializeOutput;
-class ReferenceSerializeOutput;
+template <class SO> class TypedSerializeOutput;
+class ReferenceSerializeOutputBuffer;
 
 /*
  * A class for generating and receiving recovery messages. The class mixes read/write functionality along
@@ -52,7 +52,7 @@ public:
             CatalogId tableId,
             uint32_t totalTupleCount,//Number of tuples in table overall
                                     //Not the number in this message. Used to size hash tables.
-            SerializeOutput<ReferenceSerializeOutput> *out,
+            TypedSerializeOutput<ReferenceSerializeOutputBuffer> *out,
             TupleSerializer *serializer,
             const TupleSchema *schema);
 
@@ -75,7 +75,7 @@ private:
     /*
      * Output serializer. May be null if this is a received message
      */
-    SerializeOutput<ReferenceSerializeOutput> *m_out;
+    TypedSerializeOutput<ReferenceSerializeOutputBuffer> *m_out;
 
     /*
      * Position to put the count of tuples @ once serialization is complete.

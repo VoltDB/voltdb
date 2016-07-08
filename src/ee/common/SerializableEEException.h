@@ -24,8 +24,8 @@
 
 namespace voltdb {
 
-template <class SO> class SerializeOutput;
-class ReferenceSerializeOutput;
+template <class SO> class TypedSerializeOutput;
+class ReferenceSerializeOutputBuffer;
 
 enum VoltEEExceptionType {
     VOLT_EE_EXCEPTION_TYPE_NONE = 0,
@@ -56,12 +56,12 @@ public:
     SerializableEEException(std::string message);
     virtual ~SerializableEEException();
 
-    void serialize (SerializeOutput<ReferenceSerializeOutput> *output) const;
+    void serialize (TypedSerializeOutput<ReferenceSerializeOutputBuffer> *output) const;
     virtual const std::string message() const { return m_message; }
     VoltEEExceptionType getType() const { return m_exceptionType; }
     void appendContextToMessage(const std::string& more) { m_message += more; }
 protected:
-    virtual void p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const {};
+    virtual void p_serialize(TypedSerializeOutput<ReferenceSerializeOutputBuffer> *output) const {};
 
 private:
     const VoltEEExceptionType m_exceptionType;

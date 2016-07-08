@@ -311,8 +311,8 @@ class NValue {
     void deserializeFromAllocateForStorage(SerializeInputBE& input, Pool* tempPool);
     void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE& input, Pool* tempPool);
 
-    /* Serialize this NValue to a SerializeOutput */
-    template<class T> void serializeTo(SerializeOutput<T> &output) const;
+    /* Serialize this NValue to a TypeOutput */
+    template<class T> void serializeTo(T &output) const;
 
     /* Serialize this NValue to an Export stream */
     void serializeToExport_withoutNull(ExportSerializeOutput&) const;
@@ -3090,7 +3090,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
 /**
  * Serialize this NValue to the provided SerializeOutput
  */
-template<class T> inline void NValue::serializeTo(SerializeOutput<T> &output) const {
+template<class T> inline void NValue::serializeTo(T &output) const {
     const ValueType type = getValueType();
     switch (type) {
     case VALUE_TYPE_VARCHAR:

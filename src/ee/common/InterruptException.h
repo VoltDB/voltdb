@@ -21,8 +21,8 @@
 #include "common/SerializableEEException.h"
 
 namespace voltdb {
-template <class SO> class SerializeOutput;
-class ReferenceSerializeOutput;
+template <class SO> class TypedSerializeOutput;
+class ReferenceSerializeOutputBuffer;
 
 /**
  * Thrown when it has been decided that a query is taking too
@@ -35,7 +35,7 @@ public:
     virtual ~InterruptException() {}
 
 protected:
-    void p_serialize(SerializeOutput<ReferenceSerializeOutput> *output) const;
+    void p_serialize(TypedSerializeOutput<ReferenceSerializeOutputBuffer> *output) const;
 private:
 };
 }

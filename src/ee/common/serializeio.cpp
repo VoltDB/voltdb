@@ -19,7 +19,7 @@
 
 using namespace voltdb;
 
-void FallbackSerializeOutput::expand(size_t minimum_desired) {
+void FallbackSerializeOutputBuffer::expand(size_t minimum_desired) {
     /*
      * Leave some space for message headers and such, almost 50 megabytes
      */

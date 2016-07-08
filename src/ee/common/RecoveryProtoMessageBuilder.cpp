@@ -29,7 +29,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         const RecoveryMsgType type,
         CatalogId tableId,
         uint32_t totalTupleCount,
-        SerializeOutput<ReferenceSerializeOutput> *out,
+        TypedSerializeOutput<ReferenceSerializeOutputBuffer> *out,
         TupleSerializer *serializer,
         const TupleSchema *schema) :
     m_out(out),

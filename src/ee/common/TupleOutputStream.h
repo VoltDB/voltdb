@@ -33,7 +33,7 @@ class TupleSerializer;
  * Serialization output class with some additional data that allows the
  * filtered COW processing to manage the stream.
  */
-class TupleOutputStream : public SerializeOutput<ReferenceSerializeOutput> {
+class TupleOutputStream : public TypedSerializeOutput<ReferenceSerializeOutputBuffer> {
 
 public:
 
@@ -88,7 +88,7 @@ private:
     std::size_t m_rowCountPosition;
     /** Keep track of bytes written for throttling to yield control. */
     std::size_t m_totalBytesSerialized;
-    ReferenceSerializeOutput m_serializer;
+    ReferenceSerializeOutputBuffer m_serializer;
 };
 
 } // namespace voltdb

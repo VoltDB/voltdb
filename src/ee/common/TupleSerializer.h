@@ -30,7 +30,7 @@ public:
     /**
      * Serialize the provided tuple to the provide serialize output
      */
-    virtual void serializeTo(TableTuple tuple, SerializeOutput<ReferenceSerializeOutput> *out) = 0;
+    virtual void serializeTo(TableTuple tuple, TypedSerializeOutput<ReferenceSerializeOutputBuffer> *out) = 0;
 
     /**
      * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple

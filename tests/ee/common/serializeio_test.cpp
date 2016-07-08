@@ -61,7 +61,7 @@ public:
     SerializeIOTest() : TEXT("hello world") {}
 protected:
     const string TEXT;
-    void writeTestSuite(SerializeOutput<CopySerializeOutput>* out) {
+    void writeTestSuite(TypedSerializeOutput<CopySerializeOutputBuffer>* out) {
         out->writeBool(true);
         out->writeBool(false);
         out->writeByte(numeric_limits<int8_t>::min());
@@ -99,8 +99,8 @@ protected:
 };
 
 TEST_F(SerializeIOTest, ReadWrite) {
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> out(&serializer);
+    CopySerializeOutputBuffer serializer;
+    TypedSerializeOutput<CopySerializeOutputBuffer> out(&serializer);
     writeTestSuite(&out);
 
     ReferenceSerializeInputBE in(serializer.data(), serializer.size());
@@ -120,9 +120,9 @@ TEST_F(SerializeIOTest, Unread) {
     EXPECT_EQ(0x01020304, in.readInt());
 }
 
-TEST(SerializeOutput, ReserveBytes) {
-    CopySerializeOutput serializer;
-    SerializeOutput<CopySerializeOutput> out(&serializer);
+TEST(TypedSerializeOutput, ReserveBytes) {
+    CopySerializeOutputBuffer serializer;
+    TypedSerializeOutput<CopySerializeOutputBuffer> out(&serializer);
     size_t offset = out.reserveBytes(4);
     EXPECT_EQ(0, offset);
     EXPECT_EQ(4, serializer.size());

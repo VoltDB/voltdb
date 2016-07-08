@@ -23,7 +23,7 @@
 namespace voltdb {
 
 TupleOutputStream::TupleOutputStream(void *data, std::size_t length) :
-    SerializeOutput<ReferenceSerializeOutput>(&m_serializer),
+    TypedOutput<ReferenceSerializeOutputBuffer>(&m_serializer),
     m_rowCount(0),
     m_rowCountPosition(0),
     m_totalBytesSerialized(0)

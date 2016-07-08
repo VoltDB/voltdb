@@ -400,11 +400,11 @@ typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
 #endif
 
 /** Implementation of SerializeOutput that references an existing buffer. */
-class ReferenceSerializeOutput : public SerializeOutputBuffer {
+class ReferenceSerializeOutputBuffer : public SerializeOutputBuffer {
 public:
-    ReferenceSerializeOutput() : SerializeOutputBuffer() {
+    ReferenceSerializeOutputBuffer() : SerializeOutputBuffer() {
     }
-    ReferenceSerializeOutput(void* data, size_t length) : SerializeOutputBuffer() {
+    ReferenceSerializeOutputBuffer(void* data, size_t length) : SerializeOutputBuffer() {
         initialize(data, length);
     }
 
@@ -419,7 +419,7 @@ public:
     }
 
     // Destructor does nothing: nothing to clean up!
-    virtual ~ReferenceSerializeOutput() {}
+    virtual ~ReferenceSerializeOutputBuffer() {}
 
 protected:
     /** Reference output can't resize the buffer: Frowny-Face. */
@@ -434,10 +434,10 @@ protected:
  * A serialize output class that falls back to allocating a 50 meg buffer
  * if the regular allocation runs out of space. The topend is notified when this occurs.
  */
-class FallbackSerializeOutput : public ReferenceSerializeOutput {
+class FallbackSerializeOutputBuffer : public ReferenceSerializeOutputBuffer {
 public:
-    FallbackSerializeOutput() :
-        ReferenceSerializeOutput(), fallbackBuffer_(NULL) {
+    FallbackSerializeOutputBuffer() :
+        ReferenceSerializeOutputBuffer(), fallbackBuffer_(NULL) {
     }
 
     /** Set the buffer to buffer with capacity and sets the position. */
@@ -452,7 +452,7 @@ public:
     }
 
     // Destructor frees the fallback buffer if it is allocated
-    virtual ~FallbackSerializeOutput() {
+    virtual ~FallbackSerializeOutputBuffer() {
         delete []fallbackBuffer_;
     }
 
@@ -463,18 +463,18 @@ private:
 };
 
 /** Implementation of SerializeOutput that makes a copy of the buffer. */
-class CopySerializeOutput : public SerializeOutputBuffer {
+class CopySerializeOutputBuffer : public SerializeOutputBuffer {
 public:
     // Start with something sizeable so we avoid a ton of initial
     // allocations.
     static const int INITIAL_SIZE = 8388608;
 
-    CopySerializeOutput() : bytes_(INITIAL_SIZE) {
+    CopySerializeOutputBuffer() : bytes_(INITIAL_SIZE) {
         initialize(bytes_.data(), INITIAL_SIZE);
     }
 
     // Destructor frees the ByteArray.
-    virtual ~CopySerializeOutput() {}
+    virtual ~CopySerializeOutputBuffer() {}
 
     void reset() {
         setPosition(0);
@@ -568,11 +568,6 @@ public:
         ofile.write((char*)&value,sizeof(value));
     }
 
-    template <typename T>
-    void writePrimitiveAt(T value) {
-        ofile.write((char*)&value,sizeof(value));
-    }
-
 private:
 
     // No implicit copies
@@ -582,10 +577,10 @@ private:
 };
 
 /** Template class for serializing output. */
-template <class SO> class SerializeOutput {
+template <class SO> class TypedSerializeOutput {
 public:
-    SerializeOutput() : serialize_output_(NULL) { };
-    SerializeOutput(SO * serializer) : serialize_output_(serializer) { };
+    TypedSerializeOutput() : serialize_output_(NULL) { };
+    TypedSerializeOutput(SO * serializer) : serialize_output_(serializer) { };
 private:
     SO * serialize_output_;
 public:

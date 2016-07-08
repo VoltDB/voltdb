@@ -28,8 +28,8 @@
 namespace voltdb {
 class PersistentTable;
 class PersistentTableSurgeon;
-template <class SO> class SerializeOutput;
-class ReferenceSerializeOutput;
+template <class SO> class TypedSerializeOutput;
+class ReferenceSerializeOutputBuffer;
 
 class RecoveryContext : public TableStreamerContext {
 
@@ -43,7 +43,7 @@ public:
      * RECOVERY_MSG_TYPE_COMPLETE indicating that all tuple data and updates to shipped data
      * have been sent. Returns false when there are no more recovery messages.
      */
-    bool nextMessage(SerializeOutput<ReferenceSerializeOutput> * out);
+    bool nextMessage(TypedSerializeOutput<ReferenceSerializeOutputBuffer> * out);
 
     /**
      * Mandatory TableStreamContext override.
