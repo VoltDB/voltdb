@@ -1169,7 +1169,7 @@
             if(localStorage.transDetailsDay != undefined)
                 transDetailsArrDay = JSON.parse(localStorage.transDetailsDay)
 
-            if(monitor.tpsData){
+            if(monitor.tpsFirstData){
                 for(var i = 0; i< transDetailsArr.length; i++){
                     sliceFirstData(monitor.tpsData, dataView.Seconds);
                     monitor.tpsData.push({"x": new Date(transDetailsArr[i].timestamp),
@@ -1229,7 +1229,7 @@
             }
             else{
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+//                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
             }
 
             localStorage.transDetails = JSON.stringify(transDetailsArr)
@@ -1588,11 +1588,15 @@
             if(localStorage.cmdLogDay != undefined)
                 cmdLogArrDay = JSON.parse(localStorage.cmdLogDay)
 
+
+            if(localStorage.cmdLog != undefined)
+                cmdLogArr = JSON.parse(localStorage.cmdLog)
+
             if(monitor.cmdLogFirstData){
                 for(var i = 0; i< cmdLogArr.length; i++){
-                    sliceFirstData(monitor.cmd, dataView.Seconds);
+                    sliceFirstData(monitor.cmdLogData, dataView.Seconds);
                     monitor.cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
-                        "y": cmdLogArr[i].outStandingTxn
+                        "y": cmdLogArr[i].outstandingTxn
                     })
                 }
             }
@@ -1600,8 +1604,7 @@
             if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
-            if(localStorage.cmdLog != undefined)
-                cmdLogArr = JSON.parse(localStorage.cmdLog)
+
 
             var timeStamp = cmdLogDetail[currentServer].TIMESTAMP;
             if (timeStamp >= monitor.cmdLogMaxTimeStamp) {
