@@ -63,6 +63,7 @@ public:
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
+                             1,     // sitesPerHost
                              0,     // hostId
                              "",    // hostname
                              0,     // drClusterId

@@ -56,6 +56,7 @@ class AddDropTableTest : public Test {
         m_engine->initialize(m_clusterId,
                              m_siteId,
                              m_partitionId,
+                             partitionCount,
                              m_hostId,
                              m_hostName,
                              m_drClusterId,

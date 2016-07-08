@@ -234,7 +234,6 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
 
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 {
-    VOLT_ERROR("allocating space of size %ld while on pool %p", sz, ThreadLocalPool::getDataPoolPair());
     PoolsByObjectSize& pools =
             *(static_cast< PoolPairTypePtr >(pthread_getspecific(m_key))->second);
     PoolsByObjectSize::iterator iter = pools.find(sz);
@@ -242,7 +241,6 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
     if (iter == pools.end()) {
         pool = new PoolForObjectSize(sz);
         PoolForObjectSizePtr poolPtr(pool);
-        VOLT_ERROR("adding pool for size %ld", sz);
         pools.insert(std::pair<std::size_t, PoolForObjectSizePtr>(sz, poolPtr));
     }
     else {
@@ -272,15 +270,12 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
         // plan to allocate a 2MB block, but no larger, even if it eventually
         // requires more blocks than boost would normally allocate.
         if (pool->get_requested_size() < (1024 * 256)) {
-            VOLT_ERROR("Setting next size (small)");
             pool->set_next_size((1024 * 1024 * 2) /  pool->get_requested_size());
         } else {
-            VOLT_ERROR("Setting next size (large)");
             //For large objects allocated just two of them
             pool->set_next_size(2);
         }
     }
-    VOLT_ERROR("Calling Malloc");
     return pool->malloc();
 }
 

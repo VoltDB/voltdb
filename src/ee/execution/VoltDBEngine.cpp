@@ -655,7 +655,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     }
 
     if (m_partitionId == 16383) {
-        // Don't bother allocating tables on the mp site's ee
+        // Don't allocate tables on the MP thread because the last SP thread will do that
         return true;
     }
     assert(m_catalog != NULL);
@@ -684,21 +684,21 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
-        //VoltDBEngine* mpEngine = mpEngineLocals->engine;
+        VoltDBEngine* mpEngine = mpEngineLocals->engine;
         ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
 
-//        // load up all the tables, adding all tables
-//        if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
-//            return false;
-//        }
-//
-//        mpEngine->rebuildTableCollections(true);
-//
-//        // load up all the materialized views
-//        // and limit delete statements.
-//        //
-//        // This must be done after loading all the tables.
-//        mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
+        // load up all the tables, adding all tables
+        if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
+            return false;
+        }
+
+        mpEngine->rebuildTableCollections(true);
+
+        // load up all the materialized views
+        // and limit delete statements.
+        //
+        // This must be done after loading all the tables.
+        mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         // Assign the correct pool back to this thread
@@ -874,22 +874,21 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             // add a completely new table
             //////////////////////////////////////////
 
-//            if (catalogTable->isreplicated()) {
-//                if (updateReplicated) {
-//                    tcd = new TableCatalogDelegate(catalogTable->signature(),
-//                                                   m_compactionThreshold);
-//                    // use the delegate to init the table and create indexes n' stuff
-//                    tcd->init(*m_database, *catalogTable);
-//                    std::string& tableName = tcd->getTable()->name();
-//                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-//                        VoltDBEngine* currEngine = enginePair.second.engine;
-//                        currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
-//                        currEngine->m_delegatesByName[tableName] = tcd;
-//                    }
-//                }
-//            }
-//            else {
-            {
+            if (catalogTable->isreplicated()) {
+                if (updateReplicated) {
+                    tcd = new TableCatalogDelegate(catalogTable->signature(),
+                                                   m_compactionThreshold);
+                    // use the delegate to init the table and create indexes n' stuff
+                    tcd->init(*m_database, *catalogTable);
+                    const std::string& tableName = tcd->getTable()->name();
+                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                        VoltDBEngine* currEngine = enginePair.second.engine;
+                        currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
+                        currEngine->m_delegatesByName[tableName] = tcd;
+                    }
+                }
+            }
+            else {
                 tcd = new TableCatalogDelegate(catalogTable->signature(),
                                                m_compactionThreshold);
                 // use the delegate to init the table and create indexes n' stuff
@@ -941,6 +940,10 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             }
         }
         else {
+            if (catalogTable->isreplicated() && !updateReplicated) {
+                // replicated tables should only be processed once for the entire cluster
+                continue;
+            }
 
             //////////////////////////////////////////////
             // update the export info for existing tables
@@ -1010,6 +1013,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             }
 
             PersistentTable *persistentTable = tcd->getPersistentTable();
+
             //////////////////////////////////////////
             // if the table schema has changed, build a new
             // table and migrate tuples over to it, repopulating
@@ -1211,29 +1215,24 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
     if (lastSite) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
-        EngineLocals* ourEngineLocals = NULL;
-        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-            EngineLocals locals = enginePair.second;
-            VoltDBEngine* currEngine = locals.engine;
-            ThreadLocalPool::assignThreadLocals(locals);
-            bool thisEngine = (currEngine == this);
-            if (thisEngine) {
-                ourEngineLocals = &locals;
-            }
+        EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
+        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
+        VoltDBEngine* mpEngine = mpEngineLocals->engine;
+        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
 
-            currEngine->processCatalogDeletes(timestamp, thisEngine);
+        mpEngine->processCatalogDeletes(timestamp, true);
 
-            if (currEngine->processCatalogAdditions(timestamp, thisEngine) == false) {
-                VOLT_ERROR("Error processing catalog additions.");
-                return false;
-            }
-
-            currEngine->rebuildTableCollections(thisEngine);
-
-            currEngine->initMaterializedViewsAndLimitDeletePlans(thisEngine);
-
-            currEngine->m_catalog->purgeDeletions();
+        // load up all the tables, adding all tables
+        if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
+            return false;
         }
+
+        mpEngine->rebuildTableCollections(true);
+
+        mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
+
+        mpEngine->m_catalog->purgeDeletions();
+
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
         signalLastSiteFinished();
@@ -1243,6 +1242,20 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         // block the site thread until the replicated tables have been applied in all partitions
         waitForLastSiteFinished();
     }
+
+    processCatalogDeletes(timestamp, false);
+
+    if (processCatalogAdditions(timestamp, false) == false) {
+        VOLT_ERROR("Error processing catalog additions.");
+        return false;
+    }
+
+    rebuildTableCollections(false);
+
+    initMaterializedViewsAndLimitDeletePlans(false);
+
+    m_catalog->purgeDeletions();
+
     VOLT_DEBUG("Updated catalog...");
     return true;
 }
@@ -1323,16 +1336,38 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
         assert(m_database);
         catalog::Table *catTable = m_database->tables().get(localTable->name());
         int32_t relativeIndexOfTable = catTable->relativeIndex();
-        m_tables[relativeIndexOfTable] = localTable;
-        m_tablesByName[tcd->getTable()->name()] = localTable;
-
+        if (catTable->isreplicated()) {
+            if (updateReplicated) {
+                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                    VoltDBEngine* currEngine = enginePair.second.engine;
+                    currEngine->m_tables[relativeIndexOfTable] = localTable;
+                    currEngine->m_tablesByName[tcd->getTable()->name()] = localTable;
+                }
+            }
+            else {
+                continue;
+            }
+        }
+        else {
+            m_tables[relativeIndexOfTable] = localTable;
+            m_tablesByName[tcd->getTable()->name()] = localTable;
+        }
         TableStats* stats;
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             stats = persistentTable->getTableStats();
             if (!tcd->materialized()) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
-                m_tablesBySignatureHash[hash] = persistentTable;
+                if (catTable->isreplicated()) {
+                    assert(updateReplicated);
+                    BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                        VoltDBEngine* currEngine = enginePair.second.engine;
+                        currEngine->m_tablesBySignatureHash[hash] = persistentTable;
+                    }
+                }
+                else {
+                    m_tablesBySignatureHash[hash] = persistentTable;
+                }
             }
 
             // add all of the indexes to the stats source
@@ -1501,6 +1536,9 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
+        if (srcCatalogTable->isreplicated() && !updateReplicated) {
+            continue;
+        }
         Table *srcTable = m_tables[srcCatalogTable->relativeIndex()];
         PersistentTable *srcPTable = dynamic_cast<PersistentTable*>(srcTable);
         if (srcPTable != NULL) {
