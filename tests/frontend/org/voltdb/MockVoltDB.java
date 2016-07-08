@@ -64,6 +64,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -489,6 +490,19 @@ public class MockVoltDB implements VoltDBInterface
     public boolean rejoining() {
         return false;
     }
+
+    @Override
+    public String getVoltDBRootPath(PathsType.Voltdbroot path) { return path.getPath(); }
+    @Override
+    public String getCommandLogPath(PathsType.Commandlog path) { return path.getPath(); }
+    @Override
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) { return path.getPath(); }
+    @Override
+    public String getSnapshotPath(PathsType.Snapshots path) { return path.getPath(); }
+    @Override
+    public String getExportOverflowPath(PathsType.Exportoverflow path) { return path.getPath(); }
+    @Override
+    public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
 
     @Override
     public String getCommandLogSnapshotPath() {

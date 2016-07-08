@@ -60,6 +60,7 @@ import org.voltdb.types.TimestampType;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.VoltDB;
 
 public class Collector {
     private static String m_configInfoPath = null;
@@ -488,10 +489,10 @@ public class Collector {
                 if (deploymentPaths != null) {
                     PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
                     if (drPath != null)
-                        drOverflowPath = drPath.getNodePath();
+                        drOverflowPath = VoltDB.instance().getDROverflowPath(drPath);
                     PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
                     if (exportPath != null)
-                        exportOverflowPath = exportPath.getNodePath();
+                        exportOverflowPath = VoltDB.instance().getExportOverflowPath(exportPath);
                 }
                 String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
                 cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");

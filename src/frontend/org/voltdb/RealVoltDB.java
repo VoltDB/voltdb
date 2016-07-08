@@ -389,6 +389,54 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public String getVoltDBRootPath(PathsType.Voltdbroot path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.DBROOT_PATH_KEY);
+    }
+
+    @Override
+    public String getCommandLogPath(PathsType.Commandlog path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
+    }
+
+    @Override
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
+    }
+
+    @Override
+    public String getSnapshotPath(PathsType.Snapshots path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
+    }
+
+    @Override
+    public String getExportOverflowPath(PathsType.Exportoverflow path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.EXPORT_OVERFLOW_PATH_KEY);
+    }
+
+    @Override
+    public String getDROverflowPath(PathsType.Droverflow path) {
+        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_pathList.getProperty(VoltDB.DR_OVERFLOW_PATH_KEY);
+    }
+
+    @Override
     public String getPath(String name) {
         return m_pathList.getProperty(name);
     }
@@ -448,44 +496,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private final List<String> managedPathsWithFiles(Configuration config, DeploymentType deployment) {
+    private List<String> managedPathsWithFiles(Configuration config, DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
         if (!config.m_isEnterprise) {
             return nonEmptyPaths.build();
         }
         PathsType paths = deployment.getPaths();
-        String voltDbRoot = paths.getVoltdbroot().getNodePath();
+        String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getDROverflowPath(paths.getDroverflow()))) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
-            nonEmptyPaths.add(path);
-        return nonEmptyPaths.build();
-    }
-
-    private final List<String> managedPathsWithFilesPrimed(Configuration config, DeploymentType deployment) {
-        ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!config.m_isEnterprise) {
-            return nonEmptyPaths.build();
-        }
-        PathsType paths = deployment.getPaths();
-        String voltDbRoot = paths.getVoltdbroot().getNodePath();
-        String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
-            nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
-            nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
-            nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
-            nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null)
             nonEmptyPaths.add(path);
         return nonEmptyPaths.build();
     }

@@ -28,9 +28,6 @@
   -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
-           xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" jaxb:version="2.1"
-           jaxb:extensionBindingPrefixes="ci"
             elementFormDefault="unqualified">
 
   <!-- <deployment> -->
@@ -102,120 +99,36 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
     <xs:all>
         <xs:element name="voltdbroot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="voltdbroot"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.voltdbroot" />
             </xs:complexType>
         </xs:element>
         <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="snapshots"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.snapshots" />
             </xs:complexType>
         </xs:element>
         <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="export_overflow"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.export_overflow" />
             </xs:complexType>
         </xs:element>
         <xs:element name="droverflow" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="dr_overflow"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.dr_overflow" />
             </xs:complexType>
         </xs:element>
         <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="command_log"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.command_log" />
             </xs:complexType>
         </xs:element>
         <xs:element name="commandlogsnapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-            <xs:annotation>
-                <xs:appinfo>
-                    <ci:code>
-        <![CDATA[
-        public String getNodePath() {
-            if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
-               return getPath();
-            }
-            return org.voltdb.VoltDB.instance().getPath(getKey());
-        }
-        ]]>
-                    </ci:code>
-                </xs:appinfo>
-            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="command_log_snapshot"/>
               <xs:attribute name="key" type="xs:string" default="org.voltdb.path.command_log_snapshot" />
             </xs:complexType>

@@ -1695,7 +1695,7 @@ public abstract class CatalogUtil {
      */
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
-        if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getNodePath() == null) {
+        if (paths == null || paths.getVoltdbroot() == null || VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()) == null) {
             voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
@@ -1704,7 +1704,7 @@ public abstract class CatalogUtil {
                 }
             }
         } else {
-            voltDbRoot = new VoltFile(paths.getVoltdbroot().getNodePath());
+            voltDbRoot = new VoltFile(VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()));
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
                 if (!voltDbRoot.mkdirs()) {
@@ -1719,10 +1719,10 @@ public abstract class CatalogUtil {
 
     public static void setupSnapshotPaths(PathsType.Snapshots paths, File voltDbRoot) {
         File snapshotPath;
-        snapshotPath = new File(paths.getNodePath());
+        snapshotPath = new File(VoltDB.instance().getSnapshotPath(paths));
         if (!snapshotPath.isAbsolute())
         {
-            snapshotPath = new VoltFile(voltDbRoot, paths.getNodePath());
+            snapshotPath = new VoltFile(voltDbRoot, VoltDB.instance().getSnapshotPath(paths));
         }
 
         if (!snapshotPath.exists()) {
@@ -1743,10 +1743,10 @@ public abstract class CatalogUtil {
             return;
         }
         File commandlogPath;
-        commandlogPath = new File(paths.getNodePath());
+        commandlogPath = new File(VoltDB.instance().getCommandLogPath(paths));
         if (!commandlogPath.isAbsolute())
         {
-            commandlogPath = new VoltFile(voltDbRoot, paths.getNodePath());
+            commandlogPath = new VoltFile(voltDbRoot, VoltDB.instance().getCommandLogPath(paths));
         }
 
         if (!commandlogPath.exists()) {
@@ -1768,10 +1768,10 @@ public abstract class CatalogUtil {
         }
 
         File commandlogSnapshotPath;
-        commandlogSnapshotPath = new File(paths.getNodePath());
+        commandlogSnapshotPath = new File(VoltDB.instance().getCommandLogSnapshotPath(paths));
         if (!commandlogSnapshotPath.isAbsolute())
         {
-            commandlogSnapshotPath = new VoltFile(voltDbRoot, paths.getNodePath());
+            commandlogSnapshotPath = new VoltFile(voltDbRoot, VoltDB.instance().getCommandLogSnapshotPath(paths));
         }
 
         if (!commandlogSnapshotPath.exists()) {
@@ -1787,10 +1787,10 @@ public abstract class CatalogUtil {
 
     public static void setupExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
         File exportOverflowPath;
-        exportOverflowPath = new File(paths.getNodePath());
+        exportOverflowPath = new File(VoltDB.instance().getExportOverflowPath(paths));
         if (!exportOverflowPath.isAbsolute())
         {
-            exportOverflowPath = new VoltFile(voltDbRoot, paths.getNodePath());
+            exportOverflowPath = new VoltFile(voltDbRoot, VoltDB.instance().getExportOverflowPath(paths));
         }
 
         if (!exportOverflowPath.exists()) {
@@ -1806,10 +1806,10 @@ public abstract class CatalogUtil {
 
     public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
         File drOverflowPath;
-        drOverflowPath = new File(paths.getNodePath());
+        drOverflowPath = new File(VoltDB.instance().getDROverflowPath(paths));
         if (!drOverflowPath.isAbsolute())
         {
-            drOverflowPath = new VoltFile(voltDbRoot, paths.getNodePath());
+            drOverflowPath = new VoltFile(voltDbRoot, VoltDB.instance().getDROverflowPath(paths));
         }
 
         if (!drOverflowPath.exists()) {

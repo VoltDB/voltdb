@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
@@ -46,10 +47,16 @@ public interface VoltDBInterface
 
     public CommandLog getCommandLog();
 
+    public String getVoltDBRootPath(PathsType.Voltdbroot path);
+    public String getCommandLogPath(PathsType.Commandlog path);
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path);
+    public String getSnapshotPath(PathsType.Snapshots path);
+    public String getExportOverflowPath(PathsType.Exportoverflow path);
+    public String getDROverflowPath(PathsType.Droverflow path);
+
     public String getVoltDBRootPath();
     public String getCommandLogSnapshotPath();
     public String getCommandLogPath();
-
     public String getSnapshotPath();
     public String getExportOverflowPath();
     public String getDROverflowPath();
