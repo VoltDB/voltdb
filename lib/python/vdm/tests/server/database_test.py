@@ -107,7 +107,7 @@ class CreateDatabase(Database):
         response = requests.post(__url__, json=data, headers=headers)
         value = response.json()
 
-        self.assertEqual(value['errors'][0], 'Database name is required.')
+        self.assertEqual(value['statusString'][0], 'Database name is required.')
         self.assertEqual(response.status_code, 200)
 
     def test_validate_duplicate_db(self):
@@ -118,8 +118,8 @@ class CreateDatabase(Database):
         data = {'name': 'testDB'}
         response = requests.post(__url__, json=data, headers=headers)
         value = response.json()
-        self.assertEqual(value['error'], 'database name already exists')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(value['statusString'], 'database name already exists')
+        self.assertEqual(response.status_code, 400)
 
 
 class UpdateDatabase(Database):
@@ -142,12 +142,12 @@ class UpdateDatabase(Database):
 
         response = requests.put(url, json={'name': 'test', 'members': [3]})
         value = response.json()
-        self.assertEqual(value['error'], 'You cannot specify \'Members\' while updating database.')
+        self.assertEqual(value['statusString'], 'You cannot specify \'Members\' while updating database.')
         self.assertEqual(response.status_code, 404)
 
         response = requests.put(url, json={'name': 'test', 'id': 33333})
         value = response.json()
-        self.assertEqual(value['error'], 'Database Id mentioned in the payload and url doesn\'t match.')
+        self.assertEqual(value['statusString'], 'Database Id mentioned in the payload and url doesn\'t match.')
         self.assertEqual(response.status_code, 404)
 
         response = requests.put(url, json={'name': 'test123', 'id': last_db_id})
@@ -181,7 +181,7 @@ class UpdateDatabase(Database):
         response = requests.put(url, json={'name': ''})
         value = response.json()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(value['errors'][0], 'Database name is required.')
+        self.assertEqual(value['statusString'][0], 'Database name is required.')
 
     def test_validate_db_name(self):
         """
@@ -199,7 +199,7 @@ class UpdateDatabase(Database):
         response = requests.put(url, json={'name': '@@@@'})
         value = response.json()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(value['errors'][0], 'Only alphabets, numbers, _ and . are allowed.')
+        self.assertEqual(value['statusString'][0], 'Only alphabets, numbers, _ and . are allowed.')
 
     def test_validate_update_db(self):
         """
