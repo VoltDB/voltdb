@@ -600,7 +600,7 @@ public class TestDeterminism extends PlannerTestCase {
                 false, true, DeterminismMode.FASTER);
 
         // LHS of union is not deterministic,
-        // but ORDER BY clause deterines order of whole statement.
+        // but ORDER BY clause determines order of whole statement.
         assertPlanDeterminismCore("(select a, b, c from ttree_with_key) "
                 + "union (select a, b, c from ttree_with_key order by a, b, c limit 1) "
                 + "order by a, b, c;",
@@ -620,9 +620,6 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c) "
                 + "union (select a, b, c from ttree_with_key order by a, b, c limit 1);",
                 true, true, DeterminismMode.FASTER);
-
-        assertPlanDeterminismCore("select a from tonecolumn order by abs(a)",
-                false, true, DeterminismMode.FASTER);
     }
 
     public void testFloatingAggs() throws Exception {
