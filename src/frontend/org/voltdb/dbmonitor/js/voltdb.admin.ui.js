@@ -684,7 +684,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -1484,7 +1484,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -2294,7 +2294,7 @@ function loadAdminPage() {
                                 msg += "Please try again later.";
                             }
 
-                            adminEditObjects.updateErrorFieldMsg.text(msg);
+                            $("#updateErrorFieldMsg").text(msg);
 
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
@@ -2639,7 +2639,7 @@ function loadAdminPage() {
                                 msg += "Please try again later.";
                             }
 
-                            adminEditObjects.updateErrorFieldMsg.text(msg);
+                            $("#updateErrorFieldMsg").text(msg);
 
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
