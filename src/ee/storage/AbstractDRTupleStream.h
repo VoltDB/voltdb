@@ -41,7 +41,7 @@ struct DRCommittedInfo{
 };
 
 class AbstractDRTupleStream : public TupleStreamBase {
-    friend class AbstractExecutor;
+    friend class ExecutorContext;
 
 public:
     AbstractDRTupleStream(int partitionId, int defaultBufferSize);

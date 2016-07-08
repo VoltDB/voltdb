@@ -148,11 +148,6 @@ class AbstractExecutor {
      */
     void setDMLCountOutputTable(TempTableLimits* limits);
 
-    /**
-     * Start binary log for transactions even if there is no data change.
-     */
-    void transactionChecksForDR();
-
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
@@ -167,9 +162,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-
-    // check DR for starting logging transaction
-    transactionChecksForDR();
 
     // run the executor
     return p_execute(params);

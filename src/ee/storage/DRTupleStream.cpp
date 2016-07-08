@@ -428,7 +428,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, i
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
-     io.writeByte(TXN_PAR_HASH_MULTI); // placeholder for hash flag
+     io.writeByte(0); // placeholder for hash flag
      io.writeInt(0); // placeholder for txn length
      io.writeInt(0);  // placeholder for first partition hash
 

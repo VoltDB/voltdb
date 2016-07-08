@@ -19,6 +19,7 @@
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
+#include "storage/DRTupleStream.h"
 
 #include "boost/foreach.hpp"
 
@@ -250,6 +251,19 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
     m_drReplicatedStream = drReplicatedStream;
     m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
+}
+
+void ExecutorContext::checkTransactionForDR() {
+    if (UniqueId::isMpUniqueId(m_uniqueId)) {
+        if (dynamic_cast<DRTupleStream *>(m_drStream)) {
+            m_drStream->transactionChecks(m_lastCommittedSpHandle, m_spHandle,
+                    m_uniqueId);
+            if (m_drReplicatedStream) {
+                m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
+                        m_spHandle, m_uniqueId);
+            }
+        }
+    }
 }
 
 } // end namespace voltdb

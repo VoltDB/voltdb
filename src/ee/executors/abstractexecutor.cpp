@@ -179,33 +179,6 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
-/**
- * Start binary log for transactions even if there is no data change.
- */
-void AbstractExecutor::transactionChecksForDR() {
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    AbstractOperationPlanNode* m_opNode =
-            dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
-    if (m_opNode) {
-        Table* targetTable = m_opNode->getTargetTable();
-        PersistentTable *persistentTarget =
-                dynamic_cast<PersistentTable*>(targetTable);
-        if (persistentTarget) {
-            AbstractDRTupleStream *drStream =
-                    persistentTarget->getDRTupleStream(ec);
-            if (drStream && !persistentTarget->m_isMaterialized
-                    && persistentTarget->m_drEnabled) {
-                const int64_t lastCommittedSpHandle =
-                        ec->lastCommittedSpHandle();
-                const int64_t currentSpHandle = ec->currentSpHandle();
-                const int64_t currentUniqueId = ec->currentUniqueId();
-                drStream->transactionChecks(lastCommittedSpHandle,
-                        currentSpHandle, currentUniqueId);
-            }
-        }
-    }
-}
-
 AbstractExecutor::~AbstractExecutor() {}
 
 AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
