@@ -90,13 +90,14 @@ public class SnapshotDeleteAgent extends OpsAgent
     private String parseParams(ParameterSet params, JSONObject obj) throws Exception
     {
         if (params.size() < 2) {
-            return "@SnapshotDelete expects 2 arguments, received " + params.size();
+            return "@SnapshotDelete expects 2 or 3 arguments, received " + params.size();
         }
         String[] paths = null;
+        Object paramList[] = params.toArray();
         try {
             paths = (String[])(ParameterConverter.tryToMakeCompatible(
                         String[].class,
-                        params.toArray()[0]));
+                        paramList[0]));
         }
         catch (Exception e) {
             return e.getMessage();
@@ -116,7 +117,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         try {
             nonces = (String[])(ParameterConverter.tryToMakeCompatible(
                         String[].class,
-                        params.toArray()[1]));
+                        paramList[1]));
         }
         catch (Exception e) {
             return e.getMessage();
@@ -139,7 +140,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         if (params.size() > 2) {
             stype = (String )(ParameterConverter.tryToMakeCompatible(
                         String.class,
-                        params.toArray()[2]));
+                        paramList[2]));
         }
         // Dupe SNAPSHOTSCAN as the subselector in case we consolidate later
         obj.put("subselector", "SNAPSHOTDELETE");

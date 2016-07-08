@@ -671,7 +671,7 @@ public abstract class CatalogUtil {
             setCommandLogInfo( catalog, deployment.getCommandlog());
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
             //This is here so we can update our local list of paths.
-            //I would not have needed this if validateResourceMonitor didnt go through VoltDB
+            //I would not have needed this if validateResourceMonitorInfo didnt exist here.
             VoltDB.instance().loadLegacyPathProperties(deployment);
 
             setupPaths(deployment.getPaths());

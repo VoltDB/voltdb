@@ -570,7 +570,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Also check if parents are config and voltdbroot
                 File cfile = (new File(config.m_pathToDeployment)).getParentFile();
                 rootFH = cfile.getParentFile();
-                if (cfile.getName().equals("config") && rootFH.getName().equals(VoltDB.DBROOT)) {
+                if ("config".equals(cfile.getName()) && VoltDB.DBROOT.equals(rootFH.getName())) {
                     inzFH = new VoltFile(rootFH, VoltDB.INITIALIZED_MARKER);
                     if (inzFH.exists()) {
                         VoltDB.crashLocalVoltDB("Can not use legacy start action "
@@ -983,11 +983,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            boolean usingCommandLog = m_config.m_isEnterprise
-                    && (m_catalogContext.cluster.getLogconfig() != null)
-                    && (m_catalogContext.cluster.getLogconfig().get("log") != null)
-                    && m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-
             // DR overflow directory
             if (m_config.m_isEnterprise) {
                 try {
@@ -996,8 +991,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
                     m_producerDRGateway =
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
-                                    new File(VoltDB.instance().getVoltDBRootPath()),
-                                    new File(VoltDB.instance().getSnapshotPath()),
+                                    new VoltFile(VoltDB.instance().getVoltDBRootPath()),
+                                    new VoltFile(VoltDB.instance().getSnapshotPath()),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,m_catalogContext.getDeployment().getCluster().getHostcount());
                     m_producerDRGateway.start();
@@ -1128,6 +1123,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_configuredReplicationFactor == 0) {
                 consoleLog.warn("This is not a highly available cluster. K-Safety is set to 0.");
             }
+            boolean usingCommandLog = m_config.m_isEnterprise
+                    && (m_catalogContext.cluster.getLogconfig() != null)
+                    && (m_catalogContext.cluster.getLogconfig().get("log") != null)
+                    && m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
             if (!usingCommandLog) {
                 // figure out if using a snapshot schedule
                 boolean usingPeridoicSnapshots = false;
@@ -1757,8 +1756,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_PATHS);
         try (PrintWriter pw = new PrintWriter(new FileWriter(depFH), true)) {
             m_pathList.store(pw, "DO NOT MODIFY THIS FILE");
-            pw.flush();
-            pw.close();
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to stage configuration path destination", false, e);
         }
@@ -1769,7 +1766,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         try (FileInputStream is = new FileInputStream(depFH)) {
             consoleLog.info("Loading Path configuration from " + depFH.getAbsolutePath());
             m_pathList.load(is);
-            is.close();
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to read configuration path destination", false, e);
         }

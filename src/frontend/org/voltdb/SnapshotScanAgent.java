@@ -157,17 +157,18 @@ public class SnapshotScanAgent extends OpsAgent
 
         List<ClientResultRow> clientResults = new ArrayList<ClientResultRow>();
         for (Snapshot s : aggregates.values()) {
+            Object row[] = s.asRow();
             clientResults.add(new ClientResultRow(
-                    (String)s.asRow()[0],
-                    (String)s.asRow()[1],
-                    (String)s.asRow()[2],
-                    (long)s.asRow()[3],
-                    (long)s.asRow()[4],
-                    (long)s.asRow()[5],
-                    (String)s.asRow()[6],
-                    (String)s.asRow()[7],
-                    (String)s.asRow()[8],
-                    (String)s.asRow()[9]
+                    (String)row[0],
+                    (String)row[1],
+                    (String)row[2],
+                    (long)row[3],
+                    (long)row[4],
+                    (long)row[5],
+                    (String)row[6],
+                    (String)row[7],
+                    (String)row[8],
+                    (String)row[9]
                     ));
         }
         Collections.sort(clientResults, new Comparator<ClientResultRow>() {
@@ -274,9 +275,9 @@ public class SnapshotScanAgent extends OpsAgent
                                 partitions = partitions.substring(1);
                             }
                             SnapthotPathType stype = SnapthotPathType.SNAP_PATH;
-                            if (f.getParent().equalsIgnoreCase(VoltDB.instance().getCommandLogSnapshotPath())) {
+                            if (f.getParent().equals(VoltDB.instance().getCommandLogSnapshotPath())) {
                                 stype = SnapthotPathType.SNAP_CL;
-                            } else if (f.getParent().equalsIgnoreCase(VoltDB.instance().getSnapshotPath())) {
+                            } else if (f.getParent().equals(VoltDB.instance().getSnapshotPath())) {
                                 stype = SnapthotPathType.SNAP_AUTO;
                             }
                             results.add(new SnapshotResultRow(
@@ -501,7 +502,7 @@ public class SnapshotScanAgent extends OpsAgent
         return retvals;
     }
 
-    static class ClientResultRow implements Comparable<ClientResultRow>
+    private static class ClientResultRow implements Comparable<ClientResultRow>
     {
         String path;
         String pathType;
