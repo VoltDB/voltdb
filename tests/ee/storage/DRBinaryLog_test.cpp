@@ -308,16 +308,24 @@ public:
         delete m_otherTableWithoutIndexReplica;
     }
 
+    bool isReadOnly() {
+        return (m_undoToken == INT64_MAX);
+    }
+
     void beginTxn(MockVoltDBEngine *engine, int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
         engine->prepareContext();
         m_currTxnUniqueId = addPartitionId(uniqueId);
 
-        UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken);
+        UndoQuantum* uq = isReadOnly() ? NULL : m_undoLog.generateUndoQuantum(m_undoToken);
         engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                                                             addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
     }
 
     void endTxn(MockVoltDBEngine *engine, bool success) {
+        if (isReadOnly()) {
+            return;
+        }
+
         if (!success) {
             m_undoLog.undo(m_undoToken);
         } else {
@@ -1899,7 +1907,7 @@ TEST_F(DRBinaryLogTest, InsertOverBufferLimit) {
         for (int i = 1; i <= total; i++) {
             insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 
@@ -1947,7 +1955,7 @@ TEST_F(DRBinaryLogTest, UpdateOverBufferLimit) {
             newTuple.setNValue(1, ValueFactory::getBigIntValue(i));
             updateTuple(m_table, oldTuple, newTuple);
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
 
         // Make sure all changes rolled back
@@ -1985,7 +1993,7 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
             TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
             deleteTuple(m_table, tuple);
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 
@@ -2093,6 +2101,16 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     EXPECT_EQ(0, m_table->activeTupleCount());
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     ASSERT_EQ(0, m_topend.blocks.size());
+
+    // read-only
+    int64_t prevUndoToken = m_undoToken;
+    m_undoToken = INT64_MAX;
+    beginTxn(m_engine, 101, 101, 100, 72);
+    endTxn(m_engine, true);
+    ASSERT_FALSE(flush(101));
+    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(INT64_MAX, m_undoToken);
+    m_undoToken = prevUndoToken;
 
     s_mulitPartitionFlag = false;
 }

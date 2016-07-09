@@ -51,7 +51,6 @@
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
 #include "storage/TableCatalogDelegate.hpp"
-#include "storage/DRTupleStream.h"
 
 #include <vector>
 

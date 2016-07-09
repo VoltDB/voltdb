@@ -460,8 +460,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
         void resetExecutionMetadata();
 
-        void transactionChecksForDR();
-
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------

@@ -206,7 +206,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
-    friend class AbstractExecutor;
 
 private:
     // no default ctor, no copy, no assignment
