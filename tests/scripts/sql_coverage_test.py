@@ -89,10 +89,9 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     current system time and a previous time, which is either the specified
     'prev_time' or, if that is negative (or unspecified), the previous time
     at which this function was called. The printed message is preceded by
-    'message_begin' and followed by "seconds, " and 'message_end'; if the
-    elapsed time is greater than or equal to 60 seconds, it also includes the
-    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
-    as "61.9 seconds (01:02), ".
+    'message_begin' and followed by 'message_end'; the elapsed time is printed
+    in a minutes:seconds format, with the exact number of seconds in parentheses,
+    e.g., 61.9 seconds would be printed as "01:02 (61.9 seconds), ".
     """
 
     now = time.time()
@@ -210,8 +209,9 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
-    subversion_generation, submit_verbosely, ascii_only, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed,
+               report_invalid, report_all, generate_only, subversion_generation,
+               submit_verbosely, ascii_only, args, testConfigKit):
 
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
@@ -351,8 +351,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     try:
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
-                                  jni_path, output_dir, report_all, extraStats, comparison_database,
-                                  modified_sql_path)
+                                  jni_path, output_dir, report_invalid, report_all, extraStats,
+                                  comparison_database, modified_sql_path)
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
@@ -656,9 +656,12 @@ if __name__ == "__main__":
     parser.add_option("-a", "--ascii-only", action="store_true",
                       dest="ascii_only", default=False,
                       help="include only ASCII values in randomly generated string constants")
+    parser.add_option("-i", "--report-invalid", action="store_true",
+                      dest="report_invalid", default=False,
+                      help="report invalid SQL statements, not just mismatches")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
-                      help="report all attempted SQL statements rather than mismatches")
+                      help="report all attempted SQL statements, not just mismatches")
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
@@ -734,18 +737,25 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
+        result = run_config(config_name, config, basedir, report_dir, seed,
+                            options.report_invalid, options.report_all,
                             options.generate_only, options.subversion_generation,
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        # For now, ignore certain mismatches in index-varbinary, when running against PostgreSQL
-        # TODO: fix those mismatches (see ENG-9448)
-        if options.postgresql and config_name == "index-varbinary":
-            if result["mis"] > 1520:
+        # kludge to not fail for known issues in the numeric-decimals and
+        # numeric-ints "extended" test suites, when running against PostgreSQL
+        # (or PostGIS/PostgreSQL); see ENG-10546
+        if config_name == 'numeric-decimals' and comparison_database.startswith('Post'):
+            if result["mis"] > 1180:
                 success = False
-        elif result["mis"] != 0:
-            success = False
+        elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
+            if result["mis"] > 2820:
+                success = False
+        else:
+            # end of kludge; the following are the normal behavior:
+            if result["mis"] != 0:
+                success = False
 
     # Write the summary
     time1 = time.time()

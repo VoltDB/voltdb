@@ -21,6 +21,7 @@
 #include "catalog/table.h"
 #include "catalog/index.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 
 namespace catalog {
 class Database;
@@ -29,6 +30,7 @@ class Database;
 namespace voltdb {
 class Table;
 class PersistentTable;
+class StreamedTable;
 class Pool;
 class ExecutorContext;
 class TupleSchema;
@@ -62,18 +64,14 @@ class TableCatalogDelegate {
 
     void deleteCommand();
 
-    int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
-    bool evaluateExport(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+    void init(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
+    void evaluateExport(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
                              std::map<std::string, TableCatalogDelegate*> const &tablesByName);
-
-    static void migrateChangedTuples(catalog::Table const &catalogTable,
-                                     voltdb::PersistentTable* existingTable,
-                                     voltdb::PersistentTable* newTable);
 
     static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
                                           catalog::Table const &catalogTable);
@@ -111,7 +109,13 @@ class TableCatalogDelegate {
         return dynamic_cast<PersistentTable*>(m_table);
     }
 
-    void setTable(Table * tb) { m_table = tb; }
+    StreamedTable *getStreamedTable() {
+        return dynamic_cast<StreamedTable *> (m_table);
+    }
+
+    void setTable(Table * tb) {
+        m_table = tb;
+    }
 
     bool exportEnabled() { return m_exportEnabled; }
 

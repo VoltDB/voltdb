@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
@@ -42,7 +43,7 @@ public abstract class StmtTableScan {
 
     // Store a unique list of scan columns.
     protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
-    protected Set<String> m_scanColumnNameSet = new HashSet<>();
+    protected Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
 
     // Partitioning column info
     protected List<SchemaColumn> m_partitioningColumns = null;
@@ -83,10 +84,11 @@ public abstract class StmtTableScan {
         processTVE(expr, columnName);
         expr.setOrigStmtId(m_stmtId);
 
-        if ( ! m_scanColumnNameSet.contains(columnName)) {
+        Pair<String, Integer> setItem = Pair.of(columnName, expr.getDifferentiator());
+        if ( ! m_scanColumnNameSet.contains(setItem)) {
             SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
                     columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(columnName);
+            m_scanColumnNameSet.add(setItem);
             m_scanColumnsList.add(scol);
         }
     }

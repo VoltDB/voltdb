@@ -614,7 +614,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,LN,LOG,PI,POWER,SQRT";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,LN,LOG,LOG10,PI,POWER,SQRT,ROUND";
     }
 
     // Retrieves a description of the given table's primary key columns.
@@ -755,7 +755,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     {
         checkClosed();
         // TODO: find a more suitable place for COALESCE
-        return "BIN,COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,HEX,INSERT,LCASE,LEFT,LOWER,LTRIM," +
+        return "BIN,COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,HEX,STR,INSERT,LCASE,LEFT,LOWER,LTRIM," +
                "OCTET_LENGTH,OVERLAY,POSITION,REGEXP_POSITION,REPEAT,REPLACE,RIGHT,RTRIM,SPACE,SUBSTRING,SUBSTR,"+
                "TRIM,UCASE,UPPER";
     }
@@ -883,7 +883,8 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     {
         checkClosed();
         return "CURRENT_TIMESTAMP,DATEADD,DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,EXTRACT,FROM_UNIXTIME,HOUR," +
-               "MINUT,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR,"+
+               "IS_VALID_TIMESTAMP,MAX_VALID_TIMESTAMP,MIN_VALID_TIMESTAMP," +
+               "MINUTE,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR,"+
                "WEEKDAY,YEAR";
     }
 
@@ -1212,6 +1213,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         case java.sql.Types.VARCHAR:
         case java.sql.Types.VARBINARY:
         case java.sql.Types.TIMESTAMP:
+        case java.sql.Types.OTHER:
             switch (toType) {
             case java.sql.Types.VARCHAR:
                 return true;
@@ -1720,6 +1722,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         }
     }
 
+    @Override
     public ResultSet getPseudoColumns(String catalog, String schemaPattern,
             String tableNamePattern, String columnNamePattern)
             throws SQLException {
@@ -1727,6 +1730,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         throw SQLError.noSupport();
     }
 
+    @Override
     public boolean generatedKeyAlwaysReturned() throws SQLException {
         throw SQLError.noSupport();
     }

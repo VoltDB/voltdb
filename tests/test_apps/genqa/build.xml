@@ -1,0 +1,67 @@
+<!-- Simple build file to build test -->
+<project name="genqa" basedir="." default="all">
+
+    <property name="procedures.dir"     value="${basedir}/src/genqa/procedures"/>
+    <property name="clientsrc.dir"     value="${basedir}/src/genqa"/>
+
+    <property name="build.dir"   value="build"/>
+    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="proceduresclasses.dir" value="${build.dir}/pclasses"/>
+    <property name="jar.dir"     value="${basedir}"/>
+    <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
+    <property name="log.dir"     value="${basedir}/log"/>
+
+    <target name="all" depends="client, procedures"/>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${log.dir}"/>
+        <delete dir="${voltdbroot.dir}"/>
+        <delete dir="${basedir}/felix-cache"/>
+        <delete file="${jar.dir}/client.jar"/>
+        <delete file="${basedir}/catalog-report.html"/>
+    </target>
+
+    <path id="build-classpath">
+       <fileset dir="${basedir}/../../../voltdb">
+         <include name="voltdb*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}/../../../lib">
+           <include name="*.jar"/>
+       </fileset>
+       <fileset dir="/home/opt/rabbitmq">
+           <include name="*.jar"/>
+       </fileset>
+       <fileset dir="/home/opt/kafka/libs">
+           <include name="*.jar"/>
+       </fileset>
+    </path>
+
+    <target name="client-compile">
+        <mkdir dir="${clientclasses.dir}"/>
+        <javac debug="on" srcdir="${clientsrc.dir}"
+            destdir="${clientclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="client" depends="client-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/client.jar" basedir="${clientclasses.dir}">
+        </jar>
+    </target>
+
+    <target name="procedures-compile">
+        <mkdir dir="${proceduresclasses.dir}"/>
+        <javac debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}">
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="procedures" depends="procedures-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/sp.jar" basedir="${proceduresclasses.dir}">
+        </jar>
+    </target>
+
+</project>

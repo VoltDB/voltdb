@@ -148,6 +148,8 @@ class DecimalValueGenerator:
 class PointValueGenerator:
     """This generates (random) point (GEOGRAPHY_POINT) values.
     """
+    # It's annoying to have random numbers with 12 digits, so we limit it to
+    # a small number beyond the decimal point
     DIGITS_BEYOND_DECIMAL_POINT = 2
 
     def __init__(self):
@@ -186,7 +188,10 @@ class PointValueGenerator:
 class PolygonValueGenerator:
     """This generates (random) polygon (GEOGRAPHY) values.
     """
-    DIGITS_BEYOND_DECIMAL_POINT = 2
+    # It's annoying to have random numbers with 12 digits, so we limit it to
+    # a reasonable number beyond the decimal point, but not too small since
+    # too much rounding can cause invalid polygons
+    DIGITS_BEYOND_DECIMAL_POINT = 6
 
     def __init__(self):
         decimal.getcontext().prec = PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT
@@ -218,16 +223,19 @@ class PolygonValueGenerator:
         self.__nullpct = nullpct
 
     def set_num_holes(self, num_holes):
-        self.__num_holes = num_holes
+        self.__num_holes = int(num_holes)
 
     def generate_vertex(self, longmin, longmax, latmin, latmax):
         """Generates a point that can be used as the vertex of a polygon, at a
            random location in between the specified minimum and maximum longitude
-           and latitude values.
+           and latitude values, with a small buffer so that it is not right up
+           against the edge.
         """
-        longitude = round(longmin + ((longmax - longmin) * random.random()),
+        delta = longmax - longmin
+        longitude = round(longmin + (0.1 * delta) + (0.8 * delta * random.random()),
                           PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
-        latitude  = round(latmin  + (( latmax -  latmin) * random.random()),
+        delta = latmax - latmin
+        latitude  = round(latmin  + (0.1 * delta) + (0.8 * delta * random.random()),
                           PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
         return str(longitude)+" "+str(latitude)
 
@@ -246,6 +254,9 @@ class PolygonValueGenerator:
         # lower left space again. In the corner spaces, you always choose a random
         # vertex; but the "middle" spaces are optional: you randomly decide (50-50)
         # whether to specify a vertex there or not.
+
+        # The first octant, [0, 0], is omitted here because it is dealt with
+        # specially, being both the first and last vertex
         octants = [[1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]]
         if clockwise:
             octants.reverse()
@@ -270,10 +281,10 @@ class PolygonValueGenerator:
            rings, i.e., holes. Holes are specified as being within one of 4
            quadrants of the middle "space" (see generate_loop above) of the
            exterior ring. More than 4 holes is not recommended, as they will
-           likely start to overlap, causing an invalid polygon.
+           start to overlap, causing an invalid polygon.
         """
         quadrants = [[0, 0], [1, 0], [1, 1], [0, 1]]
-        for i in xrange(count):
+        for n in xrange(count):
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
@@ -432,17 +443,19 @@ class BaseGenerator:
     #                   |       |             |                      |
     MIN_VALUE_PATTERN_GROUP =                                                                          "min" # optional min (only for numeric values)
     #                   |       |             |                      |                                  |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*))," \
-                      r"(?P<max>(-?\d*\.?\d*))(,(?P<latmin>(-?\d*\.?\d*)),(?P<latmax>(-?\d*\.?\d*)))?)?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                         |                     |                         |                                        |                    |
-    #                         |                     |                         |                                        |       end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                                                                         "nullpct" # optional null percentage
-    #                         |                     |                         |
-    MAX_LAT_PATTERN_GROUP   =                                                "latmax" # optional latitude max (only for geo values)
-    #                         |                     |
-    MIN_LAT_PATTERN_GROUP   =                      "latmin" # optional latitude min (only for geo values)
+    MAX_VALUE_PATTERN_GROUP =                                                                                                 "max" # optional max (only for numeric values)
+    #                   |       |             |                      |                                  |                      |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*)),(?P<max>(-?\d*\.?\d*))" \
+                      r"(,(?P<latmin>(-?\d*\.?\d*)),(?P<latmax>(-?\d*\.?\d*)))?)?(;(?P<numholes>(-?\d+)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                         |                         |                                     |                    |
+    #                         |                         |                         |                                     |                    end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                                                                          "nullpct" # optional null percentage
+    #                         |                         |                         |
+    NUM_HOLES_PATTERN_GROUP   =                                                  "numholes" # number of holes (only for polygon values)
+    #                         |                         |                         |
+    MAX_LAT_PATTERN_GROUP   =                          "latmax" # optional latitude max (only for geo values)
     #                         |
-    MAX_VALUE_PATTERN_GROUP ="max" # optional max (only for numeric values)
+    MIN_LAT_PATTERN_GROUP   ="latmin" # optional latitude min (only for geo values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
@@ -462,14 +475,15 @@ class BaseGenerator:
     # which may need to be wrapped in AsText(...)
     __GEO_COLUMN_NAMES    = ['PT1', 'PT2', 'PT3', 'POLY1', 'POLY2', 'POLY3']
     # List of possible prefixes for those column names, i.e., either a table name alias with '.',
-    # nothing at all; the empty one (no table name prefix) must be last
+    # or nothing at all; the empty one (no table name prefix) must be last
     __GEO_COLUMN_PREFIXES = ['A.', 'B.', 'LHS.', '']
     # List of Geo functions, which indicate that the Geo column is already appropriately
     # wrapped, so you don't need to add AsText(...)
-    __GEO_FUNCTION_NAMES  = ['AREA', 'ASTEXT', 'CAST', 'CENTROID', 'CONTAINS', 'COUNT', 'DISTANCE', 'ISVALID',
-                             'ISINVALIDREASON', 'LATITUDE', 'LONGITUDE', 'NUMINTERIORRINGS', 'NUMPOINTS']
+    __GEO_FUNCTION_NAMES  = ['AREA', 'ASTEXT', 'CAST', 'CENTROID', 'CONTAINS', 'COUNT',
+                             'DISTANCE', 'DWITHIN', 'ISVALID', 'ISINVALIDREASON', 'LATITUDE',
+                             'LONGITUDE', 'NUMINTERIORRINGS', 'NUMPOINTS']
     # Similar list, of Geo functions with two arguments
-    __GEO_FUNCS_W2_ARGS   = ['CONTAINS', 'DISTANCE']
+    __GEO_FUNCS_W2_ARGS   = ['CONTAINS', 'DISTANCE', 'DWITHIN']
 
     @classmethod
     def _expr_builder(cls, tag):
@@ -511,7 +525,7 @@ class BaseGenerator:
                            not any(f+'('+t+c+','+tbl+col in statement_fragment_upper for f in BaseGenerator.__GEO_FUNCS_W2_ARGS
                                 for t in BaseGenerator.__GEO_COLUMN_PREFIXES for c in BaseGenerator.__GEO_COLUMN_NAMES):
                             result = result.replace(tbl+col, 'AsText('+tbl+col+')')
-                            print "Modified fragment  : ", result
+                            ### print "DEBUG: Modified fragment  : ", result
         return result
 
 
@@ -520,24 +534,44 @@ class BaseGenerator:
         """ Cannot compare Geo types (point and polygon, i.e., GEOGRAPHY_POINT
             and GEOGRAPHY) against PostGIS, so, in a SELECT statement, we have
             to get them in text form, instead; e.g., replace 'PT1' with
-            AsText(PT1) or 'A.POLY1' with AsText(A.POLY1), but only in the part
-            of a SELECT statement before 'FROM', or after 'ORDER BY', and only
-            if it is not already wrapped in one of the Geo functions, e.g.,
-            AsText(PT1), LONGITUDE(PT1), AREA(POLY1), DISTANCE(PT2,POLY3), etc.
+            AsText(PT1) or 'A.POLY1' with AsText(A.POLY1), but only in the
+            part of a SELECT statement before 'FROM', or after 'ORDER BY' (or
+            between the 'THEN' part of a CASE statement and a FROM that comes
+            after it), and only if it is not already wrapped in one of the Geo
+            functions, e.g., AsText(PT1), LONGITUDE(PT1), AREA(POLY1),
+            DISTANCE(PT2,POLY3), etc. (Note: this works for the CASE statements
+            currently used in SQLCoverage, but may not for all possible CASE
+            statements.)
         """
         result = statement
         statement_upper = statement.upper()
         if statement_upper.startswith('SELECT') and any(x in statement for x in BaseGenerator.__GEO_COLUMN_NAMES):
-            from_index = statement_upper.find(' FROM ')
-            if from_index > 0:
-                before_from = statement[0:from_index]
-                after_from  = statement[from_index:]
-                result = BaseGenerator.wrap_astext_around_geo_columns_in_fragment(before_from) + after_from
-            order_by_index = result.upper().find(' ORDER BY ')
-            if order_by_index > 0:
-                before_order_by = result[0:order_by_index]
-                after_order_by  = result[order_by_index:]
-                result = before_order_by + BaseGenerator.wrap_astext_around_geo_columns_in_fragment(after_order_by)
+            # Normally, we will wrap AsText(...) around geo columns before FROM or after ORDER BY
+            wrap_before_index  = statement_upper.find(' FROM ')
+            wrap_after_index   = statement_upper.find(' ORDER BY ')
+            wrap_between_index = -1
+            # Special case for handling a CASE statement
+            if (' CASE ' in statement_upper and ' WHEN ' in statement_upper and
+                ' THEN ' in statement_upper and ' END '  in statement_upper):
+                then_index = statement_upper.find(' THEN ')
+                # When FROM comes after CASE/THEN, wrap AsText(...) around
+                # columns that come before CASE or between THEN and FROM
+                if wrap_before_index > then_index:
+                    wrap_between_index = wrap_before_index
+                    wrap_before_index  = statement_upper.find(' CASE ')
+            if wrap_after_index > 0:
+                before_text = result[0:wrap_after_index]
+                after_text  = result[wrap_after_index:]
+                result = before_text + BaseGenerator.wrap_astext_around_geo_columns_in_fragment(after_text)
+            if wrap_between_index > 0:
+                before_text  = result[0:then_index]
+                between_text = result[then_index:wrap_between_index]
+                after_text   = result[wrap_between_index:]
+                result = before_text + BaseGenerator.wrap_astext_around_geo_columns_in_fragment(between_text) + after_text
+            if wrap_before_index > 0:
+                before_text = result[0:wrap_before_index]
+                after_text  = result[wrap_before_index:]
+                result = BaseGenerator.wrap_astext_around_geo_columns_in_fragment(before_text) + after_text
         return result
 
     @classmethod
@@ -757,13 +791,14 @@ class ConstantGenerator(BaseGenerator):
     def prepare_params(self, attribute_groups):
         self.__type = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
         if not self.__type:
-            print "Generator parse error -- invalid type"
+            print "Generator parse error -- invalid type:", self.__type
             assert self.__type
 
-        min    = attribute_groups[BaseGenerator.MIN_VALUE_PATTERN_GROUP]
-        max    = attribute_groups[BaseGenerator.MAX_VALUE_PATTERN_GROUP]
-        latmin = attribute_groups[BaseGenerator.MIN_LAT_PATTERN_GROUP]
-        latmax = attribute_groups[BaseGenerator.MAX_LAT_PATTERN_GROUP]
+        min      = attribute_groups[BaseGenerator.MIN_VALUE_PATTERN_GROUP]
+        max      = attribute_groups[BaseGenerator.MAX_VALUE_PATTERN_GROUP]
+        latmin   = attribute_groups[BaseGenerator.MIN_LAT_PATTERN_GROUP]
+        latmax   = attribute_groups[BaseGenerator.MAX_LAT_PATTERN_GROUP]
+        numholes = attribute_groups[BaseGenerator.NUM_HOLES_PATTERN_GROUP]
 
         self.__value_generator = ConstantGenerator.TYPES[self.__type]()
 
@@ -772,6 +807,9 @@ class ConstantGenerator(BaseGenerator):
                 self.__value_generator.set_min_max(min, max, latmin, latmax)
             else:
                 self.__value_generator.set_min_max(min, max)
+
+        if numholes is not None:
+            self.__value_generator.set_num_holes(numholes)
 
         nullpct = attribute_groups[BaseGenerator.NULL_PCT_PATTERN_GROUP]
         if nullpct:
@@ -899,6 +937,9 @@ class Schema:
         self.__col_by_type["geo"] = {}
         self.__col_by_type["numeric"] = {}
         self.__col_by_type["nonnumeric"] = {}
+        # This does not refer to a column type, but to columns that are part of
+        # the primary key, as specified by the "indexes" key, in the schema file
+        self.__col_by_type["id"] = {}
         for code, supertype in Schema.TYPE_NAMES.iteritems():
             self.__col_by_type[supertype] = {}
 
@@ -914,6 +955,13 @@ class Schema:
                     # It represents the last table that defined the column as
                     # listed in the schema, so it's usually just the last table in the schema.
                     self.__col_by_type[supertype][column_name] = table
+            indexes = tabledict.get("indexes", None)
+            if indexes:
+                if isinstance(indexes, basestring):
+                    self.__col_by_type["id"][indexes] = table
+                else:
+                    for index in indexes:
+                        self.__col_by_type["id"][index] = table
 
     def __init_from_file(self, filename):
         fd = open(filename, "r")
@@ -1136,7 +1184,8 @@ class SQLGenerator:
                 if self.__subversion_generation and re.match("(?i)\s*SELECT", i):
                     results += 1
                     yield 'SELECT * FROM (' + i + ') subquery'
-                if (i.upper().startswith('INSERT')):
+                upper_case_statement = i.upper().lstrip()
+                if (upper_case_statement.startswith('INSERT') or upper_case_statement.startswith('UPSERT')):
                     self.__num_insert_statements += 1
 
             if results == 0:

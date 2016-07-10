@@ -1,31 +1,19 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 class ClusterConfigurationDRTest extends TestBase {
     String saveMessage              = "Changes have been saved."
@@ -55,6 +43,9 @@ class ClusterConfigurationDRTest extends TestBase {
     }
 
     def createAndDelete() {
+        int countNext = 0
+        int indexOfNewDatabase = 0
+        String newDatabaseName = ""
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -66,8 +57,36 @@ class ClusterConfigurationDRTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
+        report "hello"
 
         // Create a DR configuration
         when: 'Open popup for DR'
@@ -94,16 +113,17 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
         }
-        then: 'Check the box to enable the DR configuration'
+        then: 'Check if id is displayed.'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                dr.enabledCheckbox.click()
+                //dr.enabledCheckbox.click()
                 waitFor { dr.idField.isDisplayed() }
                 break
             } catch(geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
             }
         }
+        report "hello1"
 
         when: 'Fill the form for master'
         for(count=0; count<numberOfTrials; count++) {
@@ -130,6 +150,7 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
         }
+        report "hello2"
 
         when: 'Open popup for DR'
         for(count=0; count<numberOfTrials; count++) {
@@ -156,27 +177,8 @@ class ClusterConfigurationDRTest extends TestBase {
             }
         }
         and: ''
-        if(dr.sourceText.text().equals("On")) {
-            println("Connection Source Status Error")
-            assert false
-        }
-        else if(dr.sourceText.text().equals("Off")) {
-            for(count=0; count<numberOfTrials; count++) {
-                try {
-                    dr.sourceCheckBox.click()
-                    waitFor { dr.sourceField.isDisplayed() }
-                    break
-                } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                    println("Stale Element Exception - Retrying")
-                } catch(geb.waiting.WaitTimeoutException e) {
-                    println("")
-                }
-            }
-        }
-        else {
-            println("Unknown Error in Connection Source Status")
-            assert false
-        }
+        waitFor {dr.addConnectionSource.isDisplayed()}
+        dr.addConnectionSource.click()
         then: ''
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -231,17 +233,48 @@ class ClusterConfigurationDRTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
+
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+        report "hello3"
     }
 
-    def cleanup() { // called after each test
-        count = 0
 
+    def cleanup() { // called after each test
+        /*count = 0
+        int countNext = 0
+        String newDatabaseName = ""
         while (count < numberOfTrials) {
             count++
             try {
@@ -270,8 +303,34 @@ class ClusterConfigurationDRTest extends TestBase {
             catch (geb.waiting.WaitTimeoutException exception) {
                 openDatabase()
             }
-
-            chooseDatabase(indexOfLocal, "local")
+            newDatabaseName = "Database"
+            //chooseDatabase(indexOfLocal, "local")
+            for (count = 0; count < numberOfTrials; count++) {
+                try {
+                    for(countNext=0; countNext<numberOfTrials; countNext++) {
+                        try {
+                            waitFor { buttonAddDatabase.isDisplayed() }
+                            break
+                        } catch(geb.waiting.WaitTimeoutException exception) {
+                            currentDatabase.click()
+                        }
+                    }
+                    $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exception) {
+                    println("Waiting - Retrying")
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    println("Stale Element exception - Retrying")
+                } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                    try {
+                        waitFor { currentDatabase.text().equals(newDatabaseName) }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                }
+            }
             openDatabase()
 
             for (count = 0; count < numberOfTrials; count++) {
@@ -294,6 +353,11 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
             println()
-        }
+        }*/
+        to ClusterSettingsPage
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }

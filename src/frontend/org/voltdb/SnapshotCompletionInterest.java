@@ -35,8 +35,9 @@ public interface SnapshotCompletionInterest {
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
-        public final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
+        public final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState;
         public final int drVersion;
+        public final long clusterCreateTime;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -48,8 +49,9 @@ public interface SnapshotCompletionInterest {
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
-                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
-                final int drVersion) {
+                final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState,
+                final int drVersion,
+                final long clusterCreateTime) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -59,8 +61,9 @@ public interface SnapshotCompletionInterest {
             this.requestId = requestId;
             this.exportSequenceNumbers = exportSequenceNumbers;
             this.drSequenceNumbers = drSequenceNumbers;
-            this.remoteDCLastIds = remoteDCLastIds;
+            this.drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
             this.drVersion = drVersion;
+            this.clusterCreateTime = clusterCreateTime;
         }
 
         // Factory method for simplified instances used in testing,
@@ -71,10 +74,11 @@ public interface SnapshotCompletionInterest {
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
                 boolean truncationSnapshot,
-                int drVersion) {
+                int drVersion,
+                long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null, drVersion);
+                    true, "", null, null, null, drVersion, clusterCreateTime);
         }
     }
 

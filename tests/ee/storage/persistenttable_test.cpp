@@ -37,7 +37,7 @@
 #include "storage/table.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
-
+#include "storage/tableutil.h"
 
 using voltdb::ExecutorContext;
 using voltdb::NValue;
@@ -51,7 +51,7 @@ using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
 using voltdb::ValueFactory;
 using voltdb::VoltDBEngine;
-
+using voltdb::tableutil;
 
 class PersistentTableTest : public Test {
 public:
@@ -65,6 +65,8 @@ public:
                              0,     // partitionId
                              0,     // hostId
                              "",    // hostname
+                             0,     // drClusterId
+                             1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
                              false, // don't create DR replicated stream
                              95);   // compaction threshold
@@ -236,13 +238,12 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     iterator = table->iteratorDeletingAsWeGo();
     ASSERT_TRUE(iterator.next(tuple));
     ASSERT_TRUE(iterator.next(tuple));
-    srcTuple = table->getTempTupleInlined(tuple);
-    srcTuple.setNValue(1, newStringData);
+    TableTuple& tempTuple = table->copyIntoTempTuple(tuple);
+    tempTuple.setNValue(1, newStringData);
 
     table->updateTupleWithSpecificIndexes(tuple,
-                                          srcTuple,
-                                          table->allIndexes(),
-                                          true);
+                                          tempTuple,
+                                          table->allIndexes());
 
     // verify the updated tuple has the new timestamp.
     int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
@@ -279,6 +280,36 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
         ++i;
     }
+}
+
+TEST_F(PersistentTableTest, TruncateTableTest) {
+    VoltDBEngine* engine = getEngine();
+    engine->loadCatalog(0, catalogPayload());
+    PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    ASSERT_NE(NULL, table);
+    ASSERT_EQ(1, table->allocatedBlockCount());
+
+    beginWork();
+    const int tuplesToInsert = 10;
+    (void) tuplesToInsert;  // to make compiler happy
+    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    commit();
+
+    size_t blockCount = table->allocatedBlockCount();
+    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    ASSERT_NE(NULL, table);
+    ASSERT_EQ(blockCount, table->allocatedBlockCount());
+
+    beginWork();
+    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    table->truncateTable(engine);
+    commit();
+
+    // refresh table pointer by fetching the table from catalog as in truncate old table
+    // gets replaced with new cloned empty table
+    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    ASSERT_NE(NULL, table);
+    ASSERT_EQ(1, table->allocatedBlockCount());
 }
 
 int main() {

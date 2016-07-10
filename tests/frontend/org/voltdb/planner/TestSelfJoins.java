@@ -128,10 +128,10 @@ public class TestSelfJoins  extends PlannerTestCase {
 
         // SELF JOIN on non-partitioned columns
         failToCompile("select * FROM P1 A JOIN P1 B ON A.C = B.A",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
         // SELF JOIN on non-partitioned column
         failToCompile("select * FROM P1 A JOIN P1 B ON A.C = B.C",
-                      "Join of multiple partitioned tables has insufficient join criteria");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testInvalidSelfJoin() {
@@ -140,6 +140,13 @@ public class TestSelfJoins  extends PlannerTestCase {
                 "Not unique table/alias: A");
         failToCompile("select * FROM R1 A JOIN R2 A ON A.A = A.A",
                 "Not unique table/alias: A");
+
+        // Here's a case that can't compile (at least in the current system)
+        // because it uses a different (though technically equivalent) column
+        // in the GROUP BY and ORDER BY.
+        failToCompile("select A.C FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, A.C ORDER BY A.A, A.C",
+                "expression not in aggregate or GROUP BY columns: ORDER BY A.A");
+
     }
 
     public void testIndexedSelfJoin() {
@@ -296,16 +303,47 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
 
-        // Here's a case that can't be optimized because it purposely uses the "wrong" alias
+        // Here's a case that can't be optimized because it purposely uses the "wrong" column
         // in the GROUP BY and ORDER BY.
-        apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, A.C ORDER BY B.A, A.C");
+        apn = compile("select B.C FROM R2 A, R2 B WHERE B.A = A.A AND B.C > 1 GROUP BY A.A, B.C ORDER BY A.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
-
-        // Complex ORDER BY case: GROUP BY columns that are not in the display column list
+        // Complex ORDER BY case: GROUP BY column that is not in the display column list
         pn = apn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        nlij = (NestLoopIndexPlanNode) pn;
+        assertNull(nlij.getPreJoinPredicate());
+        assertNull(nlij.getJoinPredicate());
+        assertNull(nlij.getWherePredicate());
+        assertEquals(1, nlij.getChildCount());
+        c = (IndexScanPlanNode) nlij.getChild(0);
+        assertNull(c.getPredicate());
+        assertEquals(IndexLookupType.GT, c.getLookupType());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
+        c = (IndexScanPlanNode) nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GTE, c.getLookupType());
+        assertNull(c.getPredicate());
+        searchKeys = c.getSearchKeyExpressions();
+        assertEquals(1, searchKeys.size());
+        assertTrue(searchKeys.get(0) instanceof TupleValueExpression);
+
+        // Here's a case that can't be optimized because it purposely uses the "wrong" column
+        // in the GROUP BY and ORDER BY.
+        apn = compile("select B.C FROM R2 A, R2 B WHERE B.A = A.A AND B.C > 1 GROUP BY A.A, B.C ORDER BY B.C");
+        //* for debug */ System.out.println(apn.toExplainPlanString());
+        // Project-first case: GROUP BY column that is not in the order by or the display column list
+        pn = apn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        //TODO: This represents a missed optimization.
+        // The projection could have been inlined.
+        assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
@@ -356,6 +394,6 @@ public class TestSelfJoins  extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestJoinOrder.class.getResource("testself-joins-ddl.sql"), "testselfjoins", false);
+        setupSchema(TestJoinOrder.class.getResource("testplans-selfjoins-ddl.sql"), "testselfjoins", false);
     }
 }

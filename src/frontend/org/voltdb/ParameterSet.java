@@ -255,6 +255,9 @@ public class ParameterSet implements JSONString {
         int startPos = buffer.position();
 
         short count = buffer.getShort();
+        if (count < 0) {
+            throw new IllegalArgumentException("Invalid parameter length " + count + " for ParameterSet." );
+        }
         Object[] params = new Object[count];
         byte[][] encodedStrings = null;
         byte[][][] encodedStringArrays = null;
@@ -468,7 +471,21 @@ public class ParameterSet implements JSONString {
         try {
             js.array();
             for (Object o : m_params) {
-                js.value(o);
+                if(o instanceof Double) {
+                    Double dval = (Double) o;
+                    if (dval.isNaN()) {
+                        js.value(dval.toString());
+                    }
+                    else if (dval.isInfinite()) {
+                        js.value(dval.toString());
+                    }
+
+                    else
+                        js.value(o);
+                }
+                else {
+                    js.value(o);
+                }
             }
             js.endArray();
         }

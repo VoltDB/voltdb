@@ -41,9 +41,6 @@
 #include <algorithm>
 
 namespace voltdb {
-static const CatalogId DATABASE_ID = 100;
-
-
 static TupleSchema* createTupleScmema() {
     std::vector<ValueType> all_types;
     all_types.push_back(VALUE_TYPE_BIGINT);
@@ -69,11 +66,7 @@ static TempTable* createTempTable() {
     TupleSchema*  schema = createTupleScmema();
 
     std::vector<std::string> names(1);
-    return TableFactory::getTempTable(DATABASE_ID,
-                                                 tableName,
-                                                 schema,
-                                                 names,
-                                                 NULL);
+    return TableFactory::buildTempTable(tableName, schema, names, NULL);
 }
 
 class MergeReceiveExecutorTest : public Test
@@ -112,7 +105,7 @@ public:
             ASSERT_TRUE(srcTuples[offset + i++].getNValue(0).op_equals(tuple.getNValue(0)).isTrue());
         }
         // Clean-up
-        m_tempDstTable->deleteAllTuplesNonVirtual(true);
+        m_tempDstTable->deleteAllTempTuples();
     }
 
     char* addPartitionData(std::vector<int>& partitionValues,

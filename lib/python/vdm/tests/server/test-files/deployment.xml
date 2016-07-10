@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <deployment>
 <users>
-<user name="abc" password="test" plaintext="true" roles="User"/>
-<user name="xyz" password="test" plaintext="true" roles="User"/>
+<user name="abc" password="test" plaintext="true" roles="User" userid="1"/>
+<user name="xyz" password="test" plaintext="true" roles="User" userid="2"/>
 </users>
 <snapshot enabled="true" frequency="24h" prefix="AUTOSNAP" retain="2"/>
 <paths>
@@ -40,12 +40,13 @@
 </export>
 <heartbeat timeout="90"/>
 <import>
-<configuration enabled="true" format="" module="test" type="kafka">
+<configuration enabled="true" format="test" module="test" type="kafka">
 <property name="metadata.broker.list">2</property>
 </configuration>
 </import>
 <security enabled="true" provider="hash"/>
 <partition-detection enabled="true">
+    <snapshot prefix="voltdb_partition_detection"/>
 </partition-detection>
 <dr id="6" listen="true" port="12112">
 <connection source="uuuu"/>

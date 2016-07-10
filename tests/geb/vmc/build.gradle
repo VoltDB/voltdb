@@ -32,26 +32,13 @@ apply plugin: 'groovy'
 //apply from: "src/resources/Downloads.gradle"
 //apply from: "src/resources/GetPropertyValues.gradle"
 
-// The browser-drivers to use
+// The browser-drivers to use (first 3 work well):
 ext.drivers = ["firefox", "chrome", "phantomjs", "ie", "safari", "htmlunit"]
 
 repositories {
     mavenCentral()
     //jcenter()
 }
-/*
-buildscript {
-    repositories {
-        jcenter()
-        mavenCentral()
-    }
-    dependencies {
-        //classpath "commons-io:commons-io:2.4"
-        //classpath "commons-lang3:commons-lang3:3.3.2"
-        classpath 'org.apache.commons:commons-lang3:3.0'
-    }
-}
-*/
 
 // Returns the specified project property value, if it is defined; otherwise,
 // returns the specified default value
@@ -68,10 +55,11 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 dependencies {
     def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.12.2")
     def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
-    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.47.1")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.53.0")
     def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1")
+    def htmlunitVersion = getProjectPropertyOrDefaultValue("htmlunitVersion", "2.21")
 
-    // GEB & Spock
+    // GEB & Spock & Selenium
     testCompile "org.gebish:geb-spock:$gebVersion"
     testCompile "org.spockframework:spock-core:$spockVersion"
     testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
@@ -81,26 +69,19 @@ dependencies {
     println "Spock version   : " + spockVersion
     println "Selenium version: " + seleniumVersion
     println "PhantomJS (Ghost Driver) version: " + phantomjsVersion
-
-    // Apache commons (needed by HtmlUnitDriver?)
-    //classpath "commons-lang3:commons-lang3:3.3.2"
-    //classpath 'org.apache.commons:commons-lang3:3.0'
+    println "HtmlUnit version: " + htmlunitVersion
 
     // Selenium Drivers
-    println "Allowed browser-drivers (some work better than others):\n" + drivers
+    println "Allowed browser-drivers (first 3 work better than others):\n" + drivers
     drivers.each { driver ->
         if (driver == "phantomjs") {
             // TODO: switch back to the official 'com.github.detro' version
-            // (commented out below), after issue
+            // (commented out below), or other official version, after issue:
             // http://code.google.com/p/selenium/issues/detail?id=8102 is fixed
             testCompile "com.codeborne:phantomjsdriver:$phantomjsVersion"
             //testCompile "com.github.detro:phantomjsdriver:$phantomjsVersion"
-/*
         } else if (driver == "htmlunit") {
-            testCompile "org.seleniumhq.selenium:selenium-htmlunit-driver:$seleniumVersion" {
-                exclude 'xml-apis'
-            }
-*/
+            testCompile "org.seleniumhq.selenium:selenium-htmlunit-driver:$htmlunitVersion"
         } else {
             testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
         }
@@ -151,6 +132,7 @@ drivers.each { driver ->
         systemProperty "insertJson", getProjectPropertyOrDefaultValue("insertJson", false)
     }
 }
+// Possible future work: download Chrome driver & PhantomJS automatically
 /*
 chromeTest {
     dependsOn unzipChromeDriver

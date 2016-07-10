@@ -23,6 +23,9 @@
 
 package txnIdSelfCheck;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,9 +44,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -514,6 +514,7 @@ public class Benchmark {
     }
 
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
+        @Override
         public void uncaughtException(Thread th, Throwable ex) {
         log.error("Uncaught exception: " + ex.getMessage(), ex);
         printJStack();
@@ -681,13 +682,13 @@ public class Benchmark {
         if (!config.disabledThreads.contains("partLoadlt")) {
             partLoadlt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
-            partLoadlt.start();
+            // XXX temporary partLoadlt.start();
         }
         replLoadlt = null;
         if (config.mpratio > 0.0 && !config.disabledThreads.contains("replLoadlt")) {
             replLoadlt = new LoadTableLoader(client, "loadmp",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
-            replLoadlt.start();
+            // XXX temporary replLoadlt.start();
         }
         if (!config.disabledThreads.contains("readThread")) {
             readThread = new ReadThread(client, config.threads, config.threadoffset,

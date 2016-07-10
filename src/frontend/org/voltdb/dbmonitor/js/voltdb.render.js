@@ -122,6 +122,8 @@ function alertNodeClicked(obj) {
 
         this.exportTablesArray = [];
 
+        this.memoryDetails = [];
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -273,6 +275,10 @@ function alertNodeClicked(obj) {
                                 saveSessionCookie("username", null);
                                 saveSessionCookie("password", null);
                                 tryAutoLogin();
+                                return;
+                            }
+                            else if (response.status == 401){
+                                $("#unAuthorized").trigger("click");
                                 return;
                             }
                                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
@@ -550,8 +556,9 @@ function alertNodeClicked(obj) {
                 var proceduresData = {};
                 var procedureColumnsData = {};
                 var sysProceduresData = {};
-                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
+                var exportTableData = {}
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION', exportTableData);
+                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, exportTableData);
             });
         };
 
@@ -582,25 +589,13 @@ function alertNodeClicked(obj) {
                 alert("Error: Unable to extract cluster health information.");
                 return;
             }
-
-            if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
-                if (totalServerCount == 0) {
-                    totalServerCount = activeCount + joiningCount;
-                }
-
-                if (activeCount == activeCountCopied) {
-                    activeCount--;
-                }
-
-                missingCount = totalServerCount - (activeCount + joiningCount);
-                adminClusterObjects.ignoreServerListUpdateCount--;
-
-            }
-            else {
+            var hostCount =  0
+            VoltDBService.GetSystemInformationDeployment(function(connection){
                 activeCount = 0;
                 joiningCount = 0;
                 missingCount = 0;
                 alertCount = 0;
+                hostCount = getHostCount(connection.Metadata['@SystemInformation_DEPLOYMENT'])
 
                 jQuery.each(systemOverview, function (id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
@@ -610,46 +605,53 @@ function alertNodeClicked(obj) {
                     //    joiningCount++;
                 });
 
-                if (totalServerCount == 0) {
-                    totalServerCount = activeCount + joiningCount;
-                }
+                totalServerCount = hostCount
 
                 missingCount = totalServerCount - (activeCount + joiningCount);
-                activeCountCopied = activeCount;
 
-            }
+                if (missingCount < 0)
+                    missingCount = 0;
 
-            if (missingCount < 0)
-                missingCount = 0;
+                var html =
+                    '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
+                        '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
+                        '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
-            var html =
-                '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
-                    '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
-                    '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
+                var alertHtml = "";
 
-            var alertHtml = "";
+                jQuery.each(systemOverview, function(id, val) {
+                    var hostName;
+                    var hostIp;
+                    hostName = val["HOSTNAME"];
+                    hostIp = val["IPADDRESS"];
+                    var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
+                    if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
+                        alertHtml += '<tr><td class="active alertAlign"  width="40%"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
+                            '<td width="30%">' + hostIp + '</td>' +
+                            '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
+                        alertCount++;
+                    }
 
-            
-            jQuery.each(systemOverview, function(id, val) {
-                var hostName;
-                var hostIp;
-                hostName = val["HOSTNAME"];
-                hostIp = val["IPADDRESS"];
-                var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
-                if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
-                    alertHtml += '<tr><td class="active alertAlign"  width="40%"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
-                        '<td width="30%">' + hostIp + '</td>' +
-                        '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
-                    alertCount++;
+                });
+                if (alertCount > 0) {
+                    html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
                 }
 
-            });
-            if (alertCount > 0) {
-                html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
-            }
+                callback(html, alertHtml);
+            })
 
-            callback(html, alertHtml);
         };
+
+        var getHostCount = function(deploymentInfo){
+            var hostCount = 0;
+            if(deploymentInfo != undefined && !$.isEmptyObject(deploymentInfo.data)){
+                deploymentInfo.data.forEach(function (entry) {
+                    if (entry[0] == 'hostcount')
+                        hostCount = entry[1];
+                });
+            }
+            return hostCount;
+        }
 
         var configureRequestedHost = function (hostName) {
             $.each(systemOverview, function (id, val) {
@@ -2089,6 +2091,8 @@ function alertNodeClicked(obj) {
 
                         var memoryUsage = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["PHYSICALMEMORY"]) * 100;
                         sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
+
+                        voltDbRenderer.memoryDetails.push(memoryInfo[timeStampIndex])
                     }
 
                 });
@@ -2493,7 +2497,12 @@ function alertNodeClicked(obj) {
             }
 
             var dataCount = 0;
-            connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
+            if(jQuery.isEmptyObject(connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data) && voltDbRenderer.memoryDetails.length != 0){
+                sysTransaction["TimeStamp"] = voltDbRenderer.memoryDetails[voltDbRenderer.memoryDetails.length - 1]
+                currentTimerTick =sysTransaction["TimeStamp"];
+              }
+            else{
+                connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
                 var srcData = table;
                 var data = null;
                 currentTimerTick = srcData[colIndex["TIMESTAMP"]];
@@ -2513,6 +2522,8 @@ function alertNodeClicked(obj) {
                 }
                 dataCount++;
             });
+            }
+
             var currentTimedTransactionCount = 0.0;
             for (var proc in procStats) {
                 currentTimedTransactionCount += procStats[proc][1];
@@ -3067,7 +3078,8 @@ function alertNodeClicked(obj) {
         };
 
 
-        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName, exportTableData) {
+            exportTableData = exportTableData ==  undefined ? {} : exportTableData
             var suffix = "";
             if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
@@ -3085,32 +3097,31 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable')
-                    exports[tableName] = { name: tableName };
-                else {
-                    var isView = false;
-                    var item = { name: tableName, key: null, indexes: null, columns: null };
-                    for (var j = 0; j < rawIndexes.length; j++) {
-                        if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
-                            var indexName = rawIndexes[j][5];
-                            if (item.indexes == null)
-                                item.indexes = [];
-                            item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
-                            if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
-                                isView = true;
-                            if (indexName.toUpperCase().indexOf("PK_") > -1)
-                                item.key = indexName;
-                        }
+                var isView = false;
+                var item = { name: tableName, key: null, indexes: null, columns: null };
+                for (var j = 0; j < rawIndexes.length; j++) {
+                    if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
+                        var indexName = rawIndexes[j][5];
+                        if (item.indexes == null)
+                            item.indexes = [];
+                        item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
+                        if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
+                            isView = true;
+                        if (indexName.toUpperCase().indexOf("PK_") > -1)
+                            item.key = indexName;
                     }
-                    if (isView)
-                        views[tableName] = item;
-                    else
-                        tables[tableName] = item;
                 }
+                if (isView)
+                    views[tableName] = item;
+                else if (rawTables[k][6] == 'StreamedTable')
+                    exports[tableName] = item;
+                else
+                    tables[tableName] = item;
             }
 
             connection.Metadata['tables'] = tables;
             connection.Metadata['views'] = views;
+            connection.Metadata['exports'] = exports;
             for (var i = 0; i < rawColumns.length; i++) {
                 var TableName = rawColumns[i][2].toUpperCase();
                 if (connection.Metadata['tables'][TableName] != null) {
@@ -3118,6 +3129,14 @@ function alertNodeClicked(obj) {
                         connection.Metadata['tables'][TableName].columns = [];
                     }
                     connection.Metadata['tables'][TableName].columns[rawColumns[i][16]] =
+                        rawColumns[i][3].toUpperCase() +
+                        ' (' + rawColumns[i][5].toLowerCase() + ')';
+                }
+                else if (connection.Metadata['exports'][TableName] != null) {
+                    if (connection.Metadata['exports'][TableName].columns == null) {
+                        connection.Metadata['exports'][TableName].columns = [];
+                    }
+                    connection.Metadata['exports'][TableName].columns[rawColumns[i][16]] =
                         rawColumns[i][3].toUpperCase() +
                         ' (' + rawColumns[i][5].toLowerCase() + ')';
                 }
@@ -3175,6 +3194,7 @@ function alertNodeClicked(obj) {
             proceduresData['procedures'] = procedures;
             procedureColumnsData['procedureColumns'] = procedureColumns;
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
+            exportTableData['exportTables'] = connection.Metadata['exports']
         }
 
 

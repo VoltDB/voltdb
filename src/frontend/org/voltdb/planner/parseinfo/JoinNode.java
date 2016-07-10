@@ -506,4 +506,12 @@ public abstract class JoinNode implements Cloneable {
             m_contentDeterminismMessage = msg;
         }
     }
+
+    /**
+     * Returns if all the join operations within this join tree are inner joins.
+     * @return true or false.
+     */
+    public boolean allInnerJoins() {
+        return true;
+    }
 }

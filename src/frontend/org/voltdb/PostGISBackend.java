@@ -68,25 +68,25 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     // Captures the use of PointFromText('POINT...
     private static final Pattern pointFromTextQuery = Pattern.compile(
-            "PointFromText\\s*\\('POINT", Pattern.CASE_INSENSITIVE);
+            "PointFromText\\s*\\(", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing a PointFromText('POINT... function,
     // which PostgreSQL/PostGIS does not support, and replaces it with
     // ST_GeographyFromText('POINT..., which is an equivalent that PostGIS
     // does support
     private static final QueryTransformer pointFromTextQueryTransformer
             = new QueryTransformer(pointFromTextQuery)
-            .replacementText("ST_GeographyFromText('POINT").useWholeMatch();
+            .replacementText("ST_GeographyFromText(").useWholeMatch();
 
     // Captures the use of PolygonFromText('POLYGON...
     private static final Pattern polygonFromTextQuery = Pattern.compile(
-            "PolygonFromText\\s*\\('POLYGON", Pattern.CASE_INSENSITIVE);
+            "PolygonFromText\\s*\\(", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing a PointFromText('POINT... function,
     // which PostgreSQL/PostGIS does not support, and replaces it with
     // ST_GeographyFromText('POLYGON..., which is an equivalent that PostGIS
     // does support
     private static final QueryTransformer polygonFromTextQueryTransformer
             = new QueryTransformer(polygonFromTextQuery)
-            .replacementText("ST_GeographyFromText('POLYGON").useWholeMatch();
+            .replacementText("ST_GeographyFromText(").useWholeMatch();
 
 
     // Captures the use of LONGITUDE(columnName)
@@ -299,16 +299,18 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS with other, similar terms. */
-    static public String transformDDL(String ddl) {
-        return transformQuery(PostgreSQLBackend.transformDDL(ddl),
+    @Override
+    public String transformDDL(String ddl) {
+        return transformQuery(super.transformDDL(ddl),
                 geographyPointDdlTransformer, geographyDdlTransformer);
     }
 
     /** For a SQL query, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS, or which behave differently in PostgreSQL/PostGIS
      *  than in VoltDB, with other, similar terms, so that the results will match. */
-    static public String transformDML(String dml) {
-        return transformQuery(PostgreSQLBackend.transformDML(dml),
+    @Override
+    public String transformDML(String dml) {
+        return transformQuery(super.transformDML(dml),
                 asTextQueryTransformer,        castGeoAsVarcharQueryTransformer,
                 pointFromTextQueryTransformer, polygonFromTextQueryTransformer,
                 longitudeQueryTransformer,     latitudeQueryTransformer,

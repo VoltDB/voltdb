@@ -1,0 +1,25 @@
+This application is used to generate data for testing the C++ client.
+It started out as the hello world application, but was changed in subtle
+ways, wonderful to behold.
+
+To generate the test data in a folder named "$D", first make a debug
+build of VoltDB, either community or pro edition.  The bin directory
+for the source distribution must be on your path.  Then run the
+"run.sh" command found in this directory with the command line argument:
+  ./run.sh --client-dir "$D"
+
+The files will show up in "$D".
+
+If you built a release build you will need to run
+  ./run.sh --client-dir "$D" --build release
+
+There are some other options, but they are mostly for debugging this tool.
+
+  --working-dir "$OBJ"     Use "$OBJ" as the server's working directory.
+                           This is useful if one must debug the server
+                           while generating the test data.  By default
+                           this is "./obj".
+  --no-cleanup             Usually this script removes the server's
+                           voltdbroot and log folders.  This keeps them.
+                           Again, this is useful for debugging.
+  --help                   Print a terse debugging message.

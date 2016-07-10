@@ -1,36 +1,26 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import java.io.BufferedReader
 import java.io.FileNotFoundException
 import java.io.FileReader
 import java.io.IOException
+import org.openqa.selenium.WebElement
+import org.openqa.selenium.Keys
 
 class ClusterConfigurationTest extends TestBase {
     static String sitePerHost = "Site per host"
@@ -83,6 +73,8 @@ class ClusterConfigurationTest extends TestBase {
     String edit_DatabaseTest_File   = "src/resources/edit_DatabaseTest.csv"
     String cvsSplitBy = ","
 
+    String newDatabaseName = ""
+
     BufferedReader br = null
     String line = ""
     String[] extractedValue = ["random_input", "random_input"]
@@ -90,8 +82,10 @@ class ClusterConfigurationTest extends TestBase {
     boolean foundStatus = false
 
     int indexOfNewDatabase = 0
+    int countNext = 0
     int indexOfLocal = 1
-    int nextCount =0
+    int indexOfFailure = 0
+
     String new_string = ""
 
     def setup() { // called before each test
@@ -115,7 +109,7 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifySitePerHost() {
         println("Test: verifySitePerHost")
-        String oldVariable = overview.sitePerHostField.value()
+        // String oldVariable = overview.sitePerHostField.value()
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
@@ -137,6 +131,7 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
+        newDatabaseName = "name_src"
         and: 'Create new database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -149,9 +144,37 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Site Per Host'
+        overview.sitePerHostField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.sitePerHostField.value("1")
         overview.sitePerHostText.click()
         and: 'Check Save Message'
@@ -167,7 +190,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -202,6 +252,7 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
+        newDatabaseName = "name_src"
         and: 'Create new database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -214,9 +265,36 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for K-Safety'
+        overview.ksafetyField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.ksafetyField.value("1")
         overview.ksafetyText.click()
         and: 'Check Save Message'
@@ -232,7 +310,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -279,8 +384,35 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Get the status of Partition Detection'
         String statusOfPartitionDetection = overview.partitionDetectionStatus.text()
@@ -303,7 +435,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -479,8 +638,35 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Get the status of Http Access'
         String statusOfHttpAccess = overview.httpAccessStatus.text()
@@ -503,7 +689,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -513,34 +726,53 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifyAutoSnapshots() {
         println("Test: verifyAutoSnapshots")
-        String oldVariableFilePrefix    = overview.filePrefixField.value()
-        String oldVariableFrequency     = overview.frequencyField.value()
-        String oldVariableRetained      = overview.retainedField.value()
-        String initialStatus            = overview.autoSnapshotsStatus.text()
-        println("Initially " + initialStatus)
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
             try {
                 if(overview.autoSnapshotsText.text() == autoSnapshots ) {
                     println("Test Pass: The text and field are displayed")
+                    statusOfTest = true
                     break
                 }
                 else if(overview.autoSnapshotsText.text() != autoSnapshots) {
-                    println("Test Fail: The text is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 1
                 }
                 else {
-                    println("Test Fail: Unknown error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 0
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element Exception - Retrying")
             }
         }
-        then: 'Provide message'
-        overview.autoSnapshotsText.click()
+        then: 'Display the message regarding the text display failure if it exists'
+        if(statusOfTest==true) {
+
+        }
+        else if(statusOfTest==false && indexOfFailure==0) {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==1) {
+            println("Test Fail: The text is not displayed")
+            assert false
+        }
+        else {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+
+        when: 'Reset values'
+        statusOfTest = false
+        indexOfFailure = 0
+        then: 'Display message regarding reset values'
+        println("The values statusOfTest and indexOfFailure have been reset")
+
+        when: 'Open and check the texts of expanded Auto Snapshots'
         for(count=0; count<numberOfTrials; count++) {
+            overview.autoSnapshotsText.click()
             try {
                 if(overview.filePrefixText.text() == filePrefix &&
                         overview.frequencyText.text() == frequency &&
@@ -550,40 +782,83 @@ class ClusterConfigurationTest extends TestBase {
                         overview.retainedField.isDisplayed()
                 ) {
                     println("Test Pass: The contents are present")
+                    statusOfTest = true
                     break
                 }
                 else if(overview.filePrefixText.text() != filePrefix) {
-                    println("Test Fail: The file prefix text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 1
                 }
                 else if(overview.frequencyText.text() != frequency) {
-                    println("Test Fail: The frequency text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 2
                 }
                 else if(overview.retainedText.text() != retained) {
-                    println("Test Fail: The retained text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 3
                 }
                 else if(!overview.filePrefixField.isDisplayed()) {
-                    println("Test Fail: The file prefix field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 4
                 }
                 else if(!overview.frequencyField.isDisplayed()) {
-                    println("Test Fail: The frequency field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 5
                 }
                 else if(!overview.retainedField.isDisplayed()) {
-                    println("Test Fail: The retained field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 6
                 }
                 else {
-                    println("Test Fail: Unknown Error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 0
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element Exception - Retrying")
             }
         }
+        then: 'Display the message regarding the text display failure if it exists'
+        if(statusOfTest==true) {
+
+        }
+        else if(statusOfTest==false && indexOfFailure==0) {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==1) {
+            println("Test Fail: The file prefix text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==2) {
+            println("Test Fail: The frequency text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==3) {
+            println("Test Fail: The retained text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==4) {
+            println("Test Fail: The file prefix field is not displayed")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==5) {
+            println("Test Fail: The frequency field is not displayed")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==6) {
+            println("Test Fail: The retained field is not displayed")
+            assert false
+        }
+        else {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+
+        when: 'Reset values'
+        statusOfTest = false
+        indexOfFailure = 0
+        then: 'Display message regarding reset values'
+        println("The values statusOfTest and indexOfFailure have been reset")
 
         when: 'Create new database'
         for(count=0; count<numberOfTrials; count++) {
@@ -596,8 +871,35 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Get the status of Http Access'
         String statusOfAutoSnapshots = overview.autoSnapshotsStatus.text()
@@ -629,6 +931,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for File Prefix Field in Auto Snapshot'
+        overview.filePrefixField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.filePrefixField.value("At_Least")
         overview.filePrefixText.click()
         and: 'Check Save Message'
@@ -643,6 +946,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Frequency in Auto Snapshot'
+        overview.frequencyField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.frequencyField.value("10")
         overview.frequencyText.click()
         and: 'Check Save Message'
@@ -657,6 +961,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Retained in Auto Snapshot'
+        overview.retainedField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.retainedField.value("10")
         overview.retainedText.click()
         and: 'Check Save Message'
@@ -672,7 +977,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -765,8 +1097,35 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Get the status of Command Logging'
         String statusOfCommandLogging = overview.commandLoggingStatus.text()
@@ -789,6 +1148,7 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Provide Value for Log Frequency Time in Command Logging'
         overview.commandLoggingText.click()
+        overview.logFrequencyTimeField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logFrequencyTimeField.value("10")
         overview.logFrequencyTimeText.click()
         and: 'Check Save Message'
@@ -803,6 +1163,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Log Frequency Transactions in Command Logging'
+        overview.logFrequencyTransactionsField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logFrequencyTransactionsField.value("10")
         overview.logFrequencyTransactionsText.click()
         and: 'Check Save Message'
@@ -817,6 +1178,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Log Segment Size in Command Logging'
+        overview.logSegmentSizeField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logSegmentSizeField.value("10")
         overview.logSegmentSizeText.click()
         and: 'Check Save Message'
@@ -832,7 +1194,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1014,10 +1403,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Heartbeat Timeout in Advanced'
+        overview.heartbeatTimeoutField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
         and: 'Check Save Message'
@@ -1032,6 +1449,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Query Timeout in Advanced'
+        overview.queryTimeoutField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
         and: 'Check Save Message'
@@ -1046,6 +1464,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Max Temp Table Memory in Advanced'
+        overview.maxTempTableMemoryField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
         and: 'Check Save Message'
@@ -1060,6 +1479,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Snapshot Priority in Advanced'
+        overview.snapshotPriorityField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.snapshotPriorityField.value("10")
         overview.snapshotPriorityText.click()
         and: 'Check Save Message'
@@ -1074,8 +1494,10 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Memory Limit in Advanced'
+        overview.memoryLimitField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
+
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Memory Limit in Advanced has changed'
@@ -1089,7 +1511,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1151,10 +1600,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Root in Directories'
+        directories.rootDestinationField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.rootDestinationField.value("new_value")
         directories.rootDestinationText.click()
         and: 'Check Save Message'
@@ -1170,7 +1647,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1232,10 +1736,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Snapshots in Directories'
+        directories.snapshotField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.snapshotField.value("new_value")
         directories.snapshotText.click()
         and: 'Check Save Message'
@@ -1251,7 +1783,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1313,10 +1872,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Export Overflow in Directories'
+        directories.exportOverflowField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.exportOverflowField.value("new_value")
         directories.exportOverflowText.click()
         and: 'Check Save Message'
@@ -1332,7 +1919,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1394,10 +2008,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Command Log Field in Directories'
+        directories.commandLogField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.commandLogField.value("new_value")
         directories.commandLogText.click()
         and: 'Check Save Message'
@@ -1413,7 +2055,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1475,10 +2144,38 @@ class ClusterConfigurationTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose the new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
 
         when: 'Provide Value for Command Log Snapshots in Directories'
+        directories.commandLogSnapshotsField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.commandLogSnapshotsField.value("new_value")
         directories.commandLogSnapshotsText.click()
         and: 'Check Save Message'
@@ -1494,7 +2191,34 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Choose the database with index 1'
         openDatabase()
-        chooseDatabase(indexOfLocal, "local")
+        //chooseDatabase(indexOfLocal, "Database")
+        newDatabaseName = "Database"
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
         and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
@@ -1502,15 +2226,153 @@ class ClusterConfigurationTest extends TestBase {
         println()
     }
 
-    def gebSampleTest(){
-        when: "test"
-        println("Test")
-        then: "test"
-        println("Test")
+    def verifyCreateEditAndDeleteSecurityUsers() {
+        String username     = "usename"
+        String password     = "password"
+        String role         = "role"
+
+        when: 'Expand Security if not already expanded'
+        overview.expandSecurity()
+        then: 'Open the Add User Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.addSecurityButton.click()
+                waitFor { overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide Value For User'
+        overview.provideValueForUser(username, password, role)
+        and: 'Save the User'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        username    = "username_edited"
+        password    = "password_edited"
+        role        = "user_edited"
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'Provide value for Edit Popup'
+        overview.provideValueForUser(username, password, role)
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username and Role text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: "Delete the User"
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.deleteUserButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+
+        when: "Check Save Message"
+        checkSaveMessage()
+        try {
+            waitFor { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+
+        }
+        then: "Check No Security Available Text"
+        waitFor { overview.noSecurityAvailable.isDisplayed() }
+        waitFor { overview.noSecurityAvailable.text().equals("No security available.") }
     }
 
     def cleanup() { // called after each test
-        count = 0
+        /*count = 0
 
         while (count < numberOfTrials) {
             count++
@@ -1542,7 +2404,33 @@ class ClusterConfigurationTest extends TestBase {
                 openDatabase()
             }
 
-            chooseDatabase(indexOfLocal, "local")
+            //chooseDatabase(indexOfLocal, "Database")
+            for (count = 0; count < numberOfTrials; count++) {
+                try {
+                    for(countNext=0; countNext<numberOfTrials; countNext++) {
+                        try {
+                            waitFor { buttonAddDatabase.isDisplayed() }
+                            break
+                        } catch(geb.waiting.WaitTimeoutException exception) {
+                            currentDatabase.click()
+                        }
+                    }
+                    $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exception) {
+                    println("Waiting - Retrying")
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    println("Stale Element exception - Retrying")
+                } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                    try {
+                        waitFor { currentDatabase.text().equals(newDatabaseName) }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                }
+            }
             openDatabase()
 
             for(count=0; count<numberOfTrials; count++) {
@@ -1565,6 +2453,11 @@ class ClusterConfigurationTest extends TestBase {
                 }
             }
             println()
-        }
+        }*/
+        to ClusterSettingsPage
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }

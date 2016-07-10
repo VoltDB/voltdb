@@ -1,37 +1,19 @@
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2016 VoltDB Inc.
 #
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-
-# This script assumes a relative location in a root subdirectory of a voltdb
-# distribution. The logic is intentionally minimal since almost all of the
-# heavy lifting happens in runner.main(). The script name determines the verbs
-# that are loaded from <name>.d subdirectories. It loads the version number
-# from version.txt in the script's parent directory. It can be copied to other
-# names, and also to other locations if the path-building is adjusted. The
-# description should also be changed if re-used for another base command.
 import sys
 import os
 from optparse import OptionParser
@@ -82,12 +64,15 @@ def main():
                           version="%prog 1.0")
     parser.add_option("-p", "--path",
                   action="store", type="string", dest="filepath")
+    parser.add_option("-c", "--configpath",
+                  action="store", type="string", dest="configpath")
     parser.add_option("-s", "--server",
                   action="store", type="string", dest="server")
     (options, args) = parser.parse_args()
 
     arr = [{
         "filepath": options.filepath,
+        "configpath": options.configpath,
         "server": options.server
     }]
 
@@ -95,30 +80,11 @@ def main():
 
 
 if __name__ == '__main__':
-  options = main()
+    options = main()
 
-  path = options[0]['filepath']
-  server = options[0]['server']
+    data_path = options[0]['filepath']
+    config_path = options[0]['configpath']
+    server = options[0]['server']
 
-app_root = os.path.dirname(os.path.abspath(__file__))
-os.chdir(os.path.normpath(app_root))
+    HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
 
-if path is None:
-    home = expanduser("~")
-    # path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
-    path = os.path.join(home, '.vdm')
-
-if os.path.isdir(str(path)):
-    if os.access(str(path), os.W_OK):
-        HTTPListener.main(runner, HTTPListener, path, server)
-    else:
-        sys.stderr.write('Error: There is no permission to create file in this folder. '
-                         'Unable to start VDM.')
-        sys.exit(1)
-else:
-    try:
-        os.makedirs(path)
-        HTTPListener.main(runner, HTTPListener, path, server)
-    except Exception, err:
-        sys.stderr.write('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
-        sys.exit(1)

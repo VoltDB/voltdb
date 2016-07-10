@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
@@ -292,18 +291,6 @@ public abstract class ExpressionUtil {
     }
 
     /**
-     * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
-     * Recursively walk an expression and return a list of all the expressions
-     * of a given type it contains.
-     */
-    public static List<AbstractExpression> findAllExpressionsOfClass(AbstractExpression input, Class< ? extends AbstractExpression> aeClass) {
-        if (input == null) {
-            return new ArrayList<AbstractExpression>();
-        }
-        return input.findAllSubexpressionsOfClass(aeClass);
-    }
-
-    /**
      * Method to simplify an expression by eliminating identical subexpressions (same id)
      * If the expression is a logical conjunction of the form e1 AND e2 AND e3 AND e4,
      * and subexpression e1 is identical to the subexpression e2 the simplified expression is
@@ -339,12 +326,15 @@ public abstract class ExpressionUtil {
         if (exprType == ExpressionType.CONJUNCTION_AND) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableAlias) || isNullRejectingExpression(expr.m_right, tableAlias);
-        } else if (exprType == ExpressionType.CONJUNCTION_OR) {
+        }
+        if (exprType == ExpressionType.CONJUNCTION_OR) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableAlias) && isNullRejectingExpression(expr.m_right, tableAlias);
-        } else if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
+        }
+        if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
             return false;
-        } else if (exprType == ExpressionType.OPERATOR_NOT) {
+        }
+        if (exprType == ExpressionType.OPERATOR_NOT) {
             assert(expr.m_left != null);
             // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"
             // "NOT ( P or Q )" is as null-rejecting as "NOT P and NOT Q"
@@ -352,7 +342,8 @@ public abstract class ExpressionUtil {
             // (switches?) the handling of ANDs and ORs to enforce the above equivalences.
             if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
                 return containsMatchingTVE(expr, tableAlias);
-            } else if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
+            }
+            if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
                     expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
                 assert(expr.m_left.m_left != null && expr.m_left.m_right != null);
                 // Need to test for an existing child NOT and skip it.
@@ -360,14 +351,16 @@ public abstract class ExpressionUtil {
                 AbstractExpression tempLeft = null;
                 if (expr.m_left.m_left.getExpressionType() != ExpressionType.OPERATOR_NOT) {
                     tempLeft = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_left, null);
-                } else {
+                }
+                else {
                     assert(expr.m_left.m_left.m_left != null);
                     tempLeft = expr.m_left.m_left.m_left;
                 }
                 AbstractExpression tempRight = null;
                 if (expr.m_left.m_right.getExpressionType() != ExpressionType.OPERATOR_NOT) {
                     tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_right, null);
-                } else {
+                }
+                else {
                     assert(expr.m_left.m_right.m_left != null);
                     tempRight = expr.m_left.m_right.m_left;
                 }
@@ -375,79 +368,43 @@ public abstract class ExpressionUtil {
                         ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
                 AbstractExpression tempExpr = new OperatorExpression(type, tempLeft, tempRight);
                 return isNullRejectingExpression(tempExpr, tableAlias);
-            } else if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+            }
+            if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_NOT) {
                 // It's probably safe to assume that HSQL will have stripped out other double negatives,
                 // (like "NOT T.c IS NOT NULL"). Yet, we could also handle them here
                 assert(expr.m_left.m_left != null);
                 return isNullRejectingExpression(expr.m_left.m_left, tableAlias);
-            } else {
-                return isNullRejectingExpression(expr.m_left, tableAlias);
             }
-        } else if (exprType == ExpressionType.OPERATOR_IS_NULL) {
+            return isNullRejectingExpression(expr.m_left, tableAlias);
+        }
+        if (exprType == ExpressionType.OPERATOR_IS_NULL) {
             // IS NOT NULL is NULL rejecting -- IS NULL is not
             return false;
-        } else if (expr.hasAnySubexpressionOfType(ExpressionType.OPERATOR_ALTERNATIVE)) {
+        }
+        if (expr.hasAnySubexpressionOfClass(OperatorExpression.class)) {
             // COALESCE expression is a sub-expression
             // For example, COALESCE (C1, C2) > 0
-            List<AbstractExpression> coalesceExprs = expr.findAllSubexpressionsOfType(ExpressionType.OPERATOR_ALTERNATIVE);
-            for (AbstractExpression coalesceExpr : coalesceExprs) {
-                if (containsMatchingTVE(coalesceExpr, tableAlias)) {
-                    // This table is part of the COALESCE expression - not NULL - rejecting
+            List<OperatorExpression> coalesceExprs = expr.findAllSubexpressionsOfClass(OperatorExpression.class);
+            for (OperatorExpression coalesceExpr : coalesceExprs) {
+                if ((coalesceExpr.getExpressionType() == ExpressionType.OPERATOR_ALTERNATIVE) &&
+                    containsMatchingTVE(coalesceExpr, tableAlias)) {
+                    // This table is part of the COALESCE expression - not NULL-rejecting
                     return false;
                 }
             }
             // If we get there it means that the tableAlias is not part of any of COALESCE expression
             // still need to check the catch all case
-            return containsMatchingTVE(expr, tableAlias);
-        } else {
-            // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
-            // it contains a TVE with the matching table name then it is NULL rejection expression?
-            // Presently, yes, logical expressions are not expected to appear inside other
-            // generalized expressions, so since the handling of other kinds of expressions
-            // is pretty much "containsMatchingTVE", this fallback should be safe.
-            // The only planned developments that might contradict this restriction (AFAIK --paul)
-            // would be support for standard pseudo-functions that take logical condition arguments.
-            // These should probably be supported as special non-functions/operations for a number
-            // of reasons and may need special casing here.
-            return containsMatchingTVE(expr, tableAlias);
         }
-    }
-
-    /**
-     * Construct a COALESCE (IF left IS NULL THEN right ELSE left) expression out of two abstract expressions.
-     * The two expression must have compatible types
-     *
-     * @param leftExpr
-     * @param rightExpr
-     * @return COALESCE expression
-     */
-    public static AbstractExpression buildCoalesceExpresion(AbstractExpression leftExpr, AbstractExpression righExpr) {
-        VoltType leftType = leftExpr.getValueType();
-        VoltType rightType = righExpr.getValueType();
-        VoltType superType;
-        int superSize;
-        // Pick a type that is able to hold both results without losing a precision.
-        if (leftType.canExactlyRepresentAnyValueOf(rightType)) {
-            superType = leftType;
-            superSize = ((TupleValueExpression) leftExpr).getValueSize();
-        } else {
-            // HSQL rejects COALESCE expressions with incompatible types
-            assert (rightType.canExactlyRepresentAnyValueOf(leftType));
-            superType = rightType;
-            superSize = ((TupleValueExpression) righExpr).getValueSize();
-        }
-        AbstractExpression altExpr = new OperatorExpression(ExpressionType.OPERATOR_ALTERNATIVE, righExpr, leftExpr);
-        altExpr.setValueType(superType);
-        altExpr.setValueSize(superSize);
-
-        AbstractExpression isnullExpr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, leftExpr, null);
-        isnullExpr.setValueType(VoltType.BIGINT);
-        isnullExpr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-
-        AbstractExpression coalesceExpr = new OperatorExpression(ExpressionType.OPERATOR_CASE_WHEN, isnullExpr, altExpr);
-        coalesceExpr.setValueType(superType);
-        coalesceExpr.setValueSize(superSize);
-        return coalesceExpr;
+        // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
+        // it contains a TVE with the matching table name then it is NULL rejection expression?
+        // Presently, yes, logical expressions are not expected to appear inside other
+        // generalized expressions, so since the handling of other kinds of expressions
+        // is pretty much "containsMatchingTVE", this fallback should be safe.
+        // The only planned developments that might contradict this restriction (AFAIK --paul)
+        // would be support for standard pseudo-functions that take logical condition arguments.
+        // These should probably be supported as special non-functions/operations for a number
+        // of reasons and may need special casing here.
+        return containsMatchingTVE(expr, tableAlias);
     }
 
     /**
@@ -508,40 +465,6 @@ public abstract class ExpressionUtil {
         return false;
     }
 
-    /**
-     * Resolve the column indexes from all subqueries that are part of this expression
-     * @param expr
-     * @param db
-     */
-    public static void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        if (subqueryExpressions.isEmpty()) {
-            return;
-        }
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).resolveColumnIndexes();
-        }
-    }
-
-    /**
-     * Generate the output schemas for the subquery expression nodes
-     * @param expr
-     * @param db
-     */
-    public static void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
-    }
     /**
      * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
      * in a ScalarValueExpression if its parent is not one of:

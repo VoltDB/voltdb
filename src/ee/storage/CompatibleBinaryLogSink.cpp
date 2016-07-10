@@ -17,24 +17,27 @@
 
 #include "CompatibleBinaryLogSink.h"
 
-#include <string>
+#include "ConstraintFailureException.h"
+#include "persistenttable.h"
+#include "streamedtable.h"
+#include "tablefactory.h"
+#include "temptable.h"
+
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "common/UniqueId.hpp"
-#include "storage/persistenttable.h"
-#include "storage/tablefactory.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/ConstraintFailureException.h"
 #include "indexes/tableindex.h"
 
 #include "catalog/database.h"
 
-#include<boost/unordered_map.hpp>
-#include<boost/unordered_set.hpp>
-#include<crc/crc32c.h>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
+
+#include <crc/crc32c.h>
+
+#include <string>
 
 // IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
 
@@ -203,7 +206,7 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+void findConflictTuple(PersistentTable *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
@@ -250,9 +253,9 @@ void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupl
     tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
     tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getNullStringValue());
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
-    outputMetaTable->insertTupleNonVirtualWithDeepCopy(tempMetaTuple, pool);
+    outputMetaTable->insertTempTupleDeepCopy(tempMetaTuple, pool);
 
-    outputTupleTable->insertTupleNonVirtualWithDeepCopy(*tupleToBeWrote, pool);
+    outputTupleTable->insertTempTupleDeepCopy(*tupleToBeWrote, pool);
 }
 
 // iterate all tables and push them into export table
@@ -262,7 +265,6 @@ void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool resolved,
         TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
         TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert) {
     assert(exportTable != NULL);
-    assert(exportTable->isExport());
     assert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
            (existingMetaTableForDelete != NULL && existingTupleTableForDelete != NULL));
     assert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||
@@ -304,12 +306,12 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     if (!engine) {
         return false;
     }
-    Table* conflictExportTable;
+    StreamedTable* conflictExportTable;
     if (drTable->isReplicatedTable()) {
-        conflictExportTable = engine->getReplicatedDRConflictTable();
+        conflictExportTable = engine->getReplicatedDRConflictStreamedTable();
     }
     else {
-        conflictExportTable = engine->getPartitionedDRConflictTable();
+        conflictExportTable = engine->getPartitionedDRConflictStreamedTable();
     }
     if (!conflictExportTable) {
         return false;
@@ -321,8 +323,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> expectedMetaTableForDelete;
     boost::shared_ptr<TempTable> expectedTupleTableForDelete;
     if (deleteConflict != NO_CONFLICT) {
-        existingMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
+        existingTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
         if (existingTuple) {
             createConflictExportTuple(existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
                     drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
@@ -330,8 +332,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
     }
     if (expectedTuple) {
-        expectedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
-        expectedTupleTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
+        expectedMetaTableForDelete.reset(TableFactory::buildCopiedTempTable(EXPECTED_TABLE, conflictExportTable, NULL));
+        expectedTupleTableForDelete.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
         createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
                 drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
     }
@@ -352,8 +354,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     boost::shared_ptr<TempTable> newMetaTableForInsert;
     boost::shared_ptr<TempTable> newTupleTableForInsert;
     if (insertConflict != NO_CONFLICT) {
-        existingMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
-        existingTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
+        existingMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, conflictExportTable, NULL));
+        existingTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(EXISTING_TABLE, drTable, NULL));
         if (existingRows.size() > 0) {
             BOOST_FOREACH(LabeledTableTuple labeledTuple, existingRows) {
                 createConflictExportTuple(existingMetaTableForInsert.get(), existingTupleTableForInsert.get(), drTable,
@@ -364,15 +366,15 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (newTuple) {
-        newMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
-        newTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, drTable, NULL));
+        newMetaTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, conflictExportTable, NULL));
+        newTupleTableForInsert.reset(TableFactory::buildCopiedTempTable(NEW_TABLE, drTable, NULL));
         createConflictExportTuple(newMetaTableForInsert.get(), newTupleTableForInsert.get(),
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
+                                                                                      UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
@@ -415,7 +417,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             }
         }
         if (newTuple) {
-            drTable->insertPersistentTuple(*newTuple, true);
+            drTable->insertPersistentTuple(*newTuple, true, true);
         }
     }
 
@@ -429,28 +431,28 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (existingMetaTableForDelete.get()) {
-        existingMetaTableForDelete.get()->deleteAllTuples(true);
+        existingMetaTableForDelete.get()->deleteAllTempTupleDeepCopies();
     }
     if (existingTupleTableForDelete.get()) {
-        existingTupleTableForDelete.get()->deleteAllTuples(true);
+        existingTupleTableForDelete.get()->deleteAllTempTupleDeepCopies();
     }
     if (expectedMetaTableForDelete.get()) {
-        expectedMetaTableForDelete.get()->deleteAllTuples(true);
+        expectedMetaTableForDelete.get()->deleteAllTempTupleDeepCopies();
     }
     if (expectedTupleTableForDelete.get()) {
-        expectedTupleTableForDelete.get()->deleteAllTuples(true);
+        expectedTupleTableForDelete.get()->deleteAllTempTupleDeepCopies();
     }
     if (existingMetaTableForInsert.get()) {
-        existingMetaTableForInsert.get()->deleteAllTuples(true);
+        existingMetaTableForInsert.get()->deleteAllTempTupleDeepCopies();
     }
     if (existingTupleTableForInsert.get()) {
-        existingTupleTableForInsert.get()->deleteAllTuples(true);
+        existingTupleTableForInsert.get()->deleteAllTempTupleDeepCopies();
     }
     if (newMetaTableForInsert.get()) {
-        newMetaTableForInsert.get()->deleteAllTuples(true);
+        newMetaTableForInsert.get()->deleteAllTempTupleDeepCopies();
     }
     if (newTupleTableForInsert.get()) {
-        newTupleTableForInsert.get()->deleteAllTuples(true);
+        newTupleTableForInsert.get()->deleteAllTempTupleDeepCopies();
     }
 
     return true;
@@ -484,9 +486,14 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
         try {
-            table->insertPersistentTuple(tempTuple, true);
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log insert on table " + table->name());
+            throw;
+        }
+        try {
+            table->insertPersistentTuple(tempTuple, true, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
@@ -514,7 +521,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log delete on table " + table->name());
+            throw;
+        }
 
         TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
         if (deleteTuple.isNullTuple()) {
@@ -563,7 +575,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (old tuple) on table " + table->name());
+            throw;
+        }
 
         // create the expected tuple
         TableTuple expectedTuple(table->schema());
@@ -572,7 +589,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         expectedTuple.copyForPersistentInsert(tempTuple, pool);
 
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(newRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (new tuple) on table " + table->name());
+            throw;
+        }
 
         TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
         if (oldTuple.isNullTuple()) {
@@ -636,7 +658,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = indexKeyTuple.tuple(table, indexCrc);
 
         ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log delete by index on table " + table->name());
+            throw;
+        }
 
         const TableIndex* index = table->getUniqueIndexForDR().first;
         IndexCursor indexCursor(index->getTupleSchema());
@@ -670,7 +697,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = indexKeyTuple.tuple(table, oldKeyIndexCrc);
 
         ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update by index (old tuple) on table " + table->name());
+            throw;
+        }
 
         const TableIndex* index = table->getUniqueIndexForDR().first;
         IndexCursor indexCursor(index->getTupleSchema());
@@ -683,7 +715,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
 
         tempTuple = table->tempTuple();
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(newRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update by index (new tuple) on table " + table->name());
+            throw;
+        }
 
         table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
         break;
@@ -745,4 +782,3 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
 }
 
 }
-

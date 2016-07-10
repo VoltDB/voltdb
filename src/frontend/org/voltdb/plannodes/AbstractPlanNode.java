@@ -59,8 +59,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
-    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
-    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! KEEP false on master!
+    public static boolean enableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = true;
+        return was;
+    }
     public static boolean disableVerboseExplainForDebugging()
     {
         boolean was = m_verboseExplainForDebugging;
@@ -125,10 +130,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids
-        Collection<AbstractExpression> subqueries = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subquery : subqueries) {
-            assert(subquery instanceof AbstractSubqueryExpression);
-            newId = ((AbstractSubqueryExpression) subquery).overrideSubqueryNodeIds(newId);
+        Collection<AbstractExpression> subqueries = findAllSubquerySubexpressions();
+        for (AbstractExpression expr : subqueries) {
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+            // overrideSubqueryNodeIds(newId) will get an NPE if the subquery
+            // has not been planned, presumably the effect of hitting a bug
+            // earlier in the planner. If that happens again, it MAY be useful
+            // to preempt those cases here and single-step through a replay of
+            // findAllSubquerySubexpressions. Determining where in the parent
+            // plan this subquery expression was found MAY provide a clue
+            // as to why the subquery was not planned. It has helped before.
+            //REDO to debug*/ if (subquery instanceof SelectSubqueryExpression) {
+            //REDO to debug*/     CompiledPlan subqueryPlan = ((SelectSubqueryExpression)subquery)
+            //REDO to debug*/             .getSubqueryScan().getBestCostPlan();
+            //REDO to debug*/     if (subqueryPlan == null) {
+            //REDO to debug*/         findAllSubquerySubexpressions();
+            //REDO to debug*/     }
+            //REDO to debug*/ }
+            newId = subquery.overrideSubqueryNodeIds(newId);
         }
         return newId;
     }
@@ -214,6 +234,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
+
+    protected void resolveSubqueryColumnIndexes() {
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractExpression expr: exprs) {
+            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
+        }
+    }
 
     public void validate() throws Exception {
         //
@@ -728,36 +756,35 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
     }
 
+    final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
+        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
+        return collected;
+    }
+
     /**
      * Collect a unique list of expressions of a given type that this node has including its inlined nodes
      * @param type expression type to search for
      * @return a collection(set) of expressions that this node has
      */
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+    final private Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
         findAllExpressionsOfClass(aeClass, collected);
         return collected;
     }
 
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!
-            Collection<AbstractExpression> exprs = inlineNode.findAllExpressionsOfClass(aeClass);
-            collected.addAll(exprs);
+            inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
         // and the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
-            for (SchemaColumn col : schema.getColumns()) {
-                AbstractExpression expr = col.getExpression();
-                if (expr != null) {
-                    List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(
-                            aeClass);
-                    collected.addAll(exprs);
-                }
-            }
+            schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
         }
     }
 
@@ -766,8 +793,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return whether a node of that type is contained in the plan tree
      */
     public boolean hasAnyNodeOfType(PlanNodeType type) {
-        if (getPlanNodeType() == type)
+        if (getPlanNodeType() == type) {
             return true;
+        }
 
         for (AbstractPlanNode n : m_children) {
             if (n.hasAnyNodeOfType(type)) {
@@ -973,23 +1001,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
-            sb.append(indent + "Detailed Output Schema: ");
-            JSONStringer stringer = new JSONStringer();
-            try
-            {
-                stringer.object();
-                outputSchemaToJSON(stringer);
-                stringer.endObject();
-                sb.append(stringer.toString());
-            }
-            catch (Exception e)
-            {
-                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
-                e.printStackTrace();
-            }
-            sb.append(indent + "from\n");
-        }
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
@@ -1001,7 +1012,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 sb.append(indent);
             }
             String nodePlan = explainPlanForNode(indent);
-            sb.append(nodePlan + "\n");
+            sb.append(nodePlan);
+
+            if (m_verboseExplainForDebugging && m_outputSchema != null) {
+                sb.append(indent + " " + m_outputSchema.toExplainPlanString());
+            }
+
+            sb.append("\n");
         }
 
         // Agg < Proj < Limit < Scan
@@ -1129,15 +1146,32 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public boolean reattachFragment( SendPlanNode child ) {
-        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            if( pn.reattachFragment( child) )
+    public boolean reattachFragment(AbstractPlanNode child) {
+        for (AbstractPlanNode pn : m_children) {
+            if (pn.reattachFragment(child)) {
                 return true;
-        }
-        for( AbstractPlanNode pn : m_children ) {
-            if( pn.reattachFragment( child) )
-                return true;
+            }
         }
         return false;
+    }
+
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
+
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    public int adjustDifferentiatorField(int differentiator) {
+        assert (m_children.size() == 1);
+        return m_children.get(0).adjustDifferentiatorField(differentiator);
     }
 }

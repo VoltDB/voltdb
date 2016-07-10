@@ -1,8 +1,9 @@
 <grammar.sql>
 -- Run the template against DDL with a mix of types
 -- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
-{@aftermath = " _math _value[int:1,3]"} 
+{@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
+{@distinctableagg = "_distinctableagg"}
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_numericcolumnpredicate"}
@@ -14,11 +15,13 @@
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
+{@insertcols = "ID, VCHAR, NUM, RATIO"}
 -- reducing the random values to int16 until overflow detection works
 --{@insertvals = "_id, _value[string], _value[int32], _value[float]"}
 {@insertvals = "_id, _value[string], _value[int16 null30], _value[float]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@plus10 = "+ 10"}
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "NUM"}

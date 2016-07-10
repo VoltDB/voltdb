@@ -85,8 +85,10 @@ public class SnapshotSaveAPI
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
     private static Map<Integer, Long> m_partitionLastSeenTransactionIds =
             new HashMap<Integer, Long>();
+    private static Map<Integer, JSONObject> m_remoteDataCenterLastIds =
+            new HashMap<Integer, JSONObject>();
 
-    private static ExtensibleSnapshotDigestData m_snapshotDigestData;
+    private static ExtensibleSnapshotDigestData m_allLocalSiteSnapshotDigestData;
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -125,6 +127,16 @@ public class SnapshotSaveAPI
         }
         final JSONObject finalJsData = jsData;
 
+        JSONObject perSiteRemoteDataCenterDrIds;
+        try {
+            perSiteRemoteDataCenterDrIds = ExtensibleSnapshotDigestData.serializeSiteConsumerDrIdTrackersToJSON(
+                    context.getDrAppliedTrackers());
+        }
+        catch (JSONException e) {
+            SNAP_LOG.warn("Failed to serialize the Remote DataCenter's Last applied DRIds");
+            perSiteRemoteDataCenterDrIds = new JSONObject();
+        }
+
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForHSIds for the other sites and creating an appropriate
         // number of snapshot permits.
@@ -139,6 +151,8 @@ public class SnapshotSaveAPI
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
+                    Map<Integer, JSONObject> remoteDataCenterLastIds = m_remoteDataCenterLastIds;
+                    m_remoteDataCenterLastIds = new HashMap<Integer, JSONObject>();
 
                     /*
                      * Do a quick sanity check that the provided IDs
@@ -156,10 +170,10 @@ public class SnapshotSaveAPI
                         }
                     }
 
-                    m_snapshotDigestData = new ExtensibleSnapshotDigestData(
+                    m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            VoltDB.instance().getConsumerDRGateway().getLastReceivedBinaryLogIds());
+                            remoteDataCenterLastIds);
                     createSetupIv2(
                             file_path,
                             file_nonce,
@@ -169,7 +183,7 @@ public class SnapshotSaveAPI
                             finalJsData,
                             context,
                             result,
-                            m_snapshotDigestData,
+                            m_allLocalSiteSnapshotDigestData,
                             context.getSiteTrackerForSnapshot(),
                             hashinatorData,
                             timestamp);
@@ -186,6 +200,7 @@ public class SnapshotSaveAPI
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
             SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
+            m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
         }
 
         boolean runPostTasks = false;
@@ -228,7 +243,10 @@ public class SnapshotSaveAPI
                             earlyResultTable.addRow(context.getHostId(), hostname,
                                     CoreUtils.getSiteIdFromHSId(context.getSiteId()), "SUCCESS", "");
                         } else {
-                            earlyResultTable = SnapshotUtil.constructNodeResultsTable();
+                            //If doing snapshot for only replicated table(s), earlyResultTable here
+                            //may not be empty even if the taskList of this site is null.
+                            //In that case, snapshot result is preserved by earlyResultTable.
+                            earlyResultTable = result;
                         }
                     }
                     else {
@@ -236,7 +254,7 @@ public class SnapshotSaveAPI
                                 format,
                                 taskList,
                                 multiPartTxnId,
-                                m_snapshotDigestData);
+                                m_allLocalSiteSnapshotDigestData);
                     }
 
                     if (m_deferredSetupFuture != null && taskList != null) {

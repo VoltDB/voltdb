@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
@@ -37,6 +38,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
+import org.voltdb.Consistency;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -64,39 +67,29 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     static final VoltLogger tmLog = new VoltLogger("TM");
 
-    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
-    {
+    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
-        transient final int m_hash;
 
-        DuplicateCounterKey(long txnId, long spHandle)
-        {
+        DuplicateCounterKey(long txnId, long spHandle) {
             m_txnId = txnId;
             m_spHandle = spHandle;
-            m_hash = (37 * (int)(m_txnId ^ (m_txnId >>> 32))) +
-                ((int)(m_spHandle ^ (m_spHandle >>> 32)));
         }
 
         @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
+        public boolean equals(Object o) {
+            try {
+                DuplicateCounterKey other = (DuplicateCounterKey) o;
+                return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
             }
-            if (o == null || !(getClass().isInstance(o))) {
+            catch (Exception e) {
                 return false;
             }
-
-            DuplicateCounterKey other = (DuplicateCounterKey)o;
-
-            return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
         }
 
         // Only care about comparing TXN ID part for sorting in updateReplicas
         @Override
-        public int compareTo(DuplicateCounterKey o)
-        {
+        public int compareTo(DuplicateCounterKey o) {
             if (m_txnId < o.m_txnId) {
                 return -1;
             } else if (m_txnId > o.m_txnId) {
@@ -115,14 +108,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         @Override
-        public int hashCode()
-        {
-            return m_hash;
+        public int hashCode() {
+            assert(false) : "Hashing this is unsafe as it can't promise no collisions.";
+            throw new UnsupportedOperationException(
+                    "Hashing this is unsafe as it can't promise no collisions.");
         }
 
         @Override
-        public String toString()
-        {
+        public String toString() {
             return "<" + m_txnId + ", " + m_spHandle + ">";
         }
     };
@@ -141,13 +134,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
-        new HashMap<DuplicateCounterKey, DuplicateCounter>();
+        new TreeMap<DuplicateCounterKey, DuplicateCounter>();
     // MP fragment tasks or completion tasks pending durability
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
@@ -166,6 +162,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
+
+        // try to get the global default setting for read consistency, but fall back to SAFE
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     @Override
@@ -403,11 +402,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
+        /**
+         * A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
         Iv2InitiateTaskMessage msg = message;
-        if (m_isLeader || message.isReadOnly()) {
+        if (m_isLeader || shortcutRead) {
             /*
              * A short circuit read is a read where the client interface is local to
              * this node. The CI will let a replica perform a read in this case and
@@ -434,7 +440,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             } else if (message.isForDRv1()) {
-                assert false;
+                assert false : "DRv1 is not supported";
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
                 if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
@@ -449,7 +455,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
-            } else if (m_isLeader && !message.isReadOnly()) {
+            } else if (m_isLeader && !shortcutRead) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
@@ -492,14 +498,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
             if (SystemProcedureCatalog.listing.get(procedureName) == null ||
-                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
+                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite())
+            {
                 msg.setTxnId(newSpHandle);
                 msg.setUniqueId(uniqueId);
-                    }
+            }
 
             //Don't replicate reads, this really assumes that DML validation
             //is going to be integrated soonish
-            if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.length > 0) {
+            if (m_isLeader && (!shortcutRead) && (m_sendToHSIds.length > 0)) {
                 Iv2InitiateTaskMessage replmsg =
                     new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(),
@@ -515,10 +522,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
+
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
-                        msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
-                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+                        msg.getTxnId(),
+                        m_replicaHSIds,
+                        msg);
+
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -544,10 +555,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
+        /**
+         * A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+        final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-        if (!msg.isReadOnly()) {
+        if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
             //Durability future is always null for sync command logging
@@ -598,8 +615,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
-                message.getTxnId(), expectedHSIds, message.getStoredProcedureName());
-        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                message.getTxnId(),
+                expectedHSIds,
+                message);
+        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
@@ -628,8 +647,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
-                message.getTxnId(), expectedHSIds, "MP_DETERMINISM_ERROR");
-        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                message.getTxnId(),
+                expectedHSIds,
+                message);
+        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -659,11 +680,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Pass a response through the duplicate counters.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        // All single-partition reads are short-circuit reads and will have no duplicate counter.
-        // SpScheduler will only see InitiateResponseMessages for SP transactions, so if it's
-        // read-only here, it's short-circuited.  Avoid all the lookup below.  Also, don't update
-        // the truncation handle, since it won't have meaning for anyone.
-        if (message.isReadOnly()) {
+        /**
+         * A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+        // All short-circuit reads will have no duplicate counter.
+        // Avoid all the lookup below.
+        // Also, don't update the truncation handle, since it won't have meaning for anyone.
+        if (shortcutRead) {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             return;
@@ -740,6 +767,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
+        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
         FragmentTaskMessage msg = message;
         long newSpHandle;
         if (m_isLeader) {
@@ -749,7 +778,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
-            if (!message.isReadOnly()) {
+
+            if (!shortcutRead) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
             } else {
@@ -769,7 +799,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * everywhere.
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
-            if (m_sendToHSIds.length > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
+            if (m_sendToHSIds.length > 0 && (!shortcutRead || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -784,14 +814,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
+                            msg.getTxnId(),
+                            m_replicaHSIds,
+                            message);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
+                            msg.getTxnId(),
+                            m_replicaHSIds,
+                            message);
                 }
-                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -823,7 +857,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
-            logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
+            if (msg.getInitiateTask() != null) {
+                /**
+                 * A shortcut read is a read operation sent to any replica and completed with no
+                 * confirmation or communication with other replicas. In a partition scenario, it's
+                 * possible to read an unconfirmed transaction's writes that will be lost.
+                 */
+                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+                logThis = !shortcutRead;
+            }
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early
@@ -1073,6 +1115,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_tasks.offer(r);
         } else {
             r.run();
+        }
+    }
+
+    /**
+     * Just using "put" on the dup counter map is unsafe.
+     * It won't detect the case where keys collide from two different transactions.
+     */
+    void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
+        DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
+        if (existingDC != null) {
+            // this is a collision and is bad
+            existingDC.logWithCollidingDuplicateCounters(counter);
+            VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+        }
+        else {
+            m_duplicateCounters.put(dpKey, counter);
         }
     }
 

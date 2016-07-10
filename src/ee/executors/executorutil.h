@@ -50,6 +50,7 @@
 #include "expressions/abstractexpression.h"
 #include "storage/temptable.h"
 
+#include <cstddef> // for NULL !
 #include <cassert>
 
 namespace voltdb {

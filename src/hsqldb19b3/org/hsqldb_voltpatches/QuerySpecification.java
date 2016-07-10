@@ -57,6 +57,7 @@ import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -200,10 +201,12 @@ public class QuerySpecification extends QueryExpression {
         isGrouped         = true;
     }
 
+    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
+    @Override
     public void resolveReferences(Session session) {
 
         finaliseRangeVariables();
@@ -261,10 +264,6 @@ public class QuerySpecification extends QueryExpression {
 
     /************************* Volt DB Extensions *************************/
     void resolveColumnReferencesInGroupBy() {
-        if (! isAggregated) {
-            return;
-        }
-
         if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
             return;
         }
@@ -325,25 +324,30 @@ public class QuerySpecification extends QueryExpression {
                 continue;
             }
 
-            // find it in the SELECT list
+            // Find it in the SELECT list.  We need to look at all
+            // the select list elements to see if there are more
+            // than one.
+            int matchcount = 0;
             for (int j = 0; j < indexLimitVisible; j++) {
                 Expression selectCol = exprColumns[j];
-                if (selectCol.isAggregate) {
-                    // Group by can not support aggregate expression
-                    continue;
-                }
                 if (selectCol.alias == null) {
                     // columns referenced by their alias must have an alias
                     continue;
                 }
                 if (alias.equals(selectCol.alias.name)) {
+                    matchcount += 1;
+                    // This may be an alias to an aggregate
+                    // column.  But we'll find that later, so
+                    // don't check for it here.
                     exprColumns[k] = selectCol;
                     exprColumnList.set(k, selectCol);
-                    // found it and get the next one
-
-                    newUnresolvedExpressions.remove(element);
-                    break;
+                    if (matchcount == 1) {
+                        newUnresolvedExpressions.remove(element);
+                    }
                 }
+            }
+            if (matchcount > 1) {
+                throw new HsqlException(String.format("Group by expression \"%s\" is ambiguous", alias), "", 0);
             }
         }
         unresolvedExpressions = newUnresolvedExpressions;
@@ -617,6 +621,11 @@ public class QuerySpecification extends QueryExpression {
 
         Expression e = orderBy.getLeftNode();
 
+        if (e.dataType != null && e.dataType.isBooleanType()) {
+            // Give "invalid ORDER BY expression" error if ORDER BY boolean.
+            throw Error.error(ErrorCode.X_42576);
+        }
+
         if (e.getType() != OpTypes.VALUE) {
             return;
         }
@@ -649,6 +658,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -698,60 +708,73 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
-            // A VoltDB extension to guard against abuse of aggregates in subqueries.
-            // Make sure no aggregates in WHERE clause
-            tempSet.clear();
-            Expression.collectAllExpressions(
-                    tempSet, queryCondition, Expression.aggregateFunctionSet,
-                    Expression.subqueryExpressionSet);
-            if (!tempSet.isEmpty()) {
+            if (queryCondition.opType == OpTypes.VALUE) {
+                if (!((boolean)queryCondition.valueData)) { // WHERE false => LIMIT 0
+                    SortAndSlice sortAndSlice = new SortAndSlice();
+                    ExpressionValue limit0 = new ExpressionValue(ValuePool.INTEGER_0, Type.SQL_INTEGER);
+                    ExpressionValue offset = new ExpressionValue(ValuePool.INTEGER_0, Type.SQL_INTEGER);
+                    sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, offset, limit0));
+                    addSortAndSlice(sortAndSlice);
+                }
+                // Leave out the original WHERE condition no matter it is WHERE true or WHERE false.
+                queryCondition = null;
+            }
+            else {
+                // A VoltDB extension to guard against abuse of aggregates in subqueries.
+                // Make sure no aggregates in WHERE clause
+                tempSet.clear();
+                Expression.collectAllExpressions(
+                        tempSet, queryCondition, Expression.aggregateFunctionSet,
+                        Expression.subqueryExpressionSet);
+                if (!tempSet.isEmpty()) {
 
-                // A top level WHERE clause can't have aggregate expressions.
-                // In theory, a subquery WHERE clause may have aggregate
-                // expressions in some edge cases where they reference only
-                // columns from parent query(s).
-                // Even these should be restricted to cases where the subquery
-                // is evaluated after the parent agg, such as from the HAVING
-                // or SELECT clause of the parent query defining the columns.
-                // TO be safe, VoltDB doesn't support ANY cases of aggs of
-                // parent columns. All this code block does is choose between
-                // two error messages for two different unsupported cases.
-                if ( ! isTopLevel) {
-                    HsqlList columnSet = new OrderedHashSet();
-                    Iterator aggIt = tempSet.iterator();
-                    while (aggIt.hasNext()) {
-                        Expression nextAggr = (Expression) aggIt.next();
-                        Expression.collectAllExpressions(columnSet, nextAggr,
-                                Expression.columnExpressionSet, Expression.emptyExpressionSet);
-                    }
-                    Iterator columnIt = columnSet.iterator();
-                    while (columnIt.hasNext()) {
-                        Expression nextColumn = (Expression) columnIt.next();
-                        assert(nextColumn instanceof ExpressionColumn);
-                        ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
-                        String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
-                        String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
-                                nextColumnEx.rangeVariable.tableAlias.name : null;
-                        boolean resolved = false;
-                        for (RangeVariable rv : rangeVariables) {
-                            if (rv.rangeTable.tableName.name.equals(tableName)) {
-                                if (rv.tableAlias == null && tableAlias == null) {
-                                    resolved = true;
-                                } else if (rv.tableAlias != null && tableAlias != null) {
-                                    resolved = tableAlias.equals(rv.tableAlias.name);
+                    // A top level WHERE clause can't have aggregate expressions.
+                    // In theory, a subquery WHERE clause may have aggregate
+                    // expressions in some edge cases where they reference only
+                    // columns from parent query(s).
+                    // Even these should be restricted to cases where the subquery
+                    // is evaluated after the parent agg, such as from the HAVING
+                    // or SELECT clause of the parent query defining the columns.
+                    // TO be safe, VoltDB doesn't support ANY cases of aggs of
+                    // parent columns. All this code block does is choose between
+                    // two error messages for two different unsupported cases.
+                    if ( ! isTopLevel) {
+                        HsqlList columnSet = new OrderedHashSet();
+                        Iterator aggIt = tempSet.iterator();
+                        while (aggIt.hasNext()) {
+                            Expression nextAggr = (Expression) aggIt.next();
+                            Expression.collectAllExpressions(columnSet, nextAggr,
+                                    Expression.columnExpressionSet, Expression.emptyExpressionSet);
+                        }
+                        Iterator columnIt = columnSet.iterator();
+                        while (columnIt.hasNext()) {
+                            Expression nextColumn = (Expression) columnIt.next();
+                            assert(nextColumn instanceof ExpressionColumn);
+                            ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
+                            String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
+                            String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
+                                    nextColumnEx.rangeVariable.tableAlias.name : null;
+                            boolean resolved = false;
+                            for (RangeVariable rv : rangeVariables) {
+                                if (rv.rangeTable.tableName.name.equals(tableName)) {
+                                    if (rv.tableAlias == null && tableAlias == null) {
+                                        resolved = true;
+                                    } else if (rv.tableAlias != null && tableAlias != null) {
+                                        resolved = tableAlias.equals(rv.tableAlias.name);
+                                    }
                                 }
                             }
-                        }
-                        if (!resolved) {
-                            throw Error.error(ErrorCode.X_47001);
+                            if (!resolved) {
+                                throw Error.error(ErrorCode.X_47001);
+                            }
                         }
                     }
+                    // If we get here it means that WHERE expression has an aggregate expression
+                    // with local columns
+                    throw Error.error(ErrorCode.X_47000);
                 }
-                // If we get here it means that WHERE expression has an aggregate expression
-                // with local columns
-                throw Error.error(ErrorCode.X_47000);
+                // End of VoltDB extension
             }
-            // End of VoltDB extension
         }
 
         if (havingCondition != null) {
@@ -789,6 +812,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean areColumnsResolved() {
         return unresolvedExpressions == null
                || unresolvedExpressions.isEmpty();
@@ -807,6 +831,7 @@ public class QuerySpecification extends QueryExpression {
 //        queryCondition = null;
     }
 
+    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -829,6 +854,7 @@ public class QuerySpecification extends QueryExpression {
         return;
     }
 
+    @Override
     void resolveTypesPartOne(Session session) {
 
         resolveExpressionTypes(session);
@@ -841,6 +867,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void resolveTypesPartTwo(Session session) {
 
         resolveGroups();
@@ -912,12 +939,30 @@ public class QuerySpecification extends QueryExpression {
                     Expression.subqueryExpressionSet);
 
                 if (!tempSet.isEmpty()) {
-                    throw Error.error(ErrorCode.X_42572,
-                                      ((Expression) tempSet.get(0)).getSQL());
+                    // The sql is an aggregate function name, extracted
+                    // from the SQL text of the query.  But the function
+                    // getSQL is intended to call in a context which
+                    // parameters to the string and then adds a trailing
+                    // parenthesis. So, we add the trailing parenthesis
+                    // here if it's necessary.
+                    String sql = ((Expression) tempSet.get(0)).getSQL();
+                    if (sql.endsWith("(")) {
+                        sql += ")";
+                    }
+                    throw Error.error(ErrorCode.X_42572, sql);
                 }
             }
 
             for (int i = 0; i < indexLimitVisible; i++) {
+                if (!exprColumns[i].isComposedOf(
+                        exprColumns, indexLimitVisible,
+                        indexLimitVisible + groupByColumnCount,
+                        Expression.subqueryAggregateExpressionSet)) {
+                    tempSet.add(exprColumns[i]);
+                }
+            }
+
+            for (int i = indexStartOrderBy; i < indexStartAggregates; i++) {
                 if (!exprColumns[i].isComposedOf(
                         exprColumns, indexLimitVisible,
                         indexLimitVisible + groupByColumnCount,
@@ -1207,6 +1252,7 @@ public class QuerySpecification extends QueryExpression {
      * Positive values limit the size of the result set.
      * @return the result of executing this Select
      */
+    @Override
     Result getResult(Session session, int maxrows) {
 
         Result r;
@@ -1240,7 +1286,7 @@ public class QuerySpecification extends QueryExpression {
     private Result buildResult(Session session, int limitcount) {
 
         RowSetNavigatorData navigator = new RowSetNavigatorData(session,
-            (QuerySpecification) this);
+            this);
         Result result = Result.newResult(navigator);
 
         result.metaData = resultMetaData;
@@ -1385,7 +1431,7 @@ public class QuerySpecification extends QueryExpression {
 
         if (havingCondition != null) {
             while (navigator.hasNext()) {
-                Object[] data = (Object[]) navigator.getNext();
+                Object[] data = navigator.getNext();
 
                 if (!Boolean.TRUE.equals(
                         data[indexLimitVisible + groupByColumnCount])) {
@@ -1404,7 +1450,12 @@ public class QuerySpecification extends QueryExpression {
         accessibleColumns = new boolean[indexLimitVisible];
 
         IntValueHashMap aliases = new IntValueHashMap();
-
+        // Bundle up all the user defined aliases here.
+        // We can't import java.util.Set because there is a Set
+        // already imported into this class from Hsql itself.
+        java.util.Set<String> userAliases = new java.util.HashSet<String>();
+        // Bundle up all the generated aliases here.
+        java.util.Map<String, Integer> genAliases = new java.util.HashMap<String, Integer>();
         for (int i = 0; i < indexLimitVisible; i++) {
             Expression expression = exprColumns[i];
             String     alias      = expression.getAlias();
@@ -1414,17 +1465,32 @@ public class QuerySpecification extends QueryExpression {
 
                 expression.setAlias(name);
 
+                genAliases.put(name.name, i);
+
                 continue;
+
             }
 
             int index = aliases.get(alias, -1);
 
+            userAliases.add(alias);
             if (index == -1) {
                 aliases.put(alias, i);
 
                 accessibleColumns[i] = true;
             } else {
                 accessibleColumns[index] = false;
+            }
+        }
+        for (java.util.Map.Entry<String, Integer> genAlias : genAliases.entrySet()) {
+            String alias = genAlias.getKey();
+            while (userAliases.contains(alias)) {
+                alias = "_" + alias;
+            }
+            if (!alias.equals(genAlias.getKey())) {
+                int idx = genAlias.getValue();
+                SimpleName realAlias = HsqlNameManager.getAutoColumnName(alias);
+                exprColumns[idx].setAlias(realAlias);
             }
         }
     }
@@ -1477,6 +1543,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createTable(Session session) {
 
         createResultTable(session);
@@ -1513,6 +1580,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createResultTable(Session session) {
 
         HsqlName       tableName;
@@ -1612,15 +1680,11 @@ public class QuerySpecification extends QueryExpression {
         if (sortAndSlice.hasOrder()) {
             limit = indexStartOrderBy + sortAndSlice.getOrderLength();
 
-            sb.append(' ').append(Tokens.T_ORDER).append(Tokens.T_BY).append(
-                ' ');
-
+            sb.append(' ').append(Tokens.T_ORDER).append(' ').append(Tokens.T_BY);
+            String sep = " ";
             for (int i = indexStartOrderBy; i < limit; i++) {
-                sb.append(exprColumns[i].getSQL());
-
-                if (i < limit - 1) {
-                    sb.append(',');
-                }
+                sb.append(sep).append(exprColumns[i].getSQL());
+                sep = ",";
             }
         }
 
@@ -1631,10 +1695,12 @@ public class QuerySpecification extends QueryExpression {
         return sb.toString();
     }
 
+    @Override
     public ResultMetaData getMetaData() {
         return resultMetaData;
     }
 
+    @Override
     public String describe(Session session) {
 
         StringBuffer sb;
@@ -1655,12 +1721,16 @@ public class QuerySpecification extends QueryExpression {
         sb.append(super.toString()).append("[\n");
 
         if (sortAndSlice.limitCondition != null) {
-            sb.append("offset=[").append(
-                sortAndSlice.limitCondition.getLeftNode().describe(
-                    session)).append("]\n");
-            sb.append("limit=[").append(
-                sortAndSlice.limitCondition.getRightNode().describe(
-                    session)).append("]\n");
+        	if (sortAndSlice.limitCondition.getLeftNode() != null) {
+        		sb.append("offset=[").append(
+        				sortAndSlice.limitCondition.getLeftNode().describe(
+        						session)).append("]\n");
+        	}
+        	if (sortAndSlice.limitCondition.getRightNode() != null) {
+        		sb.append("limit=[").append(
+        				sortAndSlice.limitCondition.getRightNode().describe(
+        						session)).append("]\n");
+        	}
         }
 
         sb.append("isDistinctSelect=[").append(isDistinctSelect).append("]\n");
@@ -1817,10 +1887,12 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public Table getBaseTable() {
         return baseTable;
     }
 
+    @Override
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {
 
@@ -1835,6 +1907,7 @@ public class QuerySpecification extends QueryExpression {
                                          stopAtTypeSet);
     }
 
+    @Override
     public void collectObjectNames(Set set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -1936,6 +2009,7 @@ public class QuerySpecification extends QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
+    @Override
     public void setAsTopLevel() {
 
         setReturningResultSet();
@@ -1944,15 +2018,18 @@ public class QuerySpecification extends QueryExpression {
         isTopLevel       = true;
     }
 
+    @Override
     void setReturningResultSet() {
         persistenceScope = TableBase.SCOPE_SESSION;
         columnMode       = TableBase.COLUMNS_UNREFERENCED;
     }
 
+    @Override
     public boolean isSingleColumn() {
         return indexLimitVisible == 1;
     }
 
+    @Override
     public String[] getColumnNames() {
 
         String[] names = new String[indexLimitVisible];
@@ -1964,6 +2041,7 @@ public class QuerySpecification extends QueryExpression {
         return names;
     }
 
+    @Override
     public Type[] getColumnTypes() {
 
         if (columnTypes.length == indexLimitVisible) {
@@ -1977,18 +2055,22 @@ public class QuerySpecification extends QueryExpression {
         return types;
     }
 
+    @Override
     public int getColumnCount() {
         return indexLimitVisible;
     }
 
+    @Override
     public int[] getBaseTableColumnMap() {
         return columnMap;
     }
 
+    @Override
     public Expression getCheckCondition() {
         return queryCondition;
     }
 
+    @Override
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {
@@ -2021,10 +2103,13 @@ public class QuerySpecification extends QueryExpression {
      * transforms its data structures during parsing.  For example,
      * place call to this method at the beginning and end of
      * resolveGroups() to see what it does.
+     * Since it has no callers in the production code, declaring
+     * it private causes a warning, so it is arbitrarily declared
+     * protected.
      *
      * @param header    A string to be prepended to output
      */
-    private void dumpExprColumns(String header){
+    protected void dumpExprColumns(String header){
         System.out.println("\n\n*********************************************");
         System.out.println(header);
         try {

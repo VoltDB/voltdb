@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
+# next few lines to get the current script path from stackoverflow
+# http://stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+VOLTDB_BIN="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+# check whether there is a VoltDB bin dir in the path (before we add one)
+if [ -n "$(which voltdb 2> /dev/null)" ]; then
+    PATH_VOLTDB_BIN=$(dirname "$(which voltdb)")
+else
+    PATH_VOLTDB_BIN=""
+fi
+
+# move voltdb commands into path for this script
+# (and for any script that is sourcing it)
+PATH=$VOLTDB_BIN:$PATH
+
+# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
+if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
+    VOLTDB_VOLTDB="$VOLTDB_LIB"
+# distribution layout has libraries in separate lib and voltdb directories
+else
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
+fi
+
+# ensure classpath is set
+if [ -z ${CLASSPATH+x} ]; then
+    CLASSPATH=""
+fi
+
+# classpath setup for compiling stored procedures
+APPCLASSPATH=$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+
+# classpath setup for compiling client apps
+CLIENTCLASSPATH=$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/super-csv-*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+
+# a sourcing script may want to add to this path like so:
+# CLIENTCLASSPATH=appname-client.jar:$CLIENTCLASSPATH
+
+function envhelp() {
+    echo
+    echo "Usage: voltenv {classpath|clientclasspath|checkpath}"
+    echo
+    echo "voltenv classpath"
+    echo "  Print out a classpath that contains the VoltDB java jars"
+    echo
+    echo "voltenv clientclasspath"
+    echo "  Print out a classpath that contains the VoltDB client jars"
+    echo
+    echo "voltenv clientclasspath"
+    echo "  Print out a classpath that contains the VoltDB client jars"
+    echo
+    echo "A common use for this file is to source it from other scripts"
+    echo " in order to set up the VoltDB environment."
+    echo
+}
+
+# Print out a classpath that contains all of the VoltDB server jars
+function classpath() {
+    echo $APPCLASSPATH
+}
+
+# Print out a classpath that contains the VoltDB java jars
+function clientclasspath() {
+    echo $CLIENTCLASSPATH
+}
+
+# check for two problems
+# 1) VoltDB isn't in your path... so print an advisory
+# 2) VoltDB *is* in your path, but the current script is in a different
+#    folder. You have two VoltDB's So print an advisory.
+#
+# Neither is a real problem if you're aware of it, but could indicate a
+# real problem if it's something you didn't realize.
+#
+function checkpath() {
+    # find voltdb binaries in either installation or distribution directory.
+    if [ -n "$PATH_VOLTDB_BIN" ]; then
+        if [ "$PATH_VOLTDB_BIN" != "$VOLTDB_BIN" ]; then
+            echo "Warning: VoltDB exists in your path at:"
+            echo "    $PATH_VOLTDB_BIN"
+            echo "  But this script is using VoltDB at: "
+            echo "    $VOLTDB_BIN"
+            echo
+        fi
+    else
+        # assume this is the examples folder for a kit
+        echo "The VoltDB scripts are not in your PATH."
+        echo "For ease of use, add the VoltDB bin directory to your path: "
+        echo "    $VOLTDB_BIN"
+        echo
+    fi
+}
+
+# if this script is run directly:
+# Run the target passed as the first arg on the command line
+# If no first arg, do nothing
+if [ "${0}" = "$SOURCE" ]; then
+    if [ $# -gt 1 ]; then
+        envhelp
+        exit 0
+    elif [ $# = 1 ]; then
+        $1
+    fi
+else
+    checkpath
+fi

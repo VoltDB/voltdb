@@ -89,7 +89,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INVALID:
-        VOLT_ERROR( "INVALID plan node type %d", (int) type);
+        VOLT_ERROR("INVALID plan node type %d", (int) type);
         return NULL;
     case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
@@ -106,9 +106,12 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_TUPLESCAN: return new TupleScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_PARTITIONBY:
+        VOLT_ERROR("PartitionByExecutor not defined yet.");
+        return NULL;
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
-    VOLT_ERROR( "Undefined plan node type %d", (int) type);
+    VOLT_ERROR("Undefined plan node type %d", (int) type);
     return NULL;
 }
 

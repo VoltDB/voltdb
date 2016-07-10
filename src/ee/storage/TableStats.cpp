@@ -21,6 +21,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include <vector>
 #include <string>
@@ -42,6 +43,8 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     return columnNames;
 }
 
+// make sure to update schema in frontend sources (like TableStats.java) and tests when updating
+// the table-stats schema in here.
 void TableStats::populateTableStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
@@ -51,21 +54,15 @@ void TableStats::populateTableStatsSchema(
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_BIGINT);  columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));  allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
 }
 
-Table*
-TableStats::generateEmptyTableStatsTable()
-{
+TempTable* TableStats::generateEmptyTableStatsTable() {
     string name = "Persistent Table aggregated table stats temp table";
-    // An empty stats table isn't clearly associated with any specific
-    // database ID.  Just pick something that works for now (Yes,
-    // abstractplannode::databaseId(), I'm looking in your direction)
-    CatalogId databaseId = 1;
     vector<string> columnNames = TableStats::generateTableStatsColumnNames();
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
@@ -77,12 +74,10 @@ TableStats::generateEmptyTableStatsTable()
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
                                        columnAllowNull, columnInBytes);
 
-    return
-        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
-                                                            name,
-                                                            schema,
-                                                            columnNames,
-                                                            NULL));
+    return TableFactory::buildTempTable(name,
+                                        schema,
+                                        columnNames,
+                                        NULL);
 }
 
 /*
@@ -105,10 +100,8 @@ TableStats::TableStats(Table* table)
  * @parameter partitionId this stat source is associated with
  * @parameter databaseId Database this source is associated with
  */
-void TableStats::configure(
-        string name,
-        CatalogId databaseId) {
-    StatsSource::configure(name, databaseId);
+void TableStats::configure(string name) {
+    StatsSource::configure(name);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }
@@ -133,8 +126,9 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
-    if (!m_table->isExport()) {
-        occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1024;
+    PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(m_table);
+    if (persistentTable) {
+        occupied_tuple_mem_kb = persistentTable->occupiedTupleMemory() / 1024;
     }
     int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1024;
 
@@ -146,34 +140,23 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
         m_lastAllocatedTupleMemory = m_table->allocatedTupleMemory();
         occupied_tuple_mem_kb =
             occupied_tuple_mem_kb - (m_lastOccupiedTupleMemory / 1024);
-        m_lastOccupiedTupleMemory = m_table->occupiedTupleMemory();
+        if (persistentTable) {
+            m_lastOccupiedTupleMemory = persistentTable->occupiedTupleMemory();
+        }
         string_data_mem_kb =
             string_data_mem_kb - (m_lastStringDataMemory / 1024);
         m_lastStringDataMemory = m_table->nonInlinedMemorySize();
-    }
-
-    if (string_data_mem_kb > INT32_MAX)
-    {
-        string_data_mem_kb = -1;
-    }
-    if (allocated_tuple_mem_kb > INT32_MAX)
-    {
-        allocated_tuple_mem_kb = -1;
-    }
-    if (occupied_tuple_mem_kb > INT32_MAX)
-    {
-        occupied_tuple_mem_kb = -1;
     }
 
     tuple->setNValue(
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-            ValueFactory::getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+            ValueFactory::getBigIntValue(allocated_tuple_mem_kb));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-            ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
+            ValueFactory::getBigIntValue(occupied_tuple_mem_kb));
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-            ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+            ValueFactory::getBigIntValue(string_data_mem_kb));
 
     bool hasTupleLimit = tupleLimit == INT_MAX ? false : true;
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],

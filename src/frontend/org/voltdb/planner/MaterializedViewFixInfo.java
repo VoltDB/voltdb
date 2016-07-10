@@ -396,7 +396,7 @@ public class MaterializedViewFixInfo {
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
-            ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 

@@ -28,10 +28,16 @@ import org.voltdb.VoltTable;
 class SQLCommandOutputFormatterDefault implements SQLCommandOutputFormatter
 {
     @Override
-    public void printTable(PrintStream stream, VoltTable t, boolean includeColumnNames)
+    public void printTable(PrintStream stream, VoltTable t, boolean includeMetaData)
             throws IOException
     {
         // Use the VoltTable pretty printer to display formatted output.
-        stream.println(t.toFormattedString());
+        if (includeMetaData) {
+            stream.println(t.toFormattedString(includeMetaData));
+        }
+        else {
+            // don't insert line break at end when not including meta data
+            stream.print(t.toFormattedString(includeMetaData));
+        }
     }
 }

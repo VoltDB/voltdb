@@ -266,6 +266,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
+    jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
     jint compactionThreshold)
@@ -293,6 +294,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    hostId,
                                    hostString,
                                    drClusterId,
+                                   defaultDrBufferSize,
                                    tempTableMemory,
                                    createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));
@@ -1404,7 +1406,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         ReferenceSerializeInputBE input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
         TaskType taskId = static_cast<TaskType>(input.readLong());
-        engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
+        engine->executeTask(taskId, input);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
@@ -1419,20 +1421,36 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: ()[B
+ * Signature: (ZI[I[I)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jboolean compatible) {
+  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionId, jintArray partitionKeyValues, jintArray flags,
+          jlong startSequenceNumber) {
     try {
+        jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
+        int32_t *partitionKeyValuesPtr = reinterpret_cast<int32_t *>(partitionKeyValuesJPtr);
+        std::vector<int32_t> partitionKeyValueList(partitionKeyValuesPtr,
+            partitionKeyValuesPtr + env->GetArrayLength(partitionKeyValues));
+        env->ReleaseIntArrayElements(partitionKeyValues, partitionKeyValuesJPtr, JNI_ABORT);
+
+        jint *flagsJPtr = env->GetIntArrayElements(flags, NULL);
+        int32_t *flagsPtr = reinterpret_cast<int32_t *>(flagsJPtr);
+        std::vector<int32_t> flagList(flagsPtr, flagsPtr + env->GetArrayLength(flags));
+        env->ReleaseIntArrayElements(flags, flagsJPtr, JNI_ABORT);
+
+        assert(partitionKeyValueList.size() == flagList.size());
+
         char *output = new char[1024 * 256];
         int32_t length;
         if (compatible) {
-            length = CompatibleDRTupleStream::getTestDRBuffer(output);
+            length = CompatibleDRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
         } else {
-            length = DRTupleStream::getTestDRBuffer(output);
+            length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
         }
         jbyteArray array = env->NewByteArray(length);
-        jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
+        jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);
         ::memcpy(arrayBytes, output, length);
         env->ReleaseByteArrayElements(array, arrayBytes, 0);
         return array;

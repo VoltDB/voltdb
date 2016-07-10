@@ -355,7 +355,7 @@ public class ParameterConverter {
             return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param);
         }
 
-        // The following block switches on the type of the paramter desired.
+        // The following block switches on the type of the parameter desired.
         // It handles all of the paths not trapped in the code above. We can assume
         // values are not null and that most sane primitive stuff has been handled.
         // Downcasting is handled here (e.g. long => short).
@@ -415,7 +415,7 @@ public class ParameterConverter {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
-                    return new TimestampType(timestring);
+                    return SQLParser.parseDate(timestring);
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
@@ -546,34 +546,5 @@ public class ParameterConverter {
         throw new VoltTypeException(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
-    }
-
-
-    /**
-     * Convert string inputs to Longs for TheHashinator if possible
-     * @param param
-     * @param slot
-     * @return Object parsed as Number or null if types not compatible
-     * @throws Exception if a parse error occurs (consistent with above).
-     */
-    public static Object stringToLong(Object param, Class<?> slot)
-    throws VoltTypeException
-    {
-        try {
-            if (slot == byte.class ||
-                slot == short.class ||
-                slot == int.class ||
-                slot == long.class)
-            {
-                return Long.parseLong((String)param);
-            }
-            return null;
-        }
-        catch (NumberFormatException nfe) {
-            throw new VoltTypeException(
-                    "tryToMakeCompatible: Unable to convert string "
-                    + (String)param + " to "  + slot.getName()
-                    + " value for target parameter " + slot.getName());
-        }
     }
 }

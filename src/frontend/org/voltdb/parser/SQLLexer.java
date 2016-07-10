@@ -75,6 +75,7 @@ public class SQLLexer extends SQLPatternFactory
     private final static ObjectToken[] OBJECT_TOKENS = {
         // Rename-able objects
         new ObjectToken("table", true),
+        new ObjectToken("stream", true),
         new ObjectToken("column", true),
         new ObjectToken("index", true),
         // Non-rename-able objects
@@ -113,12 +114,12 @@ public class SQLLexer extends SQLPatternFactory
     // All rejected patterns. (set in static block)
     private static CheckedPattern[] BLACKLISTS = null;
 
-    // Extracts the table name for DDL batch conflicting command checks.
+    // Extracts the table or stream name for DDL batch conflicting command checks.
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
-            SPF.token("table"),                                     // target is table
-            SPF.capture(SPF.databaseObjectName())                        // table name (captured)
+            SPF.tokenAlternatives("table", "stream"),               // target is table or stream
+            SPF.capture(SPF.databaseObjectName())                   // table name (captured)
         ).compile("PAT_TABLE_DDL_PREAMBLE");
 
     // Matches the start of a SELECT statement

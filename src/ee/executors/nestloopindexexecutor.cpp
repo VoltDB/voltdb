@@ -50,6 +50,9 @@
 #include "common/FatalException.hpp"
 
 #include "execution/VoltDBEngine.h"
+#include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
+#include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
@@ -157,7 +160,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     // target table is a persistent table
     assert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
     PersistentTable* inner_table = static_cast<PersistentTable*>(m_indexNode->getTargetTable());
-
 
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
     assert(index);
@@ -455,6 +457,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             }
                         }
                     }
+                    else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+                        index->moveToCoveringCell(&index_values, indexCursor);
+                    }
                     else {
                         return false;
                     }
@@ -467,10 +472,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 AbstractExpression* skipNullExprIteration = skipNullExpr;
 
                 while (postfilter.isUnderLimit() &&
-                       ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                        !(inner_tuple = index->nextValueAtKey(indexCursor)).isNullTuple()) ||
-                       ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                        !(inner_tuple = index->nextValue(indexCursor)).isNullTuple()))) {
+                       IndexScanExecutor::getNextTuple(localLookupType,
+                                                       &inner_tuple,
+                                                       index,
+                                                       &indexCursor,
+                                                       num_of_searchkeys)) {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
                     pmp.countdownProgress();

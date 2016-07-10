@@ -28,9 +28,10 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.DRLogSegmentId;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.Consistency;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -38,10 +39,11 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 /**
- * The repair log stores messages received from a PI in case they need to be
- * shared with less informed RIs should the PI shed its mortal coil.  This includes
- * recording and sharing messages starting and completing multipartition transactions
- * so that a new MPI can repair the cluster state on promotion.
+ * The repair log stores messages received from a partition initiator (leader) in case
+ * they need to be shared with less informed replica initiators should the partition
+ * initiator (leader) shed its mortal coil.  This includes recording and sharing messages
+ * starting and completing multipartition transactions so that a new MPI can repair the
+ * cluster state on promotion.
  */
 public class RepairLog
 {
@@ -55,24 +57,14 @@ public class RepairLog
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
 
-    /*
-     * Track the last master-cluster unique ID associated with an
-     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
-     *  ReplicaDRGateway on repair
-     */
-    private long m_maxSeenSpBinaryLogSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenSpBinaryLogMpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenMpBinaryLogMpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenSpBinaryLogDRId = Long.MIN_VALUE;
-    private long m_maxSeenMpBinaryLogDRId = Long.MIN_VALUE;
-    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
-
     // is this a partition leader?
     boolean m_isLeader = false;
 
     // The HSID of this initiator, for logging purposes
     long m_HSId = Long.MIN_VALUE;
+
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     // want voltmessage as payload with message-independent metadata.
     static class Item
@@ -134,6 +126,8 @@ public class RepairLog
     {
         m_logSP = new ArrayDeque<Item>();
         m_logMP = new ArrayDeque<Item>();
+
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     // get the HSID for dump logging
@@ -158,27 +152,30 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
+        /**
+         * Note: A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            // We can't repair read-only SP transactions due to their short-circuited nature.
+
+            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            // We can't repair shortcut-read SP transactions due to their short-circuited nature.
             // Just don't log them to the repair log.
-            if (!m.isReadOnly()) {
+            if (!shortcutRead) {
                 m_lastSpHandle = m.getSpHandle();
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
-                if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
-                    StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
-                    // params[2] is the end sequence number from the original cluster
-                    Object[] params = spi.getParams().toArray();
-                    m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
-                    m_maxSeenSpBinaryLogSpUniqueId = Math.max(m_maxSeenSpBinaryLogSpUniqueId, ((Number)params[3]).longValue());
-                    m_maxSeenSpBinaryLogMpUniqueId = Math.max(m_maxSeenSpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
-                    m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, m.getUniqueId());
-                }
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;
-            if (!m.isReadOnly()) {
+
+            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            if (!shortcutRead) {
                 truncate(m.getTruncationHandle(), IS_MP);
                 // only log the first fragment of a procedure (and handle 1st case)
                 if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
@@ -186,23 +183,16 @@ public class RepairLog
                     m_lastMpHandle = m.getTxnId();
                     m_lastSpHandle = m.getSpHandle();
                 }
-
-                final Iv2InitiateTaskMessage initiateTask = m.getInitiateTask();
-                if (initiateTask != null && "@ApplyBinaryLogMP".equals(initiateTask.getStoredProcedureName())) {
-                    StoredProcedureInvocation spi = initiateTask.getStoredProcedureInvocation();
-                    // params[3] is the end sequence number id from the original cluster
-                    Object[] params = spi.getParams().toArray();
-                    m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
-                    m_maxSeenMpBinaryLogMpUniqueId = Math.max(m_maxSeenMpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
-                    m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
-                }
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
-            if (!ctm.isReadOnly() && !ctm.isRestart()) {
+
+            boolean shortcutRead = ctm.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+
+            if (!shortcutRead && !ctm.isRestart()) {
                 truncate(ctm.getTruncationHandle(), IS_MP);
                 m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
                 //Restore will send a complete transaction message with a lower mp transaction id because
@@ -275,16 +265,8 @@ public class RepairLog
         List<Item> items = new LinkedList<Item>();
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
-        DRLogSegmentId logInfo;
-        long maxSeenLocalDrUniqueId;
         // SP repair requests also want the SP transactions
-        if (forMPI) {
-            logInfo = new DRLogSegmentId(m_maxSeenMpBinaryLogDRId, Long.MIN_VALUE, m_maxSeenMpBinaryLogMpUniqueId);
-            maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
-        }
-        else {
-            logInfo = new DRLogSegmentId(m_maxSeenSpBinaryLogDRId, m_maxSeenSpBinaryLogSpUniqueId, m_maxSeenSpBinaryLogMpUniqueId);
-            maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
+        if (!forMPI) {
             items.addAll(m_logSP);
         }
 
@@ -304,9 +286,7 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfigCooked(),
-                        maxSeenLocalDrUniqueId,
-                        logInfo);
+                        TheHashinator.getCurrentVersionedConfigCooked());
         responses.add(hheader);
 
         int seq = responses.size();

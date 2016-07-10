@@ -18,10 +18,15 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 /**
@@ -30,20 +35,47 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class NodeSchema
 {
-    private ArrayList<SchemaColumn> m_columns;
-    private HashMap <SchemaColumn, Integer> m_columnsMapHelper;
+    // Sometimes there are columns with identical names within a given table
+    // and its schema.  We want to be able to differentiate these columns so that
+    // m_columnsMapHelper can produce the right offset for columns that have the same
+    // name but are physically different.  We use the "differentiator" (an attribute
+    // of a TVE) to do this.
+    private static class SchemaColumnComparator implements Comparator<SchemaColumn> {
+
+        @Override
+        public int compare(SchemaColumn col1, SchemaColumn col2) {
+            int nameCompare = col1.compareNames(col2);
+            if (nameCompare != 0) {
+                return nameCompare;
+
+            }
+
+            return col1.getDifferentiator() - col2.getDifferentiator();
+        }
+    }
+
+    // The list of columns produced by a plan node, in storage order.
+    private final ArrayList<SchemaColumn> m_columns;
+
+    // A helpful map that goes from a schema column to the columns index in the list.
+    private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
     public NodeSchema()
     {
         m_columns = new ArrayList<SchemaColumn>();
-        m_columnsMapHelper = new HashMap<SchemaColumn, Integer>();
+        m_columnsMapHelper = new TreeMap<>(new SchemaColumnComparator());
     }
 
     /**
      * Add a column to this schema.
      *
      * Unless actively modified, updated, or sorted, the column order is
-     * implicitly the order in which columns are added using this call
+     * implicitly the order in which columns are added using this call.
+     *
+     * Note that it's possible to add the same column to a schema more than once.
+     * In this case we replace the old entry for the column in the map (so it will
+     * stay the same size), the column list will grow by one, and the updated map entry
+     * will point the the second instance of the column in the list.
      */
     public void addColumn(SchemaColumn column)
     {
@@ -78,11 +110,53 @@ public class NodeSchema
     public SchemaColumn find(String tableName, String tableAlias, String columnName, String columnAlias)
     {
         SchemaColumn col = new SchemaColumn(tableName, tableAlias, columnName, columnAlias);
-        Integer index = m_columnsMapHelper.get(col);
-        if (index != null) {
-            return m_columns.get(index.intValue());
+        int index = findIndexOfColumn(col);
+        if (index != -1) {
+            return m_columns.get(index);
         }
         return null;
+    }
+
+    /**
+     * A subclass of SchemaColumn that always returns -1 for the differentiator,
+     * meaning that it will sort lowest among schema columns with the same names.
+     */
+    private static class SchemaColumnFloor extends SchemaColumn {
+        SchemaColumnFloor(SchemaColumn col) {
+            super(col.getTableName(), col.getTableAlias(), col.getColumnName(), col.getColumnAlias(), col.getExpression());
+        }
+
+        @Override
+        public int getDifferentiator() {
+            return -1;
+        }
+    }
+
+    private int findIndexOfColumn(SchemaColumn col) {
+        SchemaColumn floorSchemaColumn = new SchemaColumnFloor(col);
+        SortedMap<SchemaColumn, Integer> submap = m_columnsMapHelper.tailMap(floorSchemaColumn);
+        int index = -1;
+
+        // If more than one column in this NodeSchema has the same name of the column
+        // we're looking for, then we "break the tie" and prefer the one with a matching
+        // differentiator field.
+        for (Map.Entry<SchemaColumn, Integer> entry : submap.entrySet()) {
+            SchemaColumn key = entry.getKey();
+            if (key.compareNames(col) == 0) {
+                if (col.getDifferentiator() == key.getDifferentiator()) {
+                    // An exact match
+                    index = entry.getValue();
+                    break;
+                }
+
+                index = entry.getValue();
+            }
+            else {
+                break;
+            }
+        }
+
+        return index;
     }
 
     /** Convenience method for looking up the column offset for a TVE using
@@ -93,19 +167,26 @@ public class NodeSchema
     public int getIndexOfTve(TupleValueExpression tve)
     {
         SchemaColumn col = new SchemaColumn(tve.getTableName(), tve.getTableAlias(),
-                tve.getColumnName(), tve.getColumnAlias());
+                tve.getColumnName(), tve.getColumnAlias(), tve, tve.getDifferentiator());
 
-        Integer index = m_columnsMapHelper.get(col);
-        if (index != null) {
-            return index.intValue();
-        }
-        return -1;
+        return findIndexOfColumn(col);
     }
 
-    /** Convenience method to sort the SchemaColumns.  Only applies if they
-     *  all are tuple value expressions.  Modification is made in-place.
+    /**
+     * Sort schema columns by TVE index.  All elements
+     * must be TupleValueExpressions.  Modification is made in-place.
      */
-    void sortByTveIndex()
+    void sortByTveIndex() {
+        sortByTveIndex(0, size());
+    }
+
+    /**
+     * Sort a sub-range of the schema columns by TVE index.  All elements
+     * must be TupleValueExpressions.  Modification is made in-place.
+     * @param fromIndex   lower bound of range to be sorted, inclusive
+     * @param toIndex     upper bound of range to be sorted, exclusive
+     */
+    void sortByTveIndex(int fromIndex, int toIndex)
     {
         class TveColCompare implements Comparator<SchemaColumn>
         {
@@ -133,7 +214,12 @@ public class NodeSchema
             }
         }
 
-        Collections.sort(m_columns, new TveColCompare());
+        if (fromIndex == 0 && toIndex == size()) {
+            Collections.sort(m_columns, new TveColCompare());
+        }
+        else {
+            Collections.sort(m_columns.subList(fromIndex, toIndex), new TveColCompare());
+        }
     }
 
     @Override
@@ -149,14 +235,15 @@ public class NodeSchema
 
     public NodeSchema replaceTableClone(String tableAlias) {
         NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
+        for (int i = 0; i < m_columns.size(); ++i) {
             SchemaColumn col = m_columns.get(i);
             String colAlias = col.getColumnAlias();
+            int differentiator = col.getDifferentiator();
 
-            TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
+            TupleValueExpression tve = new TupleValueExpression(
+                    tableAlias, tableAlias, colAlias, colAlias, i, differentiator);
             tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getExpression().getInBytes());
-            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve);
+            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve, col.getDifferentiator());
             copy.addColumn(sc);
         }
 
@@ -181,6 +268,24 @@ public class NodeSchema
                 return false;
             }
         }
+        return true;
+    }
+
+    // Similar to the equals method above, but consider SchemaColumn objects as equal if their
+    // names are the same.  Don't worry about the differentiator field.
+    public boolean equalsOnlyNames (NodeSchema otherSchema) {
+        if (otherSchema == null) return false;
+
+        if (otherSchema.size() != size()) return false;
+
+        ArrayList<SchemaColumn> columns = otherSchema.getColumns();
+        for (int i = 0; i < size(); i++ ) {
+            SchemaColumn col1 = columns.get(i);
+            if (col1.compareNames(m_columns.get(i)) != 0) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -234,6 +339,36 @@ public class NodeSchema
             sb.append(m_columns.get(i).toString()).append("\n");
         }
         return sb.toString();
+    }
+
+    public String toExplainPlanString() {
+        StringBuffer sb = new StringBuffer();
+
+        String separator = "schema: {";
+        for (SchemaColumn col : m_columns) {
+            sb.append(separator);
+            sb.append(col.toExplainPlanString());
+
+            separator = ", ";
+        }
+        sb.append("}");
+
+        return sb.toString();
+    }
+
+    public void addAllSubexpressionsOfClassFromNodeSchema(Set<AbstractExpression> exprs,
+            Class<? extends AbstractExpression> aeClass) {
+        for (SchemaColumn col : getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
+            if (colExpr == null) {
+                continue;
+            }
+            Collection<AbstractExpression> found = colExpr.findAllSubexpressionsOfClass(aeClass);
+            if (found.isEmpty()) {
+                continue;
+            }
+            exprs.addAll(found);
+        }
     }
 }
 

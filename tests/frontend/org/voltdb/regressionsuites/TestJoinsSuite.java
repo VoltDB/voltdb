@@ -534,7 +534,7 @@ public class TestJoinsSuite extends RegressionSuite {
         // R2 3rd joined with R3 null
         // R2 4th joined with R3 null
         VoltTable result = client.callProcedure(
-                "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A")
+                "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A order by R2.A")
                                  .getResults()[0];
         VoltTableRow row = result.fetchRow(2);
         assertEquals(3, row.getLong(1));
@@ -619,13 +619,17 @@ public class TestJoinsSuite extends RegressionSuite {
                 "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A WHERE R3.A IS NULL")
                                  .getResults()[0];
         System.out.println(result.toString());
-        if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        if ( ! isHSQL()) {
+            assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        }
         // Same as above but with partitioned table
         result = client.callProcedure(
                 "@AdHoc", "select * FROM R3 RIGHT JOIN P2 ON R3.A = P2.A WHERE R3.A IS NULL")
                                  .getResults()[0];
         System.out.println(result.toString());
-        if ( ! isHSQL())  assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        if ( ! isHSQL()) {
+            assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        }
 
         // R2 1st eliminated by R2.C < 0
         // R2 2nd eliminated by R2.C < 0
@@ -881,6 +885,9 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestMultipleFullJoins(client);
         clearSeqTables(client);
         subtestUsingFullJoin(client);
+        clearSeqTables(client);
+        clearIndexTables(client);
+        subtestFullJoinOrderBy(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -1057,7 +1064,7 @@ public class TestJoinsSuite extends RegressionSuite {
         //  NULL,NULL,5,6       inner no match
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 2 OFFSET 3";
+                "R1.A = R2.A ORDER BY R1.A, R2.C LIMIT 2 OFFSET 5";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {2, 3, 2, 3},
@@ -1065,18 +1072,18 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 2 OFFSET 4";
+                "R1.A = R2.A ORDER BY R1.A, R2.C LIMIT 2 OFFSET 6";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
-            {3, 4, 3, 4L},
+            {3, 4, 3, 4},
             {4,5,MINVAL,MINVAL}
         });
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 3 OFFSET 4";
+                "R1.A = R2.A ORDER BY COALESCE(R1.C, 10), R2.C LIMIT 3 OFFSET 4";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
-            {3, 4, 3, 4L},
+            {3, 4, 3, 4},
             {4,5,MINVAL,MINVAL},
             {MINVAL,MINVAL, 5, 5}
         });
@@ -1097,7 +1104,7 @@ public class TestJoinsSuite extends RegressionSuite {
         //  NULL,NULL,5,6       inner no match
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A  LIMIT 2 OFFSET 3";
+                "R1.A = R3.A ORDER BY COALESCE(R1.A, 10), R3.C LIMIT 2 OFFSET 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {2, 3, 2, 3},
@@ -1105,7 +1112,7 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A LIMIT 2 OFFSET 4";
+                "R1.A = R3.A ORDER BY R1.A, R3.C LIMIT 2 OFFSET 6";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {3, 4, 3, 4L},
@@ -1113,7 +1120,7 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A LIMIT 3 OFFSET 4";
+                "R1.A = R3.A ORDER BY COALESCE(R1.A, 10), R3.C LIMIT 3 OFFSET 4";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {3, 4, 3, 4L},
@@ -1478,6 +1485,51 @@ public class TestJoinsSuite extends RegressionSuite {
 
     }
 
+    private void subtestFullJoinOrderBy(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1,NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(3, 1);");
+
+        sql = "SELECT L.A FROM R3 L FULL JOIN R3 R ON L.C = R.C ORDER BY A";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL},
+                {1},
+                {1},
+                {1},
+                {2},
+                {2},
+                {3},
+                {3}
+        });
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "FULL"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "SORT"));
+
+        sql = "SELECT L.A, SUM(L.C) FROM R3 L FULL JOIN R3 R ON L.C = R.C GROUP BY L.A ORDER BY 1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL},
+                {1, 2},
+                {2, 5},
+                {3, 2}
+        });
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "FULL"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "SORT"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "Serial AGGREGATION"));
+
+    }
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;

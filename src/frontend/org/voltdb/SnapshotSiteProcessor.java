@@ -215,7 +215,7 @@ public class SnapshotSiteProcessor {
             }
 
             long[] ackOffSetAndSequenceNumber =
-                context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
+                    context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.put(
                             context.getPartitionId(),
                             Pair.of(
@@ -231,7 +231,7 @@ public class SnapshotSiteProcessor {
 
     public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
         HashMap<String, Map<Integer, Pair<Long, Long>>> sequenceNumbers =
-            new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
+                new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
         m_exportSequenceNumbers.clear();
         return sequenceNumbers;
     }
@@ -392,7 +392,7 @@ public class SnapshotSiteProcessor {
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
             int tableId = tablePredicates.getKey();
             TableStreamer streamer =
-                new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
+                    new TableStreamer(tableId, format.getStreamType(), m_snapshotTableTasks.get(tableId));
             if (!streamer.activate(context, tablePredicates.getValue())) {
                 VoltDB.crashLocalVoltDB("Failed to activate snapshot stream on table " +
                                         CatalogUtil.getTableNameFromId(context.getDatabase(), tableId), false, null);
@@ -567,7 +567,7 @@ public class SnapshotSiteProcessor {
          * transaction work.
          */
         Iterator<Map.Entry<Integer, Collection<SnapshotTableTask>>> taskIter =
-            m_snapshotTableTasks.asMap().entrySet().iterator();
+                m_snapshotTableTasks.asMap().entrySet().iterator();
         while (taskIter.hasNext()) {
             Map.Entry<Integer, Collection<SnapshotTableTask>> taskEntry = taskIter.next();
             final int tableId = taskEntry.getKey();
@@ -792,7 +792,11 @@ public class SnapshotSiteProcessor {
                     jsonObj.put("isTruncation", false);
                 }
                 extraSnapshotData.mergeToZooKeeper(jsonObj, SNAP_LOG);
-                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+                byte[] zkData = jsonObj.toString().getBytes("UTF-8");
+                if (zkData.length > 5000000) {
+                    SNAP_LOG.warn("ZooKeeper node for snapshot digest unexpectedly large: " + zkData.length);
+                }
+                zk.setData(snapshotPath, zkData, stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {

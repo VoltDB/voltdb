@@ -44,6 +44,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -63,6 +64,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
@@ -187,13 +189,14 @@ public class AsyncExportClient
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:-1:%d\n", m_rowid, now);
+                final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
                 try
                 {
                     m_writer.write(-1,trace);
                 }
                 catch (IOException e)
                 {
+                    System.err.println("Exception: " + e);
                     e.printStackTrace();
                 }
             }
@@ -214,6 +217,7 @@ public class AsyncExportClient
         final String [] parsedServers;
         final String procedure;
         final boolean exportGroups;
+        final int exportTimeout;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval = apph.longValue("displayinterval");
@@ -227,6 +231,7 @@ public class AsyncExportClient
             procedure       = apph.stringValue("procedure");
             parsedServers   = servers.split(",");
             exportGroups    = apph.booleanValue("exportgroups");
+            exportTimeout   = apph.intValue("timeout");
         }
     }
 
@@ -279,6 +284,7 @@ public class AsyncExportClient
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
+                .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .setArguments(args)
             ;
 
@@ -344,6 +350,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
+                    System.err.println("Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
@@ -367,7 +374,7 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
-            waitForStreamedAllocatedMemoryZero(clientRef.get());
+            waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
             System.out.println("Writing export count as: " + TrackingResults.get(0));
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
@@ -415,7 +422,7 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.out.println("Exception: " + x);
+            System.err.println("Exception: " + x);
             x.printStackTrace();
         }
     }
@@ -526,7 +533,12 @@ public class AsyncExportClient
      * @throws Exception
      */
     public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+        waitForStreamedAllocatedMemoryZero(client,300);
+    }
+
+    public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
         boolean passed = false;
+        Instant maxTime = Instant.now().plusSeconds(timeout);
 
         VoltTable stats = null;
         try {
@@ -534,6 +546,10 @@ public class AsyncExportClient
         } catch (Exception ex) {
         }
         while (true) {
+            if ( Instant.now().isAfter(maxTime) ) {
+                throw new Exception("Test Timeout waiting for non-null @Statistics call, "
+                + "increase --timeout arg for slower tests" );
+            }
             try {
                 stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             } catch (Exception ex) {
@@ -544,6 +560,10 @@ public class AsyncExportClient
             }
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
+                if ( Instant.now().isAfter(maxTime) ) {
+                    throw new Exception("Test Timeout expecting non-zero TUPLE_ALLOCATED_MEMORY Statistic, "
+                    + "increase --timeout arg for slower clients" );
+                }
                 String ttype = stats.getString("TABLE_TYPE");
                 if (ttype.equals("StreamedTable")) {
                     if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {

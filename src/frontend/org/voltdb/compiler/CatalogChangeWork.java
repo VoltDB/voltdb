@@ -34,6 +34,9 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     // For @AdHoc DDL work, this will be null
     final String operationString;
     final String[] adhocDDLStmts;
+    final byte[] replayHashOverride;
+    public final long replayTxnId;
+    public final long replayUniqueId;
 
     public CatalogChangeWork(
             long replySiteId,
@@ -43,7 +46,8 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
-            AuthSystem.AuthUser user)
+            AuthSystem.AuthUser user, byte[] replayHashOverride,
+            long replayTxnId, long replayUniqeuId)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName, type,
@@ -58,6 +62,9 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         }
         this.operationString = operationString;
         adhocDDLStmts = null;
+        this.replayHashOverride = replayHashOverride;
+        this.replayTxnId = replayTxnId;
+        this.replayUniqueId = replayUniqeuId;
     }
 
     /**
@@ -87,5 +94,13 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         // Ditto for deployment string
         this.operationString = null;
         this.adhocDDLStmts = adhocDDL.sqlStatements;
+        this.replayHashOverride = null;
+        this.replayTxnId = -1L;
+        this.replayUniqueId = -1L;
+    }
+
+    public boolean isForReplay()
+    {
+        return replayHashOverride != null;
     }
 }

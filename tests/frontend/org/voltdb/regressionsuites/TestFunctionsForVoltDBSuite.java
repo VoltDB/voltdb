@@ -39,6 +39,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BadParamTypesForTimestamp;
 import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
 /**
@@ -46,7 +47,8 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
-
+    private static long GREGORIAN_EPOCH = -12212553600000000L;
+    private static long NYE9999         = 253402300799999999L;
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -248,7 +250,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
-
+        // Test MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP
+        project.addStmtProcedure("GET_MAX_VALID_TIMESTAMP", "select MAX_VALID_TIMESTAMP() from P2 limit 1");
+        project.addStmtProcedure("GET_MIN_VALID_TIMESTAMP", "select MIN_VALID_TIMESTAMP() from P2 limit 1");
+        // Test IS_VALID_TIMESTAMP
+        project.addStmtProcedure("TEST_IS_VALID_TIMESTAMP", "select ID from P2 where ID = ? and IS_VALID_TIMESTAMP(TM)");
         project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
                 "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
                 "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
@@ -278,6 +284,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
         project.addProcedures(GotBadParamCountsInJava.class);
+        project.addProcedures(BadParamTypesForTimestamp.class);
     }
 
     public void testExplicitErrorUDF() throws Exception
@@ -1711,19 +1718,297 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // check the validity of the second parameter
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
+        verifyStmtFails(client,
+                        "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0",
+                        "the second parameter");
+        verifyStmtFails(client,
+                        "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0",
+                        "the second parameter");
+    }
+
+    public void testFunc_Str() throws Exception
+    {
+        System.out.println("STARTING testFunc_Str");
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable result;
+        String str;
+
+        cr = client.callProcedure("@AdHoc", "Delete from D1;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        cr = client.callProcedure("@AdHoc", "Delete from R3;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        String[] decimal_strs = {"123456.64565",     // id = 0
+                "-123456.64565",    // id = 1
+                "1123456785.555",   // id = 2
+                "-1123456785.555",  // id = 3
+                "0.0",              // id = 4
+                "-0.0",             // id = 5
+                "0",                // id = 6
+                "-0",               // id = 7
+                "99999999999999999999999999.999999999999", // id = 8
+                "-99999999999999999999999999.99999999999", // id = 9
+                "1500",             // id = 10
+                "2500",             // id = 11
+                "8223372036854775807.123456789125",        // id = 12
+                "8223372036854775807.123456789175"};       // id = 13
+        for(int i = 0; i < decimal_strs.length; i++) {
+            BigDecimal bd = new BigDecimal(decimal_strs[i]);
+            cr = client.callProcedure("D1.insert", i, bd);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        }
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "select STR(DEC, 12, 1), STR(DEC, 12, 2),"
+                + "STR(DEC, 12, 3), STR(DEC, 12, 4),"
+                + "STR(DEC, 12, 0) from D1 where id = 0");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "123456.6");    // rounding down
+        str = result.getString(1);
+        assertEquals(str, "123456.65");   // rounding up
+        str = result.getString(2);
+        assertEquals(str, "123456.646");
+        str = result.getString(3);
+        assertEquals(str, "123456.6456"); // banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
+        str = result.getString(4);
+        assertEquals(str, "123457");      // rounding up
+
+        cr = client.callProcedure("@AdHoc", "select STR(DEC,15, 1), STR(DEC, 10, 2),"
+                + "STR(DEC,10), STR(DEC) from D1 where id = 2");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "1123456785.6");
+        str = result.getString(1);
+        assertEquals(str, "**********");
+        str = result.getString(2);
+        assertEquals(str, "1123456786");
+        str = result.getString(3);
+        assertEquals(str, "1123456786");
+
+        // it will go out of the range of int64_t
+        verifyStmtFails(client, "select STR(DEC, -19) from D1 where id = 12", "the second parameter should be <= 38 and > 0");
+    }
+
+    public void testRound() throws Exception
+    {
+        System.out.println("STARTING testRound");
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable result;
+        BigDecimal str;
+
+        cr = client.callProcedure("@AdHoc", "Delete from D1;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        cr = client.callProcedure("@AdHoc", "Delete from R3;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        String[] decimal_strs = {"123456.64565",     // id = 0
+                "-123456.64565",    // id = 1
+                "1123456785.555",   // id = 2
+                "-1123456785.555",  // id = 3
+                "0.0",              // id = 4
+                "-0.0",             // id = 5
+                "0",                // id = 6
+                "-0",               // id = 7
+                "99999999999999999999999999.999999999999", // id = 8
+                "-99999999999999999999999999.99999999999", // id = 9
+                "1500",             // id = 10
+                "2500",             // id = 11
+                "8223372036854775807.123456789125",        // id = 12
+                "8223372036854775807.123456789175"};       // id = 13
+        for(int i = 0; i < decimal_strs.length; i++) {
+            BigDecimal bd = new BigDecimal(decimal_strs[i]);
+            cr = client.callProcedure("D1.insert", i, bd);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        }
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 1), ROUND(DEC, 2),"
+                + "ROUND(DEC, 3), ROUND(DEC, 4),"
+                + "ROUND(DEC, 0), ROUND(DEC, -1),"
+                + "ROUND(DEC, -2), ROUND(DEC, -3) from D1 where id = 0");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getDecimalAsBigDecimal(0);
+        assertEquals(str.toString(), "123456.600000000000");    // rounding down
+        str = result.getDecimalAsBigDecimal(1);
+        assertEquals(str.toString(), "123456.650000000000");   // rounding up
+        str = result.getDecimalAsBigDecimal(2);
+        assertEquals(str.toString(), "123456.646000000000");
+        str = result.getDecimalAsBigDecimal(3);
+        assertEquals(str.toString(), "123456.645600000000"); // banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
+        str = result.getDecimalAsBigDecimal(4);
+        assertEquals(str.toString(), "123457.000000000000");      // rounding up
+        str = result.getDecimalAsBigDecimal(5);
+        assertEquals(str.toString(), "123460.000000000000");
+        str = result.getDecimalAsBigDecimal(6);
+        assertEquals(str.toString(), "123500.000000000000");
+        str = result.getDecimalAsBigDecimal(7);
+        assertEquals(str.toString(), "123000.000000000000");      // rounding down
+
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 1), ROUND(DEC, 2),"
+                + "ROUND(DEC, 3), ROUND(DEC, 4),"
+                + "ROUND(DEC, 0), ROUND(DEC, -1),"
+                + "ROUND(DEC, -2), ROUND(DEC, -3) from D1 where id = 1");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getDecimalAsBigDecimal(0);
+        assertEquals(str.toString(), "-123456.600000000000");    // rounding down
+        str = result.getDecimalAsBigDecimal(1);
+        assertEquals(str.toString(), "-123456.650000000000");   // rounding up
+        str = result.getDecimalAsBigDecimal(2);
+        assertEquals(str.toString(), "-123456.646000000000");
+        str = result.getDecimalAsBigDecimal(3);
+        assertEquals(str.toString(), "-123456.645600000000"); //banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
+        str = result.getDecimalAsBigDecimal(4);
+        assertEquals(str.toString(), "-123457.000000000000");      // rounding up
+        str = result.getDecimalAsBigDecimal(5);
+        assertEquals(str.toString(), "-123460.000000000000");
+        str = result.getDecimalAsBigDecimal(6);
+        assertEquals(str.toString(), "-123500.000000000000");
+        str = result.getDecimalAsBigDecimal(7);
+        assertEquals(str.toString(), "-123000.000000000000");      // rounding down
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 1), ROUND(DEC, 2),"
+                + "ROUND(DEC, 3), ROUND(DEC, 4),"
+                + "ROUND(DEC, 0), ROUND(DEC, -1),"
+                + "ROUND(DEC, -2), ROUND(DEC, -3) from D1 where id = 2");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getDecimalAsBigDecimal(0);
+        assertEquals(str.toString(), "1123456785.600000000000");
+        str = result.getDecimalAsBigDecimal(1);
+        assertEquals(str.toString(), "1123456785.560000000000"); // banker's rounding: half to nearest even when previous digit is odd
+        str = result.getDecimalAsBigDecimal(2);
+        assertEquals(str.toString(), "1123456785.555000000000");
+        str = result.getDecimalAsBigDecimal(3);
+        assertEquals(str.toString(), "1123456785.555000000000"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
+        str = result.getDecimalAsBigDecimal(4);
+        assertEquals(str.toString(), "1123456786.000000000000");
+        str = result.getDecimalAsBigDecimal(5);
+        assertEquals(str.toString(), "1123456790.000000000000");
+        str = result.getDecimalAsBigDecimal(6);
+        assertEquals(str.toString(), "1123456800.000000000000");
+        str = result.getDecimalAsBigDecimal(7);
+        assertEquals(str.toString(), "1123457000.000000000000");
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 1), ROUND(DEC, 2),"
+                + "ROUND(DEC, 3), ROUND(DEC, 4),"
+                + "ROUND(DEC, 0), ROUND(DEC, -1),"
+                + "ROUND(DEC, -2), ROUND(DEC, -3) from D1 where id = 3");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getDecimalAsBigDecimal(0);
+        assertEquals(str.toString(), "-1123456785.600000000000");
+        str = result.getDecimalAsBigDecimal(1);
+        assertEquals(str.toString(), "-1123456785.560000000000"); // banker's rounding: half to nearest even when previous digit is odd
+        str = result.getDecimalAsBigDecimal(2);
+        assertEquals(str.toString(), "-1123456785.555000000000");
+        str = result.getDecimalAsBigDecimal(3);
+        assertEquals(str.toString(), "-1123456785.555000000000"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
+        str = result.getDecimalAsBigDecimal(4);
+        assertEquals(str.toString(), "-1123456786.000000000000");
+        str = result.getDecimalAsBigDecimal(5);
+        assertEquals(str.toString(), "-1123456790.000000000000");
+        str = result.getDecimalAsBigDecimal(6);
+        assertEquals(str.toString(), "-1123456800.000000000000");
+        str = result.getDecimalAsBigDecimal(7);
+        assertEquals(str.toString(), "-1123457000.000000000000");
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, -3) from D1 where id = 10");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getDecimalAsBigDecimal(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is odd
+        assertEquals(str.toString(), "2000.000000000000");
+
+        cr = client.callProcedure("@AdHoc", "select ROUND(DEC, -3) from D1 where id = 11");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getDecimalAsBigDecimal(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is even
+        assertEquals(str.toString(), "2000.000000000000");
+
+        // zeros with different init input
+        for (int i = 4; i < 8; i++) {
+            cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 2) from D1 where id = "+i);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getDecimalAsBigDecimal(0);
+            assertEquals(str.intValue(), 0);
         }
 
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
+        // out of int64_t range
+        verifyStmtFails(client, "select ROUND(dec, 2) from D1 where id = 8", "out of range");
+
+        // check invalid type
+        verifyStmtFails(client,
+                        "select ROUND(id, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(tiny, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(small, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(num, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(big, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(tm, 2) from R3 where id = 1",
+                        "incompatible data type in operation");
+        verifyStmtFails(client,
+                        "select ROUND(var, 2) from R3 where id = 1",
+                        "incompatible data type in operation");
+        verifyStmtFails(client,
+                        "select ROUND(DEC, -19) from D1 where id = 12",
+                        "out of range");
+        // check the validity of the second parameter
+        verifyStmtFails(client,
+                        "select ROUND(DEC, 15) from D1 where id = 0",
+                        "the second parameter");
+        verifyStmtFails(client,
+                        "select ROUND(DEC, -26) from D1 where id = 0",
+                        "the second parameter");
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -2515,6 +2800,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(throwed);
     }
 
+
+
+    public void testBadParamTypeForTimeStampField() throws IOException, ProcCallException {
+        Client client = getClient();
+        // seed dummy data into table
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (10000, '2000-01-01 01:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        final int numberOfProcsToTest = BadParamTypesForTimestamp.procs.length;
+        final int numberOfValuesToTest = BadParamTypesForTimestamp.values.length;
+        for (int procEntry = 0; procEntry < numberOfProcsToTest; procEntry++) {
+            for (int valueIndexToTestWith = 0; valueIndexToTestWith < numberOfValuesToTest; valueIndexToTestWith++) {
+                verifyProcFails(client, "VOLTDB ERROR: SQL ERROR\n .* can't be cast as TIMESTAMP", "BadParamTypesForTimestamp", procEntry, valueIndexToTestWith);
+            }
+        }
+    }
+
     public void testRegexpPosition() throws Exception {
         System.out.println("STARTING testRegexpPosition");
 
@@ -2609,5 +2912,62 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // clear test data
         cr = client.callProcedure("@AdHoc", "DELETE FROM P1 WHERE ID IN (200, 201, 202);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
     }
+
+    private void doTestTimestampLimit(String procName, long value) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure(procName);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        vt.advanceRow();
+        assertEquals(1,  vt.getRowCount());
+        assertEquals(value, vt.getTimestampAsLong(0));
+    }
+
+    private void doTestIsValidTimestamp(long id, boolean expected) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("TEST_IS_VALID_TIMESTAMP", id);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        vt.advanceRow();
+        // If we expect the timestamp to be valid, we expect one
+        // row of answer.  If we expect it to be invalid, we expect
+        // no answers.
+        if (expected) {
+            assertEquals(1, vt.getRowCount());
+            assertEquals(id, vt.getLong(0));
+        } else {
+            assertEquals(0, vt.getRowCount());
+        }
+    }
+
+    public void testTimestampValidityFunctions() throws Exception {
+        // Insert some valid and invalid data.
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        cr = client.callProcedure("P2.insert", 100, GREGORIAN_EPOCH - 1000);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 101, NYE9999 + 1000);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 200, GREGORIAN_EPOCH);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 201, 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 202, NYE9999);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Test MIN_VALID_TIMESTAMP
+        doTestTimestampLimit("GET_MIN_VALID_TIMESTAMP", GREGORIAN_EPOCH);
+        doTestTimestampLimit("GET_MAX_VALID_TIMESTAMP", NYE9999);
+
+        // Test IS_VALID_TIMESTAMP too low.
+        doTestIsValidTimestamp(100, false);
+        doTestIsValidTimestamp(101, false);
+        doTestIsValidTimestamp(200, true);
+        doTestIsValidTimestamp(201, true);
+        doTestIsValidTimestamp(202, true);
+    }
+
 }

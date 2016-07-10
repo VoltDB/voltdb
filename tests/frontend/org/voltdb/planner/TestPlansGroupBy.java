@@ -35,9 +35,11 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -95,9 +97,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testInlineSerialAgg_noGroupBy_special() {
       AbstractPlanNode p;
       pns = compileToFragments("SELECT AVG(A1) from T1");
-      for (AbstractPlanNode apn: pns) {
-          //* enable to debug */ System.out.println(apn.toExplainPlanString());
-      }
+      //* enable to debug */ printExplainPlan(pns);
       p = pns.get(0).getChild(0);
       assertTrue(p instanceof ProjectionPlanNode);
       assertTrue(p.getChild(0) instanceof AggregatePlanNode);
@@ -509,6 +509,26 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3");
         checkGroupByOnlyPlan(true, P_AGG, true);
+
+        /**
+         * Regression case
+         */
+        // ENG-9990 Repeating GROUP BY partition key in SELECT corrupts output schema.
+        //* enable to debug */ boolean was = AbstractPlanNode.enableVerboseExplainForDebugging();
+        pns = compileToFragments("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY");
+        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+        //* enable to debug */ AbstractPlanNode.restoreVerboseExplainForDebugging(was);
+        AbstractPlanNode pn = pns.get(0);
+        pn = pn.getChild(0);
+        NodeSchema os = pn.getOutputSchema();
+        // The problem was a mismatch between the output schema
+        // of the coordinator's send node and its feeding receive node
+        // that had incorrectly rearranged its columns.
+        SchemaColumn middleCol = os.getColumns().get(1);
+        System.out.println(middleCol.toString());
+        assertTrue(middleCol.getColumnAlias().equals("C"));
+
     }
 
     private void checkPartialAggregate(boolean twoFragments) {
@@ -629,7 +649,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
              inline Serial AGGREGATION ops
               inline LIMIT 5
         */
-        String expectedStr = "  inline Serial AGGREGATION ops\n" +
+        String expectedStr = "  inline Serial AGGREGATION ops: \n" +
                              "   inline LIMIT 5";
         String explainPlan = "";
         for (AbstractPlanNode apn: pns) {
@@ -921,30 +941,59 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    public void testGroupByBooleanConstants() {
+        String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
+        for (String condition : conditions) {
+            failToCompile(String.format("SELECT count(P1.PKEY) FROM P1 GROUP BY %s", condition),
+                          "A GROUP BY clause does not allow a BOOLEAN expression.");
+        }
+    }
+
+    public void testGroupByAliasENG9872() {
+        // If we have an alias in a group by clause, and
+        // the alias is to an aggregate, we need to reject
+        // this.
+        failToCompile("SELECT 2*count(P1.PKEY) AS AAA FROM P1 GROUP BY AAA",
+                      "invalid GROUP BY expression:  COUNT()");
+        // Ambiguity.
+        failToCompile("SELECT P1.PKEY AS AAA, P1.PKEY AS AAA FROM P1 GROUP BY AAA",
+                      "Group by expression \"AAA\" is ambiguous");
+        // More ambiguity.  Also, the count aggregate is used
+        // in the group by, but we see the ambiguity first.
+        failToCompile("SELECT 2*count(P1.PKEY) AS AAA, P1.PKEY AS AAA FROM P1 GROUP BY AAA",
+                      "Group by expression \"AAA\" is ambiguous");
+        // This used to fail because we ignored select lists
+        // which had no aggregates.  Now we look at all of them.
+        compile("SELECT P1.PKEY AS AAA FROM P1 GROUP BY AAA");
+    }
+
     public void testGroupbyAliasNegativeCases() {
         // Group by aggregate expression
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
             fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("invalid GROUP BY expression"));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         // Group by alias and expression
@@ -952,8 +1001,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: SP", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: SP"));
         }
 
         // Having
@@ -961,8 +1012,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT ABS(A1), count(*) as ct FROM P1 GROUP BY ABS(A1) having ct > 3");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: CT"));
         }
 
         // Group by column.alias
@@ -970,8 +1023,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: P1.SP", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: P1.SP"));
         }
 
         //
@@ -1237,18 +1292,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere( aggFilter == null? null: new String[] {aggFilter},
                     scanFilter == null? null: new String[] {scanFilter});
     }
 
     private void checkMVFixWithWhere(String sql, Object aggFilters[]) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere(aggFilters, null);
     }
 

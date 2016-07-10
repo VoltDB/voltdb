@@ -206,6 +206,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_PI:
             ret = new ConstantFunctionExpression<FUNC_PI>();
             break;
+        case FUNC_VOLT_MIN_VALID_TIMESTAMP:
+            ret = new ConstantFunctionExpression<FUNC_VOLT_MIN_VALID_TIMESTAMP>();
+            break;
+        case FUNC_VOLT_MAX_VALID_TIMESTAMP:
+            ret = new ConstantFunctionExpression<FUNC_VOLT_MAX_VALID_TIMESTAMP>();
+            break;
         default:
             return NULL;
         }
@@ -376,11 +382,23 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LN:
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
             break;
+        case FUNC_LOG10:
+            ret = new UnaryFunctionExpression<FUNC_LOG10>((*arguments)[0]);
+            break;
         case FUNC_VOLT_VALIDATE_POLYGON:
             ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
             break;
         case FUNC_VOLT_POLYGON_INVALID_REASON:
             ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_VALIDPOLYGONFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDPOLYGONFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_STR:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_STR>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_IS_VALID_TIMESTAMP:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_IS_VALID_TIMESTAMP>((*arguments)[0]);
             break;
         default:
             return NULL;
@@ -481,6 +499,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_FORMAT_CURRENCY:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
+            break;
+        case FUNC_VOLT_STR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_STR>(*arguments);
+            break;
+        case FUNC_VOLT_ROUND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_ROUND>(*arguments);
             break;
         case FUNC_VOLT_REGEXP_POSITION:
             ret = new GeneralFunctionExpression<FUNC_VOLT_REGEXP_POSITION>(*arguments);

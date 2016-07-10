@@ -25,7 +25,6 @@
 #include <deque>
 
 namespace voltdb {
-class TableIndex;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
@@ -43,7 +42,7 @@ struct DRCommittedInfo{
 
 class AbstractDRTupleStream : public TupleStreamBase {
 public:
-    AbstractDRTupleStream();
+    AbstractDRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~AbstractDRTupleStream() {}
 
@@ -51,10 +50,12 @@ public:
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 
+    virtual void periodicFlush(int64_t timeInMillis,
+                       int64_t lastComittedSpHandle);
+
     virtual void setSecondaryCapacity(size_t capacity);
 
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
-    void configure(CatalogId partitionId) { m_partitionId = partitionId; }
 
     /**
      * write an insert or delete record to the stream
@@ -62,12 +63,11 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       DRRecordType type) = 0;
 
     /**
      * write an update record to the stream
@@ -75,31 +75,43 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
-                       TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       TableTuple &newTuple) = 0;
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId) = 0;
 
-    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId) = 0;
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId) = 0;
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId) = 0;
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
 
+    void handleOpenTransaction(StreamBlock *oldBlock);
+
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
 
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) = 0;
+
     bool m_enabled;
+    bool m_guarded; // strongest guard, reject all actions for DRTupleStream
+
+    int64_t m_openSequenceNumber;
+    int64_t m_committedSequenceNumber;
 protected:
+    virtual void openTransactionCommon(int64_t spHandle, int64_t uniqueId);
+
+    virtual void commitTransactionCommon();
+
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
@@ -110,31 +122,32 @@ protected:
 class DRTupleStreamDisableGuard {
 public:
     DRTupleStreamDisableGuard(ExecutorContext *ec, bool ignore) :
-            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
         if (!ignore) {
             setGuard();
         }
     }
     DRTupleStreamDisableGuard(ExecutorContext *ec) :
-            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
         setGuard();
     }
     ~DRTupleStreamDisableGuard() {
-        m_drStream->m_enabled = m_drStreamOldValue;
+        m_drStream->m_guarded = m_drStreamOldValue;
         if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = m_drReplicatedStreamOldValue;
+            m_drReplicatedStream->m_guarded = m_drReplicatedStreamOldValue;
         }
     }
 
 private:
-    inline void setGuard() {
-        m_drStream->m_enabled = false;
+    inline void setGuard()
+    {
+        m_drStream->m_guarded = true;
         if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = false;
+            m_drReplicatedStream->m_guarded = true;
         }
     }
 

@@ -1,32 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
-
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
 import requests
@@ -37,9 +23,8 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/voltdeploy/'
-__db_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
-__server_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
+__url__ = 'http://%s:8000/api/1.0/voltdeploy/' % __host_or_ip__
+__db_url__ = 'http://%s:8000/api/1.0/databases/' % __host_or_ip__
 
 
 def get_last_db_id():
@@ -61,7 +46,7 @@ def get_last_server_id():
         Get last Server Id
     """
 
-    url = __server_url__ + str(get_last_db_id()) + '/servers/'
+    url = __db_url__ + str(get_last_db_id()) + '/servers/'
     response = requests.get(url)
     value = response.json()
     last_server_id = 0
@@ -72,13 +57,15 @@ def get_last_server_id():
     return last_server_id
 
 
-class Database(unittest.TestCase):
+class DatabaseServer(unittest.TestCase):
     """
-    setup a new database for test
+    test cases for Server
     """
 
     def setUp(self):
+        """
         # Create a db
+        """
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(__db_url__, json=db_data, headers=headers)
@@ -86,17 +73,52 @@ class Database(unittest.TestCase):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 404)
+        # Create a server
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            url = __db_url__ + str(last_db_id) + '/servers/'
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 201:
+                self.assertEqual(response.status_code, 201)
+            else:
+                self.assertEqual(response.status_code, 404)
+        else:
+            print "The database list is empty"
 
     def tearDown(self):
-        # Delete database
+        """
+        Delete the server
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            db_data = {'dbId': last_db_id}
+            url = __db_url__ + str(last_db_id) + '/servers/'
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length - 1]['id']
+                print "ServerId to be deleted is " + str(last_server_id)
+                url = __db_url__ + str(last_db_id) + '/servers/' + str(last_server_id)
+                response = requests.delete(url, json=db_data, headers=headers)
+                self.assertEqual(response.status_code, 204)
+                # Delete database
+                db_url = __db_url__ + str(last_db_id)
+                response = requests.delete(db_url)
+                self.assertEqual(response.status_code, 204)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
 
-        last_db_id = get_last_db_id()
-        db_url = __db_url__ + str(last_db_id)
-        response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
-
-
-URL = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 
 class XML(unittest.TestCase):
     """
@@ -116,7 +138,7 @@ class XML(unittest.TestCase):
         return doc
 
 
-class UpdateDatabase(Database):
+class UpdateDatabase(DatabaseServer):
     """
     Update Database and check deployment xml in vdm.xml
     """
@@ -126,13 +148,27 @@ class UpdateDatabase(Database):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for database in root.findall('database'):
-            if database.attrib['id'] == last_db_id:
-                self.assertEqual(database.attrib['deployment'], "")
+        for database in root.findall('databases')[0].findall('database'):
+            if int(database.attrib['id']) == last_db_id:
                 self.assertEqual(database.attrib['name'], "testDB")
-                self.assertEqual(database.attrib['members'], "[]")
                 self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.findall('deployment'):
+                for member in database.findall('members')[0].findall('member'):
+                    self.assertEqual(member.attrib['hostname'], __host_or_ip__)
+                    self.assertEqual(member.attrib['description'], 'test')
+                    self.assertEqual(member.attrib['name'], 'test')
+                    self.assertEqual(member.attrib['admin-listener'], '')
+                    self.assertEqual(member.attrib['replication-listener'], '')
+                    self.assertEqual(member.attrib['enabled'], 'true')
+                    self.assertEqual(member.attrib['public-interface'], '')
+                    self.assertEqual(member.attrib['internal-listener'], '')
+                    self.assertEqual(member.attrib['http-listener'], '')
+                    self.assertEqual(member.attrib['client-listener'], '')
+                    self.assertEqual(member.attrib['placement-group'], '')
+                    self.assertEqual(member.attrib['external-interface'], '')
+                    self.assertEqual(member.attrib['internal-interface'], '')
+                    self.assertEqual(member.attrib['id'], str(get_last_server_id()))
+                    self.assertEqual(member.attrib['zookeeper-listener'], '')
+        for deployment in root.findall('deployments')[0].findall('deployment'):
             if deployment.attrib['databaseid'] == str(last_db_id):
                 for child in deployment:
                     if child.tag == "paths":
@@ -193,70 +229,7 @@ class UpdateDatabase(Database):
                             self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
 
 
-class Server(unittest.TestCase):
-    """
-    test cases for Server
-    """
-
-    def setUp(self):
-        """
-        # Create a db
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {'name': 'testDB'}
-        response = requests.post(__db_url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-        # Create a server
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length - 1]['id']
-            url = URL + str(last_db_id) + '/servers/'
-            data = {'description': 'test', 'hostname': 'test', 'name': 'test'}
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code == 201:
-                self.assertEqual(response.status_code, 201)
-            else:
-                self.assertEqual(response.status_code, 404)
-        else:
-            print "The database list is empty"
-
-    def tearDown(self):
-        """
-        Delete the server
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length - 1]['id']
-            db_data = {'dbId': last_db_id}
-            url = URL + str(last_db_id) + '/servers/'
-            response = requests.get(url)
-            value = response.json()
-            if value:
-                server_length = len(value['members'])
-                last_server_id = value['members'][server_length - 1]['id']
-                print "ServerId to be deleted is " + str(last_server_id)
-                url = URL + str(last_db_id) + '/servers/' + str(last_server_id)
-                response = requests.delete(url, json=db_data, headers=headers)
-                self.assertEqual(response.status_code, 200)
-                # Delete database
-                db_url = __db_url__ + str(last_db_id)
-                response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
-            else:
-                print "The Server list is empty"
-        else:
-            print "The database list is empty"
-
-
-class UpdateMember(Server):
+class UpdateMember(DatabaseServer):
     """
         Update member and check in vdm.xml
     """
@@ -268,12 +241,13 @@ class UpdateMember(Server):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for member in root.findall('member'):
-            if member.attrib['id'] == last_server_id:
-                self.assertEqual(member.attrib['hostname'], "test")
-                self.assertEqual(member.attrib['name'], "test")
-                self.assertEqual(member.attrib['description'], "test")
-                self.assertEqual(member.attrib['id'], str(last_server_id))
+        if root.findall('members'):
+            for member in root.findall('members')[0].findall('member'):
+                if member.attrib['id'] == last_server_id:
+                    self.assertEqual(member.attrib['hostname'], "test")
+                    self.assertEqual(member.attrib['name'], "test")
+                    self.assertEqual(member.attrib['description'], "test")
+                    self.assertEqual(member.attrib['id'], str(last_server_id))
 
 
 class Deployment(unittest.TestCase):
@@ -283,7 +257,7 @@ class Deployment(unittest.TestCase):
 
     def setUp(self):
         """Create a db"""
-        url = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
+        url = 'http://%s:8000/api/1.0/databases/' % __host_or_ip__
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(url, json=db_data, headers=headers)
@@ -293,7 +267,7 @@ class Deployment(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
         last_db_id = get_last_db_id()
-        url_dep = 'http://' + __host_or_ip__ + ':8000/api/1.0/deployment/' + str(last_db_id)
+        url_dep = 'http://%s:8000/api/1.0/databases/%u/deployment/' % (__host_or_ip__, last_db_id)
         json_data = {
             "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
@@ -314,33 +288,32 @@ class Deployment(unittest.TestCase):
                                "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
-                                                       {"name": "SNAPSHOTS", "size": "2"}
+                                                       {"name": "snapshots", "size": "2"}
                                                    ],
                                                        "size": "10"},
                                                    "frequency": 5}},
             "security": {"enabled": True, "provider": "HASH"},
             "export": {"configuration": [{"enabled": False,
                                           "type": "kafka", "exportconnectorclass": "test",
-                                          "stream": "test", "property": [{"name": "test",
+                                          "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "test", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
         }
 
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
         """Delte a db"""
         last_db_id = get_last_db_id()
-        url = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
         # Delete database
-        db_url = url + str(last_db_id)
+        db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
 
 class UpdateDatabaseDeployment(Deployment):
@@ -353,13 +326,13 @@ class UpdateDatabaseDeployment(Deployment):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for database in root.findall('database'):
-            if database.attrib['id'] == last_db_id:
-                self.assertEqual(database.attrib['deployment'], "")
+        for database in root.findall('databases')[0].findall('database'):
+            if database.attrib['id'] == str(last_db_id):
                 self.assertEqual(database.attrib['name'], "testDB")
-                self.assertEqual(database.attrib['members'], "[]")
                 self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.findall('deployment'):
+                self.assertEqual(database.findall('members')[0].findall('member'), [])
+
+        for deployment in root.findall('deployments')[0].findall('deployment'):
             if deployment.attrib['databaseid'] == str(last_db_id):
                 for child in deployment:
                     if child.tag == "paths":
@@ -395,7 +368,7 @@ class UpdateDatabaseDeployment(Deployment):
                                         self.assertEqual(supersubnode.attrib['size'], "1")
                                     if supersubnode.tag == "disklimit":
                                         for disklimit in supersubnode:
-                                            self.assertEqual(disklimit.attrib['name'], "SNAPSHOTS")
+                                            self.assertEqual(disklimit.attrib['name'], "snapshots")
                                             self.assertEqual(disklimit.attrib['size'], "2")
 
                     if child.tag == "admin-mode":

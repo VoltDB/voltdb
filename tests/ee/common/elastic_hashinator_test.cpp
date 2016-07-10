@@ -81,6 +81,37 @@ TEST_F(ElasticHashinatorTest, TestMinMaxToken)
     EXPECT_EQ( 2, hashinator->partitionForToken(std::numeric_limits<int32_t>::max() - 1));
 }
 
+TEST_F(ElasticHashinatorTest, TestNValueHashToken)
+{
+    boost::scoped_array<char> config(new char[4 + (12 * 3)]);
+    ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
+
+    output.writeInt(3);
+    output.writeInt(std::numeric_limits<int32_t>::min());
+    output.writeInt(0);
+    output.writeInt(0);
+    output.writeInt(1);
+    output.writeInt(std::numeric_limits<int32_t>::max());
+    output.writeInt(2);
+
+    boost::scoped_ptr<TheHashinator> hashinator(ElasticHashinator::newInstance(config.get(), NULL, 0));
+
+    for (int i = -100; i < 100; i++) {
+        NValue value = ValueFactory::getTinyIntValue(i);
+        EXPECT_EQ(hashinator->hashinate(value), hashinator->partitionForToken(value.murmurHash3()));
+    }
+
+    for (int i = -10000; i < 10000; i++) {
+        NValue value = ValueFactory::getIntegerValue(i);
+        EXPECT_EQ(hashinator->hashinate(value), hashinator->partitionForToken(value.murmurHash3()));
+    }
+
+    for (int i = -10000; i < 10000; i++) {
+        NValue value = ValueFactory::getBigIntValue(i);
+        EXPECT_EQ(hashinator->hashinate(value), hashinator->partitionForToken(value.murmurHash3()));
+    }
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

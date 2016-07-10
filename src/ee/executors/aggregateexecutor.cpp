@@ -682,7 +682,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 
     bool needInsert = m_postfilter.eval(&tempTuple, NULL);
     if (needInsert) {
-        m_tmpOutputTable->insertTupleNonVirtual(tempTuple);
+        m_tmpOutputTable->insertTempTuple(tempTuple);
     }
 
     VOLT_TRACE("output_table:\n%s", m_tmpOutputTable->debug().c_str());

@@ -3,6 +3,7 @@
 
 {@aftermath = " "}
 {@agg = "_genericagg"} -- varbinary don't do SUM or AVG
+{@distinctableagg = "COUNT"} -- varbinary don't do SUM
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
 {@columnpredicate = "@cmp"}
@@ -20,6 +21,7 @@
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
 {@optionalfn = ""}
+{@plus10 = " "} -- You cannot add to a varbinary
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "_value[varbinary]"}

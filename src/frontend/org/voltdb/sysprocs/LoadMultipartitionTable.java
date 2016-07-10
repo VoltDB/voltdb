@@ -82,7 +82,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             // add the partition id
             long currentPartition = context.getPartitionId();
             result.addRow(currentPartition);
-
             try {
                 // voltLoadTable is void. Assume success or exception.
                 DeprecatedProcedureAPIAccess.voltLoadTable(

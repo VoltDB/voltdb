@@ -51,6 +51,7 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -86,7 +87,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBrokenLineParsing() throws IOException {
-        final String simpleSchema1 =
+        final String simpleSchema =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
             "create view v_table1r_el (column2_integer, num_rows) as\n" +
             "select column2_integer as column2_integer,\n" +
@@ -97,32 +98,12 @@ public class TestVoltCompiler extends TestCase {
             "select column2_integer as column2_integer,\n" +
                 "count(*) as num_rows\n" +
             "from table1r_el\n" +
-            "group by column2_integer\n;\n";
+            "group by column2_integer\n;\n" +
+            "create procedure Foo as select * from table1r_el;";
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from table1r_el;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(simpleSchema);
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("testout.jar"));
         assertTrue(success);
     }
 
@@ -531,6 +512,55 @@ public class TestVoltCompiler extends TestCase {
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
         project.addExport(true /* enabled */);
         project.setTableAsExportOnly("table1r_el_only");
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnly() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table2r_el_only");
+        project.addPartitionInfo("table2r_el_only", "column1_bigint");
+
+        try {
+            assertTrue(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table3r_el_only");
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table4r_el_only");
+        project.addPartitionInfo("table4r_el_only", "column1_bigint");
+
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -2431,6 +2461,36 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
+    private void subTestDDLCompilerMatViewJoin()
+    {
+        String tableDDL;
+        String viewDDL;
+        tableDDL = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T3 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n";
+        // 0. Test final guard (to be removed after the feature is done.)
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" has 2 sources. Only one source table is allowed.");
+        // 1. Test INNER JOIN
+        // 1.1 Test one join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 LEFT JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 1.2 Test multiple joins
+        viewDDL = "CREATE VIEW V (aint, bint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, T2.a, count(*), sum(T3.b) FROM T1 JOIN T2 ON T1.a=T2.a RIGHT JOIN T3 on T2.a=T3.a GROUP BY T1.a, T2.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 2. Test self-join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
+                                               "materialized view does not support self-join.");
+        // 3. Test table join subquery.
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2) T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+    }
 
     public void testDDLCompilerMatView()
     {
@@ -2513,19 +2573,22 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // comparison expression not supported in group by clause
-        errorMsg = "Materialized view \"MY_VIEW\" with comparison expression '=' in GROUP BY clause not supported.";
+        // comparison expression not supported in group by clause -- actually gets caught because it's not allowed
+        // in the select list either.
+        errorMsg = "SELECT clause does not allow a BOOLEAN expression.";
         ddl = "create table t(id integer not null, num integer not null);\n" +
-                "create view my_view as select (id = num) as idNumber, count(*) from t group by (id = num);" +
-                "partition table my_view on column num;";
+                "create view my_view as select (id = num) as idVsNumber, count(*) from t group by (id = num);" +
+                "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
         // count(*) is needed in ddl
         errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view as select id, wage from t group by id, wage;" +
-                "partition table my_view on column num;";
+                "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        subTestDDLCompilerMatViewJoin();
     }
 
     public void testDDLCompilerTableLimit()
@@ -2784,7 +2847,7 @@ public class TestVoltCompiler extends TestCase {
     public void testGeographyPointValueNegative() throws Exception {
 
         // POINT cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*",
                 "create table pts ("
                 + "  pt geography_point not null"
                 + ");"
@@ -2879,7 +2942,7 @@ public class TestVoltCompiler extends TestCase {
                      "partition table geogs on column geog;\n";
 
         // GEOGRAPHY cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*", ddl);
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*", ddl);
 
         ddl = "create table geogs ( geog geography(0) not null );";
         badDDLAgainstSimpleSchema(".*precision or scale out of range.*", ddl);
@@ -2895,50 +2958,49 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table geogs ( geog geography(1048577) not null );";
         badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*", ddl);
 
-        // GEOGRAPHY columns cannot yet be indexed
-        ddl = "create table geogs ( geog geography not null );\n" +
-              "create index geogidx on geogs( geog );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
-
         // GEOGRAPHY columns cannot use unique/pk constraints which
         // are implemented as indexes.
         ddl = "create table geogs ( geog GEOGRAPHY primary key );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs ( geog geography, " +
                                   " primary key (geog) );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs ( geog geography, " +
                                   " constraint uniq_geog unique (geog) );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs (geog GEOGRAPHY unique);";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
+
+        ddl = "create table geogs (geog GEOGRAPHY); create unique index geogsgeog on geogs(geog);";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
+
+        ddl = "create table pgeogs (geog GEOGRAPHY, partkey int ); " +
+        "partition table pgeogs on column partkey; " +
+        "create assumeunique index pgeogsgeog on pgeogs(geog);";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         // index on boolean functions is not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create index geoindex_contains ON geogs (contains(region1, point1) );\n";
-        // error msg: Cannot create index "GEOINDEX_CONTAINS" because it contains function 'CONTAINS(), which is not supported.
-        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains function 'CONTAINS..', " +
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains a BOOLEAN valued function 'CONTAINS', " +
                                   "which is not supported.*", ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create index geoindex_within100000 ON geogs (DWITHIN(region1, point1, 100000) );\n";
-        // error msg: Cannot create index "GEOINDEX_WITHIN100000" because it contains function 'DWITHIN(), which is not supported.
-        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains function 'DWITHIN..', " +
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains a BOOLEAN valued function 'DWITHIN', " +
                                   "which is not supported.*", ddl);
 
-        // indexing on comparison expression not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL);\n " +
               "create index geoindex_nonzero_distance ON geogs ( distance(region1, point1) = 0 );\n";
-        //error msg: Cannot create index "GEOINDEX_NONZERO_DISTANCE" because it contains comparison expression '=', which is not supported.
         badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_NONZERO_DISTANCE\" because it contains " +
                                   "comparison expression '=', which is not supported.*", ddl);
 
@@ -2956,22 +3018,18 @@ public class TestVoltCompiler extends TestCase {
               "create view geo_view as select count(*), sum(id), sum(distance(region1, point1)) from geogs;\n";
         checkDDLAgainstSimpleSchema(null, ddl);
 
-        // geography type is not supported in group by clause of materialized view
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select region1, count(*) from geogs group by region1;\n";
-        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
                 "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY in GROUP BY clause not supported.",
                 ddl);
 
-        // geography point type is not supported in group by clause of materialized view
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select point1, count(*) from geogs group by point1;\n";
-        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
                 "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.",
                 ddl);
@@ -2980,27 +3038,33 @@ public class TestVoltCompiler extends TestCase {
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select isValid(Region1), count(*) from geogs group by isValid(Region1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function ISVALID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'ISVALID..' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Contains(Region1, POINT1), count(*) from geogs group by Contains(Region1, POINT1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'CONTAINS..' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Centroid(Region1), count(*) from geogs group by Centroid(Region1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'CENTROID..' in GROUP BY clause not supported.",
+                "Materialized view \"GEO_VIEW\" with a GEOGRAPHY_POINT valued function 'CENTROID' in GROUP BY clause not supported.",
+                ddl);
+
+        ddl = "create table geogs ( id integer, " +
+                " region1 geography NOT NULL, " +
+                " point1 geography_point NOT NULL );\n" +
+              "create index COMPOUND_GEO_NOT_SUPPORTED on geogs(id, region1);\n";
+        badDDLAgainstSimpleSchema(
+                "Cannot create index \"COMPOUND_GEO_NOT_SUPPORTED\" " +
+                 "because GEOGRAPHY values must be the only component of an index key: \"REGION1\"",
                 ddl);
     }
 
@@ -3372,7 +3436,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
+        expectedError = "Failed to plan for statement (sql) \"BANBALOO pkey FROM PKEY_INTEGER;\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -3381,7 +3445,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
+        expectedError = "Failed to plan for statement (sql) \"SELEC pkey FROM PKEY_INTEGER;\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -4151,10 +4215,32 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
 }
 
-    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName, String target) {
+        Connector connector =  db.getConnectors().get(target);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
+    }
+
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
+        return getConnectorTableInfoFor(db, tableName, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    }
+
+    private String getPartitionColumnInfoFor( Database db, String tableName) {
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) return null;
+        if (table.getPartitioncolumn() == null) return null;
+        return table.getPartitioncolumn().getName();
+    }
+
+    private  MaterializedViewInfo getViewInfoFor( Database db, String tableName, String viewName) {
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) return null;
+        if (table.getViews() == null) return null;
+        return table.getViews().get(viewName);
+    }
+
+    private Table getTableInfoFor( Database db, String tableName) {
+        return db.getTables().getIgnoreCase(tableName);
     }
 
     public void testGoodExportTable() throws Exception {
@@ -4198,33 +4284,160 @@ public class TestVoltCompiler extends TestCase {
                 "export table table one;"
                 );
 
-        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
                 "export table books;"
                 );
 
-        badDDLAgainstSimpleSchema("Export table configured with materialized view.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table view_source;"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as an export table.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
+                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as export source.*",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
                 );
 
-        String ddl = "create table geogs ( id integer primary key, " +
-                                         " region1 geography NOT NULL);\n" +
-                     "export table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
-                                  ddl);
+        badDDLAgainstSimpleSchema("View configured as export source.*",
+                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
+    }
 
-        ddl = "create table geogs ( id integer primary key, " +
-                                  " point1 geography_point NOT NULL );\n" +
-              "export table geogs to stream geog_stream;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
-                                  ddl);
+    public void testGoodCreateStream() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create stream e1 (id integer, f1 varchar(16));"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create stream e1 (id integer, f1 varchar(16));",
+                "create stream e2 partition on column id (id integer not null, f1 varchar(16));",
+                "create stream e3 export to target bar (id integer, f1 varchar(16));",
+                "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
+                "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
+        assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
+        assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
+        assertNotNull(getConnectorTableInfoFor(db, "e4", "bar"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e4"));
+        assertNotNull(getConnectorTableInfoFor(db, "e5", "bar"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e5"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE STREAM User_Stream Partition On Column UserId"
+                + " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);",
+                "CREATE VIEW User_Logins (UserId, LoginCount)"
+                + "AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;",
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)"
+                + "AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;"
+                );
+        assertNotNull(getViewInfoFor(db,"User_Stream","User_Logins"));
+        assertNotNull(getViewInfoFor(db,"User_Stream","User_LoginLastTime"));
+    }
+
+    public void testBadCreateStream() throws Exception {
+
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
+                "create stream 1table_name_not_valid (id integer, f1 varchar(16));"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+               "create stream foo export to target bar1,bar2 (i bigint not null);"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+                "create stream foo,foo2 export to target bar (i bigint not null);"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+                "create stream foo export to target bar ();"
+                );
+
+        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
+                "create stream foo export to target bar (id integer, primary key(id));"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as export source.*",
+                "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
+    }
+
+    public void testGoodDropStream() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                // drop an independent stream
+                "CREATE STREAM e1 (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "DROP STREAM e1;\n",
+
+                // try drop an non-existent stream
+                "DROP STREAM e2 IF EXISTS;\n",
+
+                //  automatically drop reference views for the stream
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                "DROP STREAM User_Stream IF EXISTS CASCADE ;\n"
+                );
+
+        assertNull(getTableInfoFor(db, "e1"));
+        assertNull(getTableInfoFor(db, "e2"));
+        assertNull(getTableInfoFor(db, "User_Stream"));
+        assertNull(getTableInfoFor(db, "User_Logins"));
+        assertNull(getTableInfoFor(db, "User_LoginLastTime"));
+    }
+
+    public void testBadDropStream() throws Exception {
+        // non-existent stream
+        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: E1.*",
+               "DROP STREAM e1;\n"
+                );
+
+        // non-stream table
+        badDDLAgainstSimpleSchema(".+Invalid DROP STREAM statement: table e2 is not a stream.*",
+                "CREATE TABLE e2 (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                        "DROP STREAM e2;\n"
+                );
+
+        // stream with referencing view
+        badDDLAgainstSimpleSchema(".+dependent objects exist:.*",
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                        " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                        "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                        " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                        "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                        " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                        "DROP STREAM User_Stream;\n"
+                );
+
+        // stream with referencing procedure
+        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: USER_STREAM_2.*",
+                "CREATE STREAM User_Stream_2 Partition On Column UserId" +
+                        " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                        "CREATE PROCEDURE Enter_User PARTITION ON TABLE User_Stream_2 column UserId" +
+                        " AS INSERT INTO User_Stream_2 (UserId, SessionStart) VALUES (?,?);\n" +
+                        "DROP STREAM User_Stream_2 CASCADE;\n"
+                );
     }
 
     public void testGoodDRTable() throws Exception {

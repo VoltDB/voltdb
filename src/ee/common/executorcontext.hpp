@@ -23,6 +23,7 @@
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
+#include "common/UniqueId.hpp"
 
 #include <vector>
 #include <map>
@@ -30,6 +31,7 @@
 namespace voltdb {
 
 extern const int64_t VOLT_EPOCH;
+extern const int64_t VOLT_EPOCH_IN_MILLIS;
 
 class AbstractExecutor;
 class AbstractDRTupleStream;
@@ -83,7 +85,7 @@ class ExecutorContext {
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_uniqueId = uniqueId;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH;
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
@@ -119,16 +121,12 @@ class ExecutorContext {
         return (clusterId << 49) | (uniqueId >> 14);
     }
 
-    static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
+    static int64_t getDRTimestampFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        // Convert this into a microsecond-resolution timestamp; treat the time
-        // portion as the time in milliseconds, and the sequence number as if
-        // it is a time in microseconds
-        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
-        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
+        return UniqueId::tsCounterSinceUnixEpoch(hiddenValue & UniqueId::TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
     }
 
-    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
+    static int8_t getClusterIdFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         return static_cast<int8_t>(hiddenValue >> 49);
     }
@@ -171,6 +169,11 @@ class ExecutorContext {
     /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
         return m_currentTxnTimestamp;
+    }
+
+    /** DR cluster id for the local cluster */
+    int32_t drClusterId() {
+        return m_drClusterId;
     }
 
     /** Last committed transaction known to this EE */

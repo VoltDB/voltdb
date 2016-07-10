@@ -142,9 +142,9 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
 
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
                 if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
@@ -181,7 +181,7 @@
                     if (shortApiCallDetails.updatedData == null) {
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
@@ -201,7 +201,7 @@
                         }
                     }
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                     var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true, isSqlQuery, timeoutTime);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
@@ -441,13 +441,20 @@
                 callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
 
+            var unauthorizedTimeout = setTimeout(function () {
+                callback(false, { "status": -100, "statusstring": "Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser" }, isLoginTest);
+            }, callbackTimeout);
+
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
                     if (response.status == 1) {
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
-                    } else {
+                    } else if(response.status == 401){
+                        clearTimeout(unauthorizedTimeout);
+                        callback(true, response, isLoginTest);
+                    }else{
                         callback(false, response, isLoginTest);
                     }
                 } catch (x) {
@@ -459,7 +466,7 @@
 
         this.CheckServerConnection = function (server, port, admin, user, password, isHashedPassword, processName, checkConnection) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            var uri = 'http://' + server + ':' + port + '/api/1.0/';
+            var uri = window.location.protocol + '/\/' + server + ':' + port + '/api/1.0/';
             var params = conn.BuildParamSet('@Statistics', ['TABLE', 0]);
             $.ajax({
                 url: uri + '?' + params,
@@ -480,8 +487,14 @@
                     }
                 },
                 error: function (e) {
-                    if (e.status != 200) {
+                    if (e.status != 200)
+                    {
                         checkConnection(false);
+                    }
+                },
+                 statusCode:{
+                    401: function(response){
+                        alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
                 },
                 timeout: 60000
@@ -703,6 +716,11 @@ jQuery.extend({
                 },
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                    }
                 }
             });
 
@@ -720,6 +738,11 @@ jQuery.extend({
                 success: callback,
                 error: function (e) {
                     console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    }
                 }
             });
         }

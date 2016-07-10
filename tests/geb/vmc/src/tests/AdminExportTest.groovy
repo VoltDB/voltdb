@@ -1,3 +1,26 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package vmcTest.tests
 
 import org.junit.Test
@@ -47,177 +70,243 @@ class AdminExportTest extends TestBase {
         page.exportbtn.click()
     }
 
-    def "Verify Error messages of Add Configuration for FILE"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("FILE")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.type.value().equals("type")
-            page.overview.nonce.value().equals("nonce")
-            page.overview.outdir.value().equals("outdir")
-            page.overview.typeValue.isDisplayed()
-            page.overview.nonceValue.isDisplayed()
-            page.overview.outdirValue.isDisplayed()
+    def VerifyErrormessagesofAddConfigurationforFILE() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("FILE")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.type.value().equals("type")
+                page.overview.nonce.value().equals("nonce")
+                page.overview.outdir.value().equals("outdir")
+                page.overview.typeValue.isDisplayed()
+                page.overview.nonceValue.isDisplayed()
+                page.overview.outdirValue.isDisplayed()
+            }
+
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorFileTypeValue.isDisplayed()
+                page.overview.errornonceValue.isDisplayed()
+                page.overview.errorOutdirValue.isDisplayed()
+            }
         }
-
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorFileTypeValue.isDisplayed()
-            page.overview.errornonceValue.isDisplayed()
-            page.overview.errorOutdirValue.isDisplayed()
+        else{
+            println("Add Export is not supported in Community Edition")
         }
+        then:
+            println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for JDBC"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("JDBC")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.jdbcdriver.value().equals("jdbcdriver")
-            page.overview.jdbcurl.value().equals("jdbcurl")
-            page.overview.jdbcdriverValue.isDisplayed()
-            page.overview.jdbcurlValue.isDisplayed()
+    def VerifyErrorMessagesofAddConfigurationforJDBC() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("JDBC")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.jdbcdriver.value().equals("jdbcdriver")
+                page.overview.jdbcurl.value().equals("jdbcurl")
+                page.overview.jdbcdriverValue.isDisplayed()
+                page.overview.jdbcurlValue.isDisplayed()
+            }
+
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorJdbcDriverValue.isDisplayed()
+                page.overview.errorJdbcUrlValue.isDisplayed()
+            }
         }
-
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorJdbcDriverValue.isDisplayed()
-            page.overview.errorJdbcUrlValue.isDisplayed()
+        else{
+            println("Add Export is not supported in Community Edition")
         }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for KAFKA"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.metadatabroker.value().equals("metadata.broker.list")
-            page.overview.metadatabrokerValue.isDisplayed()
+    def VerifyErrormessagesofAddConfigurationforKAFKA() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.metadatabroker.value().equals("metadata.broker.list")
+                page.overview.metadatabrokerValue.isDisplayed()
+            }
+
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorMetadataBrokerListValue.isDisplayed()
+            }
         }
-
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorMetadataBrokerListValue.isDisplayed()
+        else{
+            println("Add Export is not supported in Community Edition")
         }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for HTTP"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("HTTP")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed()
-        page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
-        page.overview.endpoint.value().equals("endpoint")
-        page.overview.endpointValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforHTTP() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("HTTP")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.endpoint.value().equals("endpoint")
+                page.overview.endpointValue.isDisplayed()
+            }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorEndpointValue.isDisplayed()
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorEndpointValue.isDisplayed()
+            }
         }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for RABBITMQ/Verify Error messages of Add Configuration for RABBITMQ broker.host"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("RABBITMQ")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.rabbitMq.value().equals("broker.host") }
-        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforRABBITMQ() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("RABBITMQ")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.rabbitMq.value().equals("broker.host") }
+            waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for RABBITMQ amqp.uri"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("RABBITMQ")
-        waitFor(waitTime) { page.overview.rabbitMq.isDisplayed() }
-        page.overview.rabbitMq.click()
-        page.overview.rabbitMq.value("amqp.uri")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.rabbitMq.value().equals("amqp.uri") }
-        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforRABBITMQamqpuri() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("RABBITMQ")
+            waitFor(waitTime) { page.overview.rabbitMq.isDisplayed() }
+            page.overview.rabbitMq.click()
+            page.overview.rabbitMq.value("amqp.uri")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.rabbitMq.value().equals("amqp.uri") }
+            waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for CUSTOM"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("CUSTOM")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforCUSTOM() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("CUSTOM")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for ELASTICSEARCH"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("ELASTICSEARCH")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
-        waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforELASTICSEARCH() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("ELASTICSEARCH")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
+            waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorEndpointESValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorEndpointESValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Add Configuration for FILE created"() {
-       // String fileTestName     = page.overview.getFileTestName()
+    def VerifyAddConfigurationforFilecreated() {
+        // String fileTestName     = page.overview.getFileTestName()
         //String fileValueOne     = page.overview.getFileValueOne()
         //String fileValueTwo     = page.overview.getFileValueTwo()
         //String fileValueThree   = page.overview.getFileValueThree()
@@ -242,6 +331,7 @@ class AdminExportTest extends TestBase {
         page.overview.nonceValue.value("test")
         page.overview.outdirValue.value("test")
         int count = 0
+        boolean isPro = false
         while(count<numberOfTrials) {
             count++
             try {
@@ -267,69 +357,76 @@ class AdminExportTest extends TestBase {
             }
 
         }
+
         and: 'Expand export'
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-        then: 'Display the created FILE'
-        waitFor(waitTime) { page.overview.fileName.isDisplayed() }
-        println("Configuration created")
-
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}){
+            isPro = True
+            while(count<numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch(geb.error.RequiredPageContentNotPresent e) {
+                } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                } catch(geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
-
-//        whor deleted'
-//        try {en: 'Expand export'
-//       // waitFor(10){page.overview.expandExport()}
-//        then: 'Check f
-//            waitFor(waitTime) { page.overview.fileName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
+        }
+//        else
+//        {
+//            println("Could not update the value of \"Export Configuration\". Unable to update deployment configuration: Error validating deployment configuration: Export is a PRO version only feature")
 //        }
+
+        then: 'Display the created FILE'
+        if(isPro){
+            waitFor(waitTime) { page.overview.fileName.isDisplayed() }
+            println("Configuration created")
+        }
+
+
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+
+            page.overview.editExportConfiguration.click()
+
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
-    def "Verify Add Configuration for JDBC created"() {
+    def VerifyAddConfigurationforJdbcCreated() {
+        boolean isPro = false
         String jdbcTestName = page.overview.getJdbcTestName()
         String jdbcValueOne = page.overview.getJdbcValueOne()
         String jdbcValueTwo = page.overview.getJdbcValueTwo()
@@ -376,174 +473,180 @@ class AdminExportTest extends TestBase {
             }
         }
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+        }
         then: 'Display the created JDBC'
-        waitFor(waitTime) { page.overview.jdbcName.isDisplayed() }
-        println("Configuration created")
+        if(isPro) {
+            waitFor(waitTime) { page.overview.jdbcName.isDisplayed() }
+            println("Configuration created")
+        }
 
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
 
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
-
-//        when: 'Expand export'
-//        page.overview.expandExport()
-//        then: 'Check for deleted'
-//        try {
-//            waitFor(20) { page.overview.jdbcName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
-//        }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
-    def "Verify Add Configuration for KAFKA created"() {
-        String kafkaTestName = page.overview.getKafkaTestName()
-        String metadataValue = page.overview.getMetadataValue()
+    def VerifyAddConfigurationforKafkaCreated() {
+//        when:
+//        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            boolean isPro = false
+            String kafkaTestName = page.overview.getKafkaTestName()
+            String metadataValue = page.overview.getMetadataValue()
 
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        page.overview.addProperty.isDisplayed()
-        page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
-        page.overview.metadatabroker.value().equals("metadata.broker.list")
-        page.overview.metadatabrokerValue.isDisplayed()
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            page.overview.addProperty.isDisplayed()
+            page.overview.save.isDisplayed()
+            page.overview.cancel.isDisplayed()
+            page.overview.metadatabroker.value().equals("metadata.broker.list")
+            page.overview.metadatabrokerValue.isDisplayed()
 
-        when: 'Provide values for add configuration'
-        page.overview.stream.value("kafkaTest")
-        page.overview.metadatabrokerValue.value("metadataValue")
-        int count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.overview.save.click()
-                waitFor(waitTime) { !page.overview.save.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
+            when: 'Provide values for add configuration'
+            page.overview.stream.value("kafkaTest")
+            page.overview.metadatabrokerValue.value("metadataValue")
+            int count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.save.click()
+                    waitFor(waitTime) { !page.overview.save.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
 
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-        }
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.overview.confirmyesbtn.click()
-                waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-        }
-        and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-        then: 'Display the created KAFKA'
-        waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-        println("Configuration created")
-
-        when: 'Edit button is displayed'
-        waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            and: 'Expand export'
+            if (!waitFor(10){page.overview.addconfig.isDisplayed()}) {
+                isPro = true
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        export.click()
+                        waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            then: 'Display the created KAFKA'
+            if (isPro) {
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+                println("Configuration created")
             }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
 
-//        when: 'Expand export'
-//        waitFor(10){page.overview.expandExport()}
-//        then: 'Check for deleted'
-//        try {
-//            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
+            if (isPro) {
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                then: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+
+                when: 'Delete Configuration is displayed'
+                page.overview.deleteConfiguration.isDisplayed()
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.deleteConfiguration.click()
+                        waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.confirmyesbtn.click()
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then: 'Print Deleted'
+                println("Deleted Configuration")
+            }
 //        }
+//        else{
+//            println("Add Export is not supported in Community Edition")
+//        }
+//        then:
+//        println("passed")
     }
 
-    def "Verify Add Configuration for HTTP created"() {
+    def VerifyAddConfigurationforHttpCreated() {
+        boolean isPro = false
         String httpTestName = page.overview.getHttpTestName()
         String endValue = page.overview.getEndValue()
 
@@ -586,69 +689,68 @@ class AdminExportTest extends TestBase {
             }
         }
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+        }
         then: 'Display the created HTTP'
-        waitFor(waitTime) { page.overview.httpName.isDisplayed() }
-        println("Configuration created")
+        if (isPro) {
+            waitFor(waitTime) { page.overview.httpName.isDisplayed() }
+            println("Configuration created")
+        }
 
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
 
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-        while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
-//        when: 'Expand export'
-//
-//        page.overview.expandExport()
-//        then: 'Check for deleted'
-//        try {
-//            waitFor(waitTime) { page.overview.httpName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
-//        }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
-    def "Verify Add Configuration for RABBITMQ broker.host created"() {
+    def VerifyAddConfigurationforRABBITMQbrokerhostcreated() {
+        boolean isPro = false
         String rabbitmqBrokerTestName = page.overview.getRabbitmqBrokerTestName()
         String brokerValue = page.overview.getBrokerValue()
 
@@ -689,69 +791,69 @@ class AdminExportTest extends TestBase {
             }
         }
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-     	then: 'Display the created RABBITMQ'
-        waitFor(waitTime) { page.overview.rabbitMqBrokerName.isDisplayed() }
-        println("Configuration created")
-
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
+        }
+        then: 'Display the created RABBITMQ'
+        if(isPro) {
+            waitFor(waitTime) { page.overview.rabbitMqBrokerName.isDisplayed() }
+            println("Configuration created")
+        }
 
-//        when: 'Expand export'
-//        page.overview.expandExport()
-//        then: 'Check for deleted'
-//        try {
-//            waitFor(waitTime) { page.overview.rabbitMqBrokerName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
-//        }
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
+
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
+
     }
 
-    def "Verify Add Configuration for RABBITMQ amqp.uri created"() {
+    def VerifyAddConfigurationforRABBITMQamqpuricreated() {
+        boolean isPro = false
         String rabbitmqAmqpTestName = page.overview.getRabbitmqAmqpTestName()
         String amqpValue = page.overview.getAmqpValue()
 
@@ -797,69 +899,68 @@ class AdminExportTest extends TestBase {
         }
 
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-     	then: 'Display the created RABBITMQ'
-        waitFor(waitTime){ page.overview.rabbitMqAmqpName.isDisplayed()}
-        println("Configuration created")
-
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
+        }
+        then: 'Display the created RABBITMQ'
+        if(isPro) {
+            waitFor(waitTime) { page.overview.rabbitMqAmqpName.isDisplayed() }
+            println("Configuration created")
+        }
 
-//        when: 'Expand export'
-//        page.overview.expandExport()
-//        then: 'Check for deleted'
-//        try {
-//            waitFor(waitTime) { page.overview.rabbitMqAmpqName.isDisplayed() }
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Configuration deleted")
-//        }
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
+
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
-    def "Verify Add Configuration for CUSTOM created"() {
+    def VerifyAddConfigurationforCUSTOMcreated() {
+        boolean isPro = false
         String customTestName = page.overview.getCustomTestName()
         String customConnectorClass = page.overview.getCustomConnectorClass()
 
@@ -874,7 +975,7 @@ class AdminExportTest extends TestBase {
 
         when: 'Provide values for add configuration'
         page.overview.stream.value(customTestName)
-        page.overview.exportConnectorClass.value(customConnectorClass)      
+        page.overview.exportConnectorClass.value(customConnectorClass)
         int count = 0
         while(count<numberOfTrials) {
             count++
@@ -900,60 +1001,68 @@ class AdminExportTest extends TestBase {
             }
         }
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-     	then: 'Display the created CUSTOM'
-        waitFor(waitTime) { page.overview.customName.isDisplayed() }
-        println("Configuration created")
-
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        }
+        then: 'Display the created CUSTOM'
+        if(isPro) {
+            waitFor(waitTime) { page.overview.customName.isDisplayed() }
+            println("Configuration created")
+        }
+
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
+
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
-    def "Verify Add Configuration for ELASTICSEARCH created"() {
+    def VerifyAddConfigurationforELASTICSEARCHcreated() {
+        boolean isPro = false
         String elasticSearchTestName     = page.overview.getElasticSearchTestName()
         String elasticSearchValueOne     = page.overview.getElasticSearchValueOne()
 
@@ -995,56 +1104,63 @@ class AdminExportTest extends TestBase {
             }
         }
         and: 'Expand export'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                export.click()
-		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-		     	break
-         	} catch(geb.error.RequiredPageContentNotPresent e) {
-         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
-     	    } catch(geb.waiting.WaitTimeoutException e) {
-     	    }
-     	}
-     	then: 'Display the created ELASTICSEARCH'
-        waitFor(waitTime){page.overview.elasticSearchName.isDisplayed()}
-
-        when: 'Edit button is displayed'
-        page.overview.editExportConfiguration.isDisplayed()
-        then: 'Click edit button'
-        page.overview.editExportConfiguration.click()
-
-        when: 'Delete Configuration is displayed'
-        page.overview.deleteConfiguration.isDisplayed()
-        count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
+            isPro = true
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    export.click()
+                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
-            try {
-                page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
+        }
+        then: 'Display the created ELASTICSEARCH'
+        if(isPro) {
+            waitFor(waitTime) { page.overview.elasticSearchName.isDisplayed() }
+        }
+
+        if(isPro) {
+            when: 'Edit button is displayed'
+            page.overview.editExportConfiguration.isDisplayed()
+            then: 'Click edit button'
+            page.overview.editExportConfiguration.click()
+
+            when: 'Delete Configuration is displayed'
+            page.overview.deleteConfiguration.isDisplayed()
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.deleteConfiguration.click()
+                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
             }
-	    }
-	    then: 'Print Deleted'
-	    println("Deleted Configuration")
+            count = 0
+            while (count < numberOfTrials) {
+                count++
+                try {
+                    page.overview.confirmyesbtn.click()
+                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                    break
+                } catch (geb.error.RequiredPageContentNotPresent e) {
+                } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                } catch (geb.waiting.WaitTimeoutException e) {
+                }
+            }
+            then: 'Print Deleted'
+            println("Deleted Configuration")
+        }
     }
 
     def "Verify Add Property in Export Configuration"(){
@@ -1070,31 +1186,31 @@ class AdminExportTest extends TestBase {
         page.overview.newTextField.value("value1")
         page.overview.newValueField.value("value2")
         int count = 0
-	    while(count<numberOfTrials) {
-	        count++
+        while(count<numberOfTrials) {
+            count++
             try {
                 page.overview.deleteConfiguration.click()
-	            waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-	            break
+                waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                break
             } catch(geb.error.RequiredPageContentNotPresent e) {
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
-	    }
-	    count = 0
-	    while(count<numberOfTrials) {
-	        count++
+        }
+        count = 0
+        while(count<numberOfTrials) {
+            count++
             try {
                 page.overview.confirmyesbtn.click()
-	            waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-	            break
+                waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                break
             } catch(geb.error.RequiredPageContentNotPresent e) {
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
             } catch(geb.waiting.WaitTimeoutException e) {
             }
-	    }
+        }
         and: 'Expand export'
         page.overview.expandExport()
         then: 'Display the created KAFKA'

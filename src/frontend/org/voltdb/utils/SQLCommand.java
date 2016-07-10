@@ -31,20 +31,24 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -385,8 +389,9 @@ public class SQLCommand
 
     private static void execListConfigurations() throws Exception {
         VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
-        if (configData.getRowCount() != 0)
+        if (configData.getRowCount() != 0) {
             printConfig(configData);
+        }
     }
 
     private static void execListClasses() {
@@ -735,7 +740,7 @@ public class SQLCommand
             m_testFrontEndResult += statement + ";\n";
             return;
         }
-        if ( ! m_interactive ) {
+        if ( !m_interactive && m_outputShowMetadata) {
             System.out.println();
             System.out.println(statement + ";");
         }
@@ -874,6 +879,7 @@ public class SQLCommand
                 rowCount = t.getRowCount();
                 // Run it through the output formatter.
                 m_outputFormatter.printTable(System.out, t, m_outputShowMetadata);
+                //System.out.println("printable");
             }
             else {
                 rowCount = t.fetchRow(0).getLong(0);
@@ -961,8 +967,23 @@ public class SQLCommand
     {
         final Client client = ClientFactory.createClient(config);
 
+        // Only fail if we can't connect to any servers
+        boolean connectedAnyServer = false;
+
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+            try {
+                client.createConnection(server.trim(), port);
+                connectedAnyServer = true;
+            }
+            catch (UnknownHostException e) {
+            }
+            catch (IOException e) {
+
+            }
+        }
+
+        if (!connectedAnyServer) {
+            throw new IOException("Unable to connect to VoltDB cluster");
         }
         return client;
     }
@@ -1109,14 +1130,17 @@ public class SQLCommand
             Integer curr_val = proc_param_counts.get(this_proc);
             if (curr_val == null) {
                 curr_val = 1;
-            } else {
+            }
+            else {
                 ++curr_val;
             }
             proc_param_counts.put(this_proc, curr_val);
         }
         params.resetRowPosition();
+        Set<String> userProcs = new HashSet<String>();
         while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
+            userProcs.add(proc_name);
             Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
@@ -1131,6 +1155,10 @@ public class SQLCommand
             HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
             argLists.put(param_count, this_params);
             procedures.put(proc_name, argLists);
+        }
+        for (String proc_name : new ArrayList<String>(procedures.keySet())) {
+            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name))
+                procedures.remove(proc_name);
         }
         classlist.clear();
         while (classes.advanceRow()) {
@@ -1219,17 +1247,23 @@ public class SQLCommand
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
                 serverList = extractArgInput(arg);
-            } else if (arg.startsWith("--port=")) {
+            }
+            else if (arg.startsWith("--port=")) {
                 port = Integer.valueOf(extractArgInput(arg));
-            } else if (arg.startsWith("--user=")) {
+            }
+            else if (arg.startsWith("--user=")) {
                 user = extractArgInput(arg);
-            } else if (arg.startsWith("--password=")) {
+            }
+            else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
-            } else if (arg.startsWith("--kerberos=")) {
+            }
+            else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
-            } else if (arg.startsWith("--kerberos")) {
+            }
+            else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
-            } else if (arg.startsWith("--query=")) {
+            }
+            else if (arg.startsWith("--query=")) {
                 List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
@@ -1305,6 +1339,16 @@ public class SQLCommand
 
         // Phone home to see if there is a newer version of VoltDB
         openURLAsync();
+
+        try
+        {
+            // If we need to prompt the user for a password, do so.
+            password = CLIConfig.readPasswordIfNeeded(user, password, "Enter password: ");
+        }
+        catch (IOException ex)
+        {
+            printUsage("Unable to read password: " + ex);
+        }
 
         // Create connection
         ClientConfig config = new ClientConfig(user, password);

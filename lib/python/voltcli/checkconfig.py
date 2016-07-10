@@ -1,34 +1,25 @@
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2016 VoltDB Inc.
 #
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import platform
 import subprocess
 import sys
 import os.path
+import os
+from voltcli import utility
 
 # Helper functions
 
@@ -97,10 +88,10 @@ def test_os_release(output):
         supported = False
         if distInfo[0] in ("centos", "redhat", "rhel"):
             releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
-            if releaseNum >= "6.3":
+            if releaseNum >= "6.6":
                 supported = True
         elif "ubuntu" in distInfo[0].lower():
-            if distInfo[1] in ("10.04", "12.04", "14.04"):
+            if distInfo[1] in ("12.04", "14.04"):
                 supported = True
     elif platform.system() == "Darwin":
         output["OS"] = ["PASS", "MacOS X"]
@@ -110,7 +101,7 @@ def test_os_release(output):
             supported = True
     else:
         output['OS'] = ["WARN", "Only supports Linux based platforms"]
-        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 10.04/12.04/14.04 and RedHat/CentOS 6.3 or later"]
+        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 12.04/14.04 and RedHat/CentOS 6.6 or later"]
     if not supported:
         formatString = "Unsupported release: " + formatString
     output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
@@ -134,7 +125,7 @@ def test_host_memory(output):
                                                     ", recommended is 1048576 for system with 64 GB or more memory"]
     else:
         output['Memory'] = ["WARN", "Recommended memory is at least 4194304 kB but was " + hostMemory + " kB"]
-                                
+
 def test_ntp(output):
     numOfRunningNTP = subprocess.Popen("ps -ef | grep 'ntpd ' | grep -cv grep", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
     returnCodeForNTPD = os.system("which ntpd >/dev/null 2>&1")
@@ -149,13 +140,21 @@ def test_ntp(output):
             output['NTP'] = ["WARN", "More then one NTP service is running"]
 
 def test_java_version(output):
-    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java \|openjdk '", stdout=subprocess.PIPE, shell=True).stdout.read()
+    if 'JAVA_HOME' in os.environ:
+        java = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+        jar = os.path.join(os.environ['JAVA_HOME'], 'bin', 'jar')
+    else:
+        java = utility.find_in_path('java')
+        jar = utility.find_in_path('jar')
+    if not java:
+        utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
+    javaVersion = utility.get_java_version(javaHome=java, verbose=True)
     if '1.8.' in javaVersion:
         output['Java'] = ["PASS", javaVersion.strip()]
     elif len(javaVersion) > 0:
-        output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly."]
+        output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly and JAVA_HOME has been setup correctly."]
     else:
-        output['Java'] = ["FAIL", "Please check if Java has been installed properly."]
+        output['Java'] = ["FAIL", "Please check if Java has been installed properly and JAVA_HOME has been setup correctly."]
 
 def test_python_version(output):
     pythonVersion = "Python " + str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])

@@ -28,7 +28,7 @@ import java.io.IOException;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.hll.HyperLogLog;
+import org.voltdb_hll.HyperLogLog;
 
 public class CountDeviceEstimate extends VoltProcedure {
 

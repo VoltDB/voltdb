@@ -25,15 +25,14 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.VoltTable;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.VoltProcedure;
 
 public class UpdateBothMP extends ReplicatedUpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results1 = doWork(p_getCIDData, p_cleanUp, p_insert, p_export, p_getAdhocData,
-                cid, rid, value, rollback);
-        VoltTable[] results2 = doWork(r_getCIDData, r_cleanUp, r_insert, r_export, r_getAdhocData,
-                cid, rid, value, rollback);
+        VoltTable[] results1 = doWork(p_getCIDData, p_cleanUp, p_insert, p_export, p_getAdhocData, p_getViewData,
+                cid, rid, value, rollback, true);
+        VoltTable[] results2 = doWork(r_getCIDData, r_cleanUp, r_insert, r_export, r_getAdhocData, r_getViewData,
+                cid, rid, value, rollback, false);
 
         assert(results1.length == 3);
         assert(results2.length == 3);

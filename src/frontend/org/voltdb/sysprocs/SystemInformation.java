@@ -30,6 +30,7 @@ import org.apache.log4j.net.SocketHubAppender;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
@@ -51,6 +52,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -341,9 +343,9 @@ public class SystemInformation extends VoltSystemProcedure
         String httpInterface = null;
         int httpPort = VoltDB.DEFAULT_HTTP_PORT;
         String internalInterface = null;
-        int internalPort = VoltDB.DEFAULT_INTERNAL_PORT;
+        int internalPort = Constants.DEFAULT_INTERNAL_PORT;
         String zkInterface = null;
-        int zkPort = VoltDB.DEFAULT_ZK_PORT;
+        int zkPort = Constants.DEFAULT_ZK_PORT;
         String drInterface = null;
         int drPort = VoltDB.DEFAULT_DR_PORT;
         String publicInterface = null;
@@ -485,16 +487,14 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("snapshotenabled", snap_enabled);
 
-        String export_enabled = "false";
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                export_enabled = "true";
                 results.addRow("exportoverflowpath", cluster.getExportoverflow());
                 break;
             }
         }
-        results.addRow("export", export_enabled);
+        results.addRow("export", Boolean.toString(CatalogUtil.isExportEnabled()));
 
         String partition_detect_enabled = "false";
         if (cluster.getNetworkpartition())

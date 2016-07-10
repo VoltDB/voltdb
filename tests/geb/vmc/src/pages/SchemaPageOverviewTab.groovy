@@ -30,37 +30,37 @@ package vmcTest.pages
  */
 class SchemaPageOverviewTab extends SchemaPage {
     static content = {
-        systemOverview 				{ $("h4", text:"System Overview") }
-        mode						{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
-        voltDBVersion				{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
-        buildstring					{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
-        clusterComposition			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
-        runningSince				{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
+        systemOverview              { $("h4", text:"System Overview") }
+        mode                        { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        voltDBVersion               { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
+        buildstring                 { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
+        clusterComposition          { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
+        runningSince                { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
 
-        modeValue					{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
-        voltDBVersionValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
-        buildstringValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
-        clusterCompositionValue		{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
-        runningSinceValue			{ $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
+        modeValue                   { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
+        voltDBVersionValue          { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
+        buildstringValue            { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
+        clusterCompositionValue     { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
+        runningSinceValue           { $("#o > div:nth-child(1) > div > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
 
-        schemaOverview          	{ $("#o > div > div.dataBlockHeading > h3") }
-        voltDbVersion				{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
-        lastSchemaUpdate			{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
-        tableCount					{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
-        materializedViewCount		{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
-        indexCount					{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
-        procedureCount				{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(1)") }
-        sqlStatementCount			{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(1)") }
+        schemaOverview              { $("#o > div > div.dataBlockHeading > h3") }
+        voltDbVersion               { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        lastSchemaUpdate            { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
+        tableCount                  { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
+        materializedViewCount       { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
+        indexCount                  { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
+        procedureCount              { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(1)") }
+        sqlStatementCount           { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(1)") }
 
-        voltDBVersionValue			{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
-        lastSchemaUpdateValue		{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
-        tableCountValue				{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
-        materializedViewCountValue	{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
-        indexCountValue				{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
-        procedureCountValue			{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(2)") }
-        sqlStatementCountValue		{ $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(2)") }
-        documentationLink 			{ $("#iconDoc") }
-        generatedbytxt				{$("#catalogContainer > div.documentation > span")}
+        voltDBVersionValue          { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
+        lastSchemaUpdateValue       { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
+        tableCountValue             { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
+        materializedViewCountValue  { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(4) > td:nth-child(2)") }
+        indexCountValue             { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(5) > td:nth-child(2)") }
+        procedureCountValue         { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(6) > td:nth-child(2)") }
+        sqlStatementCountValue      { $("#o > div > div.dataBlockContent > table > tbody > tr:nth-child(7) > td:nth-child(2)") }
+        documentationLink           { $("#iconDoc") }
+        generatedbytxt              {$("#catalogContainer > div.documentation > span")}
     }
     static at = {
         overviewTab.displayed

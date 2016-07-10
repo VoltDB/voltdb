@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -43,6 +44,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
@@ -124,6 +127,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -160,9 +164,17 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+    public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
+    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+
+    public static final String ROW_LENGTH_LIMIT = "row.length.limit";
+    public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
+
+    private static boolean m_exportEnabled = false;
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -472,6 +484,10 @@ public abstract class CatalogUtil {
         return false;
     }
 
+    public static boolean isExportEnabled() {
+        return m_exportEnabled;
+    }
+
     public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
                                                                     org.voltdb.catalog.Table table)
     {
@@ -503,6 +519,23 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Return list of materialized view for table.
+     */
+    public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
+                                                       org.voltdb.catalog.Table table)
+    {
+        ArrayList<Table> tlist = new ArrayList<Table>();
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            Table matsrc = t.getMaterializer();
+            if ((matsrc != null) && (matsrc.getRelativeIndex() == table.getRelativeIndex())) {
+                tlist.add(t);
+            }
+        }
+        return tlist;
     }
 
     /**
@@ -777,7 +810,7 @@ public abstract class CatalogUtil {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
                 //Set target to default name.
-                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -929,20 +962,52 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0, and adminstartup set to false
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
+        normalized = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("hostcount=\"0\"");
+        matcher = ADMINMODE_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("adminstartup=\"false\"");
+        return Digester.md5AsUUID(normalized);
+    }
+
+    /**
      * Given the deployment object generate the XML
      * @param deployment
      * @return XML of deployment object.
      * @throws IOException
      */
     public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     *
+     * @param deployment
+     * @param indent
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment, boolean indent) throws IOException {
         try {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
             Marshaller marshaller = m_jc.createMarshaller();
             marshaller.setSchema(m_schema);
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -1066,7 +1131,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
-    private static void validateDirectory(String type, File path) {
+    public static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
@@ -1180,40 +1245,35 @@ public abstract class CatalogUtil {
         }
 
         processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
+
+
         return processorProperties;
     }
 
     public static class ImportConfiguration {
-        private final String m_formatName;
         private final Properties m_moduleProps;
-        private final Properties m_formatterProps;
-
-        private AbstractFormatterFactory m_formatterFactory = null;
+        private FormatterBuilder m_formatterBuilder;
 
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
-            m_formatName = formatName;
             m_moduleProps = moduleProps;
-            m_formatterProps = formatterProps;
+            m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
         }
 
-        public String getFormatName() {
-            return m_formatName;
-        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
         }
 
-        public Properties getformatterProperties() {
-            return m_formatterProps;
+        public Properties getformatterProperties(){
+            return m_formatterBuilder.getFormatterProperties();
         }
 
         public void setFormatterFactory(AbstractFormatterFactory formatterFactory) {
-            m_formatterFactory = formatterFactory;
+            m_formatterBuilder.setFormatterFactory(formatterFactory);
         }
 
-        public AbstractFormatterFactory getFormatterFactory() {
-            return m_formatterFactory;
+        public FormatterBuilder getFormatterBuilder() {
+            return m_formatterBuilder;
         }
     }
 
@@ -1285,6 +1345,9 @@ public abstract class CatalogUtil {
             case KAFKA:
                 importBundleUrl = "kafkastream.jar";
                 break;
+            case KINESIS:
+                importBundleUrl = "kinesisstream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
@@ -1352,51 +1415,79 @@ public abstract class CatalogUtil {
             return;
         }
         List<String> streamList = new ArrayList<String>();
-        boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
-
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            // Get the stream name from the xml attribute "stream"
-            // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String streamName = exportConfiguration.getStream();
-            if (streamName == null || streamName.trim().isEmpty()) {
-                    throw new RuntimeException("stream must be specified along with type in export configuration.");
+            String targetName = getExportTarget(exportConfiguration);
+            if (targetName == null || targetName.trim().isEmpty()) {
+                    throw new RuntimeException("Target must be specified along with type in export configuration.");
             }
 
             if (connectorEnabled) {
-                if (streamList.contains(streamName)) {
-                    throw new RuntimeException("Multiple connectors can not be assigned to single export stream: " +
-                            streamName + ".");
+                m_exportEnabled = true;
+                if (streamList.contains(targetName)) {
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
+                            targetName + ".");
                 }
                 else {
-                    streamList.add(streamName);
+                    streamList.add(targetName);
                 }
             }
-            boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-
-            org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+            org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
                     if (defaultConnector) {
                         hostLog.info("Export configuration enabled and provided for the default export " +
-                                     "stream in deployment file, however, no export " +
-                                     "tables are assigned to the default stream. " +
-                                     "Export stream will be disabled.");
+                                     "target in deployment file, however, no export " +
+                                     "tables are assigned to the default target. " +
+                                     "Export target will be disabled.");
                     }
                     else {
-                        hostLog.info("Export configuration enabled and provided for export stream " +
-                                     streamName +
+                        hostLog.info("Export configuration enabled and provided for export target " +
+                                     targetName +
                                      " in deployment file however no export " +
-                                     "tables are assigned to the this stream. " +
-                                     "Export stream " + streamName + " will be disabled.");
+                                     "tables are assigned to the this target. " +
+                                     "Export target " + targetName + " will be disabled.");
                     }
                 }
                 continue;
             }
-            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+
+            // checking rowLengthLimit
+            int rowLengthLimit = Integer.parseInt(processorProperties.getProperty(ROW_LENGTH_LIMIT,"0"));
+            if (rowLengthLimit > 0) {
+                for (ConnectorTableInfo catTableinfo : catconn.getTableinfo()) {
+                    Table tableref = catTableinfo.getTable();
+                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ? 0 : EXPORT_INTERNAL_FIELD_Length;
+                    for (Column catColumn: tableref.getColumns()) {
+                        rowLength += catColumn.getSize();
+                    }
+                    if (rowLength > rowLengthLimit) {
+                        if (defaultConnector) {
+                            hostLog.error("Export configuration for the default export target has " +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        else {
+                            hostLog.error("Export configuration for export target " + targetName + " has" +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
+                                ", exceeding configurated limitation " + rowLengthLimit + ".");
+                    }
+                }
+            }
+
+
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);
@@ -1409,26 +1500,26 @@ public abstract class CatalogUtil {
 
             if (!connectorEnabled) {
                 if (defaultConnector) {
-                    hostLog.info("Export configuration for the default export stream is present and is " +
-                            "configured to be disabled. The default export stream will be disabled.");
+                    hostLog.info("Export configuration for the default export target is present and is " +
+                            "configured to be disabled. The default export target will be disabled.");
                 }
                 else {
-                    hostLog.info("Export configuration for export stream " + streamName + " is present and is " +
-                                 "configured to be disabled. Export stream " + streamName + " will be disabled.");
+                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
+                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
                 }
             } else {
                 if (defaultConnector) {
-                    hostLog.info("Default export stream is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 else {
-                    hostLog.info("Export stream " + streamName + " is configured and enabled with type=" + exportConfiguration.getType());
+                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
                 }
                 if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
-                        hostLog.info("Default export stream configuration properties are: ");
+                        hostLog.info("Default export target configuration properties are: ");
                     }
                     else {
-                        hostLog.info("Export stream " + streamName + " configuration properties are: ");
+                        hostLog.info("Export target " + targetName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
@@ -1438,6 +1529,29 @@ public abstract class CatalogUtil {
                 }
             }
         }
+    }
+
+    // Utility method to get target from 'target' attribute or deprecated 'stream' attribute
+    // and handle error cases.
+    private static String getExportTarget(ExportConfigurationType exportConfiguration) {
+        // Get the target name from the xml attribute "target"
+        String targetName = exportConfiguration.getTarget();
+        targetName = (StringUtils.isBlank(targetName)) ? null : targetName.trim();
+        String streamName = exportConfiguration.getStream();
+        streamName = (StringUtils.isBlank(streamName)) ? null : streamName.trim();
+        // If both are specified, they must be equal
+        if (targetName!=null && streamName!=null && !targetName.equals(streamName)) {
+            throw new RuntimeException("Only one of 'target' or 'stream' attribute must be specified");
+        }
+        // handle old deployment files, which will only have 'stream' specified
+        if (targetName==null) {
+            targetName = streamName;
+        }
+        if (targetName == null) {
+            throw new RuntimeException("Target must be specified along with type in export configuration.");
+        }
+
+        return targetName;
     }
 
     /**
@@ -1468,15 +1582,11 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return processorConfig;
         }
-        List<String> streamList = new ArrayList<String>();
         int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (!streamList.contains(importConfiguration.getModule())) {
-                streamList.add(importConfiguration.getModule());
-            }
 
             ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
 
@@ -1618,7 +1728,7 @@ public abstract class CatalogUtil {
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
         if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
-            voltDbRoot = new VoltFile("voltdbroot");
+            voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
                 if (!voltDbRoot.mkdirs()) {
@@ -1847,7 +1957,11 @@ public abstract class CatalogUtil {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
-        cluster.setHttpdportno(httpd.getPort());
+        int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
+        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+            defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
+        }
+        cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
@@ -2143,9 +2257,41 @@ public abstract class CatalogUtil {
                 table.getMaterializer() == null &&
                 !CatalogUtil.isTableExportOnly(catalog, table)) {
                 tables.add(table);
+                continue;
+            }
+            //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
+            //column as part of view.
+            if ((table.getMaterializer() != null) && !isReplicated
+                    && (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
+                //Non partitioned export table are not allowed so it should not get here.
+                Column bpc = table.getMaterializer().getPartitioncolumn();
+                if (bpc != null) {
+                    String bPartName = bpc.getName();
+                    Column pc = table.getColumns().get(bPartName);
+                    if (pc != null) {
+                        tables.add(table);
+                    }
+                }
             }
         }
         return tables;
+    }
+
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
+    public static Table getTableObjectNameFromId(Database catalog, int tableId) {
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                return table;
+            }
+        }
+        return null;
     }
 
     /**
@@ -2194,14 +2340,8 @@ public abstract class CatalogUtil {
      * @return true if proc is durable for non sys procs return true (durable)
      */
     public static boolean isDurableProc(String procName) {
-        //For sysprocs look at sysproc catalog.
-        if (procName.charAt(0) == '@') {
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
-            if (sysProc != null) {
-                return sysProc.isDurable();
-            }
-        }
-        return true;
+        SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+        return sysProc == null || sysProc.isDurable();
     }
 
     /**
@@ -2308,7 +2448,7 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Add default configuration to DR conflicts export stream if deployment file doesn't have the configuration
+     * Add default configuration to DR conflicts export target if deployment file doesn't have the configuration
      *
      * @param catalog  current catalog
      * @param export   list of export configuration
@@ -2319,7 +2459,7 @@ public abstract class CatalogUtil {
         }
         boolean userDefineStream = false;
         for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
-            if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
+            if (exportConfiguration.getTarget().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
                 userDefineStream = true;
             }
         }
@@ -2327,7 +2467,7 @@ public abstract class CatalogUtil {
         if (!userDefineStream) {
             ExportConfigurationType defaultConfiguration = new ExportConfigurationType();
             defaultConfiguration.setEnabled(true);
-            defaultConfiguration.setStream(DR_CONFLICTS_TABLE_EXPORT_GROUP);
+            defaultConfiguration.setTarget(DR_CONFLICTS_TABLE_EXPORT_GROUP);
             defaultConfiguration.setType(ServerExportEnum.FILE);
 
             // type
@@ -2388,5 +2528,15 @@ public abstract class CatalogUtil {
             }
         }
         return exprsjson.isEmpty();
+    }
+
+    public static Map<String, Column> getDRTableNamePartitionColumnMapping(Database db) {
+        Map<String, Column> res = new HashMap<String, Column>();
+        for (Table tb : db.getTables()) {
+            if (!tb.getIsreplicated() && tb.getIsdred()) {
+                res.put(tb.getTypeName(), tb.getPartitioncolumn());
+            }
+        }
+        return res;
     }
 }

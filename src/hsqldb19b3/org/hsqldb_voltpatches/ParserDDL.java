@@ -79,6 +79,7 @@ public class ParserDDL extends ParserRoutine {
 
         int     tableType = TableBase.MEMORY_TABLE;
         boolean isTable   = false;
+        boolean isStream   = false;
 
         read();
 
@@ -140,11 +141,24 @@ public class ParserDDL extends ParserRoutine {
                 tableType = database.schemaManager.getDefaultTableType();
                 break;
 
+            // A VoltDB extension to support the STREAM alias
+            case Tokens.STREAM :
+                read();
+
+                isStream   = true;
+                tableType = database.schemaManager.getDefaultTableType();
+                break;
+            // End of VoltDB extension
+
             default :
         }
 
         if (isTable) {
             return compileCreateTable(tableType);
+        }
+
+        if (isStream) {
+            return compileCreateStream(tableType);
         }
 
         // A VoltDB extension to support the assume unique attribute
@@ -457,6 +471,7 @@ public class ParserDDL extends ParserRoutine {
                 useIfExists   = true;
                 break;
 
+            case Tokens.STREAM :
             case Tokens.TABLE :
                 read();
 
@@ -518,7 +533,7 @@ public class ParserDDL extends ParserRoutine {
                     SchemaObject object =
                     // A VoltDB extension to avoid exceptions in
                     // the normal control flow.
-                    // findSchemaObject returns null when 
+                    // findSchemaObject returns null when
                     // getSchemaObject would needlessly
                     // throw into the catch block below.
                     /* disable 3 lines ...
@@ -1174,6 +1189,149 @@ public class ParserDDL extends ParserRoutine {
         return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
                                    null, null);
     }
+
+    // skip Export to target of statment
+    // skip constraint ?
+    StatementSchema compileCreateStream(int type) {
+
+        HsqlName name = readNewSchemaObjectNameNoCheck(SchemaObject.TABLE);
+        HsqlArrayList tempConstraints = new HsqlArrayList();
+
+        name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
+
+        Table table = TableUtil.newTable(database, type, name);
+
+        if (token.tokenType == Tokens.AS) {
+            return readTableAsSubqueryDefinition(table);
+        }
+
+        int position = getPosition();
+
+        readUntilThis(Tokens.OPENBRACKET);
+
+        readThis(Tokens.OPENBRACKET);
+
+        {
+            Constraint c = new Constraint(null, null, Constraint.TEMP);
+
+            tempConstraints.add(c);
+        }
+
+        boolean start     = true;
+        boolean startPart = true;
+        boolean end       = false;
+
+        while (!end) {
+            switch (token.tokenType) {
+
+                case Tokens.LIKE : {
+                    ColumnSchema[] likeColumns = readLikeTable(table);
+
+                    for (int i = 0; i < likeColumns.length; i++) {
+                        table.addColumn(likeColumns[i]);
+                    }
+
+                    start     = false;
+                    startPart = false;
+
+                    break;
+                }
+                case Tokens.CONSTRAINT :
+                case Tokens.PRIMARY :
+                case Tokens.FOREIGN :
+                // A VoltDB extension to support the assume unique attribute
+                case Tokens.ASSUMEUNIQUE :
+                // End of VoltDB extension
+                case Tokens.UNIQUE :
+                case Tokens.CHECK :
+                // A VoltDB extension to support LIMIT PARTITION ROWS
+                case Tokens.LIMIT :
+                // End of VoltDB extension
+                    if (!startPart) {
+                        throw unexpectedToken();
+                    }
+
+                    readConstraint(table, tempConstraints);
+
+                    start     = false;
+                    startPart = false;
+                    break;
+
+                case Tokens.COMMA :
+                    if (startPart) {
+                        throw unexpectedToken();
+                    }
+
+                    read();
+
+                    startPart = true;
+                    break;
+
+                case Tokens.CLOSEBRACKET :
+                    read();
+
+                    end = true;
+                    break;
+
+                default :
+                    if (!startPart) {
+                        throw unexpectedToken();
+                    }
+
+                    checkIsSchemaObjectName();
+
+                    HsqlName hsqlName =
+                        database.nameManager.newColumnHsqlName(name,
+                            token.tokenString, isDelimitedIdentifier());
+
+                    read();
+
+                    ColumnSchema newcolumn = readColumnDefinitionOrNull(table,
+                        hsqlName, tempConstraints);
+
+                    if (newcolumn == null) {
+                        if (start) {
+                            rewind(position);
+
+                            return readTableAsSubqueryDefinition(table);
+                        } else {
+                            throw Error.error(ErrorCode.X_42000);
+                        }
+                    }
+
+                    table.addColumn(newcolumn);
+
+                    start     = false;
+                    startPart = false;
+            }
+        }
+
+        if (token.tokenType == Tokens.ON) {
+            if (!table.isTemp()) {
+                throw unexpectedToken();
+            }
+
+            read();
+            readThis(Tokens.COMMIT);
+
+            if (token.tokenType == Tokens.DELETE) {}
+            else if (token.tokenType == Tokens.PRESERVE) {
+                table.persistenceScope = TableBase.SCOPE_SESSION;
+            }
+
+            read();
+            readThis(Tokens.ROWS);
+        }
+
+        Object[] args = new Object[] {
+            table, tempConstraints, null
+        };
+        String   sql  = getLastPart();
+
+        return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
+                                   null, null);
+    }
+
 
     private ColumnSchema[] readLikeTable(Table table) {
 

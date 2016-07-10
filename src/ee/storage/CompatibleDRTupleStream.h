@@ -24,7 +24,6 @@
 
 namespace voltdb {
 class StreamBlock;
-class TableIndex;
 
 class CompatibleDRTupleStream : public AbstractDRTupleStream {
 public:
@@ -37,7 +36,7 @@ public:
 
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 3;
 
-    CompatibleDRTupleStream();
+    CompatibleDRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~CompatibleDRTupleStream() {}
 
@@ -47,12 +46,11 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+                       DRRecordType type);
 
     /**
      * write an update record to the stream
@@ -60,47 +58,54 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
-                       TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+                       TableTuple &newTuple);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
-                       int64_t txnId,
+                       int partitionColumn,
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId);
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+    virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds()
+    {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
-    static int32_t getTestDRBuffer(char *out);
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads)
+    {
+        // This method is not supported in compatible stream
+    }
+
+    static int32_t getTestDRBuffer(int32_t partitionId,
+                                   std::vector<int32_t> partitionKeyValueList,
+                                   std::vector<int32_t> flagList,
+                                   long startSequenceNumber,
+                                   char *out);
 private:
-    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
     void writeRowTuple(TableTuple& tuple,
             size_t rowHeaderSz,
             size_t rowMetadataSz,
-            const std::vector<int> *interestingColumns,
-            const std::pair<const TableIndex*, uint32_t> &indexPair,
             ExportSerializeOutput &io);
 
     size_t computeOffsets(DRRecordType &type,
-            const std::pair<const TableIndex*, uint32_t> &indexPair,
             TableTuple &tuple,
             size_t &rowHeaderSz,
-            size_t &rowMetadataSz,
-            const std::vector<int> *&interestingColumns);
+            size_t &rowMetadataSz);
 
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;

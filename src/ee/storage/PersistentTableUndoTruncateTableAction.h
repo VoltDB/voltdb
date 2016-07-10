@@ -26,10 +26,8 @@ namespace voltdb {
 class PersistentTableUndoTruncateTableAction: public UndoAction {
 public:
     inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd,
-            PersistentTable *originalTable, PersistentTable *emptyTable,
-            PersistentTableSurgeon *emptyTableSurgeon, size_t drMark)
-    :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable),
-       m_emptyTableSurgeon(emptyTableSurgeon), m_drMark(drMark)
+            PersistentTable *originalTable, PersistentTable *emptyTable)
+    :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable)
     {}
 
 private:
@@ -41,7 +39,6 @@ private:
      *
      */
     virtual void undo() {
-        m_emptyTableSurgeon->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE));
         m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
     }
 
@@ -64,8 +61,6 @@ private:
     TableCatalogDelegate * m_tcd;
     PersistentTable *m_originalTable;
     PersistentTable *m_emptyTable;
-    PersistentTableSurgeon *m_emptyTableSurgeon;
-    size_t m_drMark;
 };
 
 }

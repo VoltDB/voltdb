@@ -31,7 +31,7 @@ public class ReadSPInProcAdHoc extends ReadSP {
     @Override
     public VoltTable[] run(byte cid) {
         // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
-        voltQueueSQLExperimental("SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc;", cid);
         return voltExecuteSQL(true);
     }
 

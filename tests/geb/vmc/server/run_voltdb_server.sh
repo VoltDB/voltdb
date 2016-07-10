@@ -16,6 +16,8 @@ EXTRA_PATH="$CURRENT_DIR/../../../../bin"
 DEPLOY="deployment.xml"
 DDL_DIR="."
 DDL_FILE="ddl.sql"
+GENQA=
+VOTER=
 
 # Using a -p arg means to use the "pro" version of VoltDB
 if [[ "$@" == *"-p"* ]]; then
@@ -26,13 +28,14 @@ fi
 
 # Using a -g arg means to run the "Genqa" test app (& the "pro" version of VoltDB)
 if [[ "$@" == *"-g"* ]]; then
+    GENQA=true
     SUBDIR=$(basename `ls -d1 ../../../../../pro/obj/pro/volt* | grep -v tar.gz`)
     EXTRA_PATH="$CURRENT_DIR/../../../../../pro/obj/pro/$SUBDIR/bin"
     DEPLOY="../../../test_apps/genqa/deployment.xml ../../../test_apps/genqa/genqa.jar"
     DDL_DIR="../../../test_apps/genqa/"
-    #DDL_FILE="/dev/null"
 # Using a -v arg means to run the "Voter" example app
 elif [[ "$@" == *"-v"* ]]; then
+    VOTER=true
     DEPLOY="../../../../examples/voter/deployment.xml"
     DDL_DIR="../../../../examples/voter/"
 fi
@@ -41,29 +44,44 @@ fi
 PATH=$PATH:$EXTRA_PATH
 
 # Start the VoltDB server
-echo "which voltdb:" `which voltdb`
-echo "Executing   : voltdb create -d $DEPLOY &"
-voltdb create -d $DEPLOY &
+VOLTDB_COMMAND="voltdb create --force -d $DEPLOY &"
+echo "which voltdb  :" `which voltdb`
+echo "voltdb version:" `voltdb --version`
+echo "Executing     : $VOLTDB_COMMAND"
+eval $VOLTDB_COMMAND
 
 # Run sqlcmd, from the specified directory, and use it to load DDL and (stored
 # procedure) classes; make multiple attempts, until the server has successfully
 # started up
 cd $DDL_DIR
-echo "pwd         :" `pwd`
-echo "which sqlcmd:" `which sqlcmd`
-echo "Executing   : sqlcmd < $DDL_FILE 2>&1"
+SQLCMD_COMMAND="sqlcmd < $DDL_FILE 2>&1"
+echo "pwd           :" `pwd`
+echo "which sqlcmd  :" `which sqlcmd`
+echo "Executing     : $SQLCMD_COMMAND"
+
 for i in {1..120}; do
-    sleep 1
-    SQLCMD_RESPONSE=$(sqlcmd < $DDL_FILE 2>&1)
-    if [[ "$SQLCMD_RESPONSE" == *"command not found"* || "$SQLCMD_RESPONSE" == *"not supported"* || "$SQLCMD_RESPONSE" == *"DDL Error:"* ]]; then
-        echo -e "\nsqlcmd response had error(s):\n" $SQLCMD_RESPONSE "\n"
-        break
-    elif [ "$SQLCMD_RESPONSE" != "Connection refused" ]; then
-        echo "Loaded $DDL_FILE (server started; sqlcmd ran after $i attempts)"
+    SQLCMD_RESPONSE=$(eval $SQLCMD_COMMAND)
+
+    # If the VoltDB server has not yet completed initialization, keep waiting
+    if [[ "$SQLCMD_RESPONSE" == *"Unable to connect"* || "$SQLCMD_RESPONSE" == *"Connection refused"* ]]; then
+        #echo "debug: sqlcmd response: $SQLCMD_RESPONSE"
+        sleep 1
+
+    # If the VoltDB server has processed the DDL file, we're done
+    elif [[ "$SQLCMD_RESPONSE" == *"CREATE TABLE"* && "$SQLCMD_RESPONSE" == *"CREATE VIEW"* && \
+            ($VOTER || "$SQLCMD_RESPONSE" == *"CREATE INDEX"*) && \
+            ($GENQA || "$SQLCMD_RESPONSE" == *"CREATE PROCEDURE"*) ]]; then
+        #echo -e "debug: sqlcmd response:\n$SQLCMD_RESPONSE"
+        echo -e "\nLoaded $DDL_FILE (server started; sqlcmd ran after $i attempts)\n"
         cd $CURRENT_DIR
         exit 0
+
+    # Otherwise, print an error message and exit
+    else
+        echo -e "\nsqlcmd response had error(s):\n$SQLCMD_RESPONSE\n"
+        break
     fi
 done
 cd $CURRENT_DIR
-echo "Failed to load $DDL_FILE file via sqlcmd, after $i attempt(s)"
+echo -e "\n***** Failed to load $DDL_FILE file via sqlcmd, after $i attempt(s)! *****\n"
 exit 1

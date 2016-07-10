@@ -99,9 +99,12 @@ public class VoltGeographyPointType extends Type {
     }
 
     @Override
-    public Type getAggregateType(Type other) {
-        // incompatible types in operation
-        throw Error.error(ErrorCode.X_42561);
+    public Type getAggregateType(Type otherType) {
+        if (otherType instanceof VoltGeographyPointType) {
+            return this;
+        }
+        // incompatible types in combination
+        throw Error.error(ErrorCode.X_42562);
     }
 
     @Override
@@ -113,8 +116,8 @@ public class VoltGeographyPointType extends Type {
         // We don't allow any non-comparison operators on POINTs, so
         // just throw here if anyone tries.
         //
-        // incompatible types in operation
-        throw Error.error(ErrorCode.X_42561);
+        // incompatible types in combination
+        throw Error.error(ErrorCode.X_42562);
     }
 
     // *********

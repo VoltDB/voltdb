@@ -253,5 +253,5 @@ void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tu
     // Insert the tuple into our output table
     //
     assert(m_tmpOutputTable);
-    m_tmpOutputTable->insertTupleNonVirtual(tuple);
+    m_tmpOutputTable->insertTempTuple(tuple);
 }

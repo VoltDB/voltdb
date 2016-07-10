@@ -17,15 +17,6 @@
 
 package org.voltdb;
 
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.voltdb.dtxn.UndoAction;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
-
-
 // Interface through which the outside world can interact with the consumer side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
@@ -41,55 +32,4 @@ public interface ConsumerDRGateway extends Promotable {
 
     public void restart() throws InterruptedException;
 
-    public abstract void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId);
-
-    public abstract UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId);
-
-    /**
-     * Should only be called before initialization. Populate all previously seen
-     * [drId, uniqueId] pairs from remote clusters
-     * @param lastAppliedIds A map of clusterIds to maps of partitionIds to [drId, uniqueId] pairs.
-     * The outer map is assumed to be of size 1
-     */
-    public abstract void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, DRLogSegmentId>> lastAppliedIds);
-
-    public abstract void assertSequencing(int partitionId, long drId);
-
-    public abstract Map<Integer, Map<Integer, DRLogSegmentId>> getLastReceivedBinaryLogIds();
-
-    public static class DummyConsumerDRGateway implements ConsumerDRGateway {
-        @Override
-        public void initialize(boolean resumeReplication) {}
-
-        @Override
-        public void acceptPromotion() throws InterruptedException,
-                ExecutionException, KeeperException {}
-
-        @Override
-        public void updateCatalog(CatalogContext catalog) {}
-
-        @Override
-        public boolean isActive() { return false; }
-
-        @Override
-        public void shutdown(boolean blocking) {}
-
-        @Override
-        public void restart() throws InterruptedException {}
-
-        @Override
-        public void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId) {}
-
-        @Override
-        public UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId) { return null; }
-
-        @Override
-        public void assertSequencing(int partitionId, long drId) {}
-
-        @Override
-        public Map<Integer, Map<Integer, DRLogSegmentId>> getLastReceivedBinaryLogIds() { return ImmutableMap.of(); }
-
-        @Override
-        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, DRLogSegmentId>> lastAppliedIds) {}
-    }
 }

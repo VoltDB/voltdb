@@ -64,29 +64,28 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
-    deleteAllTuplesNonVirtual(freeAllocatedStrings);
+void TempTable::deleteAllTuples(bool, bool) {
+    deleteAllTempTuples();
+}
+
+void TempTable::deleteAllTempTupleDeepCopies() {
+    if (m_tupleCount == 0) {
+        return;
+    }
+    if (m_schema->getUninlinedObjectColumnCount() > 0) {
+        TableTuple target(m_schema);
+        TableIterator iter(this, m_data.begin());
+        while (iter.hasNext()) {
+            iter.next(target);
+            target.freeObjectColumns();
+        }
+    }
+    deleteAllTempTuples();
 }
 
 bool TempTable::insertTuple(TableTuple &source) {
     insertTempTuple(source);
     return true;
-}
-
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool)
-{
-    throwFatalException("TempTable does not support update");
-    // Some day maybe, if we find a use case:
-    // Copy the source tuple into the target
-    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
-}
-
-bool TempTable::deleteTuple(TableTuple &, bool)
-{
-    throwFatalException("TempTable does not support deleting individual tuples");
 }
 
 std::string TempTable::tableType() const { return "TempTable"; }

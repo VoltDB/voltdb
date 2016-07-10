@@ -249,8 +249,8 @@ public class ExportManager
                         oldProcessor = m_processor.getAndSet(newProcessor);
                     }
                 } else {
-                    //We deleted last of the generation as we dropped the last export table.
-                    exportLog.info("Last export table dropped processor will be removed: " + m_loaderClass);
+                    //We deleted last of the generation as we dropped the last stream
+                    exportLog.info("Last stream dropped processor will be removed: " + m_loaderClass);
                     oldProcessor = m_processor.getAndSet(null);
                 }
             } catch (Exception e) {
@@ -283,11 +283,15 @@ public class ExportManager
             int myHostId,
             CatalogContext catalogContext,
             boolean isRejoin,
+            boolean forceCreate,
             HostMessenger messenger,
             List<Integer> partitions)
             throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
+        if (forceCreate) {
+            em.clearOverflowData(catalogContext);
+        }
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         m_self = em;
@@ -386,6 +390,23 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
+    }
+
+    private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
+        String overflowDir = catContext.catalog.getClusters().get("cluster").getExportoverflow();
+        try {
+            exportLog.info(
+                String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
+            VoltFile.recursivelyDelete(new File(overflowDir), false);
+        } catch(IOException e) {
+            String msg = String.format("Error cleaning out export overflow directory %s: %s",
+                    overflowDir, e.getMessage());
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(msg, e);
+            }
+            throw new ExportManager.SetupException(msg);
+        }
+
     }
 
     public void startPolling(CatalogContext catalogContext) {
@@ -604,7 +625,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            exportLog.info("First export table created processor will be initialized: " + m_loaderClass);
+            exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
             createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
         }
     }
@@ -677,9 +698,9 @@ public class ExportManager
                         return;
                     }
                     if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        assert(false);
                         exportLog.error("Could not a find an export generation " + exportGeneration +
                         ". Should be impossible. Discarding export data");
+                        assert(false);
                     }
                 }
                 return;

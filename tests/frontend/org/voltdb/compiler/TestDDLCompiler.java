@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -48,6 +46,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.utils.CatalogUtil;
+
+import junit.framework.TestCase;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -640,6 +640,79 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
+    public void testCreateStream() {
+        File jarOut = new File("createStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // create stream w/o export
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n",
+
+                // create stream w/ export
+                "CREATE STREAM FOO EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n",
+
+                // create stream w/ and w/o group
+                "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = false;
+            try {
+                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            }
+            catch (Exception e) {
+                // do nothing
+            }
+            assertTrue(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+    public void testCreateStreamNegative() throws Exception {
+        File jarOut = new File("createStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // with primary key
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT PK_TEST1 PRIMARY KEY (D1));\n",
+                // unique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 UNIQUE (D1));\n",
+                // assumeunique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 ASSUMEUNIQUE (D1));\n",
+                // with limit
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100);\n",
+                // with limit and execute
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100 EXECUTE (\n" +
+                "  DELETE FROM FOO WHERE D1 > 100));\n",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
     public void testExportDRTable() {
         File jarOut = new File("exportDrTables.jar");
         jarOut.deleteOnExit();
@@ -733,6 +806,32 @@ public class TestDDLCompiler extends TestCase {
         tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
     }
 
+    public void testIndexExpressions() throws Exception {
+        File jarOut = new File("indexExpressions.jar");
+        jarOut.deleteOnExit();
+
+        String tableCreation = "CREATE TABLE GEO ( ID INTEGER, REGION GEOGRAPHY ); ";
+
+        String schema[] = {
+                "CREATE INDEX POLY ON GEO ( POLYGONFROMTEXT( REGION ) );",
+                "CREATE INDEX POLY ON GEO ( VALIDPOLYGONFROMTEXT( REGION ) );",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableCreation + schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+
+    }
+
     public void testAutogenDRConflictTable() {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();
@@ -769,36 +868,54 @@ public class TestDDLCompiler extends TestCase {
         }
 
         // verify table schema
-        assertTrue(t.getColumns().size() == 10);
+        assertTrue(t.getColumns().size() == DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS.length);
+
         Column c1 = t.getColumns().get(DDLCompiler.DR_ROW_TYPE_COLUMN_NAME);
         assertNotNull(c1);
         assertTrue(c1.getType() == VoltType.STRING.getValue());
+
         Column c2 = t.getColumns().get(DDLCompiler.DR_LOG_ACTION_COLUMN_NAME);
         assertNotNull(c2);
         assertTrue(c2.getType() == VoltType.STRING.getValue());
+
         Column c3 = t.getColumns().get(DDLCompiler.DR_CONFLICT_COLUMN_NAME);
         assertNotNull(c3);
         assertTrue(c3.getType() == VoltType.STRING.getValue());
+
         Column c4 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_ON_PK_COLUMN_NAME);
         assertNotNull(c4);
         assertTrue(c4.getType() == VoltType.TINYINT.getValue());
+
         Column c5 = t.getColumns().get(DDLCompiler.DR_DECISION_COLUMN_NAME);
         assertNotNull(c5);
         assertTrue(c5.getType() == VoltType.STRING.getValue());
+
         Column c6 = t.getColumns().get(DDLCompiler.DR_CLUSTER_ID_COLUMN_NAME);
         assertNotNull(c6);
         assertTrue(c6.getType() == VoltType.TINYINT.getValue());
+
         Column c7 = t.getColumns().get(DDLCompiler.DR_TIMESTAMP_COLUMN_NAME);
         assertNotNull(c7);
         assertTrue(c7.getType() == VoltType.BIGINT.getValue());
+
         Column c8 = t.getColumns().get(DDLCompiler.DR_DIVERGENCE_COLUMN_NAME);
-        assertNotNull(8);
+        assertNotNull(c8);
         assertTrue(c8.getType() == VoltType.STRING.getValue());
+
         Column c9 = t.getColumns().get(DDLCompiler.DR_TABLE_NAME_COLUMN_NAME);
-        assertNotNull(9);
+        assertNotNull(c9);
         assertTrue(c9.getType() == VoltType.STRING.getValue());
-        Column c10 = t.getColumns().get(DDLCompiler.DR_TUPLE_COLUMN_NAME);
-        assertNotNull(10);
-        assertTrue(c10.getType() == VoltType.STRING.getValue());
+
+        Column c10 = t.getColumns().get(DDLCompiler.DR_CURRENT_CLUSTER_ID_COLUMN_NAME);
+        assertNotNull(c10);
+        assertTrue(c10.getType() == VoltType.TINYINT.getValue());
+
+        Column c11 = t.getColumns().get(DDLCompiler.DR_CURRENT_TIMESTAMP_COLUMN_NAME);
+        assertNotNull(c11);
+        assertTrue(c11.getType() == VoltType.BIGINT.getValue());
+
+        Column c12 = t.getColumns().get(DDLCompiler.DR_TUPLE_COLUMN_NAME);
+        assertNotNull(c12);
+        assertTrue(c12.getType() == VoltType.STRING.getValue());
     }
 }

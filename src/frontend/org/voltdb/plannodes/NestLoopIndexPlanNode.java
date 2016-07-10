@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
-import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -29,7 +28,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -76,9 +74,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         generateRealOutputSchema(db);
 
         // Generate the output schema for subqueries
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
+        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        }
     }
 
     @Override
@@ -121,48 +121,43 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_joinPredicate, outer_schema, complete_schema_of_inner_table);
         resolvePredicate(m_wherePredicate, outer_schema, complete_schema_of_inner_table);
 
-        // resolve subqueries
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
-        }
+        // Resolve subquery expression indexes
+        resolveSubqueryColumnIndexes();
 
-        // need to resolve the indexes of the output schema and
-        // order the combined output schema coherently
-        TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
-        {
-            // Right now these all need to be TVEs
+        // Resolve TVE indexes for each schema column.
+        for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
+            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumns().get(i);
+
+            // These are all TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = outer_schema.getIndexOfTve(tve);
-            int tableIdx = 0;   // 0 for outer table
-            if (index == -1)
-            {
+
+            int index;
+            int tableIdx;
+            if (i < outer_schema.size()) {
+                index = outer_schema.getIndexOfTve(tve);
+                tableIdx = 0; // 0 for outer table
+            }
+            else {
                 index = tve.resolveColumnIndexesUsingSchema(complete_schema_of_inner_table);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
-                }
-                sort_cols.put(index + outer_schema.size(), col);
                 tableIdx = 1;   // 1 for inner table
             }
-            else
-            {
-                sort_cols.put(index, col);
+
+            if (index == -1) {
+                throw new RuntimeException("Unable to find index for column: " +
+                                           col.toString());
             }
+
             tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
         }
-        // rebuild the output schema from the tree-sorted columns
-        NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
-            new_output_schema.addColumn(col);
-        }
-        m_outputSchemaPreInlineAgg = new_output_schema;
+
+        // We want the output columns to be ordered like [outer table columns][inner table columns],
+        // and further ordered by TVE index within the left- and righthand sides.
+        // generateOutputSchema already places outer columns on the left and inner on the right,
+        // so we just need to order the left- and righthand sides by TVE index separately.
+        m_outputSchemaPreInlineAgg.sortByTveIndex(0, outer_schema.size());
+        m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
 
         resolveRealOutputSchema();
@@ -237,7 +232,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         assert(indexScan != null);
 
         m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
-        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + childOutputTupleCountEstimate;
+        // Discount outer child estimates based on the number of its filters
+        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + discountEstimatedProcessedTupleCount(m_children.get(0));
     }
 
     @Override

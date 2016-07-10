@@ -178,6 +178,16 @@ public class Database {
     public PersistentStoreCollectionDatabase persistentStoreCollection;
 
     //
+    // LobManager initialization is expensive,
+    // annoying to avoid when setting breakpoints in the DDL parser,
+    // and completely irrelevent to VoltDB.
+    // So, it has been purged from this module but the
+    // lobManager attribute has been left (null) for now
+    // because it is still referenced in (dead) code in other
+    // modules.
+    // TODO: purge the LobManager class, this lobManager attribute,
+    // and the remaining references to lobManager in other modules
+    // and/or purge the (dead) code paths where they are found.
     public LobManager lobManager;
     public Collation  collation;
 
@@ -219,7 +229,7 @@ public class Database {
 
 // oj@openoffice.org - changed to file access api
         String fileaccess_class_name =
-            (String) urlProperties.getProperty("fileaccess_class_name");
+            urlProperties.getProperty("fileaccess_class_name");
 
         if (fileaccess_class_name != null) {
             String storagekey = urlProperties.getProperty("storage_key");
@@ -250,7 +260,6 @@ public class Database {
                 "false").equals("true");
         logger                   = new Logger();
         compiledStatementManager = new StatementManager(this);
-        lobManager               = new LobManager(this);
     }
 
     /**
@@ -311,8 +320,6 @@ public class Database {
                 schemaManager.createPublicSchema();
             }
 
-            lobManager.createSchema();
-
             if (DatabaseURL.isFileBasedDatabaseType(databaseType)) {
                 logger.openLog(this);
             }
@@ -360,11 +367,9 @@ public class Database {
                         session, "SET DATABASE DEFAULT TABLE TYPE CACHED");
                 }
 
-                lobManager.initialiseLobSpace();
                 logger.synchLogForce();
             }
 
-            lobManager.open();
             dbInfo.setWithContent(true);
         } catch (Throwable e) {
             logger.closeLog(Database.CLOSEMODE_IMMEDIATELY);
@@ -556,6 +561,7 @@ public class Database {
      *  Called by the garbage collector on this Databases object when garbage
      *  collection determines that there are no more references to it.
      */
+    @Override
     protected void finalize() {
 
         if (getState() != DATABASE_ONLINE) {
@@ -612,7 +618,6 @@ public class Database {
          * should be investigated for the CLOSEMODE_COMPACT mode
          */
         logger.closeLog(closemode);
-        lobManager.close();
 
         try {
             if (closemode == CLOSEMODE_COMPACT) {

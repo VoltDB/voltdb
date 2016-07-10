@@ -16,16 +16,32 @@
  */
 
 #include "streamedtable.h"
-#include "StreamedTableUndoAction.hpp"
+
 #include "ExportTupleStream.h"
-#include "common/executorcontext.hpp"
+#include "MaterializedViewTriggerForInsert.h"
+#include "StreamedTableUndoAction.hpp"
 #include "tableiterator.h"
+
+#include "catalog/materializedviewinfo.h"
+#include "common/executorcontext.hpp"
+
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
+#include <algorithm>    // std::find
+#include <cassert>
+#include <cstdio>
+#include <sstream>
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(bool exportEnabled)
-    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
-      m_sequenceNo(0)
+StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
+    : Table(1)
+    , m_stats(this)
+    , m_executorContext(ExecutorContext::getExecutorContext())
+    , m_wrapper(NULL)
+    , m_sequenceNo(0)
+    , m_partitionColumn(partitionColumn)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
@@ -34,8 +50,12 @@ StreamedTable::StreamedTable(bool exportEnabled)
 }
 
 StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
-    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
-    m_sequenceNo(0)
+    : Table(1)
+    , m_stats(this)
+    , m_executorContext(ExecutorContext::getExecutorContext())
+    , m_wrapper(wrapper)
+    , m_sequenceNo(0)
+    , m_partitionColumn(-1)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
@@ -60,8 +80,34 @@ bool StreamedTable::enableStream() {
     return false;
 }
 
-StreamedTable::~StreamedTable()
-{
+/*
+ * claim ownership of a view. table is responsible for this view*
+ */
+void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view) {
+    m_views.push_back(view);
+}
+
+void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView) {
+    assert( ! m_views.empty());
+    MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
+    if (targetView != lastView) {
+        // iterator to vector element:
+        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        assert(toView != m_views.end());
+        // Use the last view to patch the potential hole.
+        *toView = lastView;
+    }
+    // The last element is now excess.
+    m_views.pop_back();
+    delete targetView;
+}
+
+StreamedTable::~StreamedTable() {
+    // note this class has ownership of the views, even if they
+    // were allocated by VoltDBEngine
+    for (int i = 0; i < m_views.size(); i++) {
+        delete m_views[i];
+    }
     delete m_wrapper;
 }
 
@@ -70,12 +116,7 @@ TableIterator& StreamedTable::iterator() {
                                   "May not iterate a streamed table.");
 }
 
-TableIterator* StreamedTable::makeIterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
-}
-
-void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
+void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not delete all tuples of a streamed"
@@ -97,6 +138,10 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
+        // handle any materialized views
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleInsert(source, true);
+        }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
@@ -112,47 +157,21 @@ bool StreamedTable::insertTuple(TableTuple &source)
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
-    return true;
-}
-
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
-{
-    throwFatalException("May not update a streamed table.");
-    return true;
-}
-
-bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
-{
-    size_t mark = 0;
-    if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
-                                      m_executorContext->currentSpHandle(),
-                                      m_sequenceNo++,
-                                      m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
-                                      tuple,
-                                      ExportTupleStream::DELETE);
-        m_tupleCount++;
-        // Infallible delete (schema change with tuple migration & views) is not supported for export tables
-        assert(fallible);
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        if (!uq) {
-            // With no active UndoLog, there is no undo support.
-            return true;
+    else {
+        // handle any materialized views even though we dont have any connector.
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleInsert(source, true);
         }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
-{
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
 }
 
-void StreamedTable::flushOldTuples(int64_t timeInMillis)
-{
+void StreamedTable::flushOldTuples(int64_t timeInMillis) {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
                                  m_executorContext->m_lastCommittedSpHandle);
@@ -168,8 +187,7 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
     }
 }
 
-void StreamedTable::undo(size_t mark)
-{
+void StreamedTable::undo(size_t mark) {
     if (m_wrapper) {
         m_wrapper->rollbackTo(mark, SIZE_MAX);
         //Decrementing the sequence number should make the stream of tuples
@@ -177,10 +195,6 @@ void StreamedTable::undo(size_t mark)
         //then having gaps.
         m_sequenceNo--;
     }
-}
-
-TableStats *StreamedTable::getTableStats() {
-    return &stats_;
 }
 
 size_t StreamedTable::allocatedBlockCount() const {
@@ -200,7 +214,9 @@ int64_t StreamedTable::allocatedTupleMemory() const {
  */
 void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
     seqNo = m_sequenceNo;
-    streamBytesUsed = m_wrapper->bytesUsed();
+    if (m_wrapper) {
+        streamBytesUsed = m_wrapper->bytesUsed();
+    }
 }
 
 /**
@@ -211,5 +227,7 @@ void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUs
     // assume this only gets called from a fresh rejoined node
     assert(m_sequenceNo == 0);
     m_sequenceNo = seqNo;
-    m_wrapper->setBytesUsed(streamBytesUsed);
+    if (m_wrapper) {
+        m_wrapper->setBytesUsed(streamBytesUsed);
+    }
 }

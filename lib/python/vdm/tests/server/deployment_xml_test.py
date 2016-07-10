@@ -1,32 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
-
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
 import requests
@@ -72,7 +58,7 @@ class Database(unittest.TestCase):
         # if last_db_id == 0 or last_db_id==None:
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
         # else:
         #     print "The database list is empty"
 
@@ -86,7 +72,8 @@ class XML(Database):
         """
             test valid xml
         """
-        data = requests.get(__url__)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(__url__, headers=headers)
         try:
             doc = ElementTree.fromstring(data.content)
         except:
@@ -100,8 +87,8 @@ class XML(Database):
         """
         last_db_id = get_last_db_id()
         xml_url = __db_url__ + str(last_db_id) + '/deployment/'
-
-        data = requests.get(xml_url)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(xml_url, headers=headers)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:
@@ -180,7 +167,7 @@ class Deployment(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
         last_db_id = get_last_db_id()
-        url_dep = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/' + str(last_db_id)
+        url_dep = url + str(last_db_id) + '/deployment/'
         json_data = {
             "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
@@ -201,23 +188,23 @@ class Deployment(unittest.TestCase):
                                "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
-                                                       {"name": "SNAPSHOTS", "size": "2"},
-                                                       {"name": "COMMANDLOG", "size": "2"}],
+                                                       {"name": "snapshots", "size": "2"},
+                                                       {"name": "commandlog", "size": "2"}],
                                                        "size": "10"},
                                                    "frequency": 5}},
             "security": {"enabled": True, "provider": "HASH"},
             "export": {"configuration": [{"enabled": False,
                                           "type": "kafka", "exportconnectorclass": "test",
-                                          "stream": "test", "property": [{"name": "test",
+                                          "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "test", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
         }
 
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
@@ -231,7 +218,7 @@ class Deployment(unittest.TestCase):
             # Delete database
             db_url = url + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
@@ -243,8 +230,8 @@ class UpdateDeployment(Deployment):
         last_db_id = get_last_db_id()
         # Delete database
         db_url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'+str(last_db_id)+'/deployment/'
-                # url + str(last_db_id)
-        data = requests.get(db_url)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(db_url, headers=headers)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:

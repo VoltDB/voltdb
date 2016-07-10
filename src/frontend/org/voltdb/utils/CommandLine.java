@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -30,6 +32,10 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.probe.MeshProber;
+
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -49,6 +55,8 @@ public class CommandLine extends VoltDB.Configuration
      * with JMX
      */
     private String m_vemTag = null;
+
+    public String m_modeOverrideForTest = null;
 
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
@@ -90,6 +98,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
+        cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -109,6 +118,13 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        cl.m_isPaused = m_isPaused;
+        cl.m_meshBrokers = m_meshBrokers;
+        cl.m_coordinators = ImmutableSortedSet.copyOf(m_coordinators);
+        cl.m_hostCount = m_hostCount;
+        cl.m_enableAdd = m_enableAdd;
+        cl.m_voltdbRoot = m_voltdbRoot;
+
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -206,6 +222,28 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public void startPaused() {
+        m_isPaused = true;
+    }
+
+    public CommandLine enableAdd(boolean enableAdd) {
+        m_enableAdd = enableAdd;
+        return this;
+    }
+
+    public CommandLine safeMode(boolean safeMode) {
+        m_safeMode = safeMode;
+        return this;
+    }
+
+    public boolean safeMode() {
+        return m_safeMode;
+    }
+
+    public boolean enableAdd() {
+        return m_enableAdd;
+    }
+
     public CommandLine leader(String leader)
     {
         m_leader = leader;
@@ -217,6 +255,20 @@ public class CommandLine extends VoltDB.Configuration
         String hostname = MiscUtils.getHostnameFromHostnameColonPort(m_leader);
         m_leader = MiscUtils.getHostnameColonPortString(hostname, port);
         return this;
+    }
+
+    public CommandLine coordinators(String coordinators) {
+        m_coordinators = MeshProber.hosts(coordinators);
+        return this;
+    }
+
+    public CommandLine coordinators(NavigableSet<String> coordinators) {
+        m_coordinators = coordinators;
+        return this;
+    }
+
+    public NavigableSet<String> coordinators() {
+        return m_coordinators;
     }
 
     public CommandLine timestampSalt(int timestampSalt) {
@@ -356,6 +408,29 @@ public class CommandLine extends VoltDB.Configuration
         return m_drAgentPortStart;
     }
 
+    public CommandLine hostCount(int hostCount) {
+        m_hostCount = hostCount <= 0 ? VoltDB.UNDEFINED : hostCount;
+        return this;
+    }
+
+    public int hostCount() {
+        return m_hostCount;
+    }
+
+    public CommandLine voltdbRoot(String voltdbRoot) {
+        m_voltdbRoot = new VoltFile(voltdbRoot);
+        return this;
+    }
+
+    public CommandLine voltdbRoot(File voltdbRoot) {
+        m_voltdbRoot = voltdbRoot;
+        return this;
+    }
+
+    public File voltdbRoot() {
+        return m_voltdbRoot;
+    }
+
     String javaExecutable = "java";
     public CommandLine javaExecutable(String javaExecutable)
     {
@@ -386,6 +461,12 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine externalInterface(String externalInterface)
     {
         m_externalInterface = externalInterface;
+        return this;
+    }
+
+    public CommandLine setForceVoltdbCreate(boolean forceVoltdbCreate)
+    {
+        m_forceVoltdbCreate = forceVoltdbCreate;
         return this;
     }
 
@@ -559,11 +640,22 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("org.voltdb.VoltDB");
         cmdline.add(m_startAction.verb());
 
-        cmdline.add("host"); cmdline.add(m_leader);
+        if (m_startAction == StartAction.PROBE && m_safeMode) {
+            cmdline.add("safemode");
+        }
+
+        cmdline.add("host");
+        if (!m_coordinators.isEmpty()) {
+            cmdline.add(m_coordinators.first());
+        } else {
+            cmdline.add(m_leader);
+        }
         if (jarFileName() != null) {
             cmdline.add("catalog"); cmdline.add(jarFileName());
         }
-        cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        if (pathToDeployment() != null) {
+            cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        }
 
         // rejoin has no replication role
         if (!m_startAction.doesRejoin()) {
@@ -606,6 +698,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
+        if (m_forceVoltdbCreate)
+        {
+            cmdline.add("force");
+        }
+
         if (m_isEnterprise) {
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
@@ -632,6 +729,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("ipc");
         }
 
+        if (m_tag != null) {
+            cmdline.add("tag"); cmdline.add(m_tag);
+        }
+
         // handle overrides for testing hotfix version compatibility
         if (m_versionStringOverrideForTest != null) {
             assert(m_versionCompatibilityRegexOverrideForTest != null);
@@ -643,9 +744,18 @@ public class CommandLine extends VoltDB.Configuration
                 cmdline.add(m_buildStringOverrideForTest);
             }
         }
+        if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
+            cmdline.add("paused");
+        }
 
-        if (m_tag != null) {
-            cmdline.add("tag"); cmdline.add(m_tag);
+        cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
+
+        if (m_startAction == StartAction.PROBE) {
+            cmdline.add("hostcount"); cmdline.add(Integer.toString(m_hostCount));
+        }
+
+        if (m_startAction == StartAction.PROBE || m_startAction == StartAction.INITIALIZE) {
+            cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
 
         return cmdline;

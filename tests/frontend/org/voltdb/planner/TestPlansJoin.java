@@ -94,6 +94,10 @@ public class TestPlansJoin extends PlannerTestCase {
                       "user lacks privilege or object not found: X");
         failToCompile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X",
                       "user lacks privilege or object not found: R1.X");
+        failToCompile("select * FROM R1 JOIN R2 ON R1.C = R2.C AND 1",
+                          "data type of expression is not boolean");
+        failToCompile("select * FROM R1 JOIN R2 ON R1.C = R2.C AND MOD(3,1)=1",
+                          "Join with filters that do not depend on joined tables is not supported in VoltDB");
     }
 
     public void testBasicThreeTableInnerJoin() {
@@ -234,7 +238,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
-        n = n.getChild(1);
+        n = n.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
         scan = (AbstractScanPlanNode) n;
         assertTrue(scan.getPredicate() != null);
@@ -313,11 +317,11 @@ public class TestPlansJoin extends PlannerTestCase {
                      ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
         assertTrue(node.getChild(0) instanceof SeqScanPlanNode);
         seqScan = (SeqScanPlanNode)node.getChild(0);
-        assertTrue(seqScan.getPredicate() == null);
+        assertEquals(ExpressionType.CONJUNCTION_AND, seqScan.getPredicate().getExpressionType());
         node = node.getChild(1);
         assertTrue(node instanceof SeqScanPlanNode);
         seqScan = (SeqScanPlanNode)node;
-        assertEquals(ExpressionType.CONJUNCTION_AND, seqScan.getPredicate().getExpressionType());
+        assertTrue(seqScan.getPredicate() == null);
 
         apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0");
         pn = apl.get(1);
@@ -654,7 +658,11 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Two Distributed tables join on non-partitioned column
         failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
-                      "Join of multiple partitioned tables has insufficient join criteria.");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+
+        // Two Distributed tables join on boolean constant
+        failToCompile("select * FROM P1 JOIN P2 ON 1=1",
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testBasicOuterJoin() {
@@ -864,7 +872,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition");
     }
 
     public void testBasicIndexOuterJoin() {
@@ -1015,7 +1023,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition");
     }
 
     public void testDistributedIndexJoinConditions() {
@@ -1309,8 +1317,14 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals("C", col.getColumnAlias());
         AbstractExpression colExp = col.getExpression();
         assertEquals(ExpressionType.OPERATOR_CASE_WHEN, colExp.getExpressionType());
-        List<AbstractExpression> caseWhenExpr = colExp.findAllSubexpressionsOfType(ExpressionType.OPERATOR_CASE_WHEN);
-        assertEquals(2, caseWhenExpr.size());
+        List<OperatorExpression> caseWhenExprs = colExp.findAllSubexpressionsOfClass(OperatorExpression.class);
+        int caseWhenCount = 0;
+        for (OperatorExpression caseWhen : caseWhenExprs) {
+            if (caseWhen.getExpressionType() == ExpressionType.OPERATOR_CASE_WHEN) {
+                ++caseWhenCount;
+            }
+        }
+        assertEquals(2, caseWhenCount);
 
         // Test three table INNER join. USING C column should be resolved
         pn = compile("SELECT C FROM R1 JOIN R2 USING (C) JOIN R3 USING (C)");
@@ -1341,6 +1355,69 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals("C", col.getColumnAlias());
         colExp = col.getExpression();
         assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+    }
+
+    public void testJoiOrders() {
+        AbstractPlanNode pn, pn1, pn2;
+        AbstractScanPlanNode sn;
+        IndexScanPlanNode isn;
+
+        // R1 is an outer node - has one filter
+        pn = compile("SELECT * FROM R2 JOIN R1 USING (C) WHERE R1.A > 0");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // R2 is an outer node - R2.A = 3 filter is discounter more than R1.A > 0
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A > 0 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R2", sn.getTargetTableName());
+
+        // R2 is an outer node - R2.A = 3 filter is discounter more than two non-EQ filters
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A > 0 AND R1.A < 3 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R2", sn.getTargetTableName());
+
+        // R1 is an outer node - EQ + non-EQ overweight EQ
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A = 0 AND R1.D < 3 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // Index Join (R3.A) still has a lower cost compare to a Loop Join
+        // despite the R3.C = 0 equality filter on the inner node
+        pn = compile("SELECT * FROM R1 JOIN R3 ON R3.A = R1.A WHERE R3.C = 0");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // R3.A is an INDEX. Both children are IndexScans. With everything being equal,
+        // the Left table (L) has fewer filters and should be an inner node
+        pn = compile("SELECT L.A, R.A FROM R3 L JOIN R3 R ON L.A = R.A WHERE R.A > 3 AND R.C  = 3 and L.A > 2 ;");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn;
+        assertEquals("R", sn.getTargetTableAlias());
+
+        // NLIJ with inline inner IndexScan over R2 using its partial index is a winner
+        // over the NLJ with R2 on the outer side
+        pn = compile("SELECT * FROM R3 JOIN R2 ON R3.C = R2.C WHERE R2.C > 100;");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        isn = (IndexScanPlanNode) pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals("PARTIAL_IND2", isn.getTargetIndexName());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R3", sn.getTargetTableName());
 
     }
 

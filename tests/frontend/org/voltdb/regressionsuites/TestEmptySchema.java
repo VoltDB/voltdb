@@ -25,14 +25,14 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestEmptySchema extends RegressionSuite
 {
@@ -63,9 +63,9 @@ public class TestEmptySchema extends RegressionSuite
         expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
         expectedSchema[7] = new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
-        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
-        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
@@ -88,7 +88,7 @@ public class TestEmptySchema extends RegressionSuite
         expectedSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
         expectedSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
         expectedSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
         expectedTable = new VoltTable(expectedSchema);
 
         results = client.callProcedure("@Statistics", "INDEX", 0).getResults();

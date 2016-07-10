@@ -1,31 +1,19 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import java.io.BufferedReader
 import java.io.FileNotFoundException
@@ -128,7 +116,7 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -174,6 +162,12 @@ class DatabaseTest extends TestBase {
         String deleteId  = page.getIdOfDatabaseDeleteButton(newId.toString())
         for(count=0; count<numberOfTrials; count++) {
             try {
+
+                try {
+                    waitFor(5) { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
                 $(id:editId).click()
                 waitFor { popupEditDatabaseButtonOk.isDisplayed() }
                 break
@@ -209,7 +203,7 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -234,6 +228,8 @@ class DatabaseTest extends TestBase {
                 println("Unable to find the ok button - Retrying")
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element - Retrying")
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Element not visible - Retrying")
             }
         }
         then: 'Verify the New Database is created'
@@ -247,7 +243,12 @@ class DatabaseTest extends TestBase {
         when: 'Click delete for the required database'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                $(id:deleteId).click()
+                try {
+                    waitFor(5) { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
+                $("#deleteDatabase_2").click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
@@ -272,6 +273,8 @@ class DatabaseTest extends TestBase {
                 println("Unable to find the Ok button - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
             }
         }
         then: 'Assert'

@@ -1,3 +1,4 @@
+
 -- partitioned table
 CREATE TABLE partitioned
 (
@@ -20,11 +21,25 @@ CREATE TABLE partitioned
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
+CREATE VIEW partview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM partitioned GROUP BY cid;
+
 -- dimension table
 CREATE TABLE dimension
 (
   cid        tinyint            NOT NULL
-, desc	     tinyint     		NOT NULL
+, desc         tinyint             NOT NULL
 , CONSTRAINT PK_id_d PRIMARY KEY
   (
     cid
@@ -53,6 +68,20 @@ CREATE TABLE replicated
 , UNIQUE ( cid, rid )
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
+
+CREATE VIEW replview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM replicated GROUP BY cid;
 
 -- replicated table
 CREATE TABLE adhocr
@@ -106,7 +135,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE TABLE partitioned_export
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -119,10 +148,34 @@ CREATE TABLE partitioned_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-PARTITION TABLE partitioned_export ON COLUMN cid;
-EXPORT TABLE partitioned_export;
+-- PARTITION TABLE partitioned_export ON COLUMN cid;
+-- EXPORT TABLE partitioned_export;
 
-CREATE TABLE replicated_export
+CREATE VIEW ex_partview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM partitioned_export GROUP BY cid;
+
+CREATE TABLE ex_partview_shadow (
+    cid tinyint not null,
+    entries bigint,
+    maximum bigint,
+    minimum bigint,
+    summation bigint,
+    primary key(cid)
+);
+PARTITION TABLE ex_partview_shadow ON COLUMN cid;
+
+CREATE STREAM replicated_export
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -135,7 +188,7 @@ CREATE TABLE replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-EXPORT TABLE replicated_export;
+-- EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
@@ -191,22 +244,22 @@ CREATE TABLE capr
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
-, tmstmp	 timestamp			NOT NULL
+, tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
 , LIMIT PARTITION ROWS 10 EXECUTE (
-	DELETE FROM CAPR WHERE tmstmp < NOW
+    DELETE FROM CAPR WHERE tmstmp < NOW
 ) );
 
 CREATE TABLE capp
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
-, tmstmp 	 timestamp			NOT NULL
+, tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
 , LIMIT PARTITION ROWS 10 EXECUTE (
-	DELETE FROM CAPP WHERE tmstmp < NOW
+    DELETE FROM CAPP WHERE tmstmp < NOW
 ) );
 PARTITION TABLE capp ON COLUMN p;
 
@@ -265,3 +318,4 @@ PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
+

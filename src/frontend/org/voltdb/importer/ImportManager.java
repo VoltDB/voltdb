@@ -185,7 +185,10 @@ public class ImportManager implements ChannelChangeCallback {
             }
             startOSGiFramework();
 
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
+            final String clusterTag = m_distributer.getClusterTag();
+
+            ImportDataProcessor newProcessor = new ImportProcessor(
+                    myHostId, m_distributer, m_framework, m_statsCollector, clusterTag);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             m_formatterFactories.clear();
 
@@ -206,7 +209,6 @@ public class ImportManager implements ChannelChangeCallback {
                         formatterFactory = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
                         m_formatterFactories.put(module, formatterFactory);
                     }
-                    formatterFactory.configureFormatterFactory(config.getFormatName(), prop);
                     config.setFormatterFactory(formatterFactory);
                 } catch(Throwable t) {
                     VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);

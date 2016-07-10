@@ -30,8 +30,6 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.MathContext;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
@@ -129,6 +127,12 @@ public class TestJDBCQueries {
             new Data("TIMESTAMP", 0,
                         new String[] {"9999999999999", "0", "1"},
                         new String[] {""}),
+            new Data("GEOGRAPHY_POINT", 0,
+                        new String[] {"point(-122.0 37.1)", "point(-100.0 49.1)", "point(-10.0 -49.1)"},
+                        new String[] {"pt(foo)"}),
+            new Data("GEOGRAPHY", 2048,
+                        new String[] {"polygon((0 0, 1 1, 1 0, 0 0))", "polygon((0 0, 3 3, 3 0, 0 0))", "polygon((0 0, 6 6, 6 0, 0 0))"},
+                        new String[] {"plygn(3"}),
     };
 
     static enum GetType {
@@ -566,6 +570,9 @@ public class TestJDBCQueries {
                         expectValStr = String.valueOf(rs
                                 .getBigDecimal(columnIndex));
                         break;
+                    case java.sql.Types.OTHER:
+                        expectValStr = rs.getObject(columnIndex).toString();
+                        break;
                     default:
                         throw new IllegalArgumentException("Invalid type '" + colType + "'");
                     }
@@ -895,7 +902,7 @@ public class TestJDBCQueries {
             // This query does work, per ENG-7306.
             String sql = "select * from votes;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
         }
         catch (SQLException e) {
             System.err.println("ERROR(BASIC SELECT): " + e.getMessage());
@@ -907,7 +914,7 @@ public class TestJDBCQueries {
             // This query does work, per ENG-7306.
             String sql = "select * from (select * from contestants C1) alias;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
         }
         catch (SQLException e) {
             System.err.println("ERROR(SUB-SELECT with no spaces): " + e.getMessage());
@@ -919,7 +926,7 @@ public class TestJDBCQueries {
             // Add a space before the sub-select. Reported in ENG-7306
             String sql = "select * from ( select * from contestants C1) alias;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
         }
         catch (SQLException e) {
             System.err.println("ERROR(SUB-SELECT with spaces): " + e.getMessage());
@@ -972,7 +979,7 @@ public class TestJDBCQueries {
         {
             String sql = "ALTER TABLE CONTESTANTS ADD UNIQUE(contestant_name) ;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(ALTER TABLE) succeeded, should have failed)");
             fail();
         }
@@ -1012,7 +1019,7 @@ public class TestJDBCQueries {
         {
             String sql = "create table t2(id integer not null, num integer not null);";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(CREATE TABLE) succeeded, should have failed)");
             fail();
         }
@@ -1060,7 +1067,7 @@ public class TestJDBCQueries {
         {
             String sql = "CREATE PROCEDURE CountContestants2 AS SELECT COUNT(*) FROM contestants;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(CREATE PROCEDURE) succeeded, should have failed)");
             fail();
         }
@@ -1089,7 +1096,7 @@ public class TestJDBCQueries {
         {
             String sql = "drop table drop_table1;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(DROP) succeeded, should have failed)");
             fail();
         }
@@ -1130,7 +1137,7 @@ public class TestJDBCQueries {
         {
             String sql = "truncate table votes;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(TRUNCATE TABLE) succeeded, should have failed)");
             fail();
         }
@@ -1171,7 +1178,7 @@ public class TestJDBCQueries {
         {
             String sql = " upsert into contestants (contestant_number, contestant_name) values (23, 'Bruce Springsteen')";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(UPSERT) succeeded, should have failed)");
             fail();
         }
@@ -1224,7 +1231,7 @@ public class TestJDBCQueries {
         {
             String sql = "update votes set CONTESTANT_NUMBER = 7 where PHONE_NUMBER = 2150002906;";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(UPDATE) succeeded, should have failed)");
             fail();
         }
@@ -1265,7 +1272,7 @@ public class TestJDBCQueries {
         {
             String sql = "delete from votes where   PHONE_NUMBER = 3082086134      ";
             java.sql.Statement query = conn.createStatement();
-            ResultSet rs = query.executeQuery(sql);
+            query.executeQuery(sql);
             System.err.println("ERROR(executeQuery(DELETE) succeeded, should have failed)");
             fail();
         }

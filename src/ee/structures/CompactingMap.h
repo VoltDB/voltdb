@@ -236,6 +236,8 @@ public:
      */
     bool verify() const;
     bool verifyRank() const;
+    /** Do we have a cached last buffer?  This is used in testing. */
+    bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
 
 protected:
     // main internal functions

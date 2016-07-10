@@ -36,6 +36,13 @@ public class SchemaColumn
         EXPRESSION,
     }
 
+    private String m_tableName;
+    private String m_tableAlias;
+    private String m_columnName;
+    private String m_columnAlias;
+    private AbstractExpression m_expression;
+    private int m_differentiator = -1;
+
     /**
      * Create a new SchemaColumn
      * @param tableName  The name of the table where this column originated,
@@ -49,24 +56,31 @@ public class SchemaColumn
      *        so that it can adjust the index of any TupleValueExpressions
      *        without affecting other nodes/columns/plan iterations, so
      *        it clones this expression.
+     *
+     * Some callers seem to provide an empty string instead of a null.  We change the
+     * empty string to null to simplify the comparison functions.
      */
     SchemaColumn(String tableName, String tableAlias, String columnName, String columnAlias) {
-        m_tableName = tableName;
-        m_tableAlias = tableAlias;
-        m_columnName = columnName;
-        m_columnAlias = columnAlias;
+        m_tableName = tableName == null || tableName.equals("") ? null : tableName;
+        m_tableAlias = tableAlias == null || tableAlias.equals("") ? null : tableAlias;
+        m_columnName = columnName == null || columnName.equals("") ? null : columnName;
+        m_columnAlias = columnAlias == null || columnAlias.equals("") ? null : columnAlias;
     }
 
     public SchemaColumn(String tableName, String tableAlias, String columnName,
                         String columnAlias, AbstractExpression expression)
     {
-        m_tableName = tableName;
-        m_tableAlias = tableAlias;
-        m_columnName = columnName;
-        m_columnAlias = columnAlias;
+        this(tableName, tableAlias, columnName, columnAlias);
         if (expression != null) {
             m_expression = (AbstractExpression) expression.clone();
         }
+    }
+
+    public SchemaColumn(String tableName, String tableAlias, String columnName,
+            String columnAlias, AbstractExpression expression, int differentiator)
+    {
+        this(tableName, tableAlias, columnName, columnAlias, expression);
+        m_differentiator = differentiator;
     }
 
     /**
@@ -76,54 +90,89 @@ public class SchemaColumn
     protected SchemaColumn clone()
     {
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                m_expression);
+                                m_expression, m_differentiator);
     }
 
     /**
-     * Check if this SchemaColumn provides the column specified by the input
-     * arguments.  An equal match is defined as matching both the table name and
-     * the column name if it is provided, otherwise matching the provided alias.
+     * Determine if this object is equal to another based on a comparison
+     * of the table and column names or aliases.  See compareNames below
+     * for details.
      */
     @Override
     public boolean equals (Object obj) {
-        if (obj == null) return false;
-        if (obj == this) return true;
-        if (obj instanceof SchemaColumn == false) return false;
-
-        SchemaColumn sc = (SchemaColumn) obj;
-        String tableName = sc.getTableName();
-        String tableAlias = sc.getTableAlias();
-        boolean sameTable = false;
-
-        if (tableAlias != null) {
-            if (tableAlias.equals(m_tableAlias)) {
-                sameTable = true;
-            }
-        } else if (m_tableName.equals(tableName)) {
-            sameTable = true;
-        }
-
-        if (! sameTable) {
+        if (obj == null) {
             return false;
         }
 
-        String columnName = sc.getColumnName();
-        String columnAlias = sc.getColumnAlias();
-
-        if (columnName != null && !columnName.equals("")) {
-            if (columnName.equals(m_columnName)) {
-                // Next line is not true according to current VoltDB's logic
-                //assert(m_columnAlias.equals(columnAlias));
-                return true;
-            }
-        }
-        else if (columnAlias != null && !columnAlias.equals("")) {
-            if (columnAlias.equals(m_columnAlias)) {
-                return true;
-            }
+        if (obj == this) {
+            return true;
         }
 
-        return false;
+        if (obj instanceof SchemaColumn == false) {
+            return false;
+        }
+
+        SchemaColumn sc = (SchemaColumn) obj;
+        if (compareNames(sc) != 0) {
+            return false;
+        }
+
+        return getDifferentiator() == sc.getDifferentiator();
+    }
+
+    private int nullSafeStringCompareTo(String str1, String str2) {
+        if (str1 == null ^ str2 == null) {
+            return str1 == null ? -1 : 1;
+        }
+
+        if (str1 == null && str2 == null) {
+            return 0;
+        }
+
+        return str1.compareTo(str2);
+    }
+
+    /**
+     * Compare this schema column to the input.
+     *
+     * Two SchemaColumns are compared thus:
+     *
+     * -  Compare the table aliases or names, preferring to compare aliases if
+     *    not null for both sides.
+     * -  Compare the column names or aliases, preferring to compare names if
+     *    not null for both sides.
+     */
+    public int compareNames(SchemaColumn that) {
+
+        String thatTbl;
+        String thisTbl;
+        if (m_tableAlias != null && that.m_tableAlias != null) {
+            thisTbl = m_tableAlias;
+            thatTbl = that.m_tableAlias;
+        }
+        else {
+            thisTbl = m_tableName;
+            thatTbl = that.m_tableName;
+        }
+
+        int tblCmp = nullSafeStringCompareTo(thisTbl, thatTbl);
+        if (tblCmp != 0) {
+            return tblCmp;
+        }
+
+        String thisCol;
+        String thatCol;
+        if (m_columnName != null && that.m_columnName != null) {
+            thisCol = m_columnName;
+            thatCol = that.m_columnName;
+        }
+        else {
+            thisCol = m_columnAlias;
+            thatCol = that.m_columnAlias;
+        }
+
+        int colCmp = nullSafeStringCompareTo(thisCol, thatCol);
+        return colCmp;
     }
 
     @Override
@@ -135,6 +184,8 @@ public class SchemaColumn
         } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
             result += m_columnAlias.hashCode();
         }
+
+        result += m_differentiator;
         return result;
     }
 
@@ -158,7 +209,7 @@ public class SchemaColumn
                     m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                new_exp);
+                                new_exp, m_differentiator);
     }
 
     public String getTableName()
@@ -211,6 +262,23 @@ public class SchemaColumn
         return m_expression.getValueSize();
     }
 
+    /**
+     * Return the differentiator that can distinguish columns with the same name.
+     * This value is just the ordinal position of the SchemaColumn within its NodeSchema.
+     * @return  differentiator for this schema column
+     */
+    public int getDifferentiator() {
+        return m_differentiator;
+    }
+
+    /**
+     * Set the differentiator value for this SchemaColumn.
+     * @param differentiator
+     */
+    public void setDifferentiator(int differentiator) {
+        m_differentiator = differentiator;
+    }
+
     @Override
     public String toString()
     {
@@ -222,6 +290,7 @@ public class SchemaColumn
         sb.append("\tColumn Alias: ").append(m_columnAlias).append("\n");
         sb.append("\tColumn Type: ").append(getType()).append("\n");
         sb.append("\tColumn Size: ").append(getSize()).append("\n");
+        sb.append("\tDifferentiator: ").append(getDifferentiator()).append("\n");
         sb.append("\tExpression: ").append(m_expression.toString()).append("\n");
         return sb.toString();
     }
@@ -256,10 +325,10 @@ public class SchemaColumn
 
     public static SchemaColumn fromJSONObject(JSONObject jobj) throws JSONException
     {
-        String tableName = "";
-        String tableAlias = "";
-        String columnName = "";
-        String columnAlias = "";
+        String tableName = null;
+        String tableAlias = null;
+        String columnName = null;
+        String columnAlias = null;
         AbstractExpression expression = null;
         if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
             columnName = jobj.getString( Members.COLUMN_NAME.name() );
@@ -268,9 +337,50 @@ public class SchemaColumn
         return new SchemaColumn( tableName, tableAlias, columnName, columnAlias, expression );
     }
 
-    private String m_tableName;
-    private String m_tableAlias;
-    private String m_columnName;
-    private String m_columnAlias;
-    private AbstractExpression m_expression;
+    /**
+     * Generates a string that can appear in "explain plan" output
+     * when detailed debug output is enabled.
+     * @return a string that represents this SchemaColumn
+     */
+    public String toExplainPlanString() {
+        String str = "";
+        String table;
+        if (getTableAlias() != null) {
+            table = getTableAlias();
+        }
+        else if (getTableName() != null) {
+            table = getTableName();
+        }
+        else {
+            table = "<null>";
+        }
+        str += table;
+
+        str += ".";
+        if (getColumnName() != null) {
+            str += getColumnName();
+        }
+        else if (getColumnAlias() != null) {
+            str += getColumnAlias();
+        }
+        else {
+            str += "<null>";
+        }
+
+        if (m_expression != null) {
+            str += " expr: (";
+            if (m_expression.getValueType() != null) {
+                str += "[" + m_expression.getValueType().toSQLString() + "] ";
+            }
+
+            str += m_expression.explain(table) + ")";
+
+            if (m_expression instanceof TupleValueExpression) {
+                int tveIndex = ((TupleValueExpression)m_expression).getColumnIndex();
+                str += " index: " + tveIndex;
+            }
+        }
+
+        return str;
+    }
 }

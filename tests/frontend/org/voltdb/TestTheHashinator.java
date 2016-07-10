@@ -31,6 +31,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -41,6 +42,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.InstanceId;
@@ -235,6 +238,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         config, false);
 
@@ -269,6 +273,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         hashinatorConfig, false);
 
@@ -342,6 +347,7 @@ public class TestTheHashinator {
                             0,
                             "",
                             0,
+                            64*1024,
                             100,
                             hashinatorConfig, false);
 
@@ -388,6 +394,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
@@ -423,7 +430,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -462,6 +469,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
 
@@ -532,6 +540,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false);
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
@@ -597,6 +606,7 @@ public class TestTheHashinator {
                         0,
                         "",
                         0,
+                        64*1024,
                         100,
                         new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(6), 0, 0), false);
         for (int i = 0; i < 2500; i++) {
@@ -916,5 +926,28 @@ public class TestTheHashinator {
         }
 
         return dut;
+    }
+
+    private void checkConfigJSON(ImmutableSortedMap<Integer, Integer> tokens,
+                                    String JSON) throws JSONException {
+        final JSONObject jsonData = new JSONObject(JSON);
+        assertEquals(tokens.size(), jsonData.length());
+        for (Map.Entry<Integer, Integer> entry: tokens.entrySet()) {
+            assertEquals(entry.getValue().intValue(),
+                    jsonData.getInt(entry.getKey().toString()));
+        }
+    }
+    @Test
+    public void testJSONConfig() throws JSONException, IOException
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator dut = new ElasticHashinator(ElasticHashinator.getConfigureBytes(8, ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
+        ImmutableSortedMap<Integer, Integer> tokens = dut.getTokens();
+        // uncompressed
+        checkConfigJSON(tokens, dut.getConfigJSON());
+
+        // compressed
+        checkConfigJSON(tokens, ElasticHashinator.decompressJSONString(dut.getConfigJSONCompressed()));
     }
 }

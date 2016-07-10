@@ -118,6 +118,24 @@ function sync-benchmark() {
         --csvfile=periodic.csv.gz
 }
 
+function http-benchmark() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        kvbench.HTTPBenchmark \
+        --displayinterval=5 \
+        --duration=10 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40 \
+        --csvfile=periodic.csv.gz
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|sync-benchmark|sync-benchmark-help|...}"
 }

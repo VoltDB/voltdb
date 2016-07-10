@@ -22,12 +22,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
     private final byte m_configBytes[];
+    private final String m_configJSON;
     private final long m_signature;
     @SuppressWarnings("unused")
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
@@ -60,6 +63,12 @@ public class LegacyHashinator extends TheHashinator {
     public LegacyHashinator(byte configBytes[], boolean cooked) {
         catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
         m_configBytes = Arrays.copyOf(configBytes, configBytes.length);
+        try {
+            m_configJSON = new JSONStringer().
+                    array().value(catalogPartitionCount).endArray().toString();
+        } catch (JSONException e) {
+            throw new RuntimeException("Failed to serialized Hashinator Configuration to JSON.", e);
+        }
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
@@ -108,6 +117,16 @@ public class LegacyHashinator extends TheHashinator {
         return m_configBytes;
     }
 
+    /**
+     * Returns raw config JSONString.
+     * @return config JSONString
+     */
+    @Override
+    public String getConfigJSON()
+    {
+        return m_configJSON;
+    }
+
     @Override
     public HashinatorType getConfigurationType() {
         return TheHashinator.HashinatorType.LEGACY;
@@ -115,27 +134,35 @@ public class LegacyHashinator extends TheHashinator {
 
     @Override
     public int pHashToPartition(VoltType type, Object obj) {
+        assert(obj != null);
         // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
-        if (obj == null || VoltType.isNullVoltType(obj)) {
+        if (VoltType.isVoltNullValue(obj)) {
             return 0;
-        } else if (obj instanceof Long) {
-            long value = ((Long) obj).longValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Integer) {
-            long value = ((Integer) obj).intValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Short) {
-            long value = ((Short) obj).shortValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Byte) {
-            long value = ((Byte) obj).byteValue();
-            return pHashinateLong(value);
-        } else if (obj.getClass() == byte[].class) {
-            obj = bytesToValue(type, (byte[]) obj);
-            return pHashinateBytes(valueToBytes(obj));
+        }
+        long value = 0;
+        if (obj instanceof Long) {
+            value = ((Long) obj).longValue();
+        }
+        else if (obj instanceof Integer) {
+            value = ((Integer) obj).intValue();
+        }
+        else if (obj instanceof Short) {
+            value = ((Short) obj).shortValue();
+        }
+        else if (obj instanceof Byte) {
+            value = ((Byte) obj).byteValue();
+        }
+        else {
+            // The hash formula for a value represented as serialized bytes
+            // must still be appropriate for the expected partitioning type,
+            // even if this requires a round-trip conversion.
+            if (obj.getClass() == byte[].class) {
+                obj = type.bytesToValue((byte[]) obj);
+            }
+            return pHashinateBytes(VoltType.valueToBytes(obj));
         }
 
-        return pHashinateBytes(valueToBytes(obj));
+        return pHashinateLong(value);
     }
 
     @Override
@@ -145,5 +172,10 @@ public class LegacyHashinator extends TheHashinator {
             set.add(ii);
         }
         return set;
+    }
+
+    @Override
+    public int getPartitionFromHashedToken(int hashedToken) {
+        return java.lang.Math.abs(hashedToken % catalogPartitionCount);
     }
 }

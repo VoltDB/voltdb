@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.DRLogSegmentId;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -30,7 +29,7 @@ import org.voltdb.DRLogSegmentId;
 //
 //   it is important that repair work happens with the deliver lock held
 //   and that updatereplicas also holds this lock -- replica failure during
-//   repair must happen unambigously before or after each local repair action.
+//   repair must happen unambiguously before or after each local repair action.
 //
 //   A RepairAlgo can only be cancelled by initiator mailbox while the deliver
 //   lock is held. Repair work must check for cancellation before producing
@@ -38,7 +37,7 @@ import org.voltdb.DRLogSegmentId;
 //
 //   Note that a RepairAlgo can not prevent messages being delivered post
 //   cancellation.  RepairLog requests therefore use a requestId to
-//   dis-ambiguate responses for cancelled requests that are filtering in late.
+//   disambiguate responses for cancelled requests that are filtering in late.
 
 
 /**
@@ -50,13 +49,9 @@ public interface RepairAlgo
     public static class RepairResult
     {
         public final long m_txnId;
-        public final long m_localDrUniqueId;
-        public final DRLogSegmentId m_binaryLogInfo;
 
-        RepairResult(long txnId, long localDrUniqueId, DRLogSegmentId binaryLogInfo) {
+        RepairResult(long txnId) {
             m_txnId = txnId;
-            m_localDrUniqueId = localDrUniqueId;
-            m_binaryLogInfo = binaryLogInfo;
         }
     }
 

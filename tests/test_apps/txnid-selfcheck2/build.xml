@@ -1,0 +1,59 @@
+<!-- Simple build file to build tnxid2 client & SP's -->
+<project name="txnid-selfcheck2" basedir="." default="all">
+
+    <property name="procedures.dir"     value="${basedir}/src/txnIdSelfCheck/procedures"/>
+    <property name="clientsrc.dir"     value="${basedir}/src/txnIdSelfCheck"/>
+
+    <property name="build.dir"   value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="proceduresclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="jar.dir"     value="${basedir}"/>
+    <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
+    <property name="log.dir"     value="${basedir}/log"/>
+
+    <target name="all" depends="jars"/>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${log.dir}"/>
+        <delete dir="${voltdbroot.dir}"/>
+        <delete dir="${basedir}/felix-cache"/>
+        <delete file="${jar.dir}/client.jar"/>
+        <delete file="${basedir}/catalog-report.html"/>
+    </target>
+
+    <path id="build-classpath">
+       <fileset dir="${basedir}/../../../voltdb">
+           <!-- <include name="voltdbclient*.jar"/> -->
+         <include name="voltdb*.jar"/>
+       </fileset>
+    </path>
+
+    <target name="client-compile">
+        <mkdir dir="${clientclasses.dir}"/>
+        <javac debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="client" depends="client-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/client.jar" basedir="${clientclasses.dir}">
+        </jar>
+    </target>
+
+    <target name="procedures-compile">
+        <mkdir dir="${proceduresclasses.dir}"/>
+        <javac debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="jars" depends="procedures-compile, client-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/txnid.jar" basedir="${proceduresclasses.dir}">
+        </jar>
+    </target>
+
+</project>

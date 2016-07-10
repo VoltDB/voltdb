@@ -25,10 +25,12 @@ import java.util.Map;
  *
  */
 public enum IndexType {
-    INVALID         (0),
-    BALANCED_TREE   (1),
-    HASH_TABLE      (2),
-    BTREE           (3);
+    INVALID             (0),
+    BALANCED_TREE       (1),
+    HASH_TABLE          (2),
+    BTREE               (3),
+    COVERING_CELL_INDEX (4),
+    ;
 
     IndexType(int val) {
         assert (this.ordinal() == val) :
@@ -87,7 +89,9 @@ public enum IndexType {
             return "_TREE";
         case BTREE:
         case HASH_TABLE:
+        case COVERING_CELL_INDEX:
             return "";
+        case INVALID:
         }
         return null;
     }

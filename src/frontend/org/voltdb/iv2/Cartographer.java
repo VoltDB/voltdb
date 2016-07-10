@@ -480,6 +480,12 @@ public class Cartographer extends StatsSource
                         //Dont die in k=0 cluster or 2node k1 (with partition detection on)
                         return false;
                     }
+                    // check if any node still in rejoin status
+                    try {
+                        if (m_zk.exists(VoltZK.rejoinNodeBlocker, false) != null) {
+                            return false;
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
                     return doPartitionsHaveReplicas(hid);
                 }
@@ -554,5 +560,4 @@ public class Cartographer extends StatsSource
         }
         return true;
     }
-
 }

@@ -42,7 +42,7 @@ Quickstart
 VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create" to start an empty, single-node VoltDB server.
+2. Type "voltdb create --force" to start an empty, single-node VoltDB server.
 3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
 4. Type "./run.sh client" to run the client code.
 

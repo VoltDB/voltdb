@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
@@ -65,6 +66,7 @@ public class CatalogContext {
     private final long catalogCRC;
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
+    public final UUID deploymentHashForConfig;
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
@@ -130,6 +132,7 @@ public class CatalogContext {
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
+        this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
         m_defaultProcs = new DefaultProcedureManager(database);
@@ -254,18 +257,22 @@ public class CatalogContext {
      * jar is served from a url and isn't in the classpath.
      *
      * @param procedureClassName The name of the class to load.
-     * @return A java Class variable assocated with the class.
+     * @return A java Class variable associated with the class.
      * @throws ClassNotFoundException if the class is not in the jar file.
      */
     public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
-        //System.out.println("Loading class " + procedureClassName);
+        return classForProcedure(procedureClassName, m_jarfile.getLoader());
+    }
 
+    public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
+        throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
-        if (procedureClassName.startsWith("org.voltdb."))
+        if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
+        }
 
         // look in the catalog for the file
-        return m_jarfile.getLoader().loadClass(procedureClassName);
+        return Class.forName(procedureClassName, true, loader);
     }
 
     // Generate helpful status messages based on configuration present in the

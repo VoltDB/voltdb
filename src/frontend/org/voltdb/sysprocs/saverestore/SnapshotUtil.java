@@ -76,6 +76,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -147,7 +148,6 @@ public class SnapshotUtil {
         ExtensibleSnapshotDigestData extraSnapshotData,
         InstanceId instanceId,
         long timestamp,
-        long clusterCreateTime,
         int newPartitionCount,
         int clusterId)
     throws IOException
@@ -185,7 +185,6 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
-                stringer.key("clusterCreateTime").value(clusterCreateTime);
 
                 extraSnapshotData.writeToSnapshotDigest(stringer);
                 stringer.endObject();
@@ -1201,6 +1200,21 @@ public class SnapshotUtil {
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables)
         {
+            //If table has view and table is export table snapshot view table.
+            if ((table.getMaterializer() != null) &&
+                    (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
+            {
+                //Non partitioned export table are not allowed so it should not get here.
+                Column bpc = table.getMaterializer().getPartitioncolumn();
+                if (bpc == null) continue;
+
+                String bPartName = bpc.getName();
+                Column pc = table.getColumns().get(bPartName);
+                if (pc != null) {
+                    my_tables.add(table);
+                }
+                continue;
+            }
             // Make a list of all non-materialized, non-export only tables
             if ((table.getMaterializer() != null) ||
                     (CatalogUtil.isTableExportOnly(database, table)))
@@ -1520,6 +1534,17 @@ public class SnapshotUtil {
     public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length == 1) {
+            try{
+                JSONObject jsObj = new JSONObject((String)params[0]);
+                String path = jsObj.optString(JSON_PATH);
+                String dupPath = jsObj.optString(JSON_DUPLICATES_PATH);
+                if(!path.isEmpty() && dupPath.isEmpty()){
+                    jsObj.put(JSON_DUPLICATES_PATH, path);
+                }
+                task.setParams( jsObj.toString() );
+            } catch (JSONException e){
+                Throwables.propagate(e);
+            }
             return null;
         } else if (params.length == 2) {
             if (params[0] == null) {
@@ -1552,6 +1577,7 @@ public class SnapshotUtil {
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
+                jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, params[0]);
             } catch (JSONException e) {
                 Throwables.propagate(e);
             }

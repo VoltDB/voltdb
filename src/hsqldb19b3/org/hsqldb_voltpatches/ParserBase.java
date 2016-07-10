@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 
 import java.math.BigDecimal;
 
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
@@ -397,6 +396,19 @@ public class ParserBase {
             read();
 
             return true;
+        }
+
+        return false;
+    }
+
+    boolean readUntilThis(int tokenId) {
+
+        while (token.tokenType != Tokens.X_ENDPARSE) {
+           if (token.tokenType == tokenId) {
+               return true;
+           }
+
+           read();
         }
 
         return false;
@@ -791,6 +803,7 @@ public class ParserBase {
     }
     /**********************************************************************/
     // A VoltDB extension to make it easier to see SQL statement being parsed in the debugger
+    @Override
     public String toString() {
         return "A subclass of ParserBase parsing <<" + scanner.sqlString + ">>";
     }

@@ -101,9 +101,9 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             if (partitioningCol == null) {
                 assert (m_targetIsExportTable);
                 m_recentErrorMsg = "The target table for an INSERT INTO ... SELECT statement is an "
-                        + "export table with no partitioning column defined.  "
+                        + "stream with no partitioning column defined.  "
                         + "This is not currently supported.  Please define a "
-                        + "partitioning column for this export table to use it with INSERT INTO ... SELECT.";
+                        + "partitioning column for this stream to use it with INSERT INTO ... SELECT.";
                 return null;
             }
 

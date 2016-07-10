@@ -34,11 +34,14 @@
 {_point2numfun |= "LATITUDE"}
 {_point2numfun |= "LONGITUDE"}
 {_poly2numfun |= "AREA"}
+{_poly2numfun |= "NumPoints"}
+{_poly2numfun |= "NumInteriorRings"}
 {_2geo2numfun |= "DISTANCE"}
 {_polypoint2boolfun |= "CONTAINS"}
-{_poly2boolfun |= "isValid"}
+{_2geonum2boolfun |= "DWithin"}
+{_poly2boolfun |= "IsValid"}
 {_poly2pointfun |= "CENTROID"}
-{_geo2stringfun |= "asText"}
+{_geo2stringfun |= "AsText"}
 
 {_maybe |= ""}
 {_maybe |= " NOT "}

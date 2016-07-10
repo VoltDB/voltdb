@@ -1,3 +1,26 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package vmcTest.pages
 
 import geb.Module
@@ -17,31 +40,31 @@ import org.openqa.selenium.JavascriptExecutor
 class NetworkInterfaces extends Module {
 
     static content = {
-        title			                { $("h1", text:"Network Interfaces") }
+        title                           { $("h1", text:"Network Interfaces") }
 
-        portNameTitle			        { $("#hPortName") }
-        clusterSettingTitle		        { $("#hClusterSettings") }
-        serverSettingTitle		        { $("#hServerSettings") }
-        clientPortTitle			        { $("#clientport").previous() }
-        adminPortTitle			        { $("#adminport").previous() }
-        httpPortTitle 			        { $("#httpport").previous() }
-        internalPortTitle		        { $("#internalPort").previous() }
-        zookeeperPortTitle		        { $("#zookeeperPort").previous() }
-        replicationPortTitle	        { $("#replicationPort").previous() }
+        portNameTitle                   { $("#hPortName") }
+        clusterSettingTitle             { $("#hClusterSettings") }
+        serverSettingTitle              { $("#hServerSettings") }
+        clientPortTitle                 { $("#clientport").previous() }
+        adminPortTitle                  { $("#adminport").previous() }
+        httpPortTitle                   { $("#httpport").previous() }
+        internalPortTitle               { $("#internalPort").previous() }
+        zookeeperPortTitle              { $("#zookeeperPort").previous() }
+        replicationPortTitle            { $("#replicationPort").previous() }
 
-        clusterClientPortValue			{ $("#clusterClientport") }
-        clusterAdminPortValue			{ $("#clusterAdminport") }
-        clusterHttpPortValue			{ $("#clusterHttpport") }
-        clusterInternalPortValue		{ $("#clusterInternalPort") }
-        clusterZookeeperPortValue		{ $("#clusterZookeeperPort") }
-        clusterReplicationPortValue		{ $("#clusterReplicationPort") }
+        clusterClientPortValue          { $("#clusterClientport") }
+        clusterAdminPortValue           { $("#clusterAdminport") }
+        clusterHttpPortValue            { $("#clusterHttpport") }
+        clusterInternalPortValue        { $("#clusterInternalPort") }
+        clusterZookeeperPortValue       { $("#clusterZookeeperPort") }
+        clusterReplicationPortValue     { $("#clusterReplicationPort") }
 
-        serversettingclientvalue		{ $("#clientport")}
-        serversettingadminvalue			{ $("#adminport")}
-        serversettinghttpvalue			{ $("#httpport")}
-        serversettinginternalvalue		{ $("#internalPort")}
-        serversettingzookeepervalue		{ $("#zookeeperPort")}
-        serversettingreplicationvalue	{ $("#replicationPort")}
+        serversettingclientvalue        { $("#clientport")}
+        serversettingadminvalue         { $("#adminport")}
+        serversettinghttpvalue          { $("#httpport")}
+        serversettinginternalvalue      { $("#internalPort")}
+        serversettingzookeepervalue     { $("#zookeeperPort")}
+        serversettingreplicationvalue   { $("#replicationPort")}
     }
 
 }

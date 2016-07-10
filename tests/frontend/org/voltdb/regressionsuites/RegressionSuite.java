@@ -32,8 +32,11 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
+
+import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
@@ -54,8 +57,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
-
-import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -111,7 +112,8 @@ public class RegressionSuite extends TestCase {
             for (final SocketChannel sc : m_clientChannels) {
                 try {
                     ConnectionUtil.closeConnection(sc);
-                } catch (final IOException e) {
+                }
+                catch (final IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -209,7 +211,8 @@ public class RegressionSuite extends TestCase {
         String listener = null;
         if (useAdmin) {
             listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-        } else {
+        }
+        else {
             listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
         }
         ClientConfig config = new ClientConfigForTest(m_username, m_password, scheme);
@@ -224,7 +227,8 @@ public class RegressionSuite extends TestCase {
         catch (ConnectException e) {
             if (useAdmin) {
                 listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-            } else {
+            }
+            else {
                 listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
             }
             client.createConnection(listener);
@@ -392,7 +396,13 @@ public class RegressionSuite extends TestCase {
      * @return internal port number
      */
     public int internalPort(int hostId) {
-        return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
+        return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT+hostId;
+    }
+
+    static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(sql, vt, new long[][] {{modifiedTupleCount}});
     }
 
     static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
@@ -415,6 +425,27 @@ public class RegressionSuite extends TestCase {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
+    }
+
+    static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            String message = "at column 0,";
+
+            BigDecimal actual = new BigDecimal(-10000000);
+            try {
+                actual = vt.getDecimalAsBigDecimal(i);
+            } catch (IllegalArgumentException ex) {
+                ex.printStackTrace();
+                fail(message);
+            }
+            assertEquals(message, expected[i], actual);
+        }
     }
 
     private static void dumpExpectedLongs(long[][] expected) {
@@ -444,44 +475,43 @@ public class RegressionSuite extends TestCase {
                         expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
-            validateRowOfLongs(messagePrefix + " at row " + i + ", ", vt, expected[i]);
+            validateRowOfLongs(messagePrefix + " at row " + (i+1) + ", ", vt, expected[i]);
         }
     }
 
     public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
-        assertNotNull(expected);
-        assertEquals("Wrong number of rows in table.  ",
-                        expected.length, vt.getRowCount());
-        int len = expected.length;
-        for (int i=0; i < len; i++) {
-            validateRowOfLongs("at row " + i + ", ", vt, expected[i]);
-        }
+        validateTableOfLongs("", vt, expected);
     }
 
     static protected void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
-            String message = messagePrefix + "at column " + i + ", ";
+            String message = messagePrefix + "at column " + (i+1) + ", ";
 
             long actual = -10000000;
             // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
             try {
                 actual = vt.getLong(i);
-            } catch (IllegalArgumentException ex) {
+            }
+            catch (IllegalArgumentException ex) {
                 try {
                     actual = (long) vt.getDouble(i);
-                } catch (IllegalArgumentException newEx) {
+                }
+                catch (IllegalArgumentException newEx) {
                     try {
                         actual = vt.getTimestampAsLong(i);
-                    } catch (IllegalArgumentException exTm) {
+                    }
+                    catch (IllegalArgumentException exTm) {
                         try {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
-                        } catch (IllegalArgumentException newerEx) {
+                        }
+                        catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
                             fail(message);
                         }
-                    } catch (ArithmeticException newestEx) {
+                    }
+                    catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
                         fail(message);
                     }
@@ -491,7 +521,8 @@ public class RegressionSuite extends TestCase {
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
                 assertEquals(message, expected[i], actual);
-            } else {
+            }
+            else {
                 VoltType type = vt.getColumnType(i);
                 assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
@@ -513,7 +544,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == Long.MIN_VALUE) {
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 assertEquals(expected[i], actual);
             }
         }
@@ -539,7 +571,8 @@ public class RegressionSuite extends TestCase {
                 String actual = vt.getString(col);
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 assertEquals(expected[i], vt.getString(col));
             }
         }
@@ -563,7 +596,8 @@ public class RegressionSuite extends TestCase {
               if (expected[i] == null) {
                   assertTrue(vt.wasNull());
                   assertEquals(null, actual);
-              } else {
+              }
+              else {
                   assertEquals(expected[i], Encoder.hexEncode(actual));
               }
           }
@@ -586,7 +620,8 @@ public class RegressionSuite extends TestCase {
               if (expected[i] == Double.MIN_VALUE) {
                   assertTrue(vt.wasNull());
                   assertEquals(null, actual);
-              } else {
+              }
+              else {
                   assertEquals(expected[i], actual, 0.00001);
               }
           }
@@ -599,19 +634,22 @@ public class RegressionSuite extends TestCase {
             BigDecimal actual = null;
             try {
                 actual = vt.getDecimalAsBigDecimal(i);
-            } catch (IllegalArgumentException ex) {
+            }
+            catch (IllegalArgumentException ex) {
                 ex.printStackTrace();
                 fail();
             }
             if (expected[i] != null) {
                 assertNotSame(null, actual);
                 assertEquals(expected[i], actual);
-            } else {
+            }
+            else {
                 if (isHSQL()) {
                     // We don't actually use this with
                     // HSQL.  So, just assert failure here.
                     fail("HSQL is not used to test the Volt DECIMAL type.");
-                } else {
+                }
+                else {
                     assertTrue(vt.wasNull());
                 }
             }
@@ -694,7 +732,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == null) {
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 BigDecimal rounded = expected[i].setScale(m_defaultScale, RoundingMode.valueOf(m_defaultRoundingMode));
                 assertEquals(rounded, actual);
             }
@@ -743,7 +782,8 @@ public class RegressionSuite extends TestCase {
         if (epsilon > 0) {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
-        } else {
+        }
+        else {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude());
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude());
         }
@@ -858,7 +898,8 @@ public class RegressionSuite extends TestCase {
                 if (epsilon <= 0) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
-                } else {
+                }
+                else {
                     String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
                                                          Math.abs(expectedValue - actualValue), epsilon);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
@@ -1072,13 +1113,37 @@ public class RegressionSuite extends TestCase {
 
     protected static void truncateTables(Client client, String[] tables) throws IOException, ProcCallException {
         for (String tb : tables) {
-            truncateTables(client, tb);
+            truncateTable(client, tb);
         }
     }
 
-    protected static void truncateTables(Client client, String tb) throws IOException, ProcCallException {
+    protected static void truncateTable(Client client, String tb) throws IOException, ProcCallException {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
 
+    /**
+     * A convenience method to build a Properties object initialized with an
+     * arbitrary number of property/value pairs.
+     * This one method with its scalable argument list replaces the
+     * calls to the constructor and to the ugly and nonscalable
+     * putAll(ImmutableMap.<String, String> of(...) and/or
+     * a verbose list of calls to setProperty.
+     * @param alternatingKeysAndValues property-name-1, string-value-1,
+     *        property-name-2, string-value-2, ...
+     * @return the new Properties object
+     **/
+    public static Properties buildProperties(String... alternatingKeysAndValues) {
+        Properties properties = new Properties();
+        int nStrings = alternatingKeysAndValues.length;
+        // Each key should have a value, so the length should be even.
+        assert nStrings % 2 == 0;
+        for (int ii = 0; ii < nStrings; ii += 2) {
+            // Initialize each key value pair from adjacent strings.
+            properties.setProperty(
+                    alternatingKeysAndValues[ii],
+                    alternatingKeysAndValues[ii+1]);
+        }
+        return properties;
+    }
 }

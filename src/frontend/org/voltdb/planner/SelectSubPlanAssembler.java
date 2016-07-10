@@ -305,8 +305,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // Don't throw a planning error here, in case the problem is just with this
                     // particular join order, but do leave a hint to the PlanAssembler in case
                     // the failure is unanimous -- a common case.
-                    m_recentErrorMsg =
-                        "Join of multiple partitioned tables has insufficient join criteria.";
+                    m_recentErrorMsg = m_partitioning.getJoinInvalidReason();
                     // This join order, at least, is not worth trying to plan.
                     continue;
                 }
@@ -838,7 +837,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         indexedExprs.addAll(endExprs);
         // Find an outer TVE by ignoring any TVEs based on the inner table.
         for (AbstractExpression indexed : indexedExprs) {
-            Collection<AbstractExpression> indexedTVEs = indexed.findBaseTVEs();
+            Collection<AbstractExpression> indexedTVEs = indexed.findAllTupleValueSubexpressions();
             for (AbstractExpression indexedTVExpr : indexedTVEs) {
                 if ( ! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTableAlias)) {
                     return true;

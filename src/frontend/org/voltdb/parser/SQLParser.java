@@ -23,17 +23,16 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -62,7 +61,7 @@ public class SQLParser extends SQLPatternFactory
             super(String.format(message, args), cause);
         }
 
-        private static final long serialVersionUID = -4043500523038225173L;
+        private static final long serialVersionUID  = -4043500523038225173L;
     }
 
     //========== Private Parsing Data ==========
@@ -215,6 +214,17 @@ public class SQLParser extends SQLPatternFactory
         parsedProcedureModifierClause().compile("PAT_ANY_CREATE_PROCEDURE_STATEMENT_CLAUSE");
 
     /**
+     * Pattern for parsing a single EXPORT or PARTITION clauses within a CREATE STREAM statement.
+     *
+     * Capture groups:
+     *  (1) ALLOW clause: target name
+     *  (2) PARTITION clause: column name
+     *
+     */
+    private static final Pattern PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE =
+        parsedStreamModifierClause().compile("PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE");
+
+    /**
      * DROP PROCEDURE  statement regex
      */
     private static final Pattern PAT_DROP_PROCEDURE = Pattern.compile(
@@ -274,6 +284,15 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
+     * Regex to parse the DROP STREAM statement.
+     * Capture group is tagged as (1) in comments below.
+     */
+    private static final Pattern PAT_DROP_STREAM =
+            SPF.statementLeader(
+                    SPF.token("drop"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exisit")))
+                    ).compile("PAT_DROP_STREAM");
+    /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
      */
@@ -301,6 +320,21 @@ public class SQLParser extends SQLPatternFactory
             ")?" +                              // end optional TO STREAM <export target> clause
             "\\s*;\\z"                          // (end statement)
             );
+
+    /*
+     * CREATE STREAM statement regex
+     *
+     * Capture groups:
+     *  (1) stream name
+     *  (2) optional target name
+     */
+    private static final Pattern PAT_CREATE_STREAM =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
+                    unparsedStreamModifierClauses(),
+                    SPF.anyColumnFields()
+            ).compile("PAT_CREATE_STREAM");
+
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
      *  one of create procedure, create role, drop procedure, drop role,
@@ -505,7 +539,9 @@ public class SQLParser extends SQLPatternFactory
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat DayDateParser = new SimpleDateFormat("yyyy-MM-dd");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
     private static final Map<String, String> FRIENDLY_TYPE_NAMES =
@@ -574,6 +610,16 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against drop stream pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropStream(String statement)
+    {
+        return PAT_DROP_STREAM.matcher(statement);
+    }
+
+    /**
      * Match statement against export table pattern
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -581,6 +627,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchExportTable(String statement)
     {
         return PAT_EXPORT_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against create stream pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateStream(String statement)
+    {
+        return PAT_CREATE_STREAM.matcher(statement);
     }
 
     /**
@@ -686,6 +742,16 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against pattern for export/partition clauses of create stream statement
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchAnyCreateStreamStatementClause(String statement)
+    {
+        return PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE.matcher(statement);
+    }
+
+    /**
      * Match statement against pattern for replicate table
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -764,6 +830,59 @@ public class SQLParser extends SQLPatternFactory
         return SPF.capture(SPF.repeat(makeInnerProcedureModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
 
+    /**
+     * Build a pattern segment to accept a single optional EXPORT or PARTITION clause
+     * to modify CREATE STREAM statements.
+     *
+     * @param captureTokens  Capture individual tokens if true
+     * @return               Inner pattern to be wrapped by the caller as appropriate
+     *
+     * Capture groups (when captureTokens is true):
+     *  (1) EXPORT clause: target name
+     *  (2) PARTITION clause: column name
+     */
+    private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
+    {
+        return
+            SPF.oneOf(
+                SPF.clause(
+                    SPF.token("export"),SPF.token("to"),SPF.token("target"),
+                    SPF.group(captureTokens,  SPF.databaseObjectName())
+                ),
+                SPF.clause(
+                    SPF.token("partition"), SPF.token("on"), SPF.token("column"),
+                    SPF.group(captureTokens, SPF.databaseObjectName())
+                )
+            );
+    }
+
+    /**
+     * Build a pattern segment to accept and parse a single optional EXPORT or PARTITION
+     * clause used to modify a CREATE STREAM statement.
+     *
+     * @return EXPORT/PARTITION modifier clause parsing pattern.
+     *
+     * Capture groups:
+     *  (1) EXPORT clause: target name     *
+     *  (2) PARTITION clause: column name
+     */
+    static SQLPatternPart parsedStreamModifierClause() {
+        return SPF.clause(makeInnerStreamModifierClausePattern(true));
+    }
+
+    /**
+     * Build a pattern segment to recognize all the EXPORT or PARTITION modifier clauses
+     * of a CREATE STREAM statement.
+     *
+     * @return Pattern to be used by the caller inside a CREATE STREAM pattern.
+     *
+     * Capture groups:
+     *  (1) All EXPORT/PARTITION modifier clauses as one string
+     */
+    private static SQLPatternPart unparsedStreamModifierClauses() {
+        // Force the leading space to go inside the repeat block.
+        return SPF.capture(SPF.repeat(makeInnerStreamModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
+    }
     //========== Other utilities from or for SQLCommand ==========
 
     /**
@@ -1359,23 +1478,26 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Parse a date string.
+     * Parse a date string.  We parse the documented forms, which are:
+     * <ul>
+     *   <li>YYYY-MM-DD</li>
+     *   <li>YYYY-MM-DD HH:MM:SS</li>
+     *   <li>YYYY-MM-DD HH:MM:SS.SSSSSS</li>
+     * </ul>
+     *
+     * As it turns out, TimestampType takes string parameters in just this
+     * format.  So, we defer to TimestampType, and return what it
+     * constructs.  This has microsecond granularity.
+     *
      * @param dateIn  input date string
-     * @return        Date object
+     * @return        TimestampType object
      * @throws SQLParser.Exception
      */
-    public static Date parseDate(String dateIn) throws SQLParser.Exception
+    public static TimestampType parseDate(String dateIn)
     {
-        // Don't ask... Java is such a crippled language!
-        DateParser.setLenient(true);
-
         // Remove any quotes around the timestamp value.  ENG-2623
-        try {
-            return DateParser.parse(dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
-        }
-        catch (ParseException e) {
-            throw new SQLParser.Exception(e);
-        }
+        String dateRepled = dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", "");
+        return new TimestampType(dateRepled);
     }
 
     public static GeographyPointValue parseGeographyPoint(String param) {

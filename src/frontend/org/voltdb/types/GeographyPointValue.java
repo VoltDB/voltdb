@@ -163,6 +163,19 @@ public class GeographyPointValue {
     }
 
     /**
+     * The largest number of characters needed to represent
+     * a point value as a string.
+     * @return number of characters needed for display
+     */
+    public static int getValueDisplaySize() {
+        return 7 // "POINT ("
+                + 1 + 3 + 1 + 12 // lng: sign, whole part, point, fraction digits
+                + 1 // space between coordinates
+                + 1 + 2 + 1 + 12 // lat: sign, whole part, point fraction digits
+                + 1; // ")"
+        }
+
+    /**
      * Compare this point with another object. Returns true
      * if this point is being compared to another point that
      * represents the same location.

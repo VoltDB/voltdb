@@ -32,12 +32,6 @@ import org.voltdb.*;
 import java.nio.ByteBuffer;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 
-@ProcInfo
-(
-  partitionInfo   = "store.key:0"
-, singlePartition = true
-)
-
 public class Put extends VoltProcedure
 {
     // Checks if key exists

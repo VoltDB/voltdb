@@ -49,7 +49,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include <iostream>
-#include <limits.h>
+#include <limits>
+#include <sstream>
 #include "harness.h"
 
 #include "expressions/abstractexpression.h"
@@ -87,6 +88,12 @@ struct FunctionTest : public Test {
                                   (AbstractDRTupleStream *)0,
                                   (AbstractDRTupleStream *)0,
                                   0) {}
+
+        /**
+         * A template for calling nullary function call expressions.
+         */
+        template <typename OUTPUT_TYPE>
+        int testNullary(int operation, OUTPUT_TYPE, bool expect_null = false);
         /**
          * A template for calling unary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to
@@ -96,12 +103,29 @@ struct FunctionTest : public Test {
         int testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output, bool expect_null = false);
 
         /**
+         * Similar to the above function, but returns "success" if the function threw a
+         * SQLException with the given input.
+         */
+        template <typename INPUT_TYPE>
+        std::string testUnaryThrows(int operation, INPUT_TYPE input, const std::string& expectedMessage);
+
+        /**
          * A template for calling binary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to
          * convert the T value to an NValue below.
          */
         template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
         int testBinary(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, OUTPUT_TYPE output, bool expect_null = false);
+
+        /**
+         * Similar to the above function, but returns "success" if the function threw a
+         * SQLException with the given inputs.
+         */
+        template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+        std::string testBinaryThrows(int operation,
+                                     LEFT_INPUT_TYPE left_input,
+                                     RIGHT_INPUT_TYPE right_input,
+                                     const std::string& expectedMessage);
 
         /**
          * A template for calling ternary functions.  This follows the pattern
@@ -116,6 +140,11 @@ private:
         ExecutorContext m_executorContext;
 };
 
+static NValue getSomeValue(const char* &val)
+{
+    return ValueFactory::getTempStringValue(std::string(val));
+}
+
 static NValue getSomeValue(const std::string &val)
 {
     return ValueFactory::getTempStringValue(val);
@@ -124,6 +153,85 @@ static NValue getSomeValue(const std::string &val)
 static NValue getSomeValue(const int64_t val)
 {
     return ValueFactory::getBigIntValue(val);
+}
+
+static NValue getSomeValue(const TTInt &val)
+{
+    return ValueFactory::getDecimalValueFromString(val.ToString());
+}
+
+/**
+ * C++ thinks bool is a kind of integer.  This means we can't really
+ * force it to disambiguate between "getSomeValue(False)" and
+ * "getSomeValue(100)" using only types.  This is logically unneeded,
+ * but it's pretty useful.
+ */
+enum Boolean {
+    False = 0,
+    True  = 1
+};
+
+static NValue getSomeValue(const Boolean value)
+{
+    return ValueFactory::getBooleanValue(static_cast<bool>(value));
+}
+
+static NValue& getSomeValue(NValue &val)
+{
+    return val;
+}
+
+// So that NValues can be dumped to stdout when
+// staticVerboseFlag is enabled below...
+std::ostream& operator<<(std::ostream& os, const NValue& val)
+{
+    os << val.debug();
+    return os;
+}
+
+/**
+ * Test a nullary function call.
+ * @returns: -1 if the result of the function evaluation is less than the expected result.
+ *            0 if the result of the function evaluation is as expected.
+ *            1 if the result of the function evaluation is greater than the expected result.
+ * Note that this function may throw an exception from the call to AbstractExpression::eval().
+ */
+template <typename OUTPUT_TYPE>
+int FunctionTest::testNullary(int operation,
+                              OUTPUT_TYPE output,
+                              bool expect_null) {
+    if (staticVerboseFlag) {
+        std::cout << "\n *** *** ***\n";
+        std::cout << "operation:     " << operation << std::endl;
+        std::cout << "Expected out:  " << output << std::endl;
+    }
+    // This is an empty vector, but functionFactory wants it.
+    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    AbstractExpression* const_exp = ExpressionUtil::functionFactory(operation, argument);
+    int cmpout;
+    NValue expected = getSomeValue(output);
+    NValue answer;
+    try {
+        answer = const_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        delete const_exp;
+        expected.free();
+        throw;
+    }
+    if (staticVerboseFlag) {
+        std::cout << ", answer: \"" << answer.debug() << "\""
+                  << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
+                  << ", comp:     " << std::dec << cmpout << std::endl;
+    }
+    delete const_exp;
+    expected.free();
+    return cmpout;
 }
 
 /**
@@ -136,6 +244,7 @@ static NValue getSomeValue(const int64_t val)
 template <typename INPUT_TYPE, typename OUTPUT_TYPE>
 int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output, bool expect_null) {
     if (staticVerboseFlag) {
+        std::cout << "\n *** *** ***\n";
         std::cout << "operation:     " << operation << std::endl;
         std::cout << "Operand:       " << input << std::endl;
         std::cout << "Expected out:  " << output << std::endl;
@@ -143,12 +252,12 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
     argument->push_back(const_val_exp);
-    AbstractExpression* bin_exp = ExpressionUtil::functionFactory(operation, argument);
+    AbstractExpression* unary_exp = ExpressionUtil::functionFactory(operation, argument);
     int cmpout;
     NValue expected = getSomeValue(output);
     NValue answer;
     try {
-        answer = bin_exp->eval();
+        answer = unary_exp->eval();
         if (expect_null) {
             // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
             cmpout = answer.isNull() ? 0 : 1;
@@ -156,7 +265,7 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
             cmpout = answer.compare(expected);
         }
     } catch (SQLException &ex) {
-        delete bin_exp;
+        delete unary_exp;
         expected.free();
         throw;
     }
@@ -166,10 +275,38 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
                   << ", comp:     " << std::dec << cmpout << std::endl;
     }
-    delete bin_exp;
+    delete unary_exp;
     expected.free();
     return cmpout;
 }
+
+template <typename INPUT_TYPE>
+std::string FunctionTest::testUnaryThrows(int operation,
+                                          INPUT_TYPE input,
+                                          const std::string& expectedMessage) {
+    std::string diagnostic = "success";
+    try {
+        testUnary(operation, input, -1);
+        diagnostic = "Failed to throw an exception";
+    }
+    catch (const SQLException& exc) {
+        if (exc.message().find(expectedMessage) == std::string::npos) {
+            diagnostic = "Expected message \"" + expectedMessage + "\", but found \"" +
+                exc.message() + "\"";
+        }
+    }
+    catch (...) {
+        diagnostic = "Caught some unexpected kind of exception";
+    }
+
+    if (diagnostic.compare("success") != 0) {
+        std::cerr << "\n***  " << diagnostic << "  ***\n";
+    }
+
+    return diagnostic;
+}
+
+
 /**
  * Test a binary function call expression.
  * @returns: -1 if the result of the function evaluation is less than the expected result.
@@ -218,6 +355,36 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
     delete bin_exp;
     return cmpout;
 }
+
+template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE>
+std::string FunctionTest::testBinaryThrows(int operation,
+                                           LEFT_INPUT_TYPE left_input,
+                                           RIGHT_INPUT_TYPE right_input,
+                                           const std::string& expectedMessage) {
+    std::string diagnostic = "success";
+    try {
+        testBinary(operation, left_input, right_input, -1);
+        diagnostic = "Failed to throw an exception";
+    }
+    catch (const SQLException& exc) {
+        if (exc.message().find(expectedMessage) == std::string::npos) {
+            diagnostic = "Expected message \"" + expectedMessage + "\", but found \"" +
+                exc.message() + "\"";
+        }
+    }
+    catch (...) {
+        diagnostic = "Caught some unexpected kind of exception";
+    }
+
+    if (diagnostic.compare("success") != 0) {
+        std::cerr << "\n***  " << diagnostic << "  ***\n";
+    }
+
+    return diagnostic;
+
+}
+
+
 
 /**
  * Test a ternary function call expression.
@@ -320,6 +487,66 @@ TEST_F(FunctionTest, NaturalLogTest) {
     } catch(SQLException &sqlExcp) {
         const char *errMsg = sqlExcp.message().c_str();
         sawExecption = (strncmp(errMsg, "Invalid result value (-inf)", strlen(errMsg)) >= 0)? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+}
+
+TEST_F(FunctionTest, NaturalLog10Test) {
+    ASSERT_EQ(testUnary(FUNC_LOG10, 100, 2), 0);
+    ASSERT_EQ(testUnary(FUNC_LOG10, 100.0, 2.0), 0);
+
+    //invalid parameter value
+    bool sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, -100, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+
+    //invalid parameter value
+    sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, -1, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+
+    //invalid parameter type
+    sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, "100", 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+}
+
+TEST_F(FunctionTest, NaturalModTest) {
+    ASSERT_EQ(testBinary(FUNC_MOD, 2, 1, 0), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, 3, 2, 1), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, 0, 2, 0), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("2.0"), TTInt("1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("-2.0"), TTInt("1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("-2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("-7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
+
+    //invalid parameter value
+    bool sawExecption = false;
+    try {
+        testBinary(FUNC_MOD, "-100", 3, 1);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg,
+            "unsupported non-numeric type for SQL MOD function", strlen(errMsg)) >= 0) ? true : false;
     }
     ASSERT_EQ(sawExecption, true);
 }
@@ -511,9 +738,327 @@ TEST_F(FunctionTest, RegularExpressionMatch) {
     ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[a-z]家", 0), 0);
 }
 
+static NValue timestampFromString(const std::string& dateString) {
+    return ValueFactory::getTimestampValue(NValue::parseTimestampString(dateString));
+}
+
+static const NValue nullTimestamp = ValueFactory::getTimestampValue(std::numeric_limits<int64_t>::min());
+static const NValue minInt64 = ValueFactory::getTimestampValue(std::numeric_limits<int64_t>::min() + 1);
+static const NValue tooSmallTimestamp = ValueFactory::getTimestampValue(GREGORIAN_EPOCH - 1);
+static const NValue minValidTimestamp = ValueFactory::getTimestampValue(GREGORIAN_EPOCH);
+static const NValue maxValidTimestamp = ValueFactory::getTimestampValue(NYE9999);
+static const NValue tooBigTimestamp = ValueFactory::getTimestampValue(NYE9999 + 1);
+static const NValue maxInt64 = ValueFactory::getTimestampValue(std::numeric_limits<int64_t>::max());
+
+static const std::string outOfRangeMessage = "Value out of range. Cannot convert dates prior to the year 1583 or after the year 9999";
+
+TEST_F(FunctionTest, DateFunctionsTruncate) {
+    std::vector<int> funcs {
+        FUNC_TRUNCATE_YEAR,
+        FUNC_TRUNCATE_QUARTER,
+        FUNC_TRUNCATE_MONTH,
+        FUNC_TRUNCATE_DAY,
+        FUNC_TRUNCATE_HOUR,
+        FUNC_TRUNCATE_MINUTE,
+        FUNC_TRUNCATE_SECOND,
+        FUNC_TRUNCATE_MILLISECOND,
+        FUNC_TRUNCATE_MICROSECOND
+    };
+
+    std::vector<string> maxExpected {
+        "9999-01-01",                 // year
+        "9999-10-01",                 // quarter
+        "9999-12-01",                 // month
+        "9999-12-31",                 // day
+        "9999-12-31 23:00:00.000000", // hour
+        "9999-12-31 23:59:00.000000", // minute
+        "9999-12-31 23:59:59.000000", // second
+        "9999-12-31 23:59:59.999000", // millisecond
+        "9999-12-31 23:59:59.999999"  // microsecond
+    };
+
+    int i = 0;
+    BOOST_FOREACH(int func, funcs) {
+        ASSERT_EQ(testUnary(func, nullTimestamp, nullTimestamp, true), 0);
+        ASSERT_EQ("success", testUnaryThrows(func, minInt64, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, tooSmallTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, tooBigTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, maxInt64, outOfRangeMessage));
+
+        // truncate on the min valid timestamp is always a no-op,
+        // except for bug ENG-10507, which is related to TRUNCATE MILLISECOND.
+        if (func != FUNC_TRUNCATE_MILLISECOND) {
+            ASSERT_EQ(testUnary(func, minValidTimestamp, minValidTimestamp), 0);
+        }
+        else {
+            ASSERT_EQ(testUnary(func, minValidTimestamp, minValidTimestamp), -1);
+        }
+
+        ASSERT_EQ(testUnary(func, maxValidTimestamp,
+                            timestampFromString(maxExpected[i])), 0);
+
+        ++i;
+    }
+}
+
+TEST_F(FunctionTest, DateFunctionsExtract) {
+
+    std::vector<int> funcs {
+        FUNC_EXTRACT_YEAR,
+        FUNC_EXTRACT_MONTH,
+        FUNC_EXTRACT_DAY,
+        FUNC_EXTRACT_DAY_OF_WEEK,
+        FUNC_EXTRACT_WEEKDAY,
+        FUNC_EXTRACT_WEEK_OF_YEAR,
+        FUNC_EXTRACT_DAY_OF_YEAR,
+        FUNC_EXTRACT_QUARTER,
+        FUNC_EXTRACT_HOUR,
+        FUNC_EXTRACT_MINUTE,
+        FUNC_EXTRACT_SECOND
+    };
+
+    std::vector<int> minExpected {
+        1583, // year
+        1,    // month
+        1,    // day
+        7,    // day of week: Saturday
+        5,    // weekday: Saturday
+        52,   // week of year (consistent with ISO-8601)
+        1,    // day of year
+        1,    // quarter
+        0,    // hour
+        0,    // minute
+        0     // second
+    };
+
+    std::vector<int> maxExpected {
+        9999, // year
+        12,   // month
+        31,   // day
+        6,    // day of week: Friday
+        4,    // weekday: Friday
+        52,   // week of year
+        365,  // day of year
+        4,    // quarter
+        23,   // hour
+        59,   // minute
+        -1    // second  (EXTRACT second produces a decimal, see below)
+    };
+
+    int i = 0;
+    BOOST_FOREACH(int func, funcs) {
+        ASSERT_EQ("success", testUnaryThrows(func, minInt64, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, tooSmallTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, tooBigTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, maxInt64, outOfRangeMessage));
+
+        ASSERT_EQ(testUnary(func, nullTimestamp, nullTimestamp, true), 0);
+
+        ASSERT_EQ(testUnary(func, minValidTimestamp, minExpected[i]), 0);
+
+        if (func != FUNC_EXTRACT_SECOND) {
+            ASSERT_EQ(testUnary(func, maxValidTimestamp, maxExpected[i]), 0);
+        }
+        else {
+            ASSERT_EQ(testUnary(func, maxValidTimestamp,
+                                ValueFactory::getDecimalValueFromString("59.999999")), 0);
+        }
+
+        ++i;
+    }
+}
+
+TEST_F(FunctionTest, DateFunctionsAdd) {
+    const std::string intervalTooLargeMsg = "interval is too large for DATEADD function";
+
+    std::vector<int> funcs {
+        FUNC_VOLT_DATEADD_YEAR,
+        FUNC_VOLT_DATEADD_QUARTER,
+        FUNC_VOLT_DATEADD_MONTH,
+        FUNC_VOLT_DATEADD_DAY,
+        FUNC_VOLT_DATEADD_HOUR,
+        FUNC_VOLT_DATEADD_MINUTE,
+        FUNC_VOLT_DATEADD_SECOND,
+        FUNC_VOLT_DATEADD_MILLISECOND,
+        FUNC_VOLT_DATEADD_MICROSECOND
+    };
+
+    std::vector<int64_t> maxIntervals {
+        PTIME_MAX_YEAR_INTERVAL,
+        PTIME_MAX_QUARTER_INTERVAL,
+        PTIME_MAX_MONTH_INTERVAL,
+        PTIME_MAX_DAY_INTERVAL,
+        PTIME_MAX_HOUR_INTERVAL,
+        PTIME_MAX_MINUTE_INTERVAL,
+        PTIME_MAX_SECOND_INTERVAL,
+        PTIME_MAX_MILLISECOND_INTERVAL,
+        PTIME_MAX_MICROSECOND_INTERVAL
+    };
+
+    std::vector<int64_t> minIntervals {
+        PTIME_MIN_YEAR_INTERVAL,
+        PTIME_MIN_QUARTER_INTERVAL,
+        PTIME_MIN_MONTH_INTERVAL,
+        PTIME_MIN_DAY_INTERVAL,
+        PTIME_MIN_HOUR_INTERVAL,
+        PTIME_MIN_MINUTE_INTERVAL,
+        PTIME_MIN_SECOND_INTERVAL,
+        PTIME_MIN_MILLISECOND_INTERVAL,
+        PTIME_MIN_MICROSECOND_INTERVAL
+    };
+
+    int i = 0;
+    BOOST_FOREACH(int func, funcs) {
+        // test null values
+        ASSERT_EQ(0, testBinary(func, 1, nullTimestamp, nullTimestamp, true));
+        ASSERT_EQ(0, testBinary(func, NValue::getNullValue(VALUE_TYPE_BIGINT),
+                                minValidTimestamp, nullTimestamp, true));
+
+        ASSERT_EQ("success", testBinaryThrows(func, 1, minInt64, outOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, tooSmallTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, tooBigTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, maxInt64, outOfRangeMessage));
+
+        ASSERT_EQ("success", testBinaryThrows(func, maxIntervals[i] + 1,
+                                              minValidTimestamp, intervalTooLargeMsg));
+        ASSERT_EQ("success", testBinaryThrows(func, minIntervals[i] - 1,
+                                              maxValidTimestamp, intervalTooLargeMsg));
+
+        ASSERT_EQ(testBinary(func, 0, minValidTimestamp, minValidTimestamp), 0);
+        ASSERT_EQ(testBinary(func, 0, maxValidTimestamp, maxValidTimestamp), 0);
+
+        // This just asserts that if we add 1 unit (year, month, whatever)
+        // that the result is larger than the input.
+        ASSERT_EQ(testBinary(func, 1, minValidTimestamp, minValidTimestamp), 1);
+
+        // Likewise for subtracting a unit
+        ASSERT_EQ(testBinary(func, -1, maxValidTimestamp, maxValidTimestamp), -1);
+
+        ++i;
+    }
+}
+
+static const int64_t MIN_INT64 = std::numeric_limits<int64_t>::min() + 1;
+static const int64_t MAX_INT64 = std::numeric_limits<int64_t>::max();
+
+
+TEST_F(FunctionTest, DateFunctionsSinceEpoch) {
+    std::vector<int> funcs {
+        FUNC_SINCE_EPOCH_SECOND,
+        FUNC_SINCE_EPOCH_MILLISECOND,
+        FUNC_SINCE_EPOCH_MICROSECOND
+    };
+
+    std::vector<int> scale {
+        1000000,
+        1000,
+        1
+    };
+
+    int i = 0;
+    BOOST_FOREACH(int func, funcs) {
+        ASSERT_EQ(0, testUnary(func, nullTimestamp, nullTimestamp, true));
+
+        // SINCE_EPOCH does no range checking on timestamps, just simple division
+        // by 1, 1000 or 1000000.  Therefore it doesn't throw an exception for
+        // out of range values.
+
+        ASSERT_EQ(0, testUnary(func, minInt64, MIN_INT64 / scale[i]));
+        ASSERT_EQ(0, testUnary(func, tooSmallTimestamp, (GREGORIAN_EPOCH-1) / scale[i]));
+        ASSERT_EQ(0, testUnary(func, minValidTimestamp, GREGORIAN_EPOCH / scale[i]));
+        ASSERT_EQ(0, testUnary(func, maxValidTimestamp, NYE9999 / scale[i]));
+        ASSERT_EQ(0, testUnary(func, tooBigTimestamp, (NYE9999+1) / scale[i]));
+        ASSERT_EQ(0, testUnary(func, maxInt64, MAX_INT64 / scale[i]));
+
+        ++i;
+    }
+}
+
+TEST_F(FunctionTest, DateFunctionsToTimestamp) {
+    const std::string overflowMessage = "Input to TO_TIMESTAMP would overflow TIMESTAMP data type";
+
+    std::vector<int> funcs {
+        FUNC_TO_TIMESTAMP_SECOND,
+        FUNC_TO_TIMESTAMP_MILLISECOND,
+        FUNC_TO_TIMESTAMP_MICROSECOND
+    };
+
+    std::vector<int> scale {
+        1000000,
+        1000,
+        1
+    };
+
+    const NValue nullBigint = NValue::getNullValue(VALUE_TYPE_NULL);
+
+    int i = 0;
+    BOOST_FOREACH(int func, funcs) {
+        ASSERT_EQ(0, testUnary(func, nullBigint, nullTimestamp, true));
+
+        // These functions really just multiply their argument by a constant
+        // and produce a timestamp, so there are no range checks, except to avoid
+        // overflow of the 64-bit timestamp storage.
+
+        if (scale[i] != 1) {
+            ASSERT_EQ("success", testUnaryThrows(func, MIN_INT64, overflowMessage));
+            ASSERT_EQ("success", testUnaryThrows(func, (MIN_INT64 / scale[i]) - 1, overflowMessage));
+            ASSERT_EQ("success", testUnaryThrows(func, MAX_INT64, overflowMessage));
+            ASSERT_EQ("success", testUnaryThrows(func, (MAX_INT64 / scale[i]) + 1, overflowMessage));
+        }
+
+        const int64_t TRUNCATED_MIN_INT64 = (MIN_INT64 / scale[i]) * scale[i];
+        const int64_t TRUNCATED_MIN_VALID_TS = (GREGORIAN_EPOCH / scale[i]) * scale[i];
+        const int64_t TRUNCATED_MAX_VALID_TS = (NYE9999 / scale[i]) * scale[i];
+        const int64_t TRUNCATED_MAX_INT64 = (MAX_INT64 / scale[i]) * scale[i];
+
+        ASSERT_EQ(0, testUnary(func, MIN_INT64 / scale[i],
+                               ValueFactory::getTimestampValue(TRUNCATED_MIN_INT64)));
+        ASSERT_EQ(0, testUnary(func, GREGORIAN_EPOCH / scale[i],
+                               ValueFactory::getTimestampValue(TRUNCATED_MIN_VALID_TS)));
+        ASSERT_EQ(0, testUnary(func, NYE9999/ scale[i],
+                               ValueFactory::getTimestampValue(TRUNCATED_MAX_VALID_TS)));
+        ASSERT_EQ(0, testUnary(func, MAX_INT64 / scale[i],
+                               ValueFactory::getTimestampValue(TRUNCATED_MAX_INT64)));
+
+        ++i;
+    }
+}
+
+TEST_F(FunctionTest, TestTimestampValidity)
+{
+    // Test the two constant functions.
+    ASSERT_EQ(0, testNullary(FUNC_VOLT_MIN_VALID_TIMESTAMP,
+                             ValueFactory::getTimestampValue(GREGORIAN_EPOCH)));
+    ASSERT_EQ(0, testNullary(FUNC_VOLT_MAX_VALID_TIMESTAMP,
+                             ValueFactory::getTimestampValue(NYE9999)));
+    // Test of of range below.
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(GREGORIAN_EPOCH - 1000),
+                           False));
+    // Test out of range above.
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(NYE9999 + 1000),
+                           False));
+    // Test in range, including the endpoints
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(0),
+                           True));
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(GREGORIAN_EPOCH),
+                           True));
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           ValueFactory::getTimestampValue(NYE9999),
+                           True));
+    // Test null input
+    ASSERT_EQ(0, testUnary(FUNC_VOLT_IS_VALID_TIMESTAMP,
+                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
+                           NValue::getNullValue(VALUE_TYPE_TIMESTAMP),
+                           True));
+}
+
 int main(int argc, char **argv) {
     for (argv++; *argv; argv++) {
-        if (strcmp(*argv, "--verbose")) {
+        if (strcmp(*argv, "--verbose") == 0) {
             staticVerboseFlag = true;
         } else {
             std::cerr << "Unknown command line parameter: " << *argv << std::endl;

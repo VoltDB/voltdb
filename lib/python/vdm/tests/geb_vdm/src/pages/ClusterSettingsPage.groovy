@@ -1,31 +1,19 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import geb.Page
 
@@ -44,6 +32,7 @@ class ClusterSettingsPage extends Page {
 
         // Add Server Popup
         popupAddServer                          { $("#addServer > div > div") }
+        popupAddServerDetails                   { $("#accordion > div > div.panel-heading > h4 > a") }
         popupAddServerNameField                 { $("#serverName") }
         popupAddServerHostNameField             { $("#txtHostName") }
         popupAddServerDescriptionField          { $("#txtDescription") }
@@ -95,15 +84,13 @@ class ClusterSettingsPage extends Page {
         overview        { module OverviewModule }
         directories     { module DirectoriesModule }
         dr              { module DatabaseReplicationModule }
-
-        // trial
-        trialerror      { $("#serverList > tbody > tr > td:nth-child(1)") }
     }
 
     static at = {
 //        waitFor(30) { clusterSettingsTab.isDisplayed() }
         //      waitFor(30) { serverSettingsTab.isDisplayed() }
     }
+
 
     /*
      *  Return the id of Server with index as input
@@ -218,8 +205,13 @@ class ClusterSettingsPage extends Page {
 
         for (count = 0; count < numberOfTrials; count++) {
             try {
+                try {
+                    waitFor { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -275,6 +267,14 @@ class ClusterSettingsPage extends Page {
 
         for(count=0; count<numberOfTrials; count++) {
             try {
+                for(nextCount=0; nextCount<numberOfTrials; nextCount++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
                 $(id:deleteId).click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
@@ -328,10 +328,19 @@ class ClusterSettingsPage extends Page {
      *  Choose the database with given index and name
      */
     boolean chooseDatabase(int indexOfNewDatabase, String newDatabaseName) {
+        int countNext = 0
         for (count = 0; count < numberOfTrials; count++) {
             try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
                 $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
-                waitFor(60) { currentDatabase.text().equals(newDatabaseName) }
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
                 return true
             } catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
@@ -339,7 +348,7 @@ class ClusterSettingsPage extends Page {
                 println("Stale Element exception - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException exception) {
                 try {
-                    waitFor(60) { currentDatabase.text().equals(newDatabaseName) }
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
                     return true
                 } catch (geb.waiting.WaitTimeoutException exc) {
                     println("Waiting - Retrying")
@@ -385,7 +394,6 @@ class ClusterSettingsPage extends Page {
                     }
                 }
                 else if(count==0) {
-                    println("new")
                     try {
                         waitFor(30) { !saveStatus.isDisplayed() }
                     } catch (geb.waiting.WaitTimeoutException exc) {
@@ -542,4 +550,7 @@ class ClusterSettingsPage extends Page {
         }
         return cssPath
     }
+
+
+
 }

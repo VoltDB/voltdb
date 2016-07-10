@@ -244,7 +244,7 @@ public abstract class VoltProcedure {
      * @see <a href="#allowable_params">List of allowable parameter types</a>
      */
     public void voltQueueSQL(final SQLStmt stmt, Object... args) {
-        m_runner.voltQueueSQL(stmt, args);
+        m_runner.voltQueueSQL(stmt, (Expectation) null, args);
     }
 
     /**
@@ -286,7 +286,7 @@ public abstract class VoltProcedure {
     }
 
     /**
-     * Set the string that will be turned to the client. This is not the same as teh status string
+     * Set the string that will be turned to the client. This is not the same as the status string
      * returned by the server. If a procedure sets the status string and then rolls back or causes an error
      * the status string will still be propagated back to the client so it is always necessary to check
      * the server status code first.

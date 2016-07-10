@@ -19,7 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -27,8 +27,10 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -155,20 +157,21 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // Index join will have to override this method.
         // Assert and provide functionality for generic join
         assert(m_children.size() == 2);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.generateOutputSchema(db);
         }
+
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractExpression expr : subqueryExpressions) {
+            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        }
+
         // Join the schema together to form the output schema
         m_outputSchemaPreInlineAgg =
             m_children.get(0).getOutputSchema().
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
-
-        // Generate the output schema for subqueries
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
         generateRealOutputSchema(db);
     }
@@ -195,8 +198,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         IndexScanPlanNode index_scan =
             (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(m_children.size() == 2 && index_scan == null);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
@@ -208,50 +210,39 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
 
-        // need to order the combined input schema coherently.  We make the
-        // output schema ordered: [outer table columns][inner table columns]
-        TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
-        {
-            // Right now these all need to be TVEs
+        // Resolve subquery expression indexes
+        resolveSubqueryColumnIndexes();
+
+        // Resolve TVE indexes for each schema column.
+        for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
+            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumns().get(i);
+
+            // These will all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
-            if (index == -1)
-            {
+            int index;
+            if (i < outer_schema.size()) {
+                index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+            }
+            else {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
+            }
+
+            if (index == -1) {
+                throw new RuntimeException("Unable to find index for column: " +
                                                col.toString());
-                }
-                sort_cols.put(index + outer_schema.size(), col);
             }
-            else
-            {
-                sort_cols.put(index, col);
-            }
+
             tve.setColumnIndex(index);
         }
-        // rebuild the output schema from the tree-sorted columns
-        NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
-            new_output_schema.addColumn(col);
-        }
-        m_outputSchemaPreInlineAgg = new_output_schema;
+
+        // We want the output columns to be ordered like [outer table columns][inner table columns],
+        // and further ordered by TVE index within the left- and righthand sides.
+        // generateOutputSchema already places outer columns on the left and inner on the right,
+        // so we just need to order the left- and righthand sides by TVE index separately.
+        m_outputSchemaPreInlineAgg.sortByTveIndex(0, outer_schema.size());
+        m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
-
-        // Finally, resolve predicates
-        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
-
-        // Resolve subquery expression indexes
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
         resolveRealOutputSchema();
     }
@@ -288,6 +279,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     // right now, only consider the sort direction on the outer table
     public void resolveSortDirection() {
         AbstractPlanNode outerTable = m_children.get(0);
+        if (m_joinType == JoinType.FULL) {
+            // Disable the usual optimizations for ordering join output by
+            // outer table only. In case of FULL join, the unmatched inner table tuples
+            // get appended to the end of the join's output table thus invalidating
+            // the outer table join order.
+            m_sortDirection = SortDirectionType.INVALID;
+            return;
+        }
         if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
             m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
             return;
@@ -389,13 +388,85 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_preJoinPredicate, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_joinPredicate, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_wherePredicate, aeClass));
-        return collected;
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_preJoinPredicate != null) {
+            collected.addAll(m_preJoinPredicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_joinPredicate != null) {
+            collected.addAll(m_joinPredicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_wherePredicate != null) {
+            collected.addAll(m_wherePredicate.findAllSubexpressionsOfClass(aeClass));
+        }
     }
 
+    /**
+     * Discount join node child estimates based on the number of its filters
+     *
+     * @param childNode
+     * @return discounted estimates
+     */
+    protected long discountEstimatedProcessedTupleCount(AbstractPlanNode childNode) {
+        // Discount estimated processed tuple count for the outer child based on the number of
+        // filter expressions this child has with a rapidly diminishing effect
+        // that ranges from a discount of 0.09 (ORETATION_EQAUL)
+        // or 0.045 (all other expression types) for one post filter to a max discount approaching
+        // 0.888... (=8/9) for many EQUALITY filters.
+        // The discount value is less than the partial index discount (0.1) to make sure
+        // the index wins
+        AbstractExpression predicate = null;
+        if (childNode instanceof AbstractScanPlanNode) {
+            predicate = ((AbstractScanPlanNode) childNode).getPredicate();
+        } else if (childNode instanceof NestLoopPlanNode) {
+            predicate = ((NestLoopPlanNode) childNode).getWherePredicate();
+        } else if (childNode instanceof NestLoopIndexPlanNode) {
+            AbstractPlanNode inlineIndexScan = ((NestLoopIndexPlanNode) childNode).getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            assert(inlineIndexScan != null);
+            predicate = ((AbstractScanPlanNode) inlineIndexScan).getPredicate();
+        } else {
+            return childNode.getEstimatedProcessedTupleCount();
+        }
+
+        if (predicate == null) {
+            return childNode.getEstimatedProcessedTupleCount();
+        }
+
+        List<AbstractExpression> predicateExprs = ExpressionUtil.uncombinePredicate(predicate);
+        // Counters to count the number of equality and all other expressions
+        int eqCount = 0;
+        int otherCount = 0;
+        final double MAX_EQ_POST_FILTER_DISCOUNT = 0.09;
+        final double MAX_OTHER_POST_FILTER_DISCOUNT = 0.045;
+        double discountCountFactor = 1.0;
+        // Discount tuple count.
+        for (AbstractExpression predicateExpr: predicateExprs) {
+            if (ExpressionType.COMPARE_EQUAL == predicateExpr.getExpressionType()) {
+                discountCountFactor -= Math.pow(MAX_EQ_POST_FILTER_DISCOUNT, ++eqCount);
+            } else {
+                discountCountFactor -= Math.pow(MAX_OTHER_POST_FILTER_DISCOUNT, ++otherCount);
+            }
+        }
+        return  (long) (childNode.getEstimatedProcessedTupleCount() * discountCountFactor);
+    }
+
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * Resolution of columns produced by "SELECT *" is not a problem for joins because
+     * there is always a sequential scan at the top of plans that have this problem,
+     * so just return the passed-in differentiator here.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    @Override
+    public int adjustDifferentiatorField(int differentiator) {
+        return differentiator;
+    }
 }

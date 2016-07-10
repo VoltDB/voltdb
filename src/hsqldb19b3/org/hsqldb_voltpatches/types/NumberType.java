@@ -1847,6 +1847,13 @@ public final class NumberType extends Type {
 
                  return ValuePool.getDouble(Double.doubleToLongBits(ad % bd));
              }
+            case Types.SQL_DECIMAL : {
+                if ((b).equals(0)) {
+                     throw Error.error(ErrorCode.X_22012);
+                }
+
+                return ValuePool.getBigDecimal(((BigDecimal) a).remainder((BigDecimal) b));
+             }
              case Types.TINYINT :
              case Types.SQL_SMALLINT :
              case Types.SQL_INTEGER : {

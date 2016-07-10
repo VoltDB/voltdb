@@ -48,6 +48,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     @Shared def existingViews = []
     @Shared def existingStoredProcs = []
     @Shared def newExportTables = []
+    @Shared def newStreams = []
     @Shared def newRoles = []
     @Shared def errors = [:]
 
@@ -91,12 +92,13 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
                 }
                 startStatementAtLine = i + 1
                 // DDL statements that do not include certain key phrases
-                // ("CREATE TABLE", "CREATE ROLE", "CREATE PROCEDURE", "EXPORT TABLE")
+                // ("CREATE TABLE", "CREATE ROLE", "CREATE STREAM", "EXPORT TABLE")
                 // should be combined with the previous statement; otherwise, we
                 // end up with a huge number of tests, which slows things down)
                 String statementUpper = statement.toUpperCase()
                 if (fullDdlSqlStatements && !statementUpper.contains('CREATE TABLE') &&
                         !statementUpper.contains('CREATE ROLE') &&
+                        !statementUpper.contains('CREATE STREAM') &&
                         !statementUpper.contains('EXPORT TABLE')) {
                     int len = fullDdlSqlStatements.size()
                     fullDdlSqlStatements.set(len-1, fullDdlSqlStatements[len-1] + '\n' + statement)
@@ -149,18 +151,20 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         newTables.removeAll(existingTables)
         newViews.removeAll(existingViews)
         newStoredProcs.removeAll(existingStoredProcs)
+        debugPrint '\nNew Roles (to be dropped):\n' + newRoles
         debugPrint '\nNew Tables (to be dropped):\n' + newTables
         debugPrint '\nNew Export Tables (to be dropped):\n' + newExportTables
+        debugPrint '\nNew Streams (to be dropped):\n' + newStreams
         debugPrint '\nNew Views (to be dropped):\n' + newViews
         debugPrint '\nNew User Stored Procedures (to be dropped):\n' + newStoredProcs
-        debugPrint '\nNew Roles (to be dropped):\n' + newRoles
 
         // Drop all the new roles, tables, export tables, views & (user) Stored
         // Procedures that were created by this test
         newStoredProcs.each { runQuery(page, 'Drop procedure ' + it + ' if exists') }
         newViews.each { runQuery(page, 'Drop view ' + it + ' if exists') }
-        newTables.each { runQuery(page, 'Drop table ' + it + ' if exists') }
+        newStreams.each { runQuery(page, 'Drop stream ' + it + ' if exists') }
         newExportTables.each { runQuery(page, 'Drop table ' + it + ' if exists') }
+        newTables.each { runQuery(page, 'Drop table ' + it + ' if exists') }
         newRoles.each { runQuery(page, 'Drop role ' + it + ' if exists') }
     }
 
@@ -227,6 +231,9 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         // Keep track of CREATE ROLE statements
         if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('ROLE')) {
             newRoles.add(getTableOrRoleName(statement, 'ROLE'))
+        // Keep track of CREATE STREAM statements
+        } else if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('STREAM')) {
+            newStreams.add(getTableOrRoleName(statement, 'STREAM'))
         // Keep track of EXPORT TABLE statements
         } else if (statementUpperCase.contains('EXPORT') && statementUpperCase.contains('TABLE')) {
             newExportTables.add(getTableOrRoleName(statement, 'TABLE'))

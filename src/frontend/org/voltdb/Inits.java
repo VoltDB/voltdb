@@ -45,7 +45,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
+import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -69,6 +71,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
+    final NodeStateTracker m_statusTracker;
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
@@ -112,16 +115,13 @@ public class Inits {
         }
     }
 
-    Inits(RealVoltDB rvdb, int threadCount) {
+    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
+        m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction.doesRejoin()) {
-            m_isRejoin = true;
-        } else {
-            m_isRejoin = false;
-        }
+        m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
@@ -472,16 +472,22 @@ public class Inits {
 
             boolean success = false;
             int httpPort = httpPortStart;
+            HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
+                    m_deployment.getHttpd().getHttps() : null;
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
                             );
                     success = true;
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        if (httpsType != null && httpsType.isEnabled()) {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
+                        } else {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        }
                         System.exit(-1);
                     }
                 }
@@ -508,8 +514,14 @@ public class Inits {
             // by the deployment.xml configuration.
             int httpPort = -1;
             m_rvdb.m_jsonEnabled = false;
+            boolean httpsEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                httpPort = m_deployment.getHttpd().getPort();
+                if (m_deployment.getHttpd().getHttps()!=null && m_deployment.getHttpd().getHttps().isEnabled()) {
+                    httpsEnabled = true;
+                }
+                httpPort = (m_deployment.getHttpd().getPort()==null) ?
+                        (httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
+                        m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getJsonapi() != null) {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
@@ -520,7 +532,7 @@ public class Inits {
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
-                httpPort = VoltDB.DEFAULT_HTTP_PORT;
+                httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
                 setupHttpServer("", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
@@ -557,6 +569,10 @@ public class Inits {
                 adminPort = m_config.m_adminPort;
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
+            //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
+            if (m_config.m_isPaused) {
+                m_rvdb.setStartMode(OperationMode.PAUSED);
+            }
         }
     }
 
@@ -625,6 +641,7 @@ public class Inits {
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
+                        (m_config.m_startAction==StartAction.CREATE && m_config.m_forceVoltdbCreate),
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );
@@ -728,7 +745,9 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-
+                if (catalog != null) {
+                    m_statusTracker.setNodeState(NodeState.RECOVERING);
+                }
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {
