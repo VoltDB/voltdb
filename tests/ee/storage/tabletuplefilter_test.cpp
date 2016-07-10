@@ -42,6 +42,8 @@ namespace voltdb {
 class TableTupleFilterTest : public Test
 {
 public:
+    static const int NUM_OF_TUPLES = 50000;
+
     TableTupleFilterTest()
         : m_tempTable(createTempTable())
     {
@@ -93,7 +95,6 @@ private:
         }
     }
 
-    static const int NUM_OF_TUPLES = 50000;
     boost::scoped_ptr<TempTable> m_tempTable;
 };
 
@@ -104,6 +105,10 @@ TEST_F(TableTupleFilterTest, tableTupleFilterTest)
     TempTable* table = getTempTable();
     TableTupleFilter tableFilter;
     tableFilter.init(table);
+
+    int tuplePerBlock = table->getTuplesPerBlock();
+    // make sure table spans more than one block
+    ASSERT_TRUE(NUM_OF_TUPLES / tuplePerBlock > 1);
 
     TableTuple tuple = table->tempTuple();
     TableIterator iterator = table->iterator();
