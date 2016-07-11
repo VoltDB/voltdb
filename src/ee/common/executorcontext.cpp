@@ -253,6 +253,14 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
     m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
 }
 
+/**
+ * To open DR stream to start binary logging for a transaction at this level,
+ *   1. It needs to be a multipartition transaction.
+ *   2. It is NOT a read-only transaction as it generates no data change on any partition.
+ *
+ * For single partition transactions, DR stream's binary logging is handled as is
+ * at persistenttable level.
+ */
 void ExecutorContext::checkTransactionForDR() {
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
         if (dynamic_cast<DRTupleStream *>(m_drStream)) {

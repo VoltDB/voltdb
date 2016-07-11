@@ -519,7 +519,7 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     }
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
-    while (type != DR_RECORD_END_TXN) { // FIXME empty BEGIN/END binary log entry for multi-partition transaction
+    while (type != DR_RECORD_END_TXN) {
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
                 txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
