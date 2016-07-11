@@ -96,7 +96,8 @@ public class AsyncBinaryDeque {
             @Override
             public BBContainer call() throws Exception {
                 try {
-                    return m_deque.poll(ocf);
+                    // MJ TODO:
+                    return m_deque.poll("test", ocf);
                 } finally {
                     releasePermit();
                 }
@@ -140,7 +141,8 @@ public class AsyncBinaryDeque {
             @Override
             public Boolean call() throws Exception {
                 try {
-                    return m_deque.isEmpty();
+                    // MJ TODO:
+                    return m_deque.isEmpty("test");
                 } finally {
                     releasePermit();
                 }
@@ -154,7 +156,8 @@ public class AsyncBinaryDeque {
             @Override
             public Long call() throws Exception {
                 try {
-                    return m_deque.sizeInBytes();
+                    // MJ TODO:
+                    return m_deque.sizeInBytes("test");
                 } finally {
                     releasePermit();
                 }
@@ -183,7 +186,8 @@ public class AsyncBinaryDeque {
             @Override
             public Object call() throws Exception {
                 try {
-                    m_deque.parseAndTruncate(truncator);
+                    // MJ TODO:
+                    m_deque.parseAndTruncate("test", truncator);
                     return null;
                 } finally {
                     releasePermit();

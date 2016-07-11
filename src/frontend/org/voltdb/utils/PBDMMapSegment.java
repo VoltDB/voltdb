@@ -93,7 +93,8 @@ class PBDMMapSegment extends PBDSegment {
     @Override
     public int getNumEntries() throws IOException {
         if (m_closed) {
-            open(false);
+            // MJ TODO:
+            openForRead("test");
         }
         if (m_fc.size() > SEGMENT_HEADER_BYTES) {
             return m_buf.b().getInt(COUNT_OFFSET);
@@ -108,7 +109,8 @@ class PBDMMapSegment extends PBDSegment {
     }
 
     @Override
-    public int readIndex() {
+    //MJ TODO:
+    public int readIndex(String cursorId) {
         return m_objectReadIndex;
     }
 
@@ -129,12 +131,20 @@ class PBDMMapSegment extends PBDSegment {
     }
 
     @Override
-    public void open(boolean forWrite) throws IOException {
-        open(forWrite, forWrite);
+    //MJ TODO:
+    public boolean isOpenForReading(String cursorId) {
+        return false;
+    }
+    
+    @Override
+    //MJ TODO:
+    public void openForRead(String cursorId) throws IOException {
+        openForWrite(false);
     }
 
     @Override
-    protected void open(boolean forWrite, boolean truncate) throws IOException {
+    // MJ TODO:
+    protected void openForWrite(boolean truncate) throws IOException {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
         }
@@ -146,6 +156,8 @@ class PBDMMapSegment extends PBDSegment {
         m_ras = new RandomAccessFile(m_file, "rw");
         m_fc = m_ras.getChannel();
 
+        // MJ TODO:
+        boolean forWrite = true;
         if (forWrite) {
             //If this is for writing, map the chunk size RW and put the buf positions at the start
             m_buf = DBBPool.wrapMBB(m_fc.map(MapMode.READ_WRITE, 0, CHUNK_SIZE));
@@ -208,13 +220,28 @@ class PBDMMapSegment extends PBDSegment {
     }
 
     @Override
-    public boolean hasMoreEntries() throws IOException {
+    // MJ TODO:
+    public boolean hasMoreEntries(String cursorId) throws IOException {
+        if (m_closed) throw new IOException("closed");
+        return m_objectReadIndex < m_buf.b().getInt(COUNT_OFFSET);
+    }
+    @Override
+    // MJ TODO:
+    public boolean hasAllFinishedReading() throws IOException {
         if (m_closed) throw new IOException("closed");
         return m_objectReadIndex < m_buf.b().getInt(COUNT_OFFSET);
     }
 
     @Override
-    public boolean isEmpty() throws IOException {
+    // MJ TODO:
+    public boolean isCursorEmpty(String cursorId) throws IOException {
+        if (m_closed) throw new IOException("closed");
+        return m_discardCount == getNumEntries();
+    }
+    
+    @Override
+    // MJ TODO:
+    public boolean isSegmentEmpty() throws IOException {
         if (m_closed) throw new IOException("closed");
         return m_discardCount == getNumEntries();
     }
@@ -272,7 +299,8 @@ class PBDMMapSegment extends PBDSegment {
     }
 
     @Override
-    public BBContainer poll(OutputContainerFactory factory) throws IOException {
+    // MJ TODO:
+    public BBContainer poll(String cursorId, OutputContainerFactory factory) throws IOException {
         if (m_closed) throw new IOException("closed");
         final long mBufAddr = m_buf.address();
         if (!m_haveMAdvised) {
@@ -288,7 +316,7 @@ class PBDMMapSegment extends PBDSegment {
         }
 
         //No more entries to read
-        if (!hasMoreEntries()) {
+        if (!hasMoreEntries(cursorId)) {
             return null;
         }
 
@@ -364,19 +392,22 @@ class PBDMMapSegment extends PBDSegment {
      * although incredibly unlikely
      */
     @Override
-    public int uncompressedBytesToRead() {
+    // MJ TODO:
+    public int uncompressedBytesToRead(String cursorId) {
         if (m_closed) throw new RuntimeException("closed");
         return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
     }
 
     @Override
-    protected long readOffset()
+    // MJ TODO:
+    protected long readOffset(String cursorId)
     {
         return m_readBuf.position();
     }
 
     @Override
-    protected void rewindReadOffset(int byBytes)
+    // MJ TODO:
+    protected void rewindReadOffset(String cursorId, int byBytes)
     {
         m_readBuf.position(m_readBuf.position() - byBytes);
     }

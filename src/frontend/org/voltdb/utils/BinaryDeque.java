@@ -69,13 +69,16 @@ public interface BinaryDeque {
      */
     public void push(BBContainer objects[]) throws IOException;
 
+    //TODO: add javadoc
+    public void openForRead(String cursorId) throws IOException;
     /**
      * Remove and return the object at the head of the queue
      * @param ocf
      * @return
      * @throws IOException
      */
-    public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+    //TODO: Update javadoc
+    public BBContainer poll(String cursorId, OutputContainerFactory ocf) throws IOException;
 
     /**
      * Persist all objects in the queue to the backing store
@@ -90,12 +93,12 @@ public interface BinaryDeque {
      */
     public void close() throws IOException;
 
-    public boolean isEmpty() throws IOException;
+    public boolean isEmpty(String cursorId) throws IOException;
 
     public boolean initializedFromExistingFiles();
 
-    public long sizeInBytes() throws IOException;
-    public int getNumObjects();
+    public long sizeInBytes(String cursorId) throws IOException;
+    public int getNumObjects(String cursorId) throws IOException;
 
     public void closeAndDelete() throws IOException;
 
@@ -130,5 +133,5 @@ public interface BinaryDeque {
         public TruncatorResponse parse(BBContainer bb);
     }
 
-    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
+    public void parseAndTruncate(String cursorId, BinaryDequeTruncator truncator) throws IOException;
 }
