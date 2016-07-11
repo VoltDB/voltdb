@@ -39,7 +39,7 @@ public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private final LicenseApi m_licenseApi;
-    private static Pattern PATH_DELETER = Pattern.compile("(?i)\\<paths\\>(.*)\\<\\/paths\\>", Pattern.DOTALL|Pattern.MULTILINE);
+    private static final Pattern PATH_DELETER = Pattern.compile("\\<paths\\>(.*)\\<\\/paths\\>", Pattern.CASE_INSENSITIVE|Pattern.DOTALL|Pattern.MULTILINE);
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;

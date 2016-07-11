@@ -390,15 +390,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getVoltDBRootPath(PathsType.Voltdbroot path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.DBROOT_PATH_KEY);
+        return m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
     }
 
     @Override
     public String getCommandLogPath(PathsType.Commandlog path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
         return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
@@ -406,7 +406,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
         return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
@@ -414,7 +414,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getSnapshotPath(PathsType.Snapshots path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
         return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
@@ -422,7 +422,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getExportOverflowPath(PathsType.Exportoverflow path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
         return m_pathList.getProperty(VoltDB.EXPORT_OVERFLOW_PATH_KEY);
@@ -430,7 +430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getDROverflowPath(PathsType.Droverflow path) {
-        if (org.voltdb.VoltDB.instance().isRunningWithOldVerbs()) {
+        if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
         return m_pathList.getProperty(VoltDB.DR_OVERFLOW_PATH_KEY);
@@ -443,7 +443,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getVoltDBRootPath() {
-        return m_pathList.getProperty(VoltDB.DBROOT_PATH_KEY);
+        return m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
     }
 
     @Override
@@ -2040,36 +2040,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     //Load paths into properties list.
     private void loadPaths(DeploymentType deployment) throws IOException {
         String voltdbRoot = (new VoltFile(deployment.getPaths().getVoltdbroot().getPath())).getCanonicalPath();
-        m_pathList.put(deployment.getPaths().getVoltdbroot().getKey(), voltdbRoot);
+        m_pathList.put(VoltDB.VOLTDBROOT_PATH_KEY, voltdbRoot);
         File path = new VoltFile(deployment.getPaths().getCommandlog().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
-        m_pathList.put(deployment.getPaths().getCommandlog().getKey(), path.getCanonicalPath());
+        m_pathList.put(VoltDB.CL_PATH_KEY, path.getCanonicalPath());
 
         path = new VoltFile(deployment.getPaths().getCommandlogsnapshot().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
-        m_pathList.put(deployment.getPaths().getCommandlogsnapshot().getKey(), path.getCanonicalPath());
+        m_pathList.put(VoltDB.CL_SNAPSHOT_PATH_KEY, path.getCanonicalPath());
 
         path = new VoltFile(deployment.getPaths().getSnapshots().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
-        m_pathList.put(deployment.getPaths().getSnapshots().getKey(), path.getCanonicalPath());
+        m_pathList.put(VoltDB.SNAPTHOT_PATH_KEY, path.getCanonicalPath());
 
         path = new VoltFile(deployment.getPaths().getExportoverflow().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
-        m_pathList.put(deployment.getPaths().getExportoverflow().getKey(), path.getCanonicalPath());
+        m_pathList.put(VoltDB.EXPORT_OVERFLOW_PATH_KEY, path.getCanonicalPath());
 
         path = new VoltFile(deployment.getPaths().getDroverflow().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
-        m_pathList.put(deployment.getPaths().getDroverflow().getKey(), path.getCanonicalPath());
+        m_pathList.put(VoltDB.DR_OVERFLOW_PATH_KEY, path.getCanonicalPath());
     }
 
     @Override

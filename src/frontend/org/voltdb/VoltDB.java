@@ -85,14 +85,12 @@ public class VoltDB {
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
 
-    //These keys come from DeploymentFile xsd.
-    public static final String DBROOT_PATH_KEY = (new PathsType.Voltdbroot()).getKey();
-    public static final String CL_SNAPSHOT_PATH_KEY = (new PathsType.Commandlogsnapshot()).getKey();
-    public static final String CL_PATH_KEY = (new PathsType.Commandlog()).getKey();
-    public static final String SNAPTHOT_PATH_KEY = (new PathsType.Snapshots()).getKey();
-    public static final String VOLTDBROOT_PATH_KEY = (new PathsType.Voltdbroot()).getKey();
-    public static final String EXPORT_OVERFLOW_PATH_KEY = (new PathsType.Exportoverflow()).getKey();
-    public static final String DR_OVERFLOW_PATH_KEY = (new PathsType.Droverflow()).getKey();
+    public static final String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
+    public static final String CL_PATH_KEY = "org.voltdb.path.command_log";
+    public static final String SNAPTHOT_PATH_KEY = "org.voltdb.path.snapshots";
+    public static final String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
+    public static final String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
+    public static final String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint

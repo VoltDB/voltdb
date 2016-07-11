@@ -25,7 +25,6 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapthotPathType;
 
 public class SnapshotCheckResponseMessage extends VoltMessage {
