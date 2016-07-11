@@ -29,7 +29,6 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -63,7 +62,6 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -1087,18 +1085,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     void writeIv2ViableReplayEntryInternal(long spHandle)
     {
         if (m_replayComplete) {
-            SettableFuture<Boolean> written = m_cl.logIv2Fault(m_mailbox.getHSId(),
-                new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
-            boolean logWritten = false;
-            try {
-                logWritten = written.get();
-            } catch (InterruptedException e) {
-            } catch (ExecutionException e) {
-            } finally {
-                if (!logWritten){
-                    tmLog.warn("Fault Log not written for SP Handle: " + spHandle);
-                }
-            }
+            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+                    spHandle);
         }
     }
 
