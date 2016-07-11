@@ -296,15 +296,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            exprs.addAll(childStmt.findAllSubexpressionsOfType(exprType));
-        }
-        return exprs;
-    }
-
-    @Override
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         for (AbstractParsedStmt childStmt : m_children) {

@@ -51,15 +51,16 @@ APPCLASSPATH=$CLASSPATH:$({ \
 # classpath setup for compiling client apps
 CLIENTCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/super-csv-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
 # a sourcing script may want to add to this path like so:
-# CLIENTCLASSPATH=appname-client.jar:$CLIENTCLASSPATH 
+# CLIENTCLASSPATH=appname-client.jar:$CLIENTCLASSPATH
 
 function envhelp() {
     echo
     echo "Usage: voltenv {classpath|clientclasspath|checkpath}"
-    echo 
+    echo
     echo "voltenv classpath"
     echo "  Print out a classpath that contains the VoltDB java jars"
     echo
@@ -115,10 +116,10 @@ function checkpath() {
 # Run the target passed as the first arg on the command line
 # If no first arg, do nothing
 if [ "${0}" = "$SOURCE" ]; then
-    if [ $# -gt 1 ]; then 
+    if [ $# -gt 1 ]; then
         envhelp
         exit 0
-    elif [ $# = 1 ]; then 
+    elif [ $# = 1 ]; then
         $1
     fi
 else

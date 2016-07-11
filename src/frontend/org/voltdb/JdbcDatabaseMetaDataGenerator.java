@@ -703,10 +703,9 @@ public class JdbcDatabaseMetaDataGenerator
             }
         }
 
-        for (Procedure proc : procedures)
-        {
-            for (ProcParameter param : proc.getParameters())
-            {
+        for (Procedure proc : procedures) {
+            for (ProcParameter param : proc.getParameters()) {
+                Integer paramPrecisionAndRadix[] = getParamPrecisionAndRadix(param);
                 results.addRow(
                                null, // procedure catalog
                                null, // procedure schema
@@ -715,10 +714,10 @@ public class JdbcDatabaseMetaDataGenerator
                                java.sql.DatabaseMetaData.procedureColumnIn, // param type, all are IN
                                getColumnSqlDataType(VoltType.get((byte)param.getType())), // data type
                                getColumnSqlTypeName(VoltType.get((byte)param.getType())), // type name
-                               getParamPrecisionAndRadix(param)[0], // precision
+                               paramPrecisionAndRadix[0], // precision
                                getParamLength(param), // length
                                getColumnDecimalDigits(VoltType.get((byte)param.getType())),
-                               getParamPrecisionAndRadix(param)[1], // radix
+                               paramPrecisionAndRadix[1], // radix
                                java.sql.DatabaseMetaData.procedureNullableUnknown, // nullable
                                getProcedureColumnRemarks(param, proc), // remarks
                                null, // column default.  always null for us
@@ -737,33 +736,34 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getTypeInfo()
     {
         VoltTable results = new VoltTable(TYPEINFO_SCHEMA);
-        for (VoltType type : VoltType.values())
-        {
-            if (type.isJdbcVisible()) {
-                Byte unsigned = null;
-                if (type.isUnsigned() != null) {
-                    unsigned = (byte)(type.isUnsigned() ? 1 : 0);
-                }
-                results.addRow(type.toSQLString().toUpperCase(),
-                        type.getJdbcSqlType(),
-                        type.getTypePrecisionAndRadix()[0],
-                        type.getLiteralPrefix(),
-                        type.getLiteralSuffix(),
-                        type.getCreateParams(),
-                        type.getNullable(),
-                        type.isCaseSensitive() ? 1 : 0,
-                        type.getSearchable(),
-                        unsigned,
-                        0,  // no money types (according to definition) in Volt?
-                        0,  // no auto-increment
-                        type.toSQLString().toUpperCase(),
-                        type.getMinimumScale(),
-                        type.getMaximumScale(),
-                        null,
-                        null,
-                        type.getTypePrecisionAndRadix()[1]
-                        );
+        for (VoltType type : VoltType.values()) {
+            if (!type.isJdbcVisible()) {
+                continue;
             }
+            Byte unsigned = null;
+            if (type.isUnsigned() != null) {
+                unsigned = (byte)(type.isUnsigned() ? 1 : 0);
+            }
+            Integer typePrecisionAndRadix[] = type.getTypePrecisionAndRadix();
+            results.addRow(type.toSQLString().toUpperCase(),
+                    type.getJdbcSqlType(),
+                    typePrecisionAndRadix[0],
+                    type.getLiteralPrefix(),
+                    type.getLiteralSuffix(),
+                    type.getCreateParams(),
+                    type.getNullable(),
+                    type.isCaseSensitive() ? 1 : 0,
+                    type.getSearchable(),
+                    unsigned,
+                    0,  // no money types (according to definition) in Volt?
+                    0,  // no auto-increment
+                    type.toSQLString().toUpperCase(),
+                    type.getMinimumScale(),
+                    type.getMaximumScale(),
+                    null,
+                    null,
+                    typePrecisionAndRadix[1]
+                    );
         }
         return results;
     }

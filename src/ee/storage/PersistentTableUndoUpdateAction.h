@@ -30,10 +30,10 @@ public:
 
     inline PersistentTableUndoUpdateAction(char* oldTuple, char* newTuple,
                                            std::vector<char*> const & oldObjects, std::vector<char*> const & newObjects,
-                                           PersistentTableSurgeon *table, bool revertIndexes, size_t drMark)
+                                           PersistentTableSurgeon *table, bool revertIndexes)
       : m_oldTuple(oldTuple), m_newTuple(newTuple),
         m_table(table), m_revertIndexes(revertIndexes),
-        m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects), m_drMark(drMark)
+        m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects)
     { }
 
     /*
@@ -45,7 +45,6 @@ public:
     {
         m_table->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
         NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
-        m_table->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_UPDATE));
     }
 
     /*
@@ -64,7 +63,6 @@ private:
     bool const m_revertIndexes;
     std::vector<char*> const m_oldUninlineableColumns;
     std::vector<char*> const m_newUninlineableColumns;
-    size_t const m_drMark;
 };
 
 }

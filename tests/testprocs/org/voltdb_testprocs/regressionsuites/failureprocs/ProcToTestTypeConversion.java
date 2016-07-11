@@ -101,78 +101,91 @@ public class ProcToTestTypeConversion extends VoltProcedure {
     private final static SQLStmt m_smallInList = new SQLStmt("Select * from T where si IN ? ;");
     private final static SQLStmt m_intInList = new SQLStmt("Select * from T where int IN ? ;");
     private final static SQLStmt m_bigIntInList = new SQLStmt("Select * from T where bi IN ? ;");
-    private final static SQLStmt m_fltInList = new SQLStmt("Select * from T where flt IN ? ;");
-    private final static SQLStmt m_bigDecInList = new SQLStmt("Select * from T where dec IN ? ;");
+
+    // TODO: IN LISTS are not supported with these column types -- these statements should not even compile.
+    final static SQLStmt m_fltInList = new SQLStmt("Select * from T where flt IN ? ;");
+    final static SQLStmt m_bigDecInList = new SQLStmt("Select * from T where dec IN ? ;");
+
     private final static SQLStmt m_tsInList = new SQLStmt("Select * from T where ts IN ? ;");
     private final static SQLStmt m_strInList = new SQLStmt("Select * from T where str IN ? ;");
-    private final static SQLStmt m_binInList = new SQLStmt("Select * from T where bin IN ? ;");
-    private final static SQLStmt m_ptInList = new SQLStmt("Select * from T where pt IN ? ;");
-    private final static SQLStmt m_polyInList = new SQLStmt("Select * from T where pol IN ? ;");
+
+    // TODO: IN LISTS are not supported with these column types -- these statements should not even compile.
+    final static SQLStmt m_binInList = new SQLStmt("Select * from T where bin IN ? ;");
+    final static SQLStmt m_ptInList = new SQLStmt("Select * from T where pt IN ? ;");
+    final static SQLStmt m_polyInList = new SQLStmt("Select * from T where pol IN ? ;");
+
+    private final static SQLStmt m_tinyCompare = new SQLStmt("Select * from T where ti = ? ;");
+    private final static SQLStmt m_smallCompare = new SQLStmt("Select * from T where si = ? ;");
+    private final static SQLStmt m_intCompare = new SQLStmt("Select * from T where int = ? ;");
+    private final static SQLStmt m_bigIntCompare = new SQLStmt("Select * from T where bi = ? ;");
+    private final static SQLStmt m_fltCompare = new SQLStmt("Select * from T where flt = ? ;");
+    private final static SQLStmt m_bigDecCompare= new SQLStmt("Select * from T where dec = ? ;");
+    private final static SQLStmt m_tsCompare = new SQLStmt("Select * from T where ts = ? ;");
+    private final static SQLStmt m_strCompare = new SQLStmt("Select * from T where str = ? ;");
+    private final static SQLStmt m_binCompare = new SQLStmt("Select * from T where bin = ? ;");
+    private final static SQLStmt m_ptCompare = new SQLStmt("Select * from T where pt = ? ;");
+    private final static SQLStmt m_polyCompare = new SQLStmt("Select * from T where pol = ? ;");
 
     // flag to test positive cases of type conversion using inserts and selects with comparison statements
-    public final static byte TestAllAllowedTypeConv = 0;
+    public static final byte TestAllAllowedTypeConv = 0;
     // flag to test type-conversion by using insert statements in automated fashion using type conversion
     // specified by user. Used to test cases at voltqueuesql level whether type conversion is feasible
     // or not.
-    public final static byte TestTypeConvWithInsertProc = 1;
+    public static final byte TestTypeConvWithInsertProc = 1;
     // flag to test type-conversion of array parameters by using select statement with IN predicate in
     // automated fashion using type conversion specified by user. Used to test cases at voltqueuesql
     // level whether type conversion is feasible or not.
-    public final static byte TestTypesInList = 2;
+    public static final byte TestTypesInList = 2;
+    public static final byte TestFailingTypesInList = 3;
+    public static final byte TestFailingArrayTypeCompare = 4;
 
     private Object[] getUpdatedRowToInsert(int colIndex, byte valueTypeToPopulateWith, boolean strTs) {
         Object[] rowToInsert = {m_byteVal, m_shortVal, m_intVal, m_bigIntVal, m_doubleVal, m_bigDecVal, m_tsVal, m_strTs, m_binVal, m_pt, m_poly};
         assert(colIndex < rowToInsert.length);
+        rowToInsert[colIndex] = getColumnValue(valueTypeToPopulateWith, strTs);
+        return rowToInsert;
+    }
+
+    private Object getColumnValue(byte valueTypeToPopulateWith, boolean strTs) {
         VoltType toType = VoltType.get(valueTypeToPopulateWith);
 
         switch (toType) {
             case TINYINT:
-                rowToInsert[colIndex] = m_byteVal;
-                break;
+                return m_byteVal;
             case SMALLINT:
-                rowToInsert[colIndex] = m_shortVal;
-                break;
+                return m_shortVal;
             case INTEGER:
-                rowToInsert[colIndex] = m_intVal;
-                break;
+                return m_intVal;
             case BIGINT:
-                rowToInsert[colIndex] = m_bigIntVal;
-                break;
+                return m_bigIntVal;
             case FLOAT:
-                rowToInsert[colIndex] = m_doubleVal;
-                break;
+                return m_doubleVal;
             case DECIMAL:
-                rowToInsert[colIndex] = m_bigDecVal;
-                break;
+                return m_bigDecVal;
             case TIMESTAMP:
-                rowToInsert[colIndex] = m_tsVal;
-                break;
+                return m_tsVal;
             case STRING:
-                rowToInsert[colIndex] = strTs ? m_strTs : m_strNum;
-                break;
+                return strTs ? m_strTs : m_strNum;
             case VARBINARY:
-                rowToInsert[colIndex] = m_binVal;
-                break;
+                return m_binVal;
             case GEOGRAPHY_POINT:
-                rowToInsert[colIndex] = m_pt;
-                break;
+                return m_pt;
             case GEOGRAPHY:
-                rowToInsert[colIndex] = m_poly;
-                break;
+                return m_poly;
             default:
                 assert(false);
                 break;
         }
-        return rowToInsert;
+        return null;
     }
 
-    private Object getUpdatedRow4InList(byte valueTypeToPopulateWith, boolean strTs) {
+    private Object getInListParameter(byte valueTypeToPopulateWith, boolean strTs) {
         VoltType toType = VoltType.get(valueTypeToPopulateWith);
 
         switch (toType) {
             case TINYINT:
-                byte[] tiValue = {m_byteVal, m_byteVal};
-                return tiValue;
+                byte[] tinyValue = {m_byteVal, m_byteVal};
+                return tinyValue;
             case SMALLINT:
                 short[] shortValue = {m_shortVal, m_shortVal};
                 return shortValue;
@@ -217,7 +230,6 @@ public class ProcToTestTypeConversion extends VoltProcedure {
         boolean useStrTs = (m_tableColTypeVal[indOfTargetType] == VoltType.TIMESTAMP) ? true : false;
         switch(operation) {
         case TestAllAllowedTypeConv:
-
             // queues insert and select statements for which type conversion is allowed
             voltQueueSQL(insert, null, null, null, m_bigIntVal, null, null,
                                  null, null, null, null, null, null);
@@ -262,7 +274,7 @@ public class ProcToTestTypeConversion extends VoltProcedure {
 
             // Varbinary
             voltQueueSQL(insert, m_byteVal, m_shortVal, m_intVal, m_floatVal, m_bigIntVal, m_bigDecVal,
-                                 m_tsVal, m_binVal, m_binVal, m_pt, m_poly);
+                                 m_tsVal, m_strTs, m_binVal, m_pt, m_poly);
 
             // Compare stored proc. comparison expression supports broadest type conversion for select statement
             voltQueueSQL(compare, null, null, null, m_bigIntVal, null, null,
@@ -307,8 +319,8 @@ public class ProcToTestTypeConversion extends VoltProcedure {
                                   m_tsVal, m_strTs, m_binVal, m_pt, m_poly);
 
             break;
-        case TestTypeConvWithInsertProc:
 
+        case TestTypeConvWithInsertProc:
             // if column to test is of timestamp (ts) type, use ts string for string value
             // which can be used for inserting into ts column
             rowToInsert = getUpdatedRowToInsert(indOfTargetType, valueOfTypeToPopulateWith, useStrTs);
@@ -318,7 +330,7 @@ public class ProcToTestTypeConversion extends VoltProcedure {
         case TestTypesInList:
             // if column to test is of timestamp (ts) type, use ts string for string value
             // which can be used for inserting into ts column
-            Object value = getUpdatedRow4InList(valueOfTypeToPopulateWith, useStrTs);
+            Object value = getInListParameter(valueOfTypeToPopulateWith, useStrTs);
             switch (m_tableColTypeVal[indOfTargetType]) {
             case TINYINT:
                 voltQueueSQL(m_tinyInList, value);
@@ -333,11 +345,9 @@ public class ProcToTestTypeConversion extends VoltProcedure {
                 voltQueueSQL(m_bigIntInList, value);
                 break;
             case FLOAT:
-                voltQueueSQL(m_fltInList, value);
-                break;
             case DECIMAL:
-                voltQueueSQL(m_bigDecInList, value);
-                break;
+                // IN LISTs of these types are not supported.
+                return null;
             case TIMESTAMP:
                 voltQueueSQL(m_tsInList, value);
                 break;
@@ -345,19 +355,96 @@ public class ProcToTestTypeConversion extends VoltProcedure {
                 voltQueueSQL(m_strInList, value);
                 break;
             case VARBINARY:
-                voltQueueSQL(m_binInList, value);
-                break;
             case GEOGRAPHY_POINT:
-                voltQueueSQL(m_ptInList, value);
-                break;
             case GEOGRAPHY:
-                voltQueueSQL(m_polyInList, value);
-                break;
+                // IN LISTs of these types are not supported.
+                return null;
             default:
                 assert(false);
             }
             break;
+
+    case TestFailingTypesInList:
+        // if column to test is of timestamp (ts) type, use ts string for string value
+        // which can be used for inserting into ts column
+        Object failValue = getColumnValue(valueOfTypeToPopulateWith, useStrTs);
+        switch (m_tableColTypeVal[indOfTargetType]) {
+        case TINYINT:
+            voltQueueSQL(m_tinyInList, failValue);
+            break;
+        case SMALLINT:
+            voltQueueSQL(m_smallInList, failValue);
+            break;
+        case INTEGER:
+            voltQueueSQL(m_intInList, failValue);
+            break;
+        case BIGINT:
+            voltQueueSQL(m_bigIntInList, failValue);
+            break;
+        case FLOAT:
+        case DECIMAL:
+            // IN LISTs of these types are not supported.
+            return null;
+        case TIMESTAMP:
+            voltQueueSQL(m_tsInList, failValue);
+            break;
+        case STRING:
+            voltQueueSQL(m_strInList, failValue);
+            break;
+        case VARBINARY:
+        case GEOGRAPHY_POINT:
+        case GEOGRAPHY:
+            // IN LISTs of these types are not supported.
+            return null;
+        default:
+            assert(false);
         }
+        break;
+
+    case TestFailingArrayTypeCompare:
+        // if column to test is of timestamp (ts) type, use ts string for string value
+        // which can be used for inserting into ts column
+        Object arrayValue = getInListParameter(valueOfTypeToPopulateWith, useStrTs);
+        switch (m_tableColTypeVal[indOfTargetType]) {
+        case TINYINT:
+            voltQueueSQL(m_tinyCompare, arrayValue);
+            break;
+        case SMALLINT:
+            voltQueueSQL(m_smallCompare, arrayValue);
+            break;
+        case INTEGER:
+            voltQueueSQL(m_intCompare, arrayValue);
+            break;
+        case BIGINT:
+            voltQueueSQL(m_bigIntCompare, arrayValue);
+            break;
+        case FLOAT:
+            voltQueueSQL(m_fltCompare, arrayValue);
+            break;
+        case DECIMAL:
+            voltQueueSQL(m_bigDecCompare, arrayValue);
+            break;
+        case TIMESTAMP:
+            voltQueueSQL(m_tsCompare, arrayValue);
+            break;
+        case STRING:
+            voltQueueSQL(m_strCompare, arrayValue);
+            break;
+        case VARBINARY:
+            voltQueueSQL(m_binCompare, arrayValue);
+            break;
+        case GEOGRAPHY_POINT:
+            voltQueueSQL(m_ptCompare, arrayValue);
+            break;
+        case GEOGRAPHY:
+            voltQueueSQL(m_polyCompare, arrayValue);
+            break;
+        default:
+            assert(false);
+        }
+        break;
+        }
+
         return voltExecuteSQL();
     }
 }

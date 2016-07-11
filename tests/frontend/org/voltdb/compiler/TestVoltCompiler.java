@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -66,6 +64,8 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -2461,6 +2461,36 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
+    private void subTestDDLCompilerMatViewJoin()
+    {
+        String tableDDL;
+        String viewDDL;
+        tableDDL = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T3 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n";
+        // 0. Test final guard (to be removed after the feature is done.)
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" has 2 sources. Only one source table is allowed.");
+        // 1. Test INNER JOIN
+        // 1.1 Test one join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 LEFT JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 1.2 Test multiple joins
+        viewDDL = "CREATE VIEW V (aint, bint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, T2.a, count(*), sum(T3.b) FROM T1 JOIN T2 ON T1.a=T2.a RIGHT JOIN T3 on T2.a=T3.a GROUP BY T1.a, T2.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 2. Test self-join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
+                                               "materialized view does not support self-join.");
+        // 3. Test table join subquery.
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2) T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+    }
 
     public void testDDLCompilerMatView()
     {
@@ -2543,10 +2573,11 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // comparison expression not supported in group by clause
-        errorMsg = "Materialized view \"MY_VIEW\" with comparison expression '=' in GROUP BY clause not supported.";
+        // comparison expression not supported in group by clause -- actually gets caught because it's not allowed
+        // in the select list either.
+        errorMsg = "SELECT clause does not allow a BOOLEAN expression.";
         ddl = "create table t(id integer not null, num integer not null);\n" +
-                "create view my_view as select (id = num) as idNumber, count(*) from t group by (id = num);" +
+                "create view my_view as select (id = num) as idVsNumber, count(*) from t group by (id = num);" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
@@ -2556,6 +2587,8 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select id, wage from t group by id, wage;" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        subTestDDLCompilerMatViewJoin();
     }
 
     public void testDDLCompilerTableLimit()
@@ -2814,7 +2847,7 @@ public class TestVoltCompiler extends TestCase {
     public void testGeographyPointValueNegative() throws Exception {
 
         // POINT cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*",
                 "create table pts ("
                 + "  pt geography_point not null"
                 + ");"
@@ -2909,7 +2942,7 @@ public class TestVoltCompiler extends TestCase {
                      "partition table geogs on column geog;\n";
 
         // GEOGRAPHY cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*", ddl);
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*", ddl);
 
         ddl = "create table geogs ( geog geography(0) not null );";
         badDDLAgainstSimpleSchema(".*precision or scale out of range.*", ddl);
@@ -3006,7 +3039,7 @@ public class TestVoltCompiler extends TestCase {
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select isValid(Region1), count(*) from geogs group by isValid(Region1);\n";
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'ISVALID' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
@@ -3014,7 +3047,7 @@ public class TestVoltCompiler extends TestCase {
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Contains(Region1, POINT1), count(*) from geogs group by Contains(Region1, POINT1);\n";
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'CONTAINS' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
@@ -3403,7 +3436,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
+        expectedError = "Failed to plan for statement (sql) \"BANBALOO pkey FROM PKEY_INTEGER;\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -3412,7 +3445,7 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
                 );
-        expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
+        expectedError = "Failed to plan for statement (sql) \"SELEC pkey FROM PKEY_INTEGER;\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
@@ -4277,18 +4310,6 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
                 );
-
-        String ddl = "create table geogs ( id integer primary key, " +
-                                         " region1 geography NOT NULL);\n" +
-                     "export table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
-                                  ddl);
-
-        ddl = "create table geogs ( id integer primary key, " +
-                                  " point1 geography_point NOT NULL );\n" +
-              "export table geogs to stream geog_stream;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
-                                  ddl);
     }
 
     public void testGoodCreateStream() throws Exception {

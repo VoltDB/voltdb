@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -62,6 +61,26 @@ public class TestPlansOrderBy extends PlannerTestCase {
         AbstractPlanNode pn = compile(sql);
         //* to debug */ System.out.println(pn.getChild(0).toJSONString());
         //* to debug */ System.out.println(pn.getChild(0).toExplainPlanString());
+        assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
+        assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
+        assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
+        assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
+        assertEquals(expectedAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
+    }
+
+    private void validateMultiPartitionedPlan(String sql,
+            boolean expectTopOrderBy, boolean expectTopHashAggregate, boolean expectedTopAggregate,
+            boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate,
+            boolean expectedAggregate)
+    {
+        List<AbstractPlanNode> frags = compileToFragments(sql);
+        assertEquals(2, frags.size());
+        AbstractPlanNode pn = frags.get(0);
+        assertEquals(expectTopOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
+        assertEquals(expectTopHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
+        assertEquals(expectedTopAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
+
+        pn = frags.get(1);
         assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
@@ -227,6 +246,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "order by T.T_D0;");
     }
 
+    public void testOrderByBooleanConstants()
+    {
+        String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
+        for (String condition : conditions) {
+            failToCompile(String.format("SELECT * FROM T WHERE T_D0 = 2 ORDER BY %s", condition),
+                          "invalid ORDER BY expression");
+        }
+    }
+
     public void testOrderDescWithEquality() {
         validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
         // See ENG-5084 to optimize this query to use inverse scan in future.
@@ -318,44 +346,26 @@ public class TestPlansOrderBy extends PlannerTestCase {
     public void testOrderByMPOptimized() {
         {
             // P_D1_IDX index provides the right order for the coordinator. Merge Receive
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, P_D1 + 1 from P order by P_D1");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, false, new int[] {0});
+            validateMergeReceive("select P_D1, P_D1 + 1 from P order by P_D1",
+                    false, new int[] {0});
         }
         {
             // P_D32_IDX index provides the right order for the coordinator. Merge Receive
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P order by P_D3 DESC, P_D2 DESC");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, false, new int[] {2, 1});
+            validateMergeReceive("select P_D1 from P order by P_D3 DESC, P_D2 DESC",
+                    false, new int[] {2, 1});
         }
         {
             // P_D1_IDX index provides the right order for the coordinator. Merge Receive
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P order by P_D1");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, false, new int[] {0});
+            validateMergeReceive("select P_D1 from P order by P_D1", false, new int[] {0});
         }
         {
             // P_D1_IDX index provides the right order for the coordinator. Merge Receive with LIMIT
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P order by P_D1 limit 3");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, true, new int[] {0});
+            validateMergeReceive("select P_D1 from P order by P_D1 limit 3", true, new int[] {0});
         }
         {
             // Partitions results are ordered by the pushed down ORDER BY.
             // Merge Receive with Order By and with LIMIT
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, P_D2  from P order by P_D2 limit 3");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, true, new int[] {1});
+            validateMergeReceive("select P_D1, P_D2  from P order by P_D2 limit 3", true, new int[] {1});
         }
         {
             // NLIJ with index outer table scan (PK). ORDER BY column T.T_D1 is not the first index column
@@ -368,20 +378,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         {
             // NLIJ with index outer table scan (PK). ORDER BY column T.T_D0 is the first index column
             // Merge RECEIVE
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D0 limit 3");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, true, new int[] {0});
+            validateMergeReceive("select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D0 limit 3",
+                    true, new int[] {0});
         }
         {
             // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) covers ORDER BY expressions (P_D3 / 10, P_D2)
             // Merge Receive
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateMergeReceive(pn, false, new int[] {2, 1});
+            validateMergeReceive("select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 10, P_D2",
+                    false, new int[] {2, 1});
         }
     }
 
@@ -515,7 +519,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // the subquery post-processing still keeps it.
             failToCompile(
                     "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;",
-                    "Join of multiple partitioned tables has insufficient join criteria.");
+                    "This query is not plannable.  It has a subquery which needs cross-partition access.");
+
         }
         {
             // The subquery with partition column (P_D0) in the GROUP BY columns.
@@ -771,6 +776,34 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
+    public void testOrderByFullJoin() {
+
+        // ORDER BY with FULL join still requires an ORDER BY node even if the
+        // outer table output is ordered by its index
+        validatePlan("SELECT L.T_D0, L.T_D1 FROM T2 L FULL JOIN T2 R ON L.T_D2 = R.T_D2 ORDER BY 1,2",
+                true, true, true);
+
+        // Same test but with a distributed table
+        validateMergeReceive("SELECT L.P_D1 FROM P L FULL JOIN P R ON L.P_D0 = R.P_D0 ORDER BY 1;",
+                false, new int[] {1});
+
+        // With aggregate
+        validatePlan("SELECT L.T_D0, L.T_D1, SUM(L.T_D2) FROM T2 L FULL JOIN T2 R ON L.T_D2 = R.T_D2 GROUP BY L.T_D0, L.T_D1 ORDER BY 1,2",
+                true, true, true, false, true);
+
+        // Partitioned with aggregate
+        validateMultiPartitionedPlan("SELECT L.P_D1, SUM(L.P_D2) FROM P L FULL JOIN P R ON L.P_D0 = R.P_D0 GROUP BY L.P_D1 ORDER BY 1;",
+            true, true, false, true, false, false, false, true);
+
+    }
+
+    private void validateMergeReceive(String sql, boolean hasLimit, int[] sortColumnIdx) {
+        List<AbstractPlanNode> frags =  compileToFragments(sql);
+        assertEquals(2, frags.size());
+        AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+        validateMergeReceive(pn, hasLimit, sortColumnIdx);
+    }
+
     private void validateMergeReceive(AbstractPlanNode pn, boolean hasLimit, int[] sortColumnIdx) {
         assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
         MergeReceivePlanNode rpn = (MergeReceivePlanNode) pn;
@@ -782,7 +815,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         int idx = 0;
         List<AbstractExpression> sesTves = new ArrayList<>();
         for (AbstractExpression se : ses) {
-            sesTves.addAll(ExpressionUtil.findAllExpressionsOfClass(se, TupleValueExpression.class));
+            sesTves.addAll(se.findAllTupleValueSubexpressions());
         }
         assertEquals(sortColumnIdx.length, sesTves.size());
         for (AbstractExpression seTve : sesTves) {

@@ -64,6 +64,7 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TableStreamType;
@@ -75,6 +76,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
@@ -84,6 +86,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -98,6 +101,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
@@ -369,9 +373,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
+                long uniqueId, long spHandle)
         {
-            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
+                    false, uniqueId, spHandle);
         }
 
         @Override
@@ -879,8 +885,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else if (tibm instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) tibm;
-            //All durable sysprocs and non-sysprocs should not get filtered.
-            return !CatalogUtil.isDurableProc(itm.getStoredProcedureName());
+            final SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(itm.getStoredProcedureName());
+            // All durable sysprocs and non-sysprocs should not get filtered.
+            return sysproc != null && !sysproc.isDurable();
         }
         return false;
     }
@@ -1391,7 +1398,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle)
     {
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -1403,6 +1410,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
+        boolean DRCatalogChange = false;
+        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        for (Table t : tables) {
+            if (t.getIsdred()) {
+                DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
+                if (DRCatalogChange) {
+                    break;
+                }
+            }
+        }
         // if a snapshot is in process, wait for it to finish
         // don't bother if this isn't a schema change
         //
@@ -1423,6 +1440,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        if (DRCatalogChange) {
+            final Pair<Long, String> catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog);
+            generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
+                    spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
+        }
 
         return true;
     }
@@ -1536,5 +1558,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(drVersion);
         m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
         hostLog.info("DR protocol version has been set to " + drVersion);
+    }
+
+    /**
+     * Generate a in-stream DR event which pushes an event buffer to topend
+     */
+    public void generateDREvent(EventType type, long uniqueId, long lastCommittedSpHandle,
+            long spHandle, byte[] payloads) {
+        m_ee.quiesce(lastCommittedSpHandle);
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(32 + payloads.length);
+        paramBuffer.putInt(type.ordinal());
+        paramBuffer.putLong(uniqueId);
+        paramBuffer.putLong(lastCommittedSpHandle);
+        paramBuffer.putLong(spHandle);
+        paramBuffer.putInt(payloads.length);
+        paramBuffer.put(payloads);
+        m_ee.executeTask(TaskType.GENERATE_DR_EVENT, paramBuffer);
     }
 }

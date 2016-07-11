@@ -650,6 +650,199 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     return getTempStringValue(rv.c_str(), rv.length());
 }
 
+/** implement the Volt SQL STR function for decimal values */
+template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
+    if (isNull()) {
+       return getNullValue();
+    }
+
+    if (getValueType() != VALUE_TYPE_DECIMAL && getValueType() != VALUE_TYPE_DOUBLE) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_DECIMAL);
+    }
+
+    std::ostringstream out;
+    TTInt scaledValue;
+    if(getValueType() == VALUE_TYPE_DOUBLE)
+    {
+        scaledValue = castAsDecimal().castAsDecimalAndGetValue();
+    } else {
+        scaledValue = castAsDecimalAndGetValue();
+    }
+
+    if (scaledValue.IsSign()) {
+        out << '-';
+        scaledValue.ChangeSign();
+    }
+
+    //default scale 0
+    int32_t scaleLength = 0;
+
+    TTInt ten(10);
+    if (scaleLength <= 0) {
+        ten.Pow(-scaleLength);
+    }
+    else {
+        ten.Pow(scaleLength);
+    }
+    TTInt denominator = (scaleLength <= 0) ? (TTInt(kMaxScaleFactor) * ten):
+                                        (TTInt(kMaxScaleFactor) / ten);
+    TTInt fractional(scaledValue);
+    fractional %= denominator;
+    TTInt barrier = CONST_FIVE * (denominator / 10);
+
+    if (fractional > barrier) {
+        scaledValue += denominator;
+    }
+
+    if (fractional == barrier) {
+        TTInt prev = scaledValue / denominator;
+        if (prev % 2 == CONST_ONE) {
+            scaledValue += denominator;
+        }
+    }
+
+    if (scaleLength <= 0) {
+        scaledValue -= fractional;
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        out << std::fixed << whole;
+    }
+    else {
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
+        // here denominator is guarateed to be able to converted to int64_t
+        fraction /= denominator.ToInt();
+        out << std::fixed << whole;
+        // fractional part does not need groups
+        out << '.' << std::setfill('0') << std::setw(scaleLength) << fraction;
+    }
+
+    // TODO: Although there should be only one copy of newloc (and money_numpunct),
+    // we still need to test and make sure no memory leakage in this piece of code.
+    std::string rv = out.str();
+
+    //default number length 10
+    int32_t numberLength = 10;
+
+    if(rv.length() > numberLength){
+        std::string res = "";
+        for(int i=0; i<numberLength; i++){
+            res += "*";
+        }
+        return getTempStringValue(res.c_str(), res.length());
+    } else {
+        return getTempStringValue(rv.c_str(), rv.length());
+    }
+}
+
+/** implement the Volt SQL STR function for decimal values */
+template<> inline NValue NValue::call<FUNC_VOLT_STR>(const std::vector<NValue>& arguments) {
+    static TTInt one("1");
+    static TTInt five("5");
+
+    assert(arguments.size() > 0 && arguments.size() < 4);
+    const NValue &arg1 = arguments[0];
+    if (arg1.isNull()) {
+        return getNullStringValue();
+    }
+
+    const ValueType type = arg1.getValueType();
+    if (type != VALUE_TYPE_DECIMAL && type != VALUE_TYPE_DOUBLE) {
+        throwCastSQLException (type, VALUE_TYPE_DECIMAL);
+    }
+
+    std::ostringstream out;
+    TTInt scaledValue;
+    if (type == VALUE_TYPE_DOUBLE) {
+        scaledValue = arg1.castAsDecimal().castAsDecimalAndGetValue();
+    } else {
+        scaledValue = arg1.castAsDecimalAndGetValue();
+    }
+
+    if (scaledValue.IsSign()) {
+        out << '-';
+        scaledValue.ChangeSign();
+    }
+
+    //default scale 0
+    int32_t scaleLength = 0;
+    if( arguments.size() == 3 ){
+        const NValue &arg3 = arguments[2];
+        if(!arg3.isNull()){
+            scaleLength = arg3.castAsIntegerAndGetValue();
+        }
+    }
+
+    if (scaleLength >= 12 || scaleLength < 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+            "the third parameter should be < 12 and >= 0");
+    }
+
+    TTInt ten(10);
+    if (scaleLength <= 0) {
+        ten.Pow(-scaleLength);
+    }
+    else {
+        ten.Pow(scaleLength);
+    }
+    TTInt denominator = (scaleLength <= 0) ? (TTInt(kMaxScaleFactor) * ten):
+                                        (TTInt(kMaxScaleFactor) / ten);
+    TTInt fractional(scaledValue);
+    fractional %= denominator;
+    TTInt barrier = five * (denominator / 10);
+
+    if (fractional > barrier) {
+        scaledValue += denominator;
+    }
+
+    if (fractional == barrier) {
+        TTInt prev = scaledValue / denominator;
+        if (prev % 2 == one) {
+            scaledValue += denominator;
+        }
+    }
+
+    if (scaleLength <= 0) {
+        scaledValue -= fractional;
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        out << std::fixed << whole;
+    } else {
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
+        // here denominator is guarateed to be able to converted to int64_t
+        fraction /= denominator.ToInt();
+        out << std::fixed << whole;
+        // fractional part does not need groups
+        out << '.' << std::setfill('0') << std::setw(scaleLength) << fraction;
+    }
+    // TODO: Although there should be only one copy of newloc (and money_numpunct),
+    // we still need to test and make sure no memory leakage in this piece of code.
+    std::string rv = out.str();
+
+    //default number length 10
+    int32_t numberLength = 10;
+    if( arguments.size() > 1 ){
+        const NValue &arg2 = arguments[1];
+        if(!arg2.isNull()){
+            numberLength = arg2.castAsIntegerAndGetValue();
+        }
+    }
+
+    if (numberLength >= 38 || numberLength <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+            "the second parameter should be <= 38 and > 0");
+    }
+
+    if(rv.length() > numberLength){
+        std::string res = "";
+        for(int i=0; i<numberLength; i++){
+            res += "*";
+        }
+        return getTempStringValue(res.c_str(), res.length());
+    } else {
+        return getTempStringValue(rv.c_str(), rv.length());
+    }
+}
+
 static std::string pcre2_error_code_message(int error_code, std::string prefix)
 {
     unsigned char buffer[1024];

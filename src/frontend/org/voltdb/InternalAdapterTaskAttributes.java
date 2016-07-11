@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.importer.AbstractImporter;
+
 final class InternalAdapterTaskAttributes implements InvocationClientHandler, InternalConnectionContext {
 
     final boolean m_isAdmin;
@@ -66,6 +68,10 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
 
     final public InternalConnectionContext asContext() {
         return this;
+    }
+
+    final public boolean isImporter() {
+        return m_proxy != null;
     }
 
     @Override

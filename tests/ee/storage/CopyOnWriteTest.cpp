@@ -22,38 +22,46 @@
  */
 
 #include "harness.h"
-#include "common/TupleSchema.h"
-#include "common/types.h"
+
+#include "common/DefaultTupleSerializer.h"
 #include "common/NValue.hpp"
 #include "common/RecoveryProtoMessage.h"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/TupleSchema.h"
+#include "common/types.h"
+#include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
 #include "execution/VoltDBEngine.h"
 #include "expressions/expressions.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
+#include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
+#include "storage/ElasticContext.h"
+#include "storage/ElasticScanner.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableutil.h"
-#include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-#include "storage/CopyOnWriteIterator.h"
 #include "storage/TableStreamerContext.h"
-#include "storage/ElasticScanner.h"
-#include "storage/ElasticContext.h"
-#include "storage/DRTupleStream.h"
-#include "stx/btree_set.h"
-#include "common/DefaultTupleSerializer.h"
-#include "jsoncpp/jsoncpp.h"
-#include <vector>
-#include <string>
-#include <iostream>
-#include <stdint.h>
-#include <stdarg.h>
+#include "storage/tableutil.h"
+
 #include <boost/foreach.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+
+#include "stx/btree_set.h"
+
 #include <murmur3/MurmurHash3.h>
+
+#include "jsoncpp/jsoncpp.h"
+
+#include <iostream>
+#include <stdint.h>
+#include <stdarg.h>
+#include <string>
+#include <vector>
+
 
 using namespace voltdb;
 
@@ -237,7 +245,7 @@ public:
                                                          m_columnNames, signature, false, 0, false, false,
                                                          tableAllocationTargetSize));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
@@ -1190,6 +1198,32 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     tuple.setDirtyFalse();
     ASSERT_TRUE(tuple.isActive());
     ASSERT_FALSE(tuple.isDirty());
+}
+
+// Simple test that performs snapshot activation on empty table, inserts tuples and calls stream more tuples
+TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
+    initTable(1, 0);
+    int tupleCount = 4;
+
+    // Empty table has an assigned allocated tuple storage
+    ASSERT_EQ(1, m_table->allocatedBlockCount());
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+    // activate snapshot
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    // insert tuples
+    addRandomUniqueTuples(m_table, tupleCount);
+    // do work - start taking snapshot of the table
+    char serializationBuffer[BUFFER_SIZE];
+    TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+    std::vector<int> retPositions;
+    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+    // no work done by snapshot as the table was empty
+    ASSERT_EQ(0, remaining);
+    ASSERT_EQ(outputStreams.size(), retPositions.size());
+    // check the # tuple insertion count is reflected correctly
+    ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
 }
 
 TEST_F(CopyOnWriteTest, BigTest) {

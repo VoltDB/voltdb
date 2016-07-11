@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TESTS=${1:-"callcenter contentionmark geospatial json-sessions uniquedevices voltkv voter windowing windowing-with-ddl"}
+TESTS=${1:-"adperformance bank-offers callcenter contentionmark geospatial json-sessions metrocard nbbo positionkeeper uniquedevices voltkv voter windowing windowing-with-ddl"}
 
 function echodo() {
   local opt_n=0 opt_s=0 opt_x=0 retval=0 opt=0 OPTIND
@@ -50,11 +50,13 @@ if [ `basename $PWD` != 'examples' ]; then
 fi
 echo Running $TESTS
 
+# in case there's a DB running...
+echodo voltadmin shutdown
+echodo sleep 5
+
 for proj in $TESTS
 do
     echodo pushd $proj
-    echodo voltadmin shutdown
-    echodo sleep 5
     echodo ./run.sh server &
     echodo sleep 20
     echodo ./run.sh init
@@ -63,6 +65,8 @@ do
         echodo ./run.sh jdbc-benchmark
         echodo ./run.sh sync-benchmark
     fi
+    echodo voltadmin shutdown
+    echodo sleep 5
     echodo ./run.sh clean
     echodo ./run.sh cleanall
     echodo popd

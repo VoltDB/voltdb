@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>VoltDB Demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <!-- <link rel="shortcut icon" href="../../assets/ico/favicon.png"> -->
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.spacelab.min.css" rel="stylesheet">
+    <!-- Bootstrap theme -->
+    <link href="css/bootstrap-theme.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="adperformance.css" rel="stylesheet">
+
+  </head>
+
+  <body>
+
+    <!-- Fixed navbar -->
+    <div class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="http://voltdb.com"><img alt="" src="img/logo.png" /></a>
+          <a class="navbar-brand" href="http://voltdb.github.io/app-adperformance">Ad Performance</a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li><a href="javascript:window.location='http://'+window.location.hostname+':8080'">VoltDB Management Center</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- flot chart -->
+      <div class="row">
+        <div class="col-md-8">
+          <h4>Live Responses</h4>
+          <div id="chart1" style="height:200px;"></div>
+        </div>
+        <div class="col-md-4">
+          <h4>Performance</h4>
+          <div id="tps_chart" style="height:200px;"></div>
+        </div>
+      </div>
+
+
+      <!-- Data tables -->
+      <div class="row">
+        <div class="col-md-8">
+          <h4>Campaign Performance</h4>
+          <table class="table table-bordered table-condensed table-hover table-volt" id="table_ad_sum">
+          </table>
+        </div>
+        <div class="col-md-4">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-8">
+          <h4>Banner Performance</h4>
+          <table class="table table-bordered table-striped table-condensed table-volt" id="table_camp_sum">
+          </table>
+        </div>
+        <div class="col-md-4">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" role="dialog"
+         aria-labelledby="myModalLabel" aria-hidden="true"
+         data-backdrop="static"
+         data-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body center-block">
+            <h4 class="modal-title" id="myModalLabel">Starting database, this may take 30 seconds...</h4>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/jquery-1.10.2.min.js"></script>
+    <script src="js/voltdb.js"></script>
+    <script src="js/voltdb-dashboard.js"></script>
+    <script src="js/jquery.flot.js"></script>
+    <script src="js/jquery.flot.time.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/holder.js"></script>
+    <script src="adperformance.js"></script>
+
+
+  </body>
+</html>

@@ -37,22 +37,32 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.entity.ContentType;
+import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.annotate.JsonPropertyOrder;
+import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
+import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -69,6 +79,8 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HttpsType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -82,6 +94,7 @@ public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
+    static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
 
     Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -90,6 +103,24 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+
+    // ObjectMapper is thread safe, and uses a lot of memory to cache
+    // class specific serializers and deserializers. Use JSR-133
+    // initialization on demand holder to hold a sole instance
+    public final static class MapperHolder {
+        final static public ObjectMapper mapper;
+        final static public JsonFactory factory = new JsonFactory();
+        static {
+            ObjectMapper configurable = new ObjectMapper();
+            // configurable.setSerializationInclusion(Inclusion.NON_NULL);
+            configurable.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            configurable.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            configurable.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+
+            mapper = configurable;
+        }
+    }
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
@@ -131,15 +162,12 @@ public class HTTPAdminListener {
             response.setHeader("Host", getHostHeader());
         }
 
-        //Build a client response based json response
-        protected String buildClientResponse(String jsonp, byte code, String msg) {
-            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-            if (jsonp != null) {
-                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
-            }
-            return rimpl.toJSONString();
-        }
+    }
 
+        //Build a client response based json response
+    private static String buildClientResponse(String jsonp, byte code, String msg) {
+        ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+        return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -149,6 +177,7 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try{
 
                 // if this is an internal jetty retry, then just tell
@@ -250,6 +279,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             handleReportPage(baseRequest, response);
         }
 
@@ -265,6 +295,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
@@ -295,12 +326,9 @@ public class HTTPAdminListener {
 
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
-        private final ObjectMapper m_mapper;
+        private final ObjectMapper m_mapper = MapperHolder.mapper;
 
         public UserProfileHandler() {
-            m_mapper = new ObjectMapper();
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
         // GET on /profile resources.
@@ -310,11 +338,13 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
+            super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -371,16 +401,10 @@ public class HTTPAdminListener {
 
     class DeploymentRequestHandler extends VoltRequestHandler {
 
-        final ObjectMapper m_mapper;
+        final ObjectMapper m_mapper = MapperHolder.mapper;
         String m_schema = "";
 
         public DeploymentRequestHandler() {
-            m_mapper = new ObjectMapper();
-            //Mixin for to not output passwords.
-            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
@@ -433,12 +457,13 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
@@ -794,9 +819,10 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
@@ -865,7 +891,7 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
@@ -899,18 +925,24 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            // The socket channel connector seems to be faster for our use
-            //SelectChannelConnector connector = new SelectChannelConnector();
-            connector = new ServerConnector(m_server);
+            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+                // The socket channel connector seems to be faster for our use
+                //SelectChannelConnector connector = new SelectChannelConnector();
+                connector = new ServerConnector(m_server);
 
-            if (intf != null && intf.length() > 0) {
-                connector.setHost(intf);
+                if (intf != null && intf.length() > 0) {
+                    connector.setHost(intf);
+                }
+                connector.setPort(port);
+                connector.setName("VoltDB-HTTPD");
+                //open the connector here so we know if port is available and Init work can retry with next port.
+                connector.open();
+                m_server.addConnector(connector);
+            } else { // HTTPS
+                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
             }
-            connector.setPort(port);
-            connector.setName("VoltDB-HTTPD");
-            //open the connector here so we know if port is available and Init work can retry with next port.
-            connector.open();
-            m_server.addConnector(connector);
+
+            //m_server.setConnectors(new Connector[] { connector, sslConnector });
 
             //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
@@ -963,6 +995,71 @@ public class HTTPAdminListener {
         }
     }
 
+    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
+        String sysProp = System.getProperty(sysPropName);
+        if (StringUtils.isNotBlank(sysProp)) {
+            return sysProp.trim();
+        } else {
+            String value = null;
+            if (store!=null) {
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            }
+            if (StringUtils.isBlank(value) && throwForNull) {
+                    throw new IllegalArgumentException(
+                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+            } else {
+                return value;
+            }
+        }
+    }
+
+    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
+        throws IOException {
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
+        sslContextFactory.setKeyStorePath(value);
+        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeystore(), "password", true));
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTruststore(), "path", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePath(value);
+        }
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTruststore(), "password", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePassword(value);
+        }
+        // exclude weak ciphers
+        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+        /* More configurable things that we are not using for now.
+        sslContextFactory.setKeyManagerPassword("password");
+                */
+
+        // SSL HTTP Configuration
+        HttpConfiguration httpsConfig = new HttpConfiguration();
+        httpsConfig.setSecureScheme("https");
+        httpsConfig.setSecurePort(port);
+        //Add this customizer to indicate we are in https land
+        httpsConfig.addCustomizer(new SecureRequestCustomizer());
+        HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
+
+        // SSL Connector
+        ServerConnector connector = new ServerConnector(m_server,
+            new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
+            factory);
+        if (intf != null && intf.length() > 0) {
+            connector.setHost(intf);
+        }
+        connector.setPort(port);
+        connector.setName("VoltDB-HTTPS");
+        connector.open();
+
+        return connector;
+    }
+
     public void start() throws Exception {
         try {
             m_server.start();
@@ -978,7 +1075,9 @@ public class HTTPAdminListener {
     }
 
     public void stop() {
-        httpClientInterface.stop();
+        if (httpClientInterface != null) {
+            httpClientInterface.stop();
+        }
 
         try {
             m_server.stop();
@@ -990,6 +1089,8 @@ public class HTTPAdminListener {
     }
 
     public void notifyOfCatalogUpdate() {
-        httpClientInterface.notifyOfCatalogUpdate();
+        if (httpClientInterface != null) {
+            httpClientInterface.notifyOfCatalogUpdate();
+        }
     }
 }

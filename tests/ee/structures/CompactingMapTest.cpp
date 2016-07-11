@@ -189,20 +189,34 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
+    // We don't have a cached last buffer yet.
+    ASSERT_FALSE(volt.hasCachedLastBuffer());
+    ASSERT_TRUE(volt.size() == 0);
     for (int i = 0; i < ITERATIONS; i++) {
         volt.insert(std::pair<std::string,std::string>(keyFromInt(i),keyFromInt(i)));
+        // Still don't have a cached last buffer, because we never
+        // had a last buffer.
+        ASSERT_FALSE(volt.hasCachedLastBuffer());
         //ASSERT_TRUE(volt.size() == i + 1);
 
         iter = volt.find(keyFromInt(i / 2));
         ASSERT_TRUE(!iter.isEnd());
         ASSERT_TRUE(iter.value().compare(keyFromInt(i / 2)) == 0);
     }
-
+    ASSERT_EQ(ITERATIONS, volt.size());
     for (int i = 0; i < ITERATIONS; i += 2) {
+        ASSERT_EQ(ITERATIONS-i/2, volt.size());
         volt.erase(keyFromInt(i));
+        ASSERT_EQ(ITERATIONS-i/2-1, volt.size());
+        ASSERT_FALSE(volt.hasCachedLastBuffer());
         iter = volt.find(keyFromInt(i));
         ASSERT_TRUE(iter.isEnd());
     }
+
+    // Insert another and test, because why not?
+    volt.insert(std::pair<std::string,std::string>(keyFromInt(0),keyFromInt(0)));
+    ASSERT_FALSE(volt.hasCachedLastBuffer());
+    volt.erase(keyFromInt(0));
 
     iter = volt.begin();
     for (int i = 1; i < ITERATIONS; i += 2, iter.moveNext()) {
@@ -227,6 +241,7 @@ TEST_F(CompactingMapTest, Benchmark) {
         ASSERT_TRUE(success);
     }
     ASSERT_TRUE(volt.size() == 0);
+    ASSERT_TRUE(volt.hasCachedLastBuffer());
 }
 
 TEST_F(CompactingMapTest, BenchmarkDel) {

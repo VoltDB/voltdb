@@ -22,29 +22,32 @@
  */
 
 #include "harness.h"
-#include "common/TupleSchema.h"
-#include "common/types.h"
+
+#include "common/DefaultTupleSerializer.h"
 #include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/TupleSchema.h"
+#include "common/types.h"
+#include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
 #include "execution/VoltDBEngine.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
+#include "storage/DRTupleStream.h"
 #include "storage/persistenttable.h"
+#include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/CopyOnWriteIterator.h"
-#include "storage/DRTupleStream.h"
-#include "common/DefaultTupleSerializer.h"
+
 #include "stx/btree_set.h"
 
-#include <vector>
-#include <string>
-#include <stdint.h>
 #include <boost/scoped_array.hpp>
 #include <boost/foreach.hpp>
+
+#include <stdint.h>
+#include <string>
+#include <vector>
 
 using namespace voltdb;
 
@@ -157,7 +160,7 @@ public:
         m_table = dynamic_cast<voltdb::PersistentTable*>(
                 voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
@@ -364,7 +367,7 @@ TEST_F(CompactionTest, BasicCompaction) {
         m_table->deleteTuple(tuple, true);
     }
     m_table->doForcedCompaction();
-    ASSERT_EQ( m_table->m_data.size(), 0);
+    ASSERT_EQ( m_table->m_data.size(), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
@@ -507,7 +510,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 
     }
     m_table->doForcedCompaction();
-    ASSERT_EQ( m_table->m_data.size(), 0);
+    ASSERT_EQ( m_table->m_data.size(), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
     for (int ii = 0; ii < tupleCount; ii++) {
         ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());

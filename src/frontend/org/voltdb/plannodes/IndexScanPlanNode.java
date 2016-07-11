@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -130,6 +130,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
         m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        m_differentiatorMap = new HashMap<>(srcNode.m_differentiatorMap);
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
         }
@@ -153,7 +154,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         int nextKeyIndex;
         if (m_endExpression != null &&
-                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
+                searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
         } else if (searchKeySize == 0) {
             m_skip_null_predicate = null;
@@ -233,7 +234,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
             exprs.add(expr);
 
-            skipNullPredicate = ExpressionUtil.combine(exprs);
+            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
@@ -445,9 +446,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     {
         if (newExpr != null)
         {
-            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
+            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
             newEndExpressions.add((AbstractExpression)newExpr.clone());
-            m_endExpression = ExpressionUtil.combine(newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
         }
     }
 
@@ -540,12 +541,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super.resolveColumnIndexes();
     }
 
+    private double getSearchExpressionKeyWidth(final double colCount) {
+        double keyWidth = m_searchkeyExpressions.size();
+        assert(keyWidth <= colCount);
+        // count a range scan as a half covered column
+        if (keyWidth > 0.0 &&
+            m_lookupType != IndexLookupType.EQ &&
+            m_lookupType != IndexLookupType.GEO_CONTAINS) {
+            keyWidth -= 0.5;
+        }
+        else if (keyWidth == 0.0 && m_endExpression != null) {
+            // When there is no start key, count an end-key as a single-column range scan key.
+
+            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
+            // might give a result that is more in line with multi-component start-key-only scans.
+            keyWidth = 0.5;
+        }
+        return keyWidth;
+    }
+
     @Override
     public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-            Cluster unusedCluster,
-            Database unusedDb,
-            DatabaseEstimates estimates,
-            ScalarValueHints[] unusedParamHints) {
+                                     Cluster unusedCluster,
+                                     Database unusedDb,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -558,25 +578,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
-        // get the width of the index and number of columns used
+        // get the width of the index - number of columns or expression included in the index
         // need doubles for math
-        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
-        double keyWidth = m_searchkeyExpressions.size();
-        assert(keyWidth <= colCount);
-
-        // count a range scan as a half covered column
-        if (keyWidth > 0.0 &&
-                m_lookupType != IndexLookupType.EQ &&
-                m_lookupType != IndexLookupType.GEO_CONTAINS) {
-            keyWidth -= 0.5;
-        }
-        // When there is no start key, count an end-key as a single-column range scan key.
-        else if (keyWidth == 0.0 && m_endExpression != null) {
-            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
-            // might give a result that is more in line with multi-component start-key-only scans.
-            keyWidth = 0.5;
-        }
-
+        final double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+        final double keyWidth = getSearchExpressionKeyWidth(colCount);
 
         // Estimate the cost of the scan (AND each projection and sort thereafter).
         // This "tuplesToRead" is not strictly speaking an expected count of tuples.
@@ -944,7 +949,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
             // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
             // bound plans in the cache
-            List<AbstractExpression> pves = expr.findAllSubexpressionsOfClass(ParameterValueExpression.class);
+            List<AbstractExpression> pves = expr.findAllParameterSubexpressions();
             m_bindings.addAll(pves);
         }
     }
@@ -955,7 +960,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // added for reverse scan purpose only
     public boolean isPredicatesOptimizableForAggregate() {
         // for reverse scan, need to examine "added" predicates
-        List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
+        List<AbstractExpression> predicates = ExpressionUtil.uncombinePredicate(m_predicate);
         // if the size of predicates doesn't equal 1, can't be our added artifact predicates
         if (predicates.size() != 1) {
             return false;
@@ -977,16 +982,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_endExpression, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_initialExpression, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_endExpression != null) {
+            collected.addAll(m_endExpression.findAllSubexpressionsOfClass(aeClass));
         }
-        return collected;
+        if (m_initialExpression != null) {
+            collected.addAll(m_initialExpression.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_skip_null_predicate != null) {
+            collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
+        }
     }
 
 }

@@ -235,55 +235,42 @@ std::string tableStreamTypeToString(TableStreamType type) {
 string valueToString(ValueType type)
 {
     switch (type) {
-      case VALUE_TYPE_INVALID: {
-          return "INVALID";
-      }
-      case VALUE_TYPE_NULL: {
-          return "NULL";
-      }
-      case VALUE_TYPE_TINYINT: {
-          return "TINYINT";
-      }
-      case VALUE_TYPE_SMALLINT: {
-          return "SMALLINT";
-          break;
-      }
-      case VALUE_TYPE_INTEGER: {
-          return "INTEGER";
-      }
-      case VALUE_TYPE_BIGINT: {
-          return "BIGINT";
-      }
-      case VALUE_TYPE_DOUBLE: {
-          return "FLOAT";
-      }
-      case VALUE_TYPE_VARCHAR: {
-          return "VARCHAR";
-      }
-      case VALUE_TYPE_VARBINARY: {
-          return "VARBINARY";
-      }
-      case VALUE_TYPE_TIMESTAMP: {
-          return "TIMESTAMP";
-      }
-      case VALUE_TYPE_DECIMAL: {
-          return "DECIMAL";
-      }
-      case VALUE_TYPE_POINT: {
-          return "POINT";
-      }
-      case VALUE_TYPE_GEOGRAPHY: {
-          return "GEOGRAPHY";
-      }
-      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
-          return "NUMERIC";
-      }
-      case VALUE_TYPE_ARRAY: {
-          return "ARRAY";
-      }
-      default:
-          return "INVALID";
+    case VALUE_TYPE_INVALID:
+        return "INVALID";
+    case VALUE_TYPE_NULL:
+        return "NULL";
+    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+        return "NUMERIC";
+    case VALUE_TYPE_TINYINT:
+        return "TINYINT";
+    case VALUE_TYPE_SMALLINT:
+        return "SMALLINT";
+    case VALUE_TYPE_INTEGER:
+        return "INTEGER";
+    case VALUE_TYPE_BIGINT:
+        return "BIGINT";
+    case VALUE_TYPE_DOUBLE:
+        return "FLOAT";
+    case VALUE_TYPE_VARCHAR:
+        return "VARCHAR";
+    case VALUE_TYPE_TIMESTAMP:
+        return "TIMESTAMP";
+    case VALUE_TYPE_DECIMAL:
+        return "DECIMAL";
+    case VALUE_TYPE_BOOLEAN:
+        return "BOOLEAN";
+    case VALUE_TYPE_ADDRESS:
+        return "ADDRESS";
+    case VALUE_TYPE_VARBINARY:
+        return "VARBINARY";
+    case VALUE_TYPE_POINT:
+        return "POINT";
+    case VALUE_TYPE_GEOGRAPHY:
+        return "GEOGRAPHY";
+    case VALUE_TYPE_ARRAY:
+        return "ARRAY";
     }
+    return "UNDEFINED";
 }
 
 ValueType stringToValue(string str )
@@ -292,6 +279,8 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_INVALID;
     } else if (str == "NULL") {
         return VALUE_TYPE_NULL;
+    } else if (str == "NUMERIC") {
+        return VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC;
     } else if (str == "TINYINT") {
         return VALUE_TYPE_TINYINT;
     } else if (str == "SMALLINT") {
@@ -302,14 +291,18 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_BIGINT;
     } else if (str == "FLOAT") {
         return VALUE_TYPE_DOUBLE;
-    } else if (str == "STRING") {
+    } else if (str == "VARCHAR") {
         return VALUE_TYPE_VARCHAR;
-    } else if (str == "VARBINARY") {
-        return VALUE_TYPE_VARBINARY;
     } else if (str == "TIMESTAMP") {
         return VALUE_TYPE_TIMESTAMP;
     } else if (str == "DECIMAL") {
         return VALUE_TYPE_DECIMAL;
+    } else if (str == "BOOLEAN") {
+        return VALUE_TYPE_BOOLEAN;
+    } else if (str == "ADDRESS") {
+        return VALUE_TYPE_ADDRESS;
+    } else if (str == "VARBINARY") {
+        return VALUE_TYPE_VARBINARY;
     } else if (str == "POINT") {
         return VALUE_TYPE_POINT;
     } else if (str == "GEOGRAPHY") {
@@ -461,6 +454,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
+    case PLAN_NODE_TYPE_PARTITIONBY: {
+        return "PARTITIONBY";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -513,6 +509,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
+    } else if (str == "PARTITIONBY") {
+        return PLAN_NODE_TYPE_PARTITIONBY;
     }
     return PLAN_NODE_TYPE_INVALID;
 }

@@ -188,17 +188,17 @@ class Deployment(unittest.TestCase):
                                "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
-                                                       {"name": "SNAPSHOTS", "size": "2"},
-                                                       {"name": "COMMANDLOG", "size": "2"}],
+                                                       {"name": "snapshots", "size": "2"},
+                                                       {"name": "commandlog", "size": "2"}],
                                                        "size": "10"},
                                                    "frequency": 5}},
             "security": {"enabled": True, "provider": "HASH"},
             "export": {"configuration": [{"enabled": False,
                                           "type": "kafka", "exportconnectorclass": "test",
-                                          "stream": "test", "property": [{"name": "test",
+                                          "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "test", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
         }
 
         response = requests.put(url_dep,

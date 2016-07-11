@@ -17,7 +17,7 @@
 import ast
 from collections import defaultdict
 from flask import Flask, render_template, jsonify, abort, make_response, request, Response
-from flask.ext.cors import CORS
+from flask_cors import CORS
 from flask.views import MethodView
 import json
 import os
@@ -41,6 +41,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+import signal
+import thread
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -56,6 +58,16 @@ __PORT__ = 8000
 ALLOWED_EXTENSIONS = ['xml']
 
 
+def receive_signal(signum, stack):
+    config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
+    Configuration.validate_and_convert_xml_to_json(config_path)
+    thread.start_new(sync_configuration, ())
+    # print 'Received:', signum
+
+
+signal.signal(signal.SIGHUP, receive_signal)
+
+
 @APP.errorhandler(400)
 def not_found(error):
     """
@@ -65,7 +77,7 @@ def not_found(error):
     Returns:
         Error message.
     """
-    return make_response(jsonify({'error': 'Bad request'}), 400)
+    return make_response(jsonify({'status': 400, 'statusString': 'Bad request'}), 400)
 
 
 @APP.errorhandler(404)
@@ -77,7 +89,7 @@ def not_found(error):
     Returns:
         Error message.
     """
-    return make_response(jsonify({'error': 'Not found'}), 404)
+    return make_response(jsonify({'status': 404, 'statusString': 'Not found'}), 404)
 
 
 @APP.route("/")
@@ -281,7 +293,8 @@ def map_deployment(request, database_id):
             'resourcemonitor'] is None:
             deployment['systemsettings']['resourcemonitor'] = {}
 
-        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and \
+                request.json['systemsettings']['resourcemonitor']['memorylimit']:
             deployment['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                     and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
@@ -298,8 +311,8 @@ def map_deployment(request, database_id):
             deployment['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
-            deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
             if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
                 deployment['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
                 if request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
                     for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
@@ -331,10 +344,14 @@ def map_deployment(request, database_id):
         deployment['import']['configuration'] = []
         i = 0
         for configuration in request.json['import']['configuration']:
+            if 'module' not in configuration:
+                module = ''
+            else:
+                module = configuration['module']
             deployment['import']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
-                    'module': configuration['module'],
+                    'module': module,
                     'type': configuration['type'],
                     'format': configuration['format'],
                     'property': []
@@ -351,7 +368,7 @@ def map_deployment(request, database_id):
                     )
                 i += 1
     if 'export' in request.json:
-        if 'export' not in deployment or deployment['export'] is None or deployment['import'] == "None":
+        if 'export' not in deployment or deployment['export'] is None or deployment['export'] == "None":
             deployment['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
@@ -360,13 +377,18 @@ def map_deployment(request, database_id):
         except Exception, err:
             print err
         i = 0
+
         for configuration in request.json['export']['configuration']:
+            if 'exportconnectorclass' not in configuration:
+                export_connector_class = ''
+            else:
+                export_connector_class = configuration['exportconnectorclass']
             deployment['export']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
                     'stream': configuration['stream'],
                     'type': configuration['type'],
-                    'exportconnectorclass': configuration['exportconnectorclass'],
+                    'exportconnectorclass': export_connector_class,
                     'property': []
                 }
             )
@@ -395,37 +417,37 @@ def map_deployment(request, database_id):
             )
 
     if 'dr' in request.json:
-        if 'dr' not in deployment or deployment['dr'] is None:
+        if not request.json['dr']:
             deployment['dr'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr']:
-        if not hasattr(deployment['dr'], 'connection'):
-            deployment['dr']['connection'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr'] and 'source' not in request.json['dr']['connection']:
-        deployment['dr']['connection'] = None
-
-    if 'dr' in request.json and 'id' in request.json['dr']:
-        deployment['dr']['id'] = request.json['dr']['id']
-
-    if 'dr' in request.json and 'listen' in request.json['dr']:
-        deployment['dr']['listen'] = request.json['dr']['listen']
-
-    if 'dr' in request.json and request.json['dr']:
-        if 'port' in request.json['dr']:
-            deployment['dr']['port'] = request.json['dr']['port']
         else:
-            deployment['dr']['port'] = None
+            if 'dr' not in deployment or deployment['dr'] is None:
+                deployment['dr'] = {}
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] \
-            and 'source' in request.json['dr']['connection']:
-        deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            if 'connection' in request.json['dr'] and request.json['dr']['connection']:
+                if not hasattr(deployment['dr'], 'connection'):
+                    deployment['dr']['connection'] = {}
 
-    if 'dr' in request.json and not request.json['dr']:
-        deployment['dr'] = {}
+                if 'source' not in request.json['dr']['connection'] or \
+                        ('source' in request.json['dr']['connection'] and
+                                 request.json['dr']['connection']['source'].strip() == ''):
+                    deployment['dr']['connection'] = None
+                else:
+                    deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            else:
+                deployment['dr']['connection'] = None
+            if 'id' in request.json['dr']:
+                deployment['dr']['id'] = request.json['dr']['id']
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] and not request.json['dr']['connection']:
-        deployment['dr']['connection'] = {}
+            if 'listen' in request.json['dr']:
+                deployment['dr']['listen'] = request.json['dr']['listen']
+            else:
+                deployment['dr']['listen'] = True
+
+            if request.json['dr']:
+                if 'port' in request.json['dr']:
+                    deployment['dr']['port'] = request.json['dr']['port']
+                else:
+                    deployment['dr']['port'] = None
 
     return deployment
 
@@ -492,31 +514,35 @@ def check_port_valid(port_option, server):
         port = get_port(request.json[port_option])
 
     if port == server_port:
-        return jsonify(success=False,
-                       errors="Port %s for the same host is already used by server %s for %s" % \
+        return jsonify(status= 401,
+                       statusString="Port %s for the same host is already used by server %s for %s." % \
                               (port, server['hostname'], port_option))
 
 
-def validate_server_ports(database_id):
+def validate_server_ports(database_id, server_id=-1):
     arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
            "client-listener"]
 
     specified_port_values = {
-        "http-listener": get_port(request.json.get('http-listener', "")),
-        "admin-listener": get_port(request.json.get('admin-listener', "")),
-        "replication-listener": get_port(request.json.get('replication-listener', "")),
-        "client-listener": get_port(request.json.get('client-listener', "")),
-        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-        "internal-listener": get_port(request.json.get('internal-listener', ""))
+        "http-listener": get_port(request.json.get('http-listener', "").strip().lstrip("0")),
+        "admin-listener": get_port(request.json.get('admin-listener', "").strip().lstrip("0")),
+        "replication-listener": get_port(request.json.get('replication-listener', "").strip().lstrip("0")),
+        "client-listener": get_port(request.json.get('client-listener', "").strip().lstrip("0")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "").strip().lstrip("0")),
+        "internal-listener": get_port(request.json.get('internal-listener', "").strip().lstrip("0"))
     }
 
     for option in arr:
         value = specified_port_values[option]
         for port_key in specified_port_values.keys():
             if option != port_key and value is not None and specified_port_values[port_key] == value:
-                return jsonify(success=False, errors="Duplicate port")
+                return jsonify(status=401, statusString="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    if server_id == -1:
+        servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    else:
+        servers = [servers for servers in database_servers if servers['hostname'] ==
+                   request.json['hostname'] and servers['id'] != server_id]
     for server in servers:
         for option in arr:
             result = check_port_valid(option, server)
@@ -543,16 +569,26 @@ def check_size_value(value, key):
         try:
             str_value = replace_last(value, '%', '')
             int_value = int(str_value)
-            if int_value < 0 or int_value > 100:
-                return jsonify({'error': key + ' percent value must be between 0 and 100.'})
+            min_value = 0
+            error_msg = key + ' percent value must be between 0 and 99.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' percent value must be between 1 and 99.'
+            if int_value < min_value or int_value > 99:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
         try:
             int_value = int(value)
-            if int_value < 0 or int_value > 2147483647:
-                return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+            min_value = 0
+            error_msg = key + ' value must be between 0 and 2147483647.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' value must be between 1 and 2147483647.'
+            if int_value < min_value or int_value > 2147483647:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
@@ -584,9 +620,9 @@ def allowed_file(filename):
 
 def get_servers_from_database_id(database_id):
     servers = []
-    database = Global.DATABASES.get(database_id)
+    database = Global.DATABASES.get(int(database_id))
     if database is None:
-        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % int(database_id)}), 404)
     else:
         members = database['members']
 
@@ -594,6 +630,14 @@ def get_servers_from_database_id(database_id):
         server = Global.SERVERS.get(server_id)
         servers.append(server)
     return servers
+
+
+def check_invalid_roles(roles):
+    roles = str(request.json['roles']).split(',')
+    for role in roles:
+        if role.strip() == '':
+            return False
+    return True
 
 
 class DictClass(dict):
@@ -678,11 +722,11 @@ class ServerAPI(MethodView):
             Information and the status of server if it is saved otherwise the error message.
         """
         if 'id' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' while creating server.'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'You cannot specify \'Id\' while creating server.'}), 404)
 
         inputs = ServerInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401,statusString=inputs.errors)
 
         result = validate_server_ports(database_id)
         if result is not None:
@@ -691,7 +735,7 @@ class ServerAPI(MethodView):
         if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = len(Global.SERVERS) + 1
+            server_id = Global.SERVERS.keys()[-1] + 1
 
         Global.SERVERS[server_id] = {
             'id': server_id,
@@ -699,15 +743,15 @@ class ServerAPI(MethodView):
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
-            'admin-listener': request.json.get('admin-listener', "").strip(),
-            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip(),
-            'replication-listener': request.json.get('replication-listener', "").strip(),
-            'client-listener': request.json.get('client-listener', "").strip(),
+            'admin-listener': request.json.get('admin-listener', "").strip().lstrip("0"),
+            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip().lstrip("0"),
+            'replication-listener': request.json.get('replication-listener', "").strip().lstrip("0"),
+            'client-listener': request.json.get('client-listener', "").strip().lstrip("0"),
             'internal-interface': request.json.get('internal-interface', "").strip(),
             'external-interface': request.json.get('external-interface', "").strip(),
             'public-interface': request.json.get('public-interface', "").strip(),
-            'internal-listener': request.json.get('internal-listener', "").strip(),
-            'http-listener': request.json.get('http-listener', "").strip(),
+            'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
+            'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
             'placement-group': request.json.get('placement-group', "").strip()
         }
 
@@ -722,14 +766,13 @@ class ServerAPI(MethodView):
         sync_configuration()
         Configuration.write_configuration_file()
         url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/' % \
-                                  (__IP__, __PORT__, database_id, server_id)
+              (__IP__, __PORT__, database_id, server_id)
 
         resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'server': Global.SERVERS[server_id],
-                              'members': current_database['members']}), 201)
+                                      'members': current_database['members']}), 201)
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def delete(database_id, server_id):
@@ -783,7 +826,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'error': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -793,12 +836,12 @@ class ServerAPI(MethodView):
         if server_id in members:
             inputs = ServerInputs(request)
             if not inputs.validate():
-                return jsonify(success=False, errors=inputs.errors)
+                return jsonify(status=401, statusString=inputs.errors)
             current_server = Global.SERVERS.get(server_id)
             if current_server is None:
                 abort(404)
 
-            result = validate_server_ports(database_id)
+            result = validate_server_ports(database_id, server_id)
             if result is not None:
                 return result
 
@@ -835,8 +878,7 @@ class ServerAPI(MethodView):
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
         else:
             return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
-            server_id, database_id)})
-
+                server_id, database_id)})
 
 
 class DatabaseAPI(MethodView):
@@ -873,19 +915,20 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is saved otherwise the error message.
         """
         if 'id' in request.json or 'members' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
+            return make_response(
+                jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         databases = [v if type(v) is list else [v] for v in Global.DATABASES.values()]
         if request.json['name'] in [(d["name"]) for item in databases for d in item]:
-            return make_response(jsonify({'error': 'database name already exists'}), 404)
+            return make_response(jsonify({'status':400, 'statusString': 'database name already exists'}), 400)
 
         if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = len(Global.DATABASES) + 1
+            database_id = Global.DATABASES.keys()[-1] + 1
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
@@ -902,13 +945,13 @@ class DatabaseAPI(MethodView):
 
         Configuration.write_configuration_file()
         url = 'http://%s:%u/api/1.0/databases/%u' % \
-                                  (__IP__, __PORT__, database_id)
+              (__IP__, __PORT__, database_id)
 
-        resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'database': Global.DATABASES.get(database_id)}), 201)
+        resp = make_response(
+            jsonify({'status': 201, 'statusString': 'OK', 'database': Global.DATABASES.get(database_id)}), 201)
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def put(database_id):
@@ -920,12 +963,13 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is updated otherwise the error message.
         """
         if 'members' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Members\' while updating database.'}), 404)
+            return make_response(jsonify({'status':404, 'statusString': 'You cannot specify \'Members\' while updating database.'}), 404)
         if 'id' in request.json and database_id != request.json['id']:
-            return make_response(jsonify({'error': 'Database Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'Database Id mentioned in the payload and url doesn\'t match.'}),
+                                 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -1008,16 +1052,21 @@ class DeploymentUserAPI(MethodView):
         #     """
         inputs = UserInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
+
+        is_invalid_roles = check_invalid_roles(request.json['roles'])
+        if not is_invalid_roles:
+            return make_response(jsonify({'status': 404, 'statusString': 'Invalid user roles.'}))
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
-            return make_response(jsonify({'error': 'user name already exists'}), 404)
+            return make_response(jsonify({'status': 404,  'statusString': 'user name already exists'}), 404)
 
+        user_roles = ','.join(set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
-            user_id = len(Global.DEPLOYMENT_USERS) + 1
+            user_id = Global.DEPLOYMENT_USERS.keys()[-1] + 1
 
         try:
 
@@ -1026,7 +1075,7 @@ class DeploymentUserAPI(MethodView):
                 'databaseid': database_id,
                 'name': request.json['name'],
                 'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
-                'roles': request.json['roles'],
+                'roles': user_roles,
                 'plaintext': True
             }
         except Exception, err:
@@ -1049,21 +1098,27 @@ class DeploymentUserAPI(MethodView):
 
         inputs = UserInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if current_user is None:
+            return make_response(jsonify({'status': 401, 'statusString': 'No user found for id: %u' % user_id}), 404)
+
+        is_invalid_roles = check_invalid_roles(request.json['roles'])
+        if not is_invalid_roles:
+            return make_response(jsonify({'status': 404, 'statusString': 'Invalid user roles.'}))
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
-            return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+            return make_response(jsonify({'status': 404, 'statusString': 'user name already exists'}), 404)
+        user_roles = ','.join(set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
         current_user['password'] = urllib.unquote(
             str(request.json.get('password', current_user['password'])).encode('ascii')).decode('utf-8')
-        current_user['roles'] = request.json.get('roles', current_user['roles'])
+        current_user['roles'] = user_roles
         current_user['plaintext'] = request.json.get('plaintext', current_user['plaintext'])
         sync_configuration()
         Configuration.write_configuration_file()
@@ -1104,8 +1159,14 @@ class StartDatabaseAPI(MethodView):
         """
 
         try:
+
+            if 'pause' in request.args:
+                is_pause = request.args.get('pause').lower()
+            else:
+                is_pause = "false"
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database()
+            response = database.start_database(is_pause)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1127,12 +1188,17 @@ class RecoverDatabaseAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+            else:
+                pause = "false"
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(True)
+            response = database.start_database(True, pause)
             return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
+            return make_response(jsonify({'status':500, 'statusString': str(err)}),
                                  500)
 
 
@@ -1167,13 +1233,14 @@ class StopDatabaseAPI(MethodView):
                 # because voltadmin shutdown gives 'Connection broken' output
                 resp_json = json.loads(json.loads(response.data)['statusString'])
                 resp_status = {}
+
                 for value in resp_json:
                     resp_status[value] = {'status': json.loads(resp_json[value])['statusString']}
                 return make_response(jsonify({'status': 200, 'statusString': str(resp_status)}),
                                      200)
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusString': str(err)}),
+                return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                      500)
 
 
@@ -1196,7 +1263,7 @@ class StopServerAPI(MethodView):
         else:
             is_force = "false"
 
-        if is_force == "true":
+        if is_force == "false":
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
@@ -1214,7 +1281,8 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
                 if 'Connection broken' in response:
-                    return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
+                    return make_response(
+                        jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
                 else:
                     return make_response(jsonify({'status': 200, 'statusString': response}))
             except Exception, err:
@@ -1238,12 +1306,17 @@ class StartServerAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+            else:
+                pause = "false"
+
             if 'blocking' in request.args:
                 is_blocking = int(request.args.get('blocking'))
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, False, is_blocking)
+            response = server.start_server(server_id, pause, False, is_blocking)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
@@ -1251,7 +1324,7 @@ class StartServerAPI(MethodView):
                 return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                  500)
 
 
@@ -1270,6 +1343,9 @@ class StartLocalServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             if 'blocking' in request.args:
@@ -1277,7 +1353,7 @@ class StartLocalServerAPI(MethodView):
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, is_blocking )
+            return server.check_and_start_local_server(sid, pause, database_id, False, is_blocking)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1299,10 +1375,13 @@ class RecoverServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, True)
+            response = server.check_and_start_local_server(sid, pause, database_id, True)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1347,7 +1426,7 @@ class SyncVdmConfiguration(MethodView):
 
         except Exception, errs:
             print traceback.format_exc()
-            return jsonify({'status': 'success', 'error': str(errs)})
+            return jsonify({'status': 'success', 'statusString': str(errs)})
 
         try:
             Global.DATABASES = databases
@@ -1356,9 +1435,9 @@ class SyncVdmConfiguration(MethodView):
             Global.DEPLOYMENT_USERS = deployment_users
         except Exception, errs:
             print traceback.format_exc()
-            return jsonify({'status': 'success', 'error': str(errs)})
+            return jsonify({'status': 'success', 'statusString': str(errs)})
 
-        return jsonify({'status': 'success'})
+        return jsonify({'status': '201', 'statusString': 'success'})
 
 
 class VdmConfiguration(MethodView):
@@ -1406,10 +1485,7 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        if 'text/xml' in request.headers['Accept']:
-            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-            return Response(deployment_content, mimetype='text/xml')
-        else:
+        if 'Accept' in request.headers and 'application/json' in request.headers['Accept']:
             deployment = Global.DEPLOYMENT.get(database_id)
 
             new_deployment = deployment.copy()
@@ -1431,19 +1507,22 @@ class DatabaseDeploymentAPI(MethodView):
 
             del new_deployment['databaseid']
 
-
-
             return jsonify({'deployment': new_deployment})
+        else:
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
+            return Response(deployment_content, mimetype='text/xml')
 
     @staticmethod
     def put(database_id):
         if 'application/json' in request.headers['Content-Type']:
             inputs = JsonInputs(request)
             if not inputs.validate():
-                return jsonify(success=False, errors=inputs.errors)
+                return jsonify(status=401, statusString=inputs.errors)
             result = Configuration.check_validation_deployment(request)
             if 'status' in result and result['status'] == 'error':
                 return jsonify(result)
+            if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
+                return jsonify({'status': '401', 'statusString': 'DR id is required.'})
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()
@@ -1453,7 +1532,7 @@ class DatabaseDeploymentAPI(MethodView):
             if 'status' in result and result['status'] == 'failure':
                 return jsonify(result)
             else:
-                return jsonify({'status': 'success'})
+                return jsonify({'status': 201, 'statusString': "success"})
 
 
 class VdmAPI(MethodView):
@@ -1479,7 +1558,7 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_run = False
         if not database:
-            return make_response(jsonify({"status": 404, 'error': 'Not found'}), 404)
+            return make_response(jsonify({"status": 404, 'statusString': 'Not found'}), 404)
         else:
             if len(database['members']) == 0:
                 return jsonify({"status": 404, "statusString": "No Members"})
@@ -1512,7 +1591,9 @@ class StatusDatabaseAPI(MethodView):
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-            return jsonify({'status': 200, 'statusString': 'OK', 'dbStatus': {'status': status, 'serverStatus': serverDetails, 'isFreshStart': isFreshStart}})
+            return jsonify({'status': 200, 'statusString': 'OK',
+                            'dbStatus': {'status': status, 'serverStatus': serverDetails,
+                                         'isFreshStart': isFreshStart}})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -1526,7 +1607,7 @@ class StatusDatabaseServerAPI(MethodView):
         else:
             server = Global.SERVERS.get(server_id)
             if len(database['members']) == 0:
-                return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
+                return jsonify({"status": 200, "statusString": "OK", 'statusString': 'errorNoMembers'})
             if not server:
                 return make_response(jsonify({"status": 404, "statusString": "Not found"}), 404)
             elif server_id not in database['members']:
@@ -1550,7 +1631,12 @@ class StatusDatabaseServerAPI(MethodView):
                     client = voltdbclient.FastSerializer(client_host, client_port)
                     proc = voltdbclient.VoltProcedure(client, "@Ping")
                     response = proc.call()
-                    return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running" } })
+                    voltProcess = voltdbserver.VoltDatabase(database_id)
+                    if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
+                        return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running"}})
+                    else:
+                        return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
+                                                                                              'details': ""}})
                 except:
                     voltProcess = voltdbserver.VoltDatabase(database_id)
                     error = ''
@@ -1559,12 +1645,12 @@ class StatusDatabaseServerAPI(MethodView):
                     except:
                         pass
 
-                    if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                    if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
                                                                                               'details': error}})
                     else:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
-                                                                                               'details': error}})
+                                                                                              'details': error}})
 
 
 def main(runner, amodule, config_dir, data_dir, server):
@@ -1641,47 +1727,50 @@ def main(runner, amodule, config_dir, data_dir, server):
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
-                     methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, defaults={'database_id': None},
                      view_func=DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>', strict_slashes=False, view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, view_func=DATABASE_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
 
     # Internal API
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', strict_slashes=False,
+                     view_func=STATUS_DATABASE_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', strict_slashes=False,
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/voltdeploy/status/', strict_slashes=False,
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/', strict_slashes=False,
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/', strict_slashes=False,
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False,
+                     view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')

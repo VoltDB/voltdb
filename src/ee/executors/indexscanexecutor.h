@@ -69,6 +69,8 @@ class LimitPlanNode;
 
 class AggregateExecutorBase;
 
+struct CountingPostfilter;
+
 class IndexScanExecutor : public AbstractExecutor
 {
 public:
@@ -109,6 +111,8 @@ private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+    void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.

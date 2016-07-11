@@ -72,26 +72,36 @@ public class TupleValueExpression extends AbstractValueExpression {
                                 String tableAlias,
                                 String columnName,
                                 String columnAlias,
-                                int columnIndex) {
+                                int columnIndex,
+                                int differentiator) {
         super(ExpressionType.VALUE_TUPLE);
         m_tableName = tableName;
         m_tableAlias = tableAlias;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
         m_columnIndex = columnIndex;
+        m_differentiator = differentiator;
+    }
+
+    public TupleValueExpression(String tableName,
+            String tableAlias,
+            String columnName,
+            String columnAlias,
+            int columnIndex) {
+        this(tableName, tableAlias, columnName, columnAlias, columnIndex, -1);
     }
 
     public TupleValueExpression(String tableName,
                                 String tableAlias,
                                 String columnName,
                                 String columnAlias) {
-        this(tableName, tableAlias, columnName, columnAlias, -1);
+        this(tableName, tableAlias, columnName, columnAlias, -1, -1);
     }
 
     public TupleValueExpression(String tableName,
                                 String columnName,
                                 int columnIndex) {
-        this(tableName, null, columnName, null, columnIndex);
+        this(tableName, null, columnName, null, columnIndex, -1);
     }
 
     public TupleValueExpression() {

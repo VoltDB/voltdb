@@ -114,7 +114,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   bool everysite	    "Does the stored procedure as a single procedure txn at every site?"
   bool systemproc           "Is this procedure an internal system procedure?"
   bool defaultproc          "Is this procedure a default auto-generated CRUD procedure?"
-  bool hasjava              "Is this a full java stored procedure or is it just a single stmt?"
+  bool hasjava              "Is this a full java (or other JVM language) stored procedure or is it just a single stmt?"
   bool hasseqscans          "Do any of the proc statements use sequential scans?"
   string language           "What language is the procedure implemented with"
   Table? partitiontable     "Which table contains the partition column for this procedure?"
@@ -125,19 +125,37 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
 end
 
-begin Table                        "A table (relation) in the database"
-  Column* columns                  "The set of columns in the table"
-  Index* indexes                   "The set of indexes on the columns in the table"
-  Constraint* constraints          "The set of constraints on the table"
-  bool isreplicated                "Is the table replicated?"
-  Column? partitioncolumn          "On which column is the table partitioned"
-  int estimatedtuplecount          "A rough estimate of the number of tuples in the table; used for planning"
-  MaterializedViewInfo* views      "Information about materialized views based on this table's content"
-  Table? materializer              "If this is a materialized view, this field stores the source table"
-  string signature                 "Catalog version independent signature of the table consisting of name and schema"
-  int tuplelimit                   "A maximum number of rows in a table"
-  bool isDRed                      "Is this table DRed?"
-  Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
+begin Table                          "A table (relation) in the database"
+  Column* columns                    "The set of columns in the table"
+  Index* indexes                     "The set of indexes on the columns in the table"
+  Constraint* constraints            "The set of constraints on the table"
+  bool isreplicated                  "Is the table replicated?"
+  Column? partitioncolumn            "On which column is the table partitioned"
+  int estimatedtuplecount            "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views        "Information about materialized views based on this table's content"
+  MaterializedViewHandler* mvHandler "Only on result table of a materialized view"
+  ViewTrigger* viewTriggers          "Only on the source table of a materialized view"
+  Table? materializer                "If this is a materialized view, this field stores the source table"
+  string signature                   "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit                     "A maximum number of rows in a table"
+  bool isDRed                        "Is this table DRed?"
+  Statement* tuplelimitDeleteStmt    "Delete statement to execute if tuple limit will be exceeded"
+end
+
+begin ViewTrigger
+  Table? destTable
+  int tablePos
+end
+
+begin MaterializedViewHandler       "Information used to build and update a materialized view"
+  Table? dest                       "The table which will be updated when the source table is updated"
+  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string predicate                  "A filtering predicate"
+  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
+  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
+  IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
+  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
+  Statement* createQuery            "The SELECT statement that defines the view"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
@@ -146,8 +164,8 @@ begin MaterializedViewInfo          "Information used to build and update a mate
   string predicate                  "A filtering predicate"
   string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
-  IndexRef* indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
-  Statement* fallbackQueryStmts      "Statements to search for mview min/max fallback value"
+  IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
+  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
 end
 
 begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"

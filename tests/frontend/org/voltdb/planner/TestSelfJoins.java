@@ -128,10 +128,10 @@ public class TestSelfJoins  extends PlannerTestCase {
 
         // SELF JOIN on non-partitioned columns
         failToCompile("select * FROM P1 A JOIN P1 B ON A.C = B.A",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
         // SELF JOIN on non-partitioned column
         failToCompile("select * FROM P1 A JOIN P1 B ON A.C = B.C",
-                      "Join of multiple partitioned tables has insufficient join criteria");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testInvalidSelfJoin() {
@@ -394,6 +394,6 @@ public class TestSelfJoins  extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestJoinOrder.class.getResource("testself-joins-ddl.sql"), "testselfjoins", false);
+        setupSchema(TestJoinOrder.class.getResource("testplans-selfjoins-ddl.sql"), "testselfjoins", false);
     }
 }

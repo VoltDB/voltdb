@@ -62,6 +62,10 @@ public class TestMaxSuite extends RegressionSuite {
     }
 
     public void testAdHocMaxSQLText() throws Exception {
+        if (isValgrind()) {
+            return;
+        }
+
         Client client = this.getClient();
         StringBuilder stringBuilder = new StringBuilder(
                 "select * from max_in_table where column0 in(");

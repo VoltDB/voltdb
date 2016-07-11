@@ -75,7 +75,10 @@ arr = [{
 if options.virtual is not None:
     if str(options.virtual).lower() == 'false':
         venv_starter.main(arr)
-    else:
+    elif str(options.virtual).lower() == 'true':
         venv_starter.start_virtual_environment(arr)
+    else:
+        sys.stderr.write('Virtual option only allows \'true\' and \'false\' values.\n')
+        sys.exit(1)
 else:
     venv_starter.start_virtual_environment(arr)

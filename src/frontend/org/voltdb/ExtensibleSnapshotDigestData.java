@@ -125,11 +125,10 @@ public class ExtensibleSnapshotDigestData {
                     JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
                     Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
                     if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
-                        log.error("Found a mismatch in export sequence numbers while recording snapshot metadata " +
-                                " for partition " + partitionId +
+                        log.error("Found a mismatch in export sequence numbers of export table " + tableName +
+                                " while recording snapshot metadata for partition " + partitionId +
                                 " the sequence number should be the same at all replicas, but one had " +
-                                existingSequenceNumber
-                                + " and another had " + partitionSequenceNumber);
+                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber);
                     }
                     existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
 
@@ -205,6 +204,9 @@ public class ExtensibleSnapshotDigestData {
     static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerState)
             throws JSONException {
         JSONObject clusters = new JSONObject();
+        if (drMixedClusterSizeConsumerState == null) {
+            return clusters;
+        }
         for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
             // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
             // from the local cluster's partition count (which is not tracked here)

@@ -392,7 +392,7 @@ public class TestClientInterface {
         assertEquals(1, parameters.length);
         assertEquals(3, parameters[0]);
         AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
-        assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
+        assertTrue(Arrays.equals(VoltType.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
         assertEquals(query, sql);

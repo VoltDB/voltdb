@@ -63,6 +63,7 @@ doc/tutorials/auction/csvloader_*.csv
 /tests/sqlcmd/scripts/**/*.out
 /tests/sqlcmd/scripts/**/*.outclean
 /tests/sqlcmd/scripts/**/*.outdiffs
+/tests/sqlcmd/sqlcmdtest-*-procs.jar
 /tools/voltify.venv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java
@@ -70,3 +71,18 @@ doc/tutorials/auction/csvloader_*.csv
 /tests/sqlcmd/scripts/**/*.outdiffs
 out
 bundles
+*.lcbak
+.gradle/*
+build.gradle
+/lib/python/vdm/.idea/
+/lib/python/vdm/server/nohup.out/*
+/lib/python/vdm/tests/geb_vdm/.gradle/*
+/lib/python/vdm/tests/geb_vdm/build/*
+/lib/python/vdm/tests/server/test_reports/*
+/src/frontend/org/voltdb/.gradle/*
+/src/frontend/org/voltdb/.idea/*
+/tests/.idea/*
+/tests/geb/vmc/.idea/*
+/build/lib/voltdb.war
+/tests/geb/vmc/.nb-gradle/
+/lib/python/vdm/tests/geb_vdm/.nb-gradle/

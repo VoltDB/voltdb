@@ -137,8 +137,9 @@ bool tableutil::addRandomTuples(Table* table, int num_of_tuples)
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
         TableTuple &tuple = table->tempTuple();
         setRandomTupleValues(table, &tuple);
-        //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debugNoHeader() << std::endl;
-        //VOLT_DEBUG("Created random tuple: %s", tuple.debug().c_str());
+        // std::cout << std::endl << "Creating tuple" << std::endl
+        //           << tuple.debug(table->name()) << std::endl;
+        // VOLT_DEBUG("  Created random tuple: %s\n", tuple.debug(table->name()).c_str());
         if ( ! table->insertTuple(tuple)) {
             return false;
         }
@@ -158,8 +159,8 @@ bool tableutil::addDuplicateRandomTuples(Table* table, int num_of_tuples)
     TableTuple &tuple = table->tempTuple();
     setRandomTupleValues(table, &tuple);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
-        //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debugNoHeader() << std::endl;
-        //VOLT_DEBUG("Created random tuple: %s", tuple.debug().c_str());
+        //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debug(table->name()) << std::endl;
+        //VOLT_DEBUG("Created random tuple: %s", tuple.debug(table->name()).c_str());
         if ( ! table->insertTuple(tuple)) {
             return false;
         }

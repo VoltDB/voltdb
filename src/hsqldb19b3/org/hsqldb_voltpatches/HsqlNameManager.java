@@ -75,7 +75,7 @@ public final class HsqlNameManager {
 
     static {
         for (int i = 0; i < autoColumnNames.length; i++) {
-            autoColumnNames[i] = new HsqlName(staticManager, "C" + (i + 1), 0,
+            autoColumnNames[i] = new HsqlName(staticManager, makeAutoColumnName("C", i), 0,
                                               false);
             autoNoNameColumnNames[i] = String.valueOf(i);
         }
@@ -215,19 +215,23 @@ public final class HsqlNameManager {
             return autoColumnNames[i];
         }
 
-        return new HsqlName(staticManager, "C_" + (i + 1), 0, false);
+        return new HsqlName(staticManager, makeAutoColumnName("C_", i), 0, false);
     }
 
-    /**
-     * Column index i is 0 based, returns 1 based numbered column.
-     */
     static public String getAutoColumnNameString(int i) {
 
         if (i < autoColumnNames.length) {
             return autoColumnNames[i].name;
         }
 
-        return "C" + (i + 1);
+        return makeAutoColumnName("C", i);
+    }
+
+    /**
+     * Column index i is 0 based, returns 1 based numbered column.
+     */
+    private static String makeAutoColumnName(String prefix, int i) {
+        return prefix + (i + 1);
     }
 
     static public String getAutoNoNameColumnString(int i) {
@@ -302,11 +306,13 @@ public final class HsqlNameManager {
             this.isNameQuoted = isNameQuoted;
         }
 
-        public int hashCode() {
+        @Override
+		public int hashCode() {
             return name.hashCode();
         }
 
-        public boolean equals(Object other) {
+        @Override
+		public boolean equals(Object other) {
 
             if (other instanceof SimpleName) {
                 return ((SimpleName) other).isNameQuoted == isNameQuoted
@@ -367,7 +373,8 @@ public final class HsqlNameManager {
             }
         }
 
-        public String getStatementName() {
+        @Override
+		public String getStatementName() {
             return statementName;
         }
 
@@ -457,7 +464,8 @@ public final class HsqlNameManager {
             }
         }
 
-        public boolean equals(Object other) {
+        @Override
+		public boolean equals(Object other) {
 
             if (other instanceof HsqlName) {
                 return hashCode == ((HsqlName) other).hashCode;
@@ -469,7 +477,8 @@ public final class HsqlNameManager {
         /**
          * hash code for this object is its unique serial number.
          */
-        public int hashCode() {
+        @Override
+		public int hashCode() {
             return hashCode;
         }
 
@@ -505,7 +514,8 @@ public final class HsqlNameManager {
             return isReservedName(name);
         }
 
-        public String toString() {
+        @Override
+		public String toString() {
 
             return getClass().getName() + super.hashCode()
                    + "[this.hashCode()=" + this.hashCode + ", name=" + name
@@ -540,5 +550,9 @@ public final class HsqlNameManager {
 
             return !Tokens.isKeyword(name);
         }
+    }
+
+    public static SimpleName getAutoColumnName(String realAlias) {
+        return new HsqlName(staticManager, realAlias, 0, false);
     }
 }

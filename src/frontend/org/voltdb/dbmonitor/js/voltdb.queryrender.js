@@ -1,7 +1,8 @@
-function QueryUI(queryString, userName) {
+function QueryUI(queryTab) {
     "use strict";
     var CommandParser,
-        queryToRun = queryString;
+        queryToRun = '';
+    this.QueryTab = queryTab;
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -104,7 +105,7 @@ function QueryUI(queryString, userName) {
                     if (param.toLowerCase() === 'null') {
                         parameterBank.push(null);
                     } else {
-                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
+                        if (param.indexOf(QuotedStringNonceLiteral) > -1) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }
@@ -118,23 +119,21 @@ function QueryUI(queryString, userName) {
         this.parseProcedureCallParameters = parseProcedureCallParametersMethod
         this.parseUserInput = parseUserInputMethod;
     }
-
     CommandParser = new ICommandParser();
 
     //TODO: Apply reasonable coding standards to the code below...
 
-    function executeCallback(format, target, id, isExplainQuery) {
+    function executeCallback(format, target, id, isExplainQuery, tab_id) {
         var Format = format;
-        var targetHtml = target.find('#resultHtml');
-        var targetCsv = target.find('#resultCsv');
-        var targetMonospace = target.find('#resultMonospace');
+        var targetHtml = target.find('#resultHtml-' + tab_id);
+        var targetCsv = target.find('#resultCsv-' + tab_id);
+        var targetMonospace = target.find('#resultMonospace-' + tab_id);
         var Id = id;
         $(targetHtml).html('');
         $(targetCsv).html('');
         $(targetMonospace).html('');
 
         function callback(response) {
-
             var processResponseForAllViews = function () {
                 processResponse('HTML', targetHtml, Id + '_html', response, isExplainQuery);
                 processResponse('CSV', targetCsv, Id + '_csv', response, isExplainQuery);
@@ -175,8 +174,9 @@ function QueryUI(queryString, userName) {
     }
 
     function executeMethod() {
-        var target = $('.queryResult');
-        var format = $('#exportType').val();
+        var query_id = this.QueryTab[0].id.split('-')[1]
+        var target = $('.queryResult-' + query_id);
+        var format = $('#exportType-' + query_id).val();
 
         var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
@@ -185,14 +185,21 @@ function QueryUI(queryString, userName) {
         }
 
         var connection = VoltDBCore.connections[dataSource];
-        var source = '';
-        source = queryToRun;
-        source = source.replace(/^\s+|\s+$/g, '');
+        var source = $('#querybox-' + query_id).getSelectedText();
+        if (source != null){
+            source = source.replace(/^\s+|\s+$/g,'');
+            if (source == '')
+                source = $('#querybox-' + query_id).val();
+        }
+        else
+            source = $('#querybox-' + query_id).val();
+
+        source = source.replace(/^\s+|\s+$/g,'');
         if (source == '')
             return;
 
-        $("#runBTn").attr('disabled', 'disabled');
-        $("#runBTn").addClass("graphOpacity");
+        $('#runBTn-' + query_id).attr('disabled', 'disabled');
+        $('#runBTn-' + query_id).addClass("graphOpacity");
 
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
@@ -206,7 +213,7 @@ function QueryUI(queryString, userName) {
             if (statements[i].toLowerCase().indexOf('@explain') >= 0) {
                 isExplainQuery = true;
             }
-            var callback = new executeCallback(format, target, id, isExplainQuery);
+            var callback = new executeCallback(format, target, id, isExplainQuery, query_id);
             if (/^execute /i.test(statements[i])) {
                 statements[i] = 'exec ' + statements[i].substr(8);
             }
@@ -234,14 +241,14 @@ function QueryUI(queryString, userName) {
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
-                $('#queryResults').removeClass('errorValue');
-                $('#queryResults').html('Query Duration: ' + (totalDuration / 1000.0) + 's');
+                $('#queryResults-' + query_id).removeClass('errorValue');
+                $('#queryResults-' + query_id).html('Query Duration: ' + (totalDuration / 1000.0) + 's');
             } else {
-                $('#queryResults').addClass('errorValue');
-                $('#queryResults').html('Query error | Query Duration: ' + (totalDuration / 1000.0) + 's');
+                $('#queryResults-' + query_id).addClass('errorValue');
+                $('#queryResults-' + query_id).html('Query error | Query Duration: ' + (totalDuration / 1000.0) + 's');
             }
-            $("#runBTn").removeAttr('disabled');
-            $("#runBTn").removeClass("graphOpacity");
+            $('#runBTn-' + query_id).removeAttr('disabled');
+            $('#runBTn-' + query_id).removeClass("graphOpacity");
         }
         connectionQueue.End(atEnd, start);
     }
@@ -329,6 +336,9 @@ function QueryUI(queryString, userName) {
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
                 }
+                else if(typ == 22){
+                    val = parseFloat(val).toFixed(12)
+                }
                 if (isExplainQuery == true) {
                     val = applyFormat(val);
                 }
@@ -394,6 +404,5 @@ function QueryUI(queryString, userName) {
             return $('<div/>').text(value).html();
         }
     }
-
     this.execute = executeMethod;
 }

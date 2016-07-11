@@ -738,6 +738,8 @@ ul.tabs {
     width: 100%;
 }
 
+ul.refreshList { margin-top:10px;}
+
     ul.tabs li {
         float: left;
         margin: 0;
@@ -756,7 +758,7 @@ ul.tabs {
             text-decoration: none;
             color: #000;
             display: block;
-            font-size: 1.2em;
+            font-size: 14px;
             padding: 0 3px;
             border: 1px solid #fff;
             outline: none;
@@ -1820,10 +1822,11 @@ ul.topRightList li a {
 
 .btnStudio {
     background: #AA1F2F;
-    padding: 5px 10px;
+    padding: 5px 10px 4px 10px;
     border: 1px solid #AA1F2F;
     color: #FFFFFF;
     cursor: pointer;
+
 }
 
     .btnStudio:hover {
@@ -1831,6 +1834,19 @@ ul.topRightList li a {
         border: 1px solid #76BD1D;
         color: #FFFFFF;
     }
+
+ .plusBtn {
+          font-size: 20px;
+          background:#ccc;
+          border:none;
+          color:#222;
+          font-weight:normal;
+          padding: 1px 10px;
+          margin: 6px 3px 5px 3px;
+          border-radius: 12px 2px 0 0;
+            }
+.plusBtn:hover {background:none; border:none;}
+
 
 .contentQuery {
     background: #CCCCCC;
@@ -1844,19 +1860,21 @@ ul.topRightList li a {
 
 .blockWrapper {
     margin-bottom: 20px;
+    margin-top:3px;
 }
 
 .objectExplorer {
     float: left;
-    width: 28%;
-    padding: 15px 1%;
+    /*width: 28%;*/
+    width:300px;
+    padding: 13px 1%;
     background: #fff;
     position: relative;
 }
 
 .queryInput {
     float: right;
-    width: 68%;
+    width: 68.5%;
 }
 
 #queryForm {
@@ -1864,7 +1882,7 @@ ul.topRightList li a {
 }
 
 .queryInput .query textarea {
-    width: 98%;
+    width: 100%;
     padding: 1%;
     resize: none !important;
     height: 215px;
@@ -1884,12 +1902,12 @@ ul.topRightList li a {
 .btnList {
     margin-top:10px;
     padding: 0;
-    float: right;
+    /*float: right;*/
 }
 
     .btnList li {
         margin: 0;
-        padding: 0 10px 0 0;
+        padding: 0 10px 1px 0;
         float: left;
     }
 
@@ -1904,7 +1922,7 @@ ul.topRightList li a {
 
 .blockWrapper h1.theHeadingQuery {
     margin: 0 0 1.5px 0 !important;
-    padding: 0px 0px 10px 2px;
+    padding: 0px 0px 8px 2px;
     background-color: #FFFFFF;
     -webkit-box-shadow: 0px 6px 7px -5px #ccc;
     -moz-box-shadow: 0px 6px 7px -5px #ccc;
@@ -1929,11 +1947,11 @@ ul.topRightList li a {
     }
 
 h3.ui-accordion-header {
-    padding: 8px 5px 8px 23px;
+    padding: 8px 5px 8px 23px!important;
     margin-bottom: 5px !important;
-    font-weight: bold;
-    font-size: 12px;
-    border-bottom: 1px solid #f2f2f2;
+    font-weight: bold!important;
+    font-size: 12px!important;
+    border-bottom: 1px solid #f2f2f2!important;
     width: auto;
     white-space: nowrap;
     overflow: hidden;
@@ -1956,12 +1974,12 @@ h3.ui-accordion-header {
 }
 
 h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query, h1.icon-queryResult {
-    background-image: url(images/voltdb-icon-sprite.png);
-    background-repeat: no-repeat;
+    background-image: url(images/voltdb-icon-sprite.png)!important;
+    background-repeat: no-repeat!important;
 }
 
 h3.ui-accordion-header {
-    background-position: 8px -1185px;
+    background-position: 8px -1185px!important;
     background-color: #f2f2f2;
 }
 
@@ -1970,9 +1988,9 @@ h3.ui-state-hover {
 }
 
 h3.ui-state-active {
-    background-position: 8px -1214px;
+    background-position: 8px -1214px!important;
     margin-bottom: 0;
-    background-color: #76bd1d;
+    background-color: #76bd1d!important;
     color: #fff;
 }
 
@@ -1985,8 +2003,40 @@ h3.ui-state-active {
 }
 
 h1.icon-queryResult {
-    background-position: 15px -1039px;
+    background-position: 0px -1039px;
+    padding-left:30px!important;
 }
+
+/*********************jquery ui class override*********************/
+#accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
+#accordionViews .ui-state-default,.ui-widget-content .ui-state-default, .ui-widget-header .ui-state-default {
+
+border:none!important;
+border-radius:0;
+background:#e0e0e0;
+border:1px solid #FFF;
+
+}
+#accordionProcedures .ui-state-default .ui-icon, #accordionTable .ui-state-default .ui-icon,
+#accordionStreamedTable .ui-state-default .ui-icon, #accordionViews .ui-state-default .ui-icon { background-image:none!important;}
+.ui-accordion .ui-accordion-content { padding:10px!important; border-radius:none!important;}
+
+.close-tab{
+    float:left;
+    color:#222;
+}
+
+#worktabs .ui-state-active a, .ui-state-active a:link, .ui-state-active a:visited { color:#FFF; background:#76BD1D; padding:.5em .2em; border-radius:12px 2px 0 0;}
+#worktabs .ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active {background:#76BD1D;}
+#worktabs .ui-tabs-nav { padding:1px 0 0px 3px !important; border-radius:0;}
+#worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
+#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-3px; }
+#worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
+#worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
+#worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
+.workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
+.workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
+/*********************jquery ui class override ends*********************/
 
 .exportType {
     float: right;
@@ -2002,7 +2052,7 @@ h1.icon-queryResult {
 .resultHtml, .resultCsv, .resultMonospace {
     width: 100%;
     overflow: auto;
-    height: 400px;
+    height: 200px;
 }
 
 .queryResult pre {
@@ -3721,6 +3771,14 @@ label.errorTimeOut {
     margin: 0 0 22px 0;
     height: 10px;
 }
+.clsQueryWrapper {float:right;}
+.queryTimeClass {float:left;}
+.clsQueryBtns { float:right;}
+
+/********************jquery us css override*****************/
+#worktabs .ui-widget-header { border:none;}
+/********************jquery us css override end*****************/
+
 
 /*********************************************media Qu********************/
 
@@ -4341,6 +4399,9 @@ label.errorTimeOut {
     }
 	.menuHome ul li:hover ul{ position:absolute;}
 	.menuHome ul li a{padding: 3px 2px 5px 15px;}
+	.clsQueryWrapper { float:none;}
+	.queryTimeClass { float:none;}
+	.clsQueryBtns { float:none;}
 }
 
 @media (min-width: 480px) and (max-width: 700px) {

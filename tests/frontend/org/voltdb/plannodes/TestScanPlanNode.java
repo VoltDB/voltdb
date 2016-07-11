@@ -46,8 +46,7 @@ public class TestScanPlanNode extends TestCase
     MockVoltDB m_voltdb;
 
     @Override
-    protected void setUp()
-    {
+    protected void setUp() {
         m_voltdb = new MockVoltDB();
         m_voltdb.addTable(TABLE1, false);
         for (int i = 0; i < COLS.length; ++i)

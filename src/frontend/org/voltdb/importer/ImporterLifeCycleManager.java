@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Predicate;
@@ -61,11 +61,16 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private final AtomicBoolean m_starting = new AtomicBoolean(false);
     // Safe to keep reference here as there is only and it is not susceptible to catalog changes
     private final ChannelDistributer m_distributer;
+    private final String m_distributerDesignation;
 
-    public ImporterLifeCycleManager(AbstractImporterFactory factory, final ChannelDistributer distributer)
+    public ImporterLifeCycleManager(
+            AbstractImporterFactory factory,
+            final ChannelDistributer distributer,
+            String clusterTag)
     {
         m_factory = factory;
         m_distributer = distributer;
+        m_distributerDesignation = m_factory.getTypeName() + "_" + clusterTag;
     }
 
 
@@ -74,10 +79,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      *
      * @param props Properties defined in a configuration section for this importer
      */
-    public final void configure(Properties props, AbstractFormatterFactory formatterFactory)
+    public final void configure(Properties props, FormatterBuilder formatterBuilder)
     {
         ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props, formatterFactory));
+        builder.putAll(m_factory.createImporterConfigurations(props, formatterBuilder));
         m_configs = builder.build();
     }
 
@@ -93,9 +98,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     public final void readyForData()
     {
         m_starting.compareAndSet(false, true);
-        if (!m_factory.isImporterRunEveryWhere()) {
-            m_distributer.registerCallback(m_factory.getTypeName(), this);
-        }
 
         if (m_stopping) return;
 
@@ -120,8 +122,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         m_executorService = MoreExecutors.listeningDecorator(tpe);
 
-        ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         if (m_factory.isImporterRunEveryWhere()) {
+            ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
                 builder.put(importer.getResourceID(), importer);
@@ -130,7 +132,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
-            m_distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
+            m_distributer.registerCallback(m_distributerDesignation, this);
+            m_distributer.registerChannels(m_distributerDesignation, m_configs.keySet());
         }
     }
 
@@ -149,7 +152,15 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     @Override
     public final void onChange(ImporterChannelAssignment assignment)
     {
-        if (m_stopping) return;
+        if (m_stopping && !assignment.getAdded().isEmpty()) {
+            String msg = "Received an a channel assignment when the importer is stopping: " + assignment;
+            s_logger.warn(msg);
+            throw new IllegalStateException(msg);
+        }
+
+        if (m_stopping) {
+            return;
+        }
 
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
 
@@ -160,16 +171,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         List<String> missingAddedURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
             if (m_configs.containsKey(removed)) {
-                try {
-                    AbstractImporter importer = oldReference.get(removed);
-                    if (importer!=null) {
-                        toStop.add(importer);
-                    }
-                } catch(Exception e) {
-                    s_logger.warn(
-                            String.format("Error calling stop on %s in importer %s", removed.toString(), m_factory.getTypeName()),
-                            e);
-                }
+               AbstractImporter importer = oldReference.get(removed);
+               if (importer != null) {
+                    toStop.add(importer);
+               }
             } else {
                 missingRemovedURLs.add(removed.toString());
             }
@@ -253,7 +258,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         stopImporters(oldReference.values());
         if (!m_factory.isImporterRunEveryWhere()) {
-            m_distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
+            m_distributer.registerChannels(m_distributerDesignation, Collections.<URI> emptySet());
+            m_distributer.unregisterCallback(m_distributerDesignation);
         }
 
         if (m_executorService != null) {

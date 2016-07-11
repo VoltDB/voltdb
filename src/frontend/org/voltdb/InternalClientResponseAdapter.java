@@ -51,7 +51,7 @@ import org.voltdb.client.ProcedureCallback;
  */
 public class InternalClientResponseAdapter implements Connection, WriteStream {
 
-    private static final VoltLogger m_logger = new VoltLogger("IMPORT");
+    private static final VoltLogger m_logger = new VoltLogger("HOST");
     public final static long SUPPRESS_INTERVAL = 120;
     public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION =
             Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
@@ -66,7 +66,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
-
     private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
     // Maintain internal connection ids per caller id. This is useful when collecting statistics
@@ -82,7 +81,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final StoredProcedureInvocation m_task;
         private final Procedure m_proc;
         private final AuthSystem.AuthUser m_user;
-
+        private final String m_procName;
         public InternalCallback(
                 final InternalAdapterTaskAttributes kattrs,
                 Procedure proc,
@@ -101,10 +100,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_statsCollector = statsCollector;
             m_partition = partition;
             m_user = user;
+            m_procName = procName;
         }
 
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
+            if (response.getStatus() != ClientResponse.SUCCESS && m_kattrs.isImporter()) {
+                String fmt = "Stored procedure failed: %s Error: %s failures: %d";
+                rateLimitedLog(Level.WARN, null, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
+            }
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
@@ -288,10 +292,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
                 public void handle() {
                     try {
-                        if (resp.getStatus() != ClientResponse.SUCCESS) {
-                            String fmt = "InternalClientResponseAdapter stored procedure failed: %s Error: %s failures: %d";
-                            rateLimitedLog(Level.WARN, null, fmt, callback.getProcedureName(), resp.getStatusString(), m_failures.incrementAndGet());
-                        }
                         callback.handleResponse(resp);
                     } catch (Exception ex) {
                         m_logger.error("Failed to process callback.", ex);
@@ -379,9 +379,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public String getHostnameOrIP(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            rateLimitedLog(Level.WARN, null,
-                    "Could not find caller details for client handle %d. Using internal adapter name", clientHandle);
-            return getHostnameOrIP();
+           return getHostnameOrIP();
         } else {
             return callback.getInternalContext().getName();
         }

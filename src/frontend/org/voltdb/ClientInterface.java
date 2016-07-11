@@ -288,7 +288,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 catch (IOException e) {
                     String msg = "Client interface failed to bind to"
                             + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
-                    MiscUtils.printPortsInUse(hostLog);
+                    CoreUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
@@ -1110,11 +1110,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     Procedure procedure = null;
 
                     if (invocation != null) {
-                        procedure = catalogContext.procedures.get(invocation.getProcName());
-                        if (procedure == null) {
-                            procedure = SystemProcedureCatalog.listing.get(invocation.getProcName())
-                                                              .asCatalogProcedure();
-                        }
+                        procedure = getProcedureFromName(invocation.getProcName(), catalogContext);
+                        assert (procedure != null);
                     }
 
                     //Can be null on hangup
@@ -1261,6 +1258,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_cihm.put(adapter.connectionId(), cihm);
         }
         return m_cihm.get(adapter.connectionId());
+    }
+
+    public void unbindAdapter(final Connection adapter) {
+        ClientInterfaceHandleManager cihm = m_cihm.remove(adapter.connectionId());
+        if (cihm != null) {
+            m_numConnections.decrementAndGet();
+            /*
+             * It's necessary to free all the resources held
+             * Outstanding requests may actually still be at large
+             */
+            m_allACGs.remove(cihm.m_acg);
+            m_notifier.removeConnection(adapter);
+            cihm.freeOutstandingTxns();
+        }
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
@@ -1903,5 +1914,45 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 0 /* Can provide anything for multi-part */,
                 spi.getSerializedSize(), System.nanoTime());
 
+    }
+
+    /**
+     * This is not designed to be a safe shutdown.
+     * This is designed to stop sending messages to clients as fast as possible.
+     * It is currently called from VoltDB.crash...
+     *
+     * Note: this really needs to work. We CAN'T respond back to the client anything
+     * after we've decided to crash or it might break some of our contracts.
+     *
+     * @return false if we can't be assured this safely worked
+     */
+    public boolean ceaseAllPublicFacingTrafficImmediately() {
+        try {
+            if (m_acceptor != null) {
+                // This call seems to block until the shutdown is done
+                // which is good becasue we assume there will be no new
+                // connections afterward
+                m_acceptor.shutdown();
+            }
+            if (m_adminAcceptor != null) {
+                m_adminAcceptor.shutdown();
+            }
+        }
+        catch (InterruptedException e) {
+            // this whole method is really a best effort kind of thing...
+            log.error(e);
+            // if we didn't succeed, let the caller know and take action
+            return false;
+        }
+        finally {
+            // this feels like an unclean thing to do... but should work
+            // for the purposes of cutting all responses right before we deliberatly
+            // end the process
+            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // care if it's empty... so... this.
+            m_cihm.clear();
+        }
+
+        return true;
     }
 }

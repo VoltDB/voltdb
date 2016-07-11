@@ -43,7 +43,8 @@ public:
 
     TupleStreamBase(int defaultBufferSizes, size_t extraHeaderSpace = 0);
 
-    virtual ~TupleStreamBase() {
+    virtual ~TupleStreamBase()
+    {
         cleanupManagedBuffers();
     }
 
@@ -59,7 +60,7 @@ public:
      * to test buffer rollover.
      */
     void setDefaultCapacity(size_t capacity);
-    virtual void setSecondaryCapacity(size_t capacity) {};
+    virtual void setSecondaryCapacity(size_t capacity) {}
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
@@ -67,8 +68,8 @@ public:
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     /** age out committed data */
-    void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedSpHandle);
+    virtual void periodicFlush(int64_t timeInMillis,
+                               int64_t lastComittedSpHandle);
 
     virtual void extendBufferChain(size_t minLength);
     void pushPendingBlocks();
@@ -76,8 +77,10 @@ public:
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
 
+    virtual void handleOpenTransaction(StreamBlock *oldBlock) {}
+
     /** Send committed data to the top end. */
-    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
+    void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId, bool sync, bool flush);
 
     /** time interval between flushing partially filled buffers */
     int64_t m_flushInterval;
@@ -100,8 +103,6 @@ public:
     /** transaction id of the current (possibly uncommitted) transaction */
     int64_t m_openSpHandle;
 
-    int64_t m_openSequenceNumber;
-
     int64_t m_openUniqueId;
 
     /** Universal stream offset when current transaction was opened */
@@ -112,8 +113,6 @@ public:
 
     /** current committed uso */
     size_t m_committedUso;
-
-    int64_t m_committedSequenceNumber;
 
     int64_t m_committedUniqueId;
 

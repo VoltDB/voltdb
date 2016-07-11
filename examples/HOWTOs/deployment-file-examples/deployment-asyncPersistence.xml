@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file config will asynchronously
+    write transactions to disk, allowing for only a small
+    window of lost transactions if there is a global
+    cluster failure.
+
+    The frequency parameter here says to ensure data is
+    fsynced to disk every 200ms or 500 individual transactions,
+    whichever comes first. This will cause backpressure if the
+    target disk can't keep up with the write rate or the fsync
+    rate, but it will bound lost transactions in the event of
+    a global failure.
+
+    See:
+    https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
+-->
+<deployment>
+    <cluster hostcount="1"/>
+    <commandlog enabled="true" synchronous="false">
+        <frequency time="200" transactions="500"/>
+    </commandlog>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>

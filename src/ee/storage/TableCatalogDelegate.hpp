@@ -64,18 +64,14 @@ class TableCatalogDelegate {
 
     void deleteCommand();
 
-    int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
-    bool evaluateExport(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+    void init(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
+    void evaluateExport(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
                              std::map<std::string, TableCatalogDelegate*> const &tablesByName);
-
-    static void migrateChangedTuples(catalog::Table const &catalogTable,
-                                     voltdb::PersistentTable* existingTable,
-                                     voltdb::PersistentTable* newTable);
 
     static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
                                           catalog::Table const &catalogTable);

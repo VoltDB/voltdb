@@ -78,11 +78,14 @@ import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.JoinType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -146,6 +149,8 @@ public class DDLCompiler {
     public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
     public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";
     public static String DR_TABLE_NAME_COLUMN_NAME = "TABLE_NAME";
+    public static String DR_CURRENT_CLUSTER_ID_COLUMN_NAME = "CURRENT_CLUSTER_ID";
+    public static String DR_CURRENT_TIMESTAMP_COLUMN_NAME = "CURRENT_TIMESTAMP";
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
@@ -159,6 +164,8 @@ public class DDLCompiler {
         {DR_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_DIVERGENCE_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024 BYTES)"},
+        {DR_CURRENT_CLUSTER_ID_COLUMN_NAME, "TINYINT NOT NULL"},
+        {DR_CURRENT_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
 
@@ -179,61 +186,6 @@ public class DDLCompiler {
         m_compiler = compiler;
         m_tracker = tracker;
         m_classLoader = classLoader;
-    }
-
-    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
-        assert(tableNode.name.equals("table"));
-
-        String valueTypeStr;
-        VoltType type;
-        String columnName;
-        boolean typeDetected = false;
-        String separatorStr;
-
-        for (VoltXMLElement subNode : tableNode.children) {
-            if (subNode.name.equals("columns")) {
-                for (VoltXMLElement columnNode : subNode.children) {
-                    if (columnNode.name.equals("column")) {
-                        valueTypeStr = columnNode.attributes.get("valuetype");
-                        columnName = columnNode.attributes.get("name");
-                        type = VoltType.typeFromString(valueTypeStr);
-                        if (lookupType == type) {
-                            if (msg != null) {
-                                separatorStr = (typeDetected == true)? ", " : " ";
-                                msg.append(separatorStr + "column name: '" + columnName + "' type: '" + valueTypeStr + "'");
-                            }
-                            typeDetected = true;
-                        }
-                    }
-                }
-            } // if (subNode.name.equals("columns"))
-        }
-
-        return typeDetected;
-    }
-
-    // Function to check if the table - TableXML, supplied as VoltXMLElement, does not contain geo types.
-    // If table does contain geo types, VoltCompilerException is generated with information about geo columns
-    // found in table wrapped in exception message
-    private void guardForGeoColumns(VoltXMLElement tableXML, String tableName, String tableVerb)
-            throws VoltCompilerException {
-        assert(tableXML.name.equals("table"));
-        assert(tableVerb != null);
-        assert(tableName != null);
-
-        boolean pointColDetected = false;
-        StringBuffer pointMsg = new StringBuffer();
-        pointColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, pointMsg);
-
-        boolean polygonColDetected = false;
-        StringBuffer polygonMsg = new StringBuffer();
-        polygonColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, polygonMsg);
-        //
-        if (pointColDetected || polygonColDetected) {
-            String separatorStr = (pointColDetected && polygonColDetected) ? "," : "";
-            throw m_compiler.new VoltCompilerException("Can't " + tableVerb + " table '" + tableName.toUpperCase() + "' containing geo type column(s) -" +
-                    pointMsg + separatorStr + polygonMsg + ".");
-        }
     }
 
     /**
@@ -953,8 +905,6 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
 
             if (tableXML != null) {
-                guardForGeoColumns(tableXML, tableName, EXPORT);
-
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid EXPORT statement: table %s is a DR table.", tableName));
@@ -1689,20 +1639,15 @@ public class DDLCompiler {
         table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
-         * Validate that the total size
+         * Validate that each variable-length column is below the max value length,
+         * and that the maximum size for the row is below the max row length.
          */
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if (t.isVariableLength()) {
-                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
-                            " specifies a maximum size of " + c.getSize() + " bytes" +
-                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
-                }
-                maxRowSize += 4 + c.getSize();
-            }
-            else if (t == VoltType.STRING) {
+            if (t == VoltType.STRING && (! c.getInbytes())) {
+                // A VARCHAR column whose size is defined in characters.
+
                 if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
                             " specifies a maximum size of " + c.getSize() + " characters" +
@@ -1712,10 +1657,26 @@ public class DDLCompiler {
                 }
                 maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
             }
+            else if (t.isVariableLength()) {
+                // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
+
+                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
+                }
+                maxRowSize += 4 + c.getSize();
+            }
             else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
+
+        if (maxRowSize > MAX_ROW_SIZE) {
+            throw m_compiler.new VoltCompilerException("Error: Table " + name + " has a maximum row size of " + maxRowSize +
+                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+        }
+
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
         if (query != null) {
@@ -1725,11 +1686,6 @@ public class DDLCompiler {
             // Don't need a real StringBuilder or export state to get the CREATE for a table
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
                     table, query, null);
-        }
-
-        if (maxRowSize > MAX_ROW_SIZE) {
-            throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
-                    " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
     }
 
@@ -2899,6 +2855,7 @@ public class DDLCompiler {
         // this is not the optimal index candidate for now
         return false;
     }
+
     /**
      * Build the abstract expression representing the partial index predicate.
      * Verify it satisfies the rules. Throw error messages otherwise.
@@ -2933,15 +2890,35 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
-        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
             msg += "with aggregate expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }
-        if (!predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty()) {
+        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
             msg += "with subquery expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }
         return predicate;
+    }
+
+    /**
+     * If the view is defined on joint tables (>1 source table),
+     * check if there are self-joins.
+     *
+     * @param tableList The list of view source tables.
+     * @param compiler The VoltCompiler
+     * @throws VoltCompilerException
+     */
+    private static void checkViewSources(ArrayList<Table> tableList, VoltCompiler compiler)
+                                             throws VoltCompilerException {
+        HashSet<String> tableSet = new HashSet<String>();
+        for (Table tbl : tableList) {
+            if (! tableSet.add(tbl.getTypeName())) {
+                String errMsg = "Table " + tbl.getTypeName() + " appeared in the table list more than once: " +
+                                "materialized view does not support self-join.";
+                throw compiler.new VoltCompilerException(errMsg);
+            }
+        }
     }
 
     /**
@@ -3041,10 +3018,8 @@ public class DDLCompiler {
             throw compiler.new VoltCompilerException(msg.toString());
         }
 
-        if (stmt.m_tableList.size() != 1) {
-            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-                       "Only one source table is allowed.");
-            throw compiler.new VoltCompilerException(msg.toString());
+        if (! stmt.m_joinTree.allInnerJoins()) {
+            throw compiler.new VoltCompilerException("Materialized view only supports INNER JOIN.");
         }
 
         if (stmt.orderByColumns().size() != 0) {
@@ -3064,6 +3039,13 @@ public class DDLCompiler {
 
         if (displayColCount <= groupColCount) {
             msg.append("has too few columns.");
+            throw compiler.new VoltCompilerException(msg.toString());
+        }
+
+        checkViewSources(stmt.m_tableList, compiler);
+        if (stmt.m_tableList.size() != 1) {
+            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
             throw compiler.new VoltCompilerException(msg.toString());
         }
 

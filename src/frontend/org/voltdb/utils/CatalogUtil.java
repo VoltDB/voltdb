@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -43,6 +44,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
@@ -124,6 +127,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -160,9 +164,15 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+    public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
+    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+
+    public static final String ROW_LENGTH_LIMIT = "row.length.limit";
+    public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
     private static boolean m_exportEnabled = false;
 
@@ -952,20 +962,52 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0, and adminstartup set to false
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
+        normalized = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("hostcount=\"0\"");
+        matcher = ADMINMODE_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("adminstartup=\"false\"");
+        return Digester.md5AsUUID(normalized);
+    }
+
+    /**
      * Given the deployment object generate the XML
      * @param deployment
      * @return XML of deployment object.
      * @throws IOException
      */
     public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     *
+     * @param deployment
+     * @param indent
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment, boolean indent) throws IOException {
         try {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
             Marshaller marshaller = m_jc.createMarshaller();
             marshaller.setSchema(m_schema);
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -1089,7 +1131,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
-    private static void validateDirectory(String type, File path) {
+    public static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
@@ -1203,40 +1245,35 @@ public abstract class CatalogUtil {
         }
 
         processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
+
+
         return processorProperties;
     }
 
     public static class ImportConfiguration {
-        private final String m_formatName;
         private final Properties m_moduleProps;
-        private final Properties m_formatterProps;
-
-        private AbstractFormatterFactory m_formatterFactory = null;
+        private FormatterBuilder m_formatterBuilder;
 
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
-            m_formatName = formatName;
             m_moduleProps = moduleProps;
-            m_formatterProps = formatterProps;
+            m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
         }
 
-        public String getFormatName() {
-            return m_formatName;
-        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
         }
 
-        public Properties getformatterProperties() {
-            return m_formatterProps;
+        public Properties getformatterProperties(){
+            return m_formatterBuilder.getFormatterProperties();
         }
 
         public void setFormatterFactory(AbstractFormatterFactory formatterFactory) {
-            m_formatterFactory = formatterFactory;
+            m_formatterBuilder.setFormatterFactory(formatterFactory);
         }
 
-        public AbstractFormatterFactory getFormatterFactory() {
-            return m_formatterFactory;
+        public FormatterBuilder getFormatterBuilder() {
+            return m_formatterBuilder;
         }
     }
 
@@ -1307,6 +1344,9 @@ public abstract class CatalogUtil {
                 break;
             case KAFKA:
                 importBundleUrl = "kafkastream.jar";
+                break;
+            case KINESIS:
+                importBundleUrl = "kinesisstream.jar";
                 break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
@@ -1416,6 +1456,38 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
+
+            // checking rowLengthLimit
+            int rowLengthLimit = Integer.parseInt(processorProperties.getProperty(ROW_LENGTH_LIMIT,"0"));
+            if (rowLengthLimit > 0) {
+                for (ConnectorTableInfo catTableinfo : catconn.getTableinfo()) {
+                    Table tableref = catTableinfo.getTable();
+                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ? 0 : EXPORT_INTERNAL_FIELD_Length;
+                    for (Column catColumn: tableref.getColumns()) {
+                        rowLength += catColumn.getSize();
+                    }
+                    if (rowLength > rowLengthLimit) {
+                        if (defaultConnector) {
+                            hostLog.error("Export configuration for the default export target has " +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        else {
+                            hostLog.error("Export configuration for export target " + targetName + " has" +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
+                                ", exceeding configurated limitation " + rowLengthLimit + ".");
+                    }
+                }
+            }
+
+
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);
@@ -1510,15 +1582,11 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return processorConfig;
         }
-        List<String> streamList = new ArrayList<String>();
         int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (!streamList.contains(importConfiguration.getModule())) {
-                streamList.add(importConfiguration.getModule());
-            }
 
             ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
 
@@ -1660,7 +1728,7 @@ public abstract class CatalogUtil {
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
         if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
-            voltDbRoot = new VoltFile("voltdbroot");
+            voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
                 if (!voltDbRoot.mkdirs()) {
@@ -1889,7 +1957,11 @@ public abstract class CatalogUtil {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
-        cluster.setHttpdportno(httpd.getPort());
+        int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
+        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+            defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
+        }
+        cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
@@ -2268,14 +2340,8 @@ public abstract class CatalogUtil {
      * @return true if proc is durable for non sys procs return true (durable)
      */
     public static boolean isDurableProc(String procName) {
-        //For sysprocs look at sysproc catalog.
-        if (procName.charAt(0) == '@') {
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
-            if (sysProc != null) {
-                return sysProc.isDurable();
-            }
-        }
-        return true;
+        SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+        return sysProc == null || sysProc.isDurable();
     }
 
     /**
