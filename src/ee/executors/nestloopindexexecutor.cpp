@@ -233,7 +233,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     //
     TableTuple outer_tuple(outer_table->schema());
     TableTuple inner_tuple(inner_table->schema());
-    TableIterator outer_iterator = outer_table->iteratorDeletingAsWeGo();
+    TableIterator* outer_iterator = outer_table->iteratorDeletingAsWeGo();
     int num_of_outer_cols = outer_table->columnCount();
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
@@ -280,7 +280,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     }
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (postfilter.isUnderLimit() && outer_iterator.next(outer_tuple)) {
+    while (postfilter.isUnderLimit() && outer_iterator->next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         pmp.countdownProgress();
@@ -552,6 +552,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             }
         }
     } // END OUTER WHILE LOOP
+    delete outer_iterator;
 
     //
     // FULL Outer Join. Iterate over the unmatched inner tuples

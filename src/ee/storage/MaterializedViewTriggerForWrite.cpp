@@ -45,10 +45,11 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
     if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
         TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
-        while (iterator.next(scannedTuple)) {
+        TableIterator* iterator = srcTable->makeIterator();
+        while (iterator->next(scannedTuple)) {
             processTupleInsert(scannedTuple, false);
         }
+        delete iterator;
     }
 }
 
@@ -286,9 +287,9 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
     NValue newVal = initialNull;
     // loop through tuples to find the MIN / MAX
     TableTuple tuple(m_srcPersistentTable->schema());
-    TableIterator &iterator = m_srcPersistentTable->iterator();
+    TableIterator* iterator = m_srcPersistentTable->makeIterator();
     VOLT_TRACE("Starting iteration on: %s\n", m_srcPersistentTable->debug().c_str());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         // apply post filter
         VOLT_TRACE("Checking tuple: %s\n", tuple.debugNoHeader().c_str());
         if (failsPredicate(tuple)) {
@@ -322,6 +323,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
             VOLT_TRACE("\tAfter: new best %s\n", newVal.debug().c_str());
         }
     }
+    delete iterator;
     VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
     return newVal;
 }
@@ -349,11 +351,12 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     Table *tbl = context->executeExecutors(executorList, 0);
     assert(tbl);
     // get the fallback value from the returned table.
-    TableIterator iterator = tbl->iterator();
+    TableIterator* iterator = tbl->makeIterator();
     TableTuple tuple(tbl->schema());
-    if (iterator.next(tuple)) {
+    if (iterator->next(tuple)) {
         newVal = tuple.getNValue(0);
     }
+    delete iterator;
     // For debug:
     // if (context->m_siteId == 0) {
     //     cout << "oldTuple: " << oldTuple.debugNoHeader() << "\n"

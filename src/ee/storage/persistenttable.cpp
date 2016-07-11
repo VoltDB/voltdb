@@ -114,7 +114,6 @@ private:
 
 PersistentTable::PersistentTable(int partitionColumn, const char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
@@ -131,9 +130,6 @@ PersistentTable::PersistentTable(int partitionColumn, const char * signature, bo
     m_drTimestampColumnIndex(-1),
     m_pkeyIndex(NULL)
 {
-    // this happens here because m_data might not be initialized above
-    m_iter.reset(m_data.begin());
-
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -1632,17 +1628,18 @@ void PersistentTable::printBucketInfo() {
 }
 
 int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
-    TableIterator iter = iterator();
+    TableIterator* iter = makeIterator();
 
     int64_t mispartitionedRows = 0;
 
-    while (iter.hasNext()) {
+    while (iter->hasNext()) {
         TableTuple tuple(schema());
-        iter.next(tuple);
+        iter->next(tuple);
         if (hashinator->hashinate(tuple.getNValue(m_partitionColumn)) != partitionId) {
             mispartitionedRows++;
         }
     }
+    delete iter;
     return mispartitionedRows;
 }
 
@@ -1731,6 +1728,7 @@ static bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* 
 }
 #endif
 
+
 TableIndex* PersistentTable::index(std::string name) const {
     BOOST_FOREACH(TableIndex *index, m_indexes) {
         if (index->getName().compare(name) == 0) {
@@ -1753,8 +1751,8 @@ void PersistentTable::addIndex(TableIndex *index) {
 
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);
-    TableIterator iter = iterator();
-    while (iter.next(tuple)) {
+    TableIterator* iter = makeIterator();
+    while (iter->next(tuple)) {
         index->addEntry(&tuple, NULL);
     }
 
@@ -1766,6 +1764,7 @@ void PersistentTable::addIndex(TableIndex *index) {
     m_noAvailableUniqueIndex = false;
     m_smallestUniqueIndex = NULL;
     m_smallestUniqueIndexCrc = 0;
+    delete iter;
 }
 
 void PersistentTable::removeIndex(TableIndex *index) {

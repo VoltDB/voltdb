@@ -36,6 +36,7 @@ class RecoveryContext : public TableStreamerContext {
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
+    virtual ~RecoveryContext();
 
     /*
      * Generate the next recovery message. Eventually returns a message containing the message type
@@ -67,7 +68,7 @@ private:
      * to scan every data block and ignore updates
      * during the iteration process
      */
-    TableIterator m_iterator;
+    TableIterator* m_iterator;
 
     /*
      * Integer indices of tuples that have been updated since being shipped

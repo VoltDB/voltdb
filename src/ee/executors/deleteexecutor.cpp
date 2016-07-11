@@ -113,8 +113,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(targetTuple.sizeInValues() == targetTable->columnCount());
-        TableIterator inputIterator = m_inputTable->iterator();
-        while (inputIterator.next(m_inputTuple)) {
+        TableIterator* inputIterator = m_inputTable->makeIterator();
+        while (inputIterator->next(m_inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans
             // If our beloved DeletePlanNode is apart of a single-site query plan,
@@ -128,6 +128,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             // Delete from target table
             targetTable->deleteTuple(targetTuple, true);
         }
+        delete inputIterator;
         modified_tuples = m_inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
                    (int)modified_tuples,
