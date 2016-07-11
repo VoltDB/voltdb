@@ -57,11 +57,11 @@ import org.voltdb.exceptions.EEException;
 
 /**
  * An implementation of Site which provides only the functionality
- * necessary to run read-only multi-partition transactions.  A pool
+ * necessary to run basic multi-partition transactions (e.g., RO, N-part adhoc).  A pool
  * of these will be used to run multiple read-only transactions
  * concurrently.
  */
-public class MpRoSite implements Runnable, SiteProcedureConnection
+public class MpSite implements Runnable, SiteProcedureConnection
 {
     @SuppressWarnings("unused")
     private static final VoltLogger tmLog = new VoltLogger("TM");
@@ -93,7 +93,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public long getLatestUndoToken()
     {
-        throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
     }
 
     SiteProcedureConnection getSiteProcedureConnection()
@@ -105,34 +105,34 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
      *
-     * The only sysproc which should run on the RO MP Site is Adhoc.  Everything
+     * The only sysproc which should run on the MP Site is Adhoc.  Everything
      * else will yell at you.
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
         @Override
         public Database getDatabase() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public Cluster getCluster() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public long getSpHandleForSnapshotDigest() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public long getSiteId() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public boolean isLowestSiteId()
         {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
@@ -143,17 +143,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public int getHostId() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public int getPartitionId() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public long getCatalogCRC() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
@@ -165,7 +165,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public byte[] getDeploymentHash() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         // Needed for Adhoc queries
@@ -176,118 +176,118 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public SiteTracker getSiteTrackerForSnapshot() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public int getNumberOfPartitions() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public void setNumberOfPartitions(int partitionCount) {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public SiteSnapshotConnection getSiteSnapshotConnection()
         {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            throw new RuntimeException("Not needed for MP Site, shouldn't be here.");
         }
 
         @Override
         public void updateBackendLogLevels() {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public TheHashinator getCurrentHashinator()
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public void updateHashinator(TheHashinator hashinator)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                                 long lastReceivedDRId)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                              long localUniqueId, DRConsumerDrIdTracker tracker)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public void resetDrAppliedTracker() {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
         @Override
         public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                 List<DBBPool.BBContainer> outputBuffers)
         {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
-            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+            throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
         }
     };
 
-    /** Create a new RO MP execution site */
-    public MpRoSite(
+    /** Create a new MP execution site */
+    public MpSite(
             SiteTaskerQueue scheduler,
             long siteId,
             BackendTarget backend,
@@ -405,7 +405,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -413,13 +413,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             boolean shouldDRStream,
             boolean undo)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void updateBackendLogLevels()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -432,20 +432,20 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setSpHandleForSnapshotDigest(long spHandle)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
             List<UndoAction> undoActions)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -454,7 +454,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -466,37 +466,37 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public long[] getUSOForExportTable(String signature)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void toggleProfiler(int toggle)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void tick()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void quiesce()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -505,20 +505,20 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public Future<?> doSnapshotWork()
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -530,7 +530,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -546,7 +546,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             boolean readOnly)
             throws EEException
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -560,12 +560,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultipart) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -576,7 +576,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void updateHashinator(TheHashinator hashinator) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     /**
@@ -585,7 +585,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
      */
     @Override
     public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -606,21 +606,21 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
-        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+        throw new UnsupportedOperationException("MP Site doesn't do this, shouldn't be here");
     }
 
     @Override
     public void setBatchTimeout(int batchTimeout) {
-        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+        throw new UnsupportedOperationException("MP Site doesn't do this, shouldn't be here");
     }
 
     @Override
     public int getBatchTimeout() {
-        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+        throw new UnsupportedOperationException("MP Site doesn't do this, shouldn't be here");
     }
 
     @Override
     public void setDRProtocolVersion(int drVersion) {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        throw new RuntimeException("MP Site doesn't do this, shouldn't be here.");
     }
 }

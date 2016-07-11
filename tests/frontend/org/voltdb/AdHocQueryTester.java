@@ -125,6 +125,15 @@ public abstract class AdHocQueryTester extends TestCase {
      * @throws IOException
      * @throws NoConnectionsException
      */
+    protected void runAllAdHocNPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException {
+        runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d OR PARTVAL = %d;", hashableA, hashableB), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        //runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+    }
+    /**
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws NoConnectionsException
+     */
     protected void runAllAdHocSPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException {
         int spPartialCount = 0;
         spPartialCount = runQueryTest("SELECT * FROM PARTED1;", hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);

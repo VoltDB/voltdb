@@ -365,7 +365,7 @@ public class AsyncCompilerAgent {
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
-        boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+        boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning && !work.invocationName.equalsIgnoreCase("@AdHoc_NP");
 
         if (work.userParamSet != null && work.userParamSet.length > 0) {
             if (work.sqlStatements.length != 1) {
@@ -377,7 +377,7 @@ public class AsyncCompilerAgent {
             if (inferSP) {
                 partitioning = StatementPartitioning.inferPartitioning();
             }
-            else if (work.userPartitionKey == null) {
+            else if (work.userPartitionKey == null || work.invocationName.equalsIgnoreCase("@AdHoc_NP")) {
                 partitioning = StatementPartitioning.forceMP();
             } else {
                 partitioning = StatementPartitioning.forceSP();

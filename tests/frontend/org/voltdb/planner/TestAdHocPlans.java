@@ -64,6 +64,11 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runAllAdHocSPtests(0, 1, 2, 3);
     }
 
+    public void testNP() throws Exception {
+        //DB is empty so the hashable numbers don't really seem to matter
+        runAllAdHocNPtests(0, 1, 2, 3);
+    }
+
     public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
         // query with max predicates in where clause
         String sql = getQueryForLongQueryTable(300);

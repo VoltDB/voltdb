@@ -303,6 +303,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 assertEquals(1, modCount.asScalarLong());
             }
 
+            runAllAdHocNPtests(hashableA, hashableB, hashableC, hashableD);
             runAllAdHocSPtests(hashableA, hashableB, hashableC, hashableD);
         }
         finally {
@@ -336,6 +337,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
     public int runQueryTest(String query, int hashable, int spPartialSoFar, int expected, int validatingSPresult)
             throws IOException, NoConnectionsException, ProcCallException {
         VoltTable result;
+
+        result = m_client.callProcedure("@AdHoc_NP", query).getResults()[0];
+        assertEquals(expected, result.getRowCount());
+
         result = m_client.callProcedure("@AdHoc", query).getResults()[0];
         //System.out.println(result.toString());
         assertEquals(expected, result.getRowCount());

@@ -34,26 +34,26 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 
 /**
- * Provide a pool of MP Read-only sites to do MP RO work.
+ * Provide a pool of MP sites to do MP work.
  * This should be owned by the MpTransactionTaskQueue and expects all operations
  * to be done while holding its lock.
  */
-class MpRoSitePool {
+class MpSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
     static int DEFAULT_MAX_POOL_SIZE = 20;
     static int INITIAL_POOL_SIZE = 1;
 
-    class MpRoSiteContext {
+    class MpSiteContext {
         final private BackendTarget m_backend;
         final private SiteTaskerQueue m_queue;
-        final private MpRoSite m_site;
+        final private MpSite m_site;
         final private CatalogContext m_catalogContext;
         final private ProcedureRunnerFactory m_prf;
         final private LoadedProcedureSet m_loadedProcedures;
         final private Thread m_siteThread;
 
-        MpRoSiteContext(long siteId, BackendTarget backend,
+        MpSiteContext(long siteId, BackendTarget backend,
                 CatalogContext context, int partitionId,
                 InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
                 ThreadFactory threadFactory)
@@ -63,7 +63,7 @@ class MpRoSitePool {
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
-            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
+            m_site = new MpSite(m_queue, siteId, backend, m_catalogContext, partitionId);
             m_prf = new ProcedureRunnerFactory();
             m_prf.configure(m_site, m_site.m_sysprocContext);
             m_loadedProcedures = new LoadedProcedureSet(m_site, m_prf,
@@ -101,9 +101,9 @@ class MpRoSitePool {
     }
 
     // Stack of idle MpRoSites
-    private Deque<MpRoSiteContext> m_idleSites = new ArrayDeque<MpRoSiteContext>();
+    private Deque<MpSiteContext> m_idleSites = new ArrayDeque<MpSiteContext>();
     // Active sites, hashed by the txnID they're working on
-    private Map<Long, MpRoSiteContext> m_busySites = new HashMap<Long, MpRoSiteContext>();
+    private Map<Long, MpSiteContext> m_busySites = new HashMap<Long, MpSiteContext>();
 
     // Stuff we need to construct new MpRoSites
     private final long m_siteId;
@@ -115,7 +115,7 @@ class MpRoSitePool {
     private ThreadFactory m_poolThreadFactory;
     private final int m_poolSize;
 
-    MpRoSitePool(
+    MpSitePool(
             long siteId,
             BackendTarget backend,
             CatalogContext context,
@@ -142,7 +142,7 @@ class MpRoSitePool {
 
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
-            m_idleSites.push(new MpRoSiteContext(m_siteId,
+            m_idleSites.push(new MpSiteContext(m_siteId,
                         m_backend,
                         m_catalogContext,
                         m_partitionId,
@@ -163,9 +163,9 @@ class MpRoSitePool {
         // Wipe out all the idle sites with stale catalogs.
         // Non-idle sites will get killed and replaced when they finish
         // whatever they started before the catalog update
-        Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
+        Iterator<MpSiteContext> siterator = m_idleSites.iterator();
         while (siterator.hasNext()) {
-            MpRoSiteContext site = siterator.next();
+            MpSiteContext site = siterator.next();
             if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()
                     || site.getCatalogVersion() != m_catalogContext.catalogVersion) {
                 site.shutdown();
@@ -182,7 +182,7 @@ class MpRoSitePool {
     void repair(long txnId, SiteTasker task)
     {
         if (m_busySites.containsKey(txnId)) {
-            MpRoSiteContext site = m_busySites.get(txnId);
+            MpSiteContext site = m_busySites.get(txnId);
             site.offer(task);
         }
         else {
@@ -210,14 +210,14 @@ class MpRoSitePool {
         if (!retval) {
             return false;
         }
-        MpRoSiteContext site;
+        MpSiteContext site;
         // Repair case
         if (m_busySites.containsKey(txnId)) {
             site = m_busySites.get(txnId);
         }
         else {
             if (m_idleSites.isEmpty()) {
-                m_idleSites.push(new MpRoSiteContext(m_siteId,
+                m_idleSites.push(new MpSiteContext(m_siteId,
                             m_backend,
                             m_catalogContext,
                             m_partitionId,
@@ -237,7 +237,7 @@ class MpRoSitePool {
      */
     void completeWork(long txnId)
     {
-        MpRoSiteContext site = m_busySites.remove(txnId);
+        MpSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
@@ -256,16 +256,16 @@ class MpRoSitePool {
     void shutdown()
     {
         // Shutdown all, then join all, hopefully save some shutdown time for tests.
-        for (MpRoSiteContext site : m_idleSites) {
+        for (MpSiteContext site : m_idleSites) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpSiteContext site : m_busySites.values()) {
             site.shutdown();
         }
-        for (MpRoSiteContext site : m_idleSites) {
+        for (MpSiteContext site : m_idleSites) {
             site.joinThread();
         }
-        for (MpRoSiteContext site : m_busySites.values()) {
+        for (MpSiteContext site : m_busySites.values()) {
             site.joinThread();
         }
     }

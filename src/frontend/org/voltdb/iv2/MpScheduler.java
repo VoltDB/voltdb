@@ -36,6 +36,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ParameterConverter;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
@@ -47,6 +48,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.sysprocs.AdHocNPPartitions;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
 
@@ -90,9 +92,14 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(MpSitePool sitePool)
     {
         m_pendingTasks.setMpRoSitePool(sitePool);
+    }
+
+    void setMpUpdateSitePool(MpSitePool updateSitePool)
+    {
+        m_pendingTasks.setMpUpdateSitePool(updateSitePool);
     }
 
     void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
@@ -297,8 +304,16 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
-            Set<Integer> involvedPartitions = getBalancePartitions(message);
+        if (NpProcedureTaskConstructor != null) {
+            Set<Integer> involvedPartitions = null;
+            if (isNpTxn(message)) {
+                if (message.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions")) {
+                    involvedPartitions = getBalancePartitions(message);
+                } else {
+                    // Generic multi-partition transaction, see if the planner provided a subset of partitions
+                    involvedPartitions = getInvolvedPartitions(message);
+                }
+            }
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
                 involvedPartitionMasters.keySet().retainAll(involvedPartitions);
@@ -329,8 +344,10 @@ public class MpScheduler extends Scheduler
     private boolean isNpTxn(Iv2InitiateTaskMessage msg)
     {
         return msg.getStoredProcedureName().startsWith("@") &&
-                msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
-                (byte) msg.getParameters()[1] != 1; // clearIndex is MP, normal rebalance is NP
+                ((msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
+                        (byte) msg.getParameters()[1] != 1) ||
+                msg.getStoredProcedureName().equalsIgnoreCase("@AdHoc_RO_NP") ||
+                msg.getStoredProcedureName().equalsIgnoreCase("@AdHoc_RW_NP")) ; // clearIndex is MP, normal rebalance is NP
     }
 
     /**
@@ -346,6 +363,26 @@ public class MpScheduler extends Scheduler
                     request.partitionPairs.get(0).destPartition);
         } catch (JSONException e) {
             hostLog.warn("Unable to determine partitions for @BalancePartitions", e);
+            return null;
+        }
+    }
+
+    /**
+     * Extract involved partitions from a request.
+     */
+    private Set<Integer> getInvolvedPartitions(Iv2InitiateTaskMessage msg)
+    {
+
+        Object param = ParameterConverter.tryToMakeCompatible(String.class, msg.getParameters()[0]);
+        try {
+            JSONObject jsObj = new JSONObject((String) param);
+            AdHocNPPartitions request = new AdHocNPPartitions(jsObj, false);
+            Set<Integer> partitionSet = Sets.newHashSet(request.partitions);
+
+            return partitionSet;
+        } catch (JSONException e) {
+            // Unable to find partitions
+            //System.out.println("Unable to find NP partitions! " + e);
             return null;
         }
     }

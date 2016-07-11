@@ -24,13 +24,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+
+import com.google_voltpatches.common.collect.HashMultimap;
 
 /**
  * Provide an implementation of the TransactionTaskQueue specifically for the MPI.
@@ -46,22 +47,31 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+    private final HashMultimap<Integer, Long> m_currentWriteSites = HashMultimap.create();
+    private final HashMultimap<Integer, Long> m_currentReadSites = HashMultimap.create();
 
-    private MpRoSitePool m_sitePool = null;
+    private MpSitePool m_sitePool = null;
+    private MpSitePool m_updateSitePool = null;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
     {
         super(queue, initialTnxId);
     }
 
-    void setMpRoSitePool(MpRoSitePool sitePool)
+    void setMpRoSitePool(MpSitePool sitePool)
     {
         m_sitePool = sitePool;
+    }
+
+    void setMpUpdateSitePool(MpSitePool sitePool)
+    {
+        m_updateSitePool = sitePool;
     }
 
     synchronized void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_sitePool.updateCatalog(diffCmds, context, csp);
+        m_updateSitePool.updateCatalog(diffCmds, context, csp);
     }
 
     void shutdown()
@@ -69,6 +79,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (m_sitePool != null) {
             m_sitePool.shutdown();
         }
+
+        if (m_updateSitePool != null) {
+            m_updateSitePool.shutdown();
+        }
+
     }
 
     /**
@@ -87,6 +102,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         return true;
     }
 
+    // XXX Fixme for N part txns...may have both MP reads and writes concurrently
     // repair is used by MPI repair to inject a repair task into the
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
@@ -160,8 +176,28 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             m_sitePool.doWork(task.getTxnId(), task);
         }
         else {
-            m_taskQueue.offer(task);
+            // UpdateSitePool does not support all procedure types, so only send N-part transactions there
+            if(task.getTransactionState().getInvocation() != null &&
+                    task.getTransactionState().getInvocation().getProcName().equals("@AdHoc_NP")) {
+                m_updateSitePool.doWork(task.getTxnId(), task);
+            } else {
+                m_taskQueue.offer(task);
+            }
         }
+    }
+
+    private boolean hasReadSiteConflicts(TransactionTask task) {
+        HashMultimap<Integer,Long> currentReadSitesCopy = HashMultimap.create(m_currentReadSites);
+        currentReadSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
+
+        return !currentReadSitesCopy.isEmpty();
+    }
+
+    private boolean hasWriteSiteConflicts(TransactionTask task) {
+        HashMultimap<Integer,Long> currentWriteSitesCopy = HashMultimap.create(m_currentWriteSites);
+        currentWriteSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
+
+        return !currentWriteSitesCopy.isEmpty();
     }
 
     private boolean taskQueueOffer()
@@ -181,28 +217,38 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         if (!m_backlog.isEmpty()) {
             // We may not queue the next task, just peek to get the read-only state
             TransactionTask task = m_backlog.peekFirst();
-            if (!task.getTransactionState().isReadOnly()) {
-                if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-                    task = m_backlog.pollFirst();
+
+            while (task != null &&
+                    ((!task.getTransactionState().isReadOnly() && !hasReadSiteConflicts(task) && !hasWriteSiteConflicts(task) && m_updateSitePool.canAcceptWork()) ||
+                    (task.getTransactionState().isReadOnly() && !hasWriteSiteConflicts(task) && m_sitePool.canAcceptWork()))
+                    ) {
+                task = m_backlog.pollFirst();
+                if (!task.getTransactionState().isReadOnly()) {
+
                     m_currentWrites.put(task.getTxnId(), task);
+                    for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
+                        m_currentWriteSites.put(entry.getKey(), task.getTxnId());
+                    }
                     taskQueueOffer(task);
                     retval = true;
                 }
-            }
-            else if (m_currentWrites.isEmpty()) {
-                while (task != null && task.getTransactionState().isReadOnly() &&
-                       m_sitePool.canAcceptWork())
-                {
-                    task = m_backlog.pollFirst();
+                else {
+
                     assert(task.getTransactionState().isReadOnly());
                     m_currentReads.put(task.getTxnId(), task);
+                    for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
+                        m_currentReadSites.put(entry.getKey(), task.getTxnId());
+                    }
                     taskQueueOffer(task);
                     retval = true;
-                    // Prime the pump with the head task, if any.  If empty,
-                    // task will be null
-                    task = m_backlog.peekFirst();
+
                 }
+                // Prime the pump with the head task, if any.  If empty,
+                // task will be null
+                task = m_backlog.peekFirst();
+
             }
+
         }
         return retval;
     }
@@ -218,13 +264,25 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         int offered = 0;
         if (m_currentReads.containsKey(txnId)) {
+            TransactionTask task = m_currentReads.get(txnId);
+            Iterator<Integer> iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            while(iter.hasNext()) {
+                m_currentReadSites.remove(iter.next(),txnId);
+            }
             m_currentReads.remove(txnId);
             m_sitePool.completeWork(txnId);
         }
         else {
             assert(m_currentWrites.containsKey(txnId));
+            TransactionTask task = m_currentWrites.get(txnId);
+            Iterator<Integer> iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            while(iter.hasNext()) {
+                m_currentWriteSites.remove(iter.next(),txnId);
+            }
             m_currentWrites.remove(txnId);
-            assert(m_currentWrites.isEmpty());
+            if (task.getTransactionState().getInvocation().getProcName().equals("@AdHoc_NP")) {
+                m_updateSitePool.completeWork(txnId);
+            }
         }
         if (taskQueueOffer()) {
             ++offered;

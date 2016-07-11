@@ -76,6 +76,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.sysprocs.AdHocNPPartitions;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -357,6 +358,9 @@ public final class InvocationDispatcher {
             }
             else if ("@AdHoc".equals(task.procName)) {
                 return dispatchAdHoc(task, handler, ccxn, false, user);
+            }
+            else if ("@AdHoc_NP".equals(task.procName)) {
+                return dispatchAdHocNp(task, handler, ccxn, false, user);
             }
             else if ("@AdHocSpForTest".equals(task.procName)) {
                 return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
@@ -812,6 +816,35 @@ public final class InvocationDispatcher {
             sendSentinel(txnId, initiatorHSId, -1, -1, true);
         }
     }
+
+    private final ClientResponseImpl dispatchAdHocNp(StoredProcedureInvocation task,
+            InvocationClientHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
+        ParameterSet params = task.getParams();
+        assert(params.size() > 1);
+        Object[] paramArray = params.toArray();
+        String sql = (String) paramArray[0];
+        // get the partition params which must exist
+        JSONObject jsObj;
+        String userPartitions = "";
+        try {
+            jsObj = new JSONObject((String) Arrays.copyOfRange(paramArray, 1, 2)[0]);
+            AdHocNPPartitions partitions = new AdHocNPPartitions(jsObj,true);
+            userPartitions = partitions.toJSONString();
+        } catch (JSONException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        Object[] userPartitionKey = new Object[1];
+        userPartitionKey[0] = userPartitions;
+        Object[] userParams = null;
+        if (params.size() > 2) {
+            userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
+        }
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);
+        return null;
+    }
+
 
     private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
             InvocationClientHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
@@ -1387,10 +1420,23 @@ public final class InvocationDispatcher {
         // pick the sysproc based on the presence of partition info
         // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
         // -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
+
+        boolean isNPartition = plannedStmtBatch.work.invocationName.equalsIgnoreCase("@AdHoc_NP");
+        boolean isSinglePartition = !isNPartition && (plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend);
         int partition = -1;
 
-        if (isSinglePartition) {
+        if (isNPartition) {
+            if (plannedStmtBatch.isReadOnly()) {
+                task.procName = "@AdHoc_RO_NP";
+            }
+            else {
+                task.procName = "@AdHoc_RW_NP";
+            }
+            Object partParam = (String) plannedStmtBatch.partitionParam();
+            byte[] param = VoltType.valueToBytes(partParam);
+            task.setParams(param, buf.array());
+        }
+        else if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
                 task.procName = "@AdHoc_RO_SP";
             }

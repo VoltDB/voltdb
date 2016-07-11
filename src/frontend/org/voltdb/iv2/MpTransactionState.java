@@ -434,4 +434,8 @@ public class MpTransactionState extends TransactionState
                                     m_useHSIds.containsAll(m_masterHSIds.values()));
         return m_masterHSIds.get(partition);
     }
+
+    public Map<Integer, Long> getMasterHSIds() {
+        return m_masterHSIds;
+    }
 }

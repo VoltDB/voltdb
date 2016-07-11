@@ -87,13 +87,22 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
-        MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
+        MpSitePool sitePool = new MpSitePool(m_initiatorMailbox.getHSId(),
                 backend,
                 catalogContext,
                 m_partitionId,
                 m_initiatorMailbox,
                 csp);
         sched.setMpRoSitePool(sitePool);
+
+        MpSitePool updateSitePool = new MpSitePool(m_initiatorMailbox.getHSId(),
+                backend,
+                catalogContext,
+                m_partitionId,
+                m_initiatorMailbox,
+                csp);
+        sched.setMpUpdateSitePool(updateSitePool);
+
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
