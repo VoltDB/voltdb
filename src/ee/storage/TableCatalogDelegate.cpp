@@ -546,10 +546,10 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator& iterator = existingTable->iterator();
+        TableIterator* iterator = existingTable->makeIterator();
         TableTuple& tupleToInsert = newTable->tempTuple();
 
-        while (iterator.next(scannedTuple)) {
+        while (iterator->next(scannedTuple)) {
 
             //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
 
@@ -584,6 +584,7 @@ static void migrateChangedTuples(catalog::Table const& catalogTable,
                 break;
             }
         }
+        delete iterator;
     }
 
     // release any memory held by the default values --

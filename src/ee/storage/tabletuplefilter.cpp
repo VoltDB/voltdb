@@ -87,10 +87,11 @@ void TableTupleFilter::init(Table* table)
     init(table->getBlockAddresses(), table->getTuplesPerBlock(), table->getTupleLength());
 
     TableTuple tuple(table->schema());
-    TableIterator iterator = table->iterator();
-    while (iterator.next(tuple)) {
+    TableIterator* iterator = table->makeIterator();
+    while (iterator->next(tuple)) {
         initActiveTuple(tuple);
     }
+    delete iterator;
 }
 
 uint64_t TableTupleFilter::findBlockIndex(uint64_t tupleAddress)

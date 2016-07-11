@@ -363,9 +363,10 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
-        TableIterator iterator = m_dest->iterator();
-        iterator.next(m_existingTuple);
+        TableIterator* iterator = m_dest->makeIterator();
+        iterator->next(m_existingTuple);
         assert( ! m_existingTuple.isNullTuple());
+        delete iterator;
         return true;
     }
 

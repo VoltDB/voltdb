@@ -97,7 +97,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+    TableIterator* iterator = input_table->iteratorDeletingAsWeGo();
 
     int tuple_ctr = 0;
     int tuples_skipped = 0;
@@ -105,7 +105,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     node->getLimitAndOffsetByReference(params, limit, offset);
 
-    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+    while ((limit == -1 || tuple_ctr < limit) && iterator->next(tuple))
     {
         // TODO: need a way to skip / iterate N items.
         if (tuples_skipped < offset)
@@ -124,6 +124,7 @@ LimitExecutor::p_execute(const NValueArray &params)
             return false;
         }
     }
+    delete iterator;
 
     cleanupInputTempTable(input_table);
 
