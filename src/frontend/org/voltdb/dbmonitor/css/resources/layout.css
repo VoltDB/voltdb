@@ -611,7 +611,7 @@ ul.rightShowhideList {
         }
 
 .preBtn {
-    float: right;
+    float: left;
     padding: 6px 0 0 10px;
 }
 
@@ -3782,6 +3782,18 @@ label.errorTimeOut {
 .sliderGraph .ui-slider .ui-widget-header { background:#ccc}
 .sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
 .sliderMain { position:relative; top:3px;}
+.sliderPop {margin-bottom: 10px;}
+.sliderControl { margin:0; padding:0;}
+.sliderControl .ui-slider .ui-slider-handle {outline:none; border-radius:1px; border:1px solid #ccc!important; }
+.slideContent { float:left;}
+.slideContent input[type="text"] { width:22px;}
+.sliderMain { float:left; width:58%; margin:0 0 0 10px;}
+fieldset { border:1px solid #ccc; padding:20px;}
+.chartContent {float: left; width: 34px; margin: 68px 0 0 27px;}
+.chartDataContent { float: right;padding: 0 45px 0 0;width: 240px;}
+.chartDataContent ul li { line-height:20px;}
+.chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
+.chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
