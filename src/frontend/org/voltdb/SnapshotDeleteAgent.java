@@ -267,18 +267,16 @@ public class SnapshotDeleteAgent extends OpsAgent
     }
 
     private VoltTable constructFragmentResultsTable() {
-        ColumnInfo[] result_columns = new ColumnInfo[10];
-        int ii = 0;
-        result_columns[ii++] = new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
-        result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("PATHTYPE", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("NONCE", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("SIZE", VoltType.BIGINT);
-        result_columns[ii++] = new ColumnInfo("DELETED", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-        return new VoltTable(result_columns);
+        return new VoltTable(new ColumnInfo(
+                VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID)
+                , new ColumnInfo("HOSTNAME", VoltType.STRING)
+                , new ColumnInfo("PATH", VoltType.STRING)
+                , new ColumnInfo("PATHTYPE", VoltType.STRING)
+                , new ColumnInfo("NONCE", VoltType.STRING)
+                , new ColumnInfo("NAME", VoltType.STRING)
+                , new ColumnInfo("SIZE", VoltType.BIGINT)
+                , new ColumnInfo("DELETED", VoltType.STRING)
+                , new ColumnInfo("RESULT", VoltType.STRING)
+                , new ColumnInfo("ERR_MSG", VoltType.STRING));
     }
 }
