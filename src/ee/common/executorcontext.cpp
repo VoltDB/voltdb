@@ -19,6 +19,8 @@
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
+#include "storage/persistenttable.h"
+#include "plannodes/insertnode.h"
 
 #include "boost/foreach.hpp"
 
@@ -140,18 +142,64 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
     size_t ttl = executorList.size();
     int ctr = 0;
 
+    EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
+    bool needsReleaseLock = false;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
-            // Call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-            if (!executor->execute(*m_staticParams)) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
+
+            if (executor->getPlanNode()->getPlanNodeType() == PLAN_NODE_TYPE_INSERT) {
+                InsertPlanNode* node = dynamic_cast<InsertPlanNode*>(executor->getPlanNode());
+                assert(node);
+                Table* targetTable = node->getTargetTable();
+                PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
+                if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
+                    if (VoltDBEngine::countDownGlobalTxnStartCount()) {
+                        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
+                        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
+                        needsReleaseLock = true;
+                        // Call the execute method to actually perform whatever action
+                        // it is that the node is supposed to do...
+                        if (!executor->execute(*m_staticParams)) {
+                            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                               "Unspecified execution error detected");
+                        }
+                        ++ctr;
+                        needsReleaseLock = false;
+                        globalTxnStartCountdownLatch = SITES_PER_HOST;
+                        // Assign the correct pool back to this thread
+                        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+                        VoltDBEngine::signalLastSiteFinished();
+                    } else {
+                        VoltDBEngine::waitForLastSiteFinished();
+                    }
+                } else {
+                    // Call the execute method to actually perform whatever action
+                    // it is that the node is supposed to do...
+                    if (!executor->execute(*m_staticParams)) {
+                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                            "Unspecified execution error detected");
+                    }
+                    ++ctr;
+                }
+            } else {
+                // Call the execute method to actually perform whatever action
+                // it is that the node is supposed to do...
+                if (!executor->execute(*m_staticParams)) {
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                        "Unspecified execution error detected");
+                }
+                ++ctr;
             }
-            ++ctr;
         }
     } catch (const SerializableEEException &e) {
+        if (needsReleaseLock) {
+            globalTxnStartCountdownLatch = SITES_PER_HOST;
+            // Assign the correct pool back to this thread
+            ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+            VoltDBEngine::signalLastSiteFinished();
+        }
+
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.

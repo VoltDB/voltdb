@@ -101,6 +101,30 @@ class TheHashinator;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
+struct EngineLocals : public PoolLocals {
+    inline EngineLocals() : PoolLocals(), engine(NULL) {}
+
+    inline EngineLocals(VoltDBEngine* eng) : PoolLocals(), engine(eng)
+    {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), engine(src.engine)
+    {}
+
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
+        engine = rhs.engine;
+        return *this;
+    }
+
+    VoltDBEngine* engine;
+};
+typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
+
+extern pthread_mutex_t sharedEngineMutex;
+extern pthread_cond_t sharedEngineCondition;
+extern SharedEngineLocalsType enginesByPartitionId;
+extern std::atomic<int32_t> globalTxnStartCountdownLatch;
+extern int32_t SITES_PER_HOST;
+
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -415,6 +439,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_partitionId;
         }
 
+        /**
+         * Cross-site synchronization functions
+         */
+        static void signalLastSiteFinished();
+        static void waitForLastSiteFinished();
+
+        static bool countDownGlobalTxnStartCount() {
+            return --globalTxnStartCountdownLatch == 0;
+        }
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 
@@ -440,11 +474,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         void reportProgressToTopend();
 
-        /**
-         * Cross-site synchronization functions
-         */
-        void signalLastSiteFinished();
-        void waitForLastSiteFinished();
+
 
         /**
          * Execute a single plan fragment.
@@ -642,32 +672,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         std::stack<int64_t> m_tuplesModifiedStack;
 };
-
-
-struct EngineLocals : public PoolLocals {
-    inline EngineLocals() : PoolLocals(), engine(NULL) {}
-
-    inline EngineLocals(VoltDBEngine* eng) : PoolLocals(), engine(eng)
-    {}
-    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), engine(src.engine)
-    {}
-
-    inline EngineLocals& operator = (EngineLocals const& rhs) {
-        PoolLocals::operator = (rhs);
-        engine = rhs.engine;
-        return *this;
-    }
-
-    VoltDBEngine* engine;
-};
-
-typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
-
-extern pthread_mutex_t sharedEngineMutex;
-extern pthread_cond_t sharedEngineCondition;
-extern SharedEngineLocalsType enginesByPartitionId;
-extern std::atomic<int32_t> globalTxnStartCountdownLatch;
-extern int32_t SITES_PER_HOST;
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
 {

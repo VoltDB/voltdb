@@ -633,19 +633,19 @@ void VoltDBEngine::signalLastSiteFinished() {
     }
     // We now know all other threads are waiting to be signaled
     globalTxnEndCountdownLatch = 0;
-    VOLT_ERROR("partition %d kicking everyone awake with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
+//    VOLT_ERROR("partition %d kicking everyone awake with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
     pthread_cond_broadcast(&sharedEngineCondition);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 
 void VoltDBEngine::waitForLastSiteFinished() {
     pthread_mutex_lock(&sharedEngineMutex);
-    VOLT_ERROR("partition %d falling asleep", m_partitionId);
+//    VOLT_ERROR("partition %d falling asleep", m_partitionId);
     globalTxnEndCountdownLatch++;
     while (globalTxnEndCountdownLatch != 0) {
         pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     }
-    VOLT_ERROR("partition %d waking up with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
+//    VOLT_ERROR("partition %d waking up with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 
@@ -682,9 +682,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    bool lastSite = --globalTxnStartCountdownLatch == 0;
-
-    if (lastSite) {
+    if (countDownGlobalTxnStartCount()) {
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
@@ -1215,9 +1213,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    bool lastSite = --globalTxnStartCountdownLatch == 0;
-
-    if (lastSite) {
+    if (countDownGlobalTxnStartCount()) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
