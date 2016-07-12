@@ -58,6 +58,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogUtil;
 
 import junit.framework.TestCase;
 
@@ -130,8 +131,8 @@ public class TestCalcite extends TestCase {
         @Override
         public RelDataType getRowType(RelDataTypeFactory typeFactory) {
             FieldInfoBuilder builder = typeFactory.builder();
-
-            for (Column catColumn : m_catTable.getColumns()) {
+            List<Column> columns = CatalogUtil.getSortedCatalogItems(m_catTable.getColumns(), "index");
+            for (Column catColumn : columns) {
                 VoltType vt = VoltType.get((byte)catColumn.getType());
                 RelDataType rdt = toRelDataType(typeFactory, vt, catColumn.getSize());
                 rdt = typeFactory.createTypeWithNullability(rdt, catColumn.getNullable());
