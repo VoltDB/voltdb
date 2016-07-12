@@ -250,12 +250,14 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     pthread_mutex_lock(&sharedEngineMutex);
     if (partitionId != 16383) {
         enginesByPartitionId[partitionId] = EngineLocals();
+        VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
         if (SITES_PER_HOST == 0) {
             SITES_PER_HOST = sitesPerHost;
             globalTxnStartCountdownLatch = SITES_PER_HOST;
         }
         if (createDrReplicatedStream) {
             mpEngineLocals = EngineLocals();
+            VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocal.context);
         }
     }
     pthread_mutex_unlock(&sharedEngineMutex);
@@ -714,6 +716,11 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     // This must be done after loading all the tables.
     initMaterializedViewsAndLimitDeletePlans(false);
 
+    typedef std::pair<CatalogId, Table*> CatToTable;
+    BOOST_FOREACH (CatToTable tablePair, m_tables) {
+        VOLT_ERROR("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
+    }
+
     VOLT_DEBUG("Loaded catalog from partition...");
     return true;
 }
@@ -849,7 +856,9 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
 bool
 VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
 {
-    VOLT_ERROR("loading catalog for partition %d with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
+    VOLT_ERROR("loading %s catalog for partition %d with context %p",
+            (updateReplicated?"REPLICATED":"PARTITIONED"),
+            m_partitionId, ExecutorContext::getExecutorContext());
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -877,6 +886,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                         currEngine->m_delegatesByName[tableName] = tcd;
                     }
                 }
+                continue;
             }
             else {
                 tcd = new TableCatalogDelegate(catalogTable->signature(),
@@ -930,7 +940,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             }
         }
         else {
-            if (catalogTable->isreplicated() && !updateReplicated) {
+            if (catalogTable->isreplicated() ^ updateReplicated) {
                 // replicated tables should only be processed once for the entire cluster
                 continue;
             }
@@ -1220,8 +1230,6 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
-        mpEngine->m_catalog->purgeDeletions();
-
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         ExecutorContext::assignThreadLocals(*ourEngineLocals);
         signalLastSiteFinished();
@@ -1325,12 +1333,16 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
         assert(m_database);
         catalog::Table *catTable = m_database->tables().get(localTable->name());
         int32_t relativeIndexOfTable = catTable->relativeIndex();
+        const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
             if (updateReplicated) {
+                VOLT_ERROR("loading REPLICATED table %d (%s) from partition %d with context %p",
+                        relativeIndexOfTable, tableName.c_str(),
+                        m_partitionId, ExecutorContext::getExecutorContext());
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                     VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
-                    currEngine->m_tablesByName[tcd->getTable()->name()] = localTable;
+                    currEngine->m_tablesByName[tableName] = localTable;
                 }
             }
             else {
@@ -1338,8 +1350,14 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
             }
         }
         else {
+            if (updateReplicated) {
+                continue;
+            }
+            VOLT_ERROR("loading Partitioned table %d (%s) for partition %d with context %p",
+                    relativeIndexOfTable, tableName.c_str(),
+                    m_partitionId, ExecutorContext::getExecutorContext());
             m_tables[relativeIndexOfTable] = localTable;
-            m_tablesByName[tcd->getTable()->name()] = localTable;
+            m_tablesByName[tableName] = localTable;
         }
         TableStats* stats;
         PersistentTable* persistentTable = tcd->getPersistentTable();
@@ -1525,7 +1543,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
-        if (srcCatalogTable->isreplicated() && !updateReplicated) {
+        if (srcCatalogTable->isreplicated() ^ updateReplicated) {
             continue;
         }
         Table *srcTable = m_tables[srcCatalogTable->relativeIndex()];
