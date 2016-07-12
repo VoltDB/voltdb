@@ -313,7 +313,6 @@ $(document).ready(function () {
         if(tablist.length <= 1){
             e.stopPropagation()
             e.preventDefault()
-            $("#btnWarningLastTab").trigger("click")
             return;
         }
     })
@@ -346,6 +345,7 @@ $(document).ready(function () {
                 $('#'+ element_id).remove();
                 $('#q-' + id).remove()
                 $('#queryBtnList-' + id).remove()
+                SQLQueryRender.enableDisableCrossTab()
                 SQLQueryRender.showHideNewTab()
                 popup.close()
             });
@@ -356,8 +356,6 @@ $(document).ready(function () {
             });
         }
     })
-
-    $('#btnWarningLastTab').popup();
 
     var removeTabData =  function(elementId){
         var tabName = $('#' + elementId).find('a').text();
@@ -585,6 +583,19 @@ $(document).ready(function () {
             return orderData
         }
 
+        this.enableDisableCrossTab = function(){
+            var tablist = []
+            $('#worktabs ul li').not($('#liNewQuery')).each(function(){
+                var id = $(this).attr('id').split('-')[1]
+                tablist.push(id)
+                $('#close-tab-' + id).removeClass('disableCloserTab');
+            })
+
+            if(tablist.length == 1){
+                $('#close-tab-' + tablist[0]).addClass('disableCloserTab');
+            }
+        }
+
         this.loadSavedQueries= function(){
             var sql_localStorage = localStorage.queries
             var queryData = {}
@@ -604,8 +615,8 @@ $(document).ready(function () {
                 $(html).appendTo( ul );
                 $("#new-query").unbind('click')
                 $("#new-query").on('click', function() {
-                SQLQueryRender.createQueryTab()
-            });
+                    SQLQueryRender.createQueryTab()
+                });
             }
         }
 
@@ -718,6 +729,7 @@ $(document).ready(function () {
 
             tab_counter++
             this.showHideNewTab()
+            SQLQueryRender.enableDisableCrossTab()
         }
 
         this.addQueryBtn = function(tab_id){
