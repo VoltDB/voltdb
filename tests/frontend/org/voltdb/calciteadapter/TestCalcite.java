@@ -25,23 +25,29 @@ package org.voltdb.calciteadapter;
 
 import java.io.File;
 import java.nio.charset.Charset;
-import java.util.Collection;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.apache.calcite.linq4j.tree.Expression;
+import org.apache.calcite.adapter.enumerable.EnumerableConvention;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
-import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.sql.SqlCollation;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -56,7 +62,6 @@ import junit.framework.TestCase;
 public class TestCalcite extends TestCase {
 
     // Stolen from TestVoltCompiler
-    String nothing_jar;
     String testout_jar;
 
     @Override
@@ -99,10 +104,6 @@ public class TestCalcite extends TestCase {
             m_catTable = table;
         }
 
-        static public TableAdapter fromTableCatalog(org.voltdb.catalog.Table table) {
-            return new TableAdapter(table);
-        }
-
         public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
             SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
             RelDataType rdt;
@@ -139,77 +140,40 @@ public class TestCalcite extends TestCase {
 
         @Override
         public Statistic getStatistic() {
-            // TODO Auto-generated method stub
-            return null;
+            return new Statistic() {
+
+                @Override
+                public Double getRowCount() {
+                    // TODO Auto-generated method stub
+                    return null;
+                }
+
+                @Override
+                public boolean isKey(ImmutableBitSet columns) {
+                    // TODO Auto-generated method stub
+                    return false;
+                }
+
+                @Override
+                public List<RelCollation> getCollations() {
+                    return new ArrayList<>();
+                }
+
+                @Override
+                public RelDistribution getDistribution() {
+                    // TODO Auto-generated method stub
+                    return null;
+                }
+
+            };
         }
 
     }
 
-    private static class SchemaAdapter implements Schema {
-
-        final Catalog m_catalog;
-
-        public SchemaAdapter(Catalog catalog) {
-            m_catalog = catalog;
-        }
-
-
-        @Override
-        public Expression getExpression(SchemaPlus sp, String str) {
-            return null;
-        }
-
-        @Override
-        public boolean contentsHaveChangedSince(long arg0, long arg1) {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
-        @Override
-        public Set<String> getFunctionNames() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Collection<Function> getFunctions(String arg0) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Schema getSubSchema(String arg0) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        @Override
-        public Set<String> getSubSchemaNames() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        private CatalogMap<Table> getCatalogTables() {
-            return m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-        }
-
-        @Override
-        public org.apache.calcite.schema.Table getTable(String arg0) {
-            return TableAdapter.fromTableCatalog(getCatalogTables().get(arg0));
-        }
-
-        @Override
-        public Set<String> getTableNames() {
-            return getCatalogTables().keySet();
-        }
-
-        @Override
-        public boolean isMutable() {
-            // TODO Auto-generated method stub
-            return false;
-        }
-
+    private CatalogMap<Table> getCatalogTables(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
     }
+
 
     private SchemaPlus schemaPlusFromDDL(String ddl) {
         VoltCompiler compiler = new VoltCompiler();
@@ -217,30 +181,13 @@ public class TestCalcite extends TestCase {
 
         assertTrue(success);
 
+        SchemaPlus rootSchema = Frameworks.createRootSchema(true);
         Catalog cat = compiler.getCatalog();
-        SchemaAdapter schema = new SchemaAdapter(cat);
-        assert(schema != null);
-
-        SchemaPlus rootSchema = Frameworks.createRootSchema(false);
-        rootSchema.add("voltdb", schema);
+        for (Table table : getCatalogTables(cat)) {
+            rootSchema.add(table.getTypeName(), new TableAdapter(table));
+        }
 
         return rootSchema;
-    }
-
-    private void dumpRootSchema(SchemaPlus rootSchema) {
-        final RelDataTypeFactory typeFactory =
-                new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
-        Set<String> subSchemaNames = rootSchema.getSubSchemaNames();
-        for (String subSchemaName : subSchemaNames) {
-            System.out.println(subSchemaName);
-            Schema subSchema = rootSchema.getSubSchema(subSchemaName);
-            for (String tableName : subSchema.getTableNames()) {
-                System.out.println("  " + tableName);
-                org.apache.calcite.schema.Table table = subSchema.getTable(tableName);
-                RelDataType rowType = table.getRowType(typeFactory);
-                System.out.println("    " + rowType.getFullTypeString());
-            }
-        }
     }
 
     public void testSchema() {
@@ -253,6 +200,36 @@ public class TestCalcite extends TestCase {
                 + "v varchar(32));";
         SchemaPlus rootSchema = schemaPlusFromDDL(ddl);
         assertTrue(rootSchema != null);
-        dumpRootSchema(rootSchema);
+    }
+
+    private Planner getCalcitePlanner(SchemaPlus schemaPlus) {
+      final FrameworkConfig config = Frameworks.newConfigBuilder()
+              .parserConfig(SqlParser.Config.DEFAULT)
+              .defaultSchema(schemaPlus)
+              .build();
+        return Frameworks.getPlanner(config);
+    }
+
+    public void testCalcitePlanner() throws Exception {
+        String ddl = "create table test_calcite ("
+                + "i integer primary key, "
+                + "si smallint, "
+                + "ti tinyint,"
+                + "bi bigint,"
+                + "f float not null, "
+                + "v varchar(32));";
+        Planner planner = getCalcitePlanner(schemaPlusFromDDL(ddl));
+        assertTrue(planner != null);
+        SqlNode parse = planner.parse("select * from test_calcite");
+        System.out.println(parse);
+
+        SqlNode validate = planner.validate(parse);
+        System.out.println(validate);
+        RelNode convert = planner.rel(validate).project();
+        RelTraitSet traitSet = planner.getEmptyTraitSet()
+            .replace(EnumerableConvention.INSTANCE);
+        RelNode transform = planner.transform(0, traitSet, convert);
+
+        System.out.println(transform.getDescription());
     }
 }
