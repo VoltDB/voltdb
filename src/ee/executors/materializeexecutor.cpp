@@ -112,7 +112,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
             for (int j = m_columnCount - 1; j >= 0; --j) {
                 temp_tuple.setNValue(j, params[i * m_columnCount + j]);
             }
-            output_table->insertTupleNonVirtual(temp_tuple);
+            output_table->insertTempTuple(temp_tuple);
         }
         VOLT_TRACE ("Materialized :\n %s", this->output_table->debug().c_str());
         return true;
@@ -147,7 +147,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     }
 
     // Add tuple to the output
-    output_table->insertTupleNonVirtual(temp_tuple);
+    output_table->insertTempTuple(temp_tuple);
 
     return true;
 }

@@ -80,7 +80,7 @@ bool TupleScanExecutor::p_execute(const NValueArray &params) {
         temp_tuple.setNValue(i, params[paramIdxs[i]]);
     }
 
-    output_temp_table->insertTupleNonVirtual(temp_tuple);
+    output_temp_table->insertTempTuple(temp_tuple);
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Tuple scanning");
 

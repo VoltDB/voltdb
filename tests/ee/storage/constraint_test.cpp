@@ -49,22 +49,24 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <stdint.h>
 #include "harness.h"
+
 #include "common/common.h"
-#include "common/types.h"
-#include "common/TupleSchema.h"
 #include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
 #include "common/SerializableEEException.h"
 #include "common/tabletuple.h"
-#include "storage/tablefactory.h"
-#include "storage/persistenttable.h"
-#include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
+#include "common/TupleSchema.h"
+#include "common/types.h"
+#include "common/ValueFactory.hpp"
 #include "execution/VoltDBEngine.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
+#include "storage/DRTupleStream.h"
+#include "storage/persistenttable.h"
+#include "storage/tablefactory.h"
 
+#include <cstdlib>
+#include <stdint.h>
 
 using std::string;
 using std::vector;
@@ -118,7 +120,7 @@ protected:
         }
         table = static_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature));
         if (pkey) {
-            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
+            TableIndex *pkeyIndex = TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);
             table->addIndex(pkeyIndex);
             table->setPrimaryKeyIndex(pkeyIndex);

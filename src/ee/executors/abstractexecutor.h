@@ -84,7 +84,7 @@ class AbstractExecutor {
     {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
-            m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+            m_tmpOutputTable->deleteAllTempTuples();
         }
     }
 
@@ -92,7 +92,7 @@ class AbstractExecutor {
         TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
         if (tmp_input_table) {
             // No need of its input temp table
-            tmp_input_table->deleteAllTuplesNonVirtual(false);
+            tmp_input_table->deleteAllTempTuples();
         }
     }
 
