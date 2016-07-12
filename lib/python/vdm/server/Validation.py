@@ -87,7 +87,6 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
