@@ -44,6 +44,7 @@ function fkey(e){
        }
     })
 
+
     // Attach the event click for all links in the page
     $("a").bind("click", function()
     {
@@ -68,14 +69,36 @@ $(document).ready(function () {
     bindDOMEvents();
     $("#helppopup").load("help.htm", function () {
     });
+     var defaultValue = 30;
+     if ($.cookie("retainedTimeInterval") != undefined){
+        defaultValue = $.cookie("retainedTimeInterval")
+     }
+     $( "#slider-range-min" ).slider({
+                  range: "min",
+                  value: defaultValue,
+                  min: 1,
+                  max: 100,
+                  slide: function( event, ui ) {
+                    $( "#timeInterval" ).val(ui.value );
+                    $.cookie("retainedTimeInterval", ui.value, { expires: 365 })
+                  }
+                });
+
+
+     $( "#timeInterval" ).val( defaultValue );
 
     //clear the localStorage for DataTables in DR Section
 
     $.each(localStorage, function(key, value){
-        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'
-        && key != 'memoryDetails' && key != 'transDetails' && key != 'partitionDetails' && key != 'latency' && key != 'cmdLog'){
+        if (key.indexOf("DataTables_") > -1){
             localStorage.removeItem(key)
         }
+//
+//        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'
+//        && key != 'memoryDetails' && key != 'transDetails' && key != 'partitionDetails' && key != 'latency' && key != 'cmdLog'
+//        && key != 'memoryDetailsMin' ){
+//            localStorage.removeItem(key)
+//        }
     });
 
 

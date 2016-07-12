@@ -620,7 +620,6 @@ ul.rightShowhideList {
 }
 
     .viewSelect label {
-        font-weight: bold;
         font-size: 14px;
         position:relative;
         top:2px;
@@ -667,16 +666,16 @@ ul.rightShowhideList {
 }
 
     .chartHeader h1 {
-        padding: 15px 0 0 20px;
+        padding: 18px 0 0 20px;
     }
 
     .chartHeader span {
         position: absolute;
         max-width: 150px;
         display: block;
-        right: 20px;
+        right: 40px;
         text-align: right;
-        top: 15px;
+        top: 18px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -3777,12 +3776,14 @@ label.errorTimeOut {
 .queryTimeClass {float:left;}
 .clsQueryBtns { float:right;}
 .sliderGraph { float:left; margin:8px 30px 0 0;}
-.labelSlider { float:left; position:relative;right:125px;}
-.labelSlider label {font-weight: bold; font-size: 14px;}
+.labelSlider { float:left; position:relative;right:208px;}
+.labelSlider label {font-size: 14px;}
 .sliderGraph .ui-slider .ui-widget-header { background:#ccc}
 .sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
 .sliderMain { position:relative; top:3px;}
-.sliderPop {margin-bottom: 10px;}
+.downloadBtnChart { float: right;margin-right: 10px;position: relative; top: -4px;}
+#timeInterval {border:0; color:#222; font-weight:bold; width:24px;}
+/*.sliderPop {margin-bottom: 10px;}
 .sliderControl { margin:0; padding:0;}
 .sliderControl .ui-slider .ui-slider-handle {outline:none; border-radius:1px; border:1px solid #ccc!important; }
 .slideContent { float:left;}
@@ -3793,7 +3794,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .chartDataContent { float: right;padding: 0 45px 0 0;width: 240px;}
 .chartDataContent ul li { line-height:20px;}
 .chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
-.chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}
+.chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
