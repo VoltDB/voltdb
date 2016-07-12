@@ -68,6 +68,7 @@ public class IICVResolveChecker implements ConflictResolveChecker.ResolveChecker
                 checkEquals("Mismatched ACTION_TYPE: expected %s, actual %s", xdcrExpected.getActionType(), xdcrActual.getActionType());
                 checkEquals("Mismatched CONFLICT_TYPE: expected %s, actual %s", xdcrExpected.getConflictType(), xdcrActual.getConflictType());
                 checkEquals("Mismatched DECISION: expected %s, actual %s", xdcrExpected.getDecision(), xdcrActual.getDecision());
+                checkEquals("Mismatched Divergence: expected %s, actual %s", xdcrExpected.getDivergenceType(), xdcrActual.getDivergenceType());
                 checkEquals("Unexpected matching key column: expected %s, actual %s",
                         xdcrExpected.getKey(), toByteArray(xdcrActual.getTuple().getString("KEY")));
             }
@@ -75,6 +76,7 @@ public class IICVResolveChecker implements ConflictResolveChecker.ResolveChecker
                 checkEquals("Mismatched ACTION_TYPE: expected %s, actual %s", xdcrExpected.getActionType(), xdcrActual.getActionType());
                 checkEquals("Mismatched CONFLICT_TYPE: expected %s, actual %s", xdcrExpected.getConflictType(), xdcrActual.getConflictType());
                 checkEquals("Mismatched DECISION: expected %s, actual %s", xdcrExpected.getDecision(), xdcrActual.getDecision());
+                checkEquals("Mismatched Divergence: expected %s, actual %s", xdcrExpected.getDivergenceType(), xdcrActual.getDivergenceType());
                 checkEquals("Mismatched key column: expected %s, actual %s",
                         xdcrExpected.getKey(), toByteArray(xdcrActual.getTuple().getString("KEY")));
                 checkEquals("Mismatched value column: expected %s, actual %s",

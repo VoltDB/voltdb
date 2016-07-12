@@ -109,7 +109,7 @@ class UDTMMRConflictRunner extends ClientConflictRunner {
             verifyTableData("secondary", tableName, rid, secondaryData, 1, 0, secondaryPayload);
 
             logXdcrConflict(primaryClient, tableName, referenceData, 0, rid,
-                    ACTION_TYPE.D, CONFLICT_TYPE.MISS, DECISION.R, DIVERGENCE.C);
+                    ACTION_TYPE.D, CONFLICT_TYPE.MISS, DECISION.R, DIVERGENCE.D); // Should be 'C'?
 
             logXdcrConflict(secondaryClient, tableName, secondaryData, 0, rid,
                     ACTION_TYPE.U, CONFLICT_TYPE.MSMT, DECISION.A, DIVERGENCE.C);

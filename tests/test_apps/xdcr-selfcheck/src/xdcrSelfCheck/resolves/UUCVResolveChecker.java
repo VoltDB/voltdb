@@ -72,6 +72,7 @@ public class UUCVResolveChecker implements ConflictResolveChecker.ResolveChecker
                 checkEquals("Mismatched ACTION_TYPE: expected %s, actual %s", ACTION_TYPE.U, xdcrActual.getActionTypeEnum());
                 checkEquals("Mismatched CONFLICT_TYPE: expected %s, actual %s", xdcrExpected.getConflictType(), xdcrActual.getConflictType());
                 checkEquals("Mismatched DECISION: expected %s, actual %s", xdcrExpected.getDecision(), xdcrActual.getDecision());
+                checkEquals("Mismatched Divergence: expected %s, actual %s", xdcrExpected.getDivergenceType(), xdcrActual.getDivergenceType());
                 checkEquals("Unexpected matching key column: expected %s, actual %s",
                         xdcrExpected.getKey(), toByteArray(xdcrActual.getTuple().getString("KEY")));
                 checkEquals("Mismatched value column: expected %s, actual %s",
@@ -82,6 +83,7 @@ public class UUCVResolveChecker implements ConflictResolveChecker.ResolveChecker
                 checkEquals("Mismatched ACTION_TYPE: expected %s, actual %s", ACTION_TYPE.U, xdcrActual.getActionTypeEnum());
                 checkEquals("Mismatched CONFLICT_TYPE: expected %s, actual %s", xdcrExpected.getConflictType(), xdcrActual.getConflictType());
                 checkEquals("Mismatched DECISION: expected %s, actual %s", xdcrExpected.getDecision(), xdcrActual.getDecision());
+                checkEquals("Mismatched Divergence: expected %s, actual %s", xdcrExpected.getDivergenceType(), xdcrActual.getDivergenceType());
                 checkEquals("Mismatched key column: expected %s, actual %s",
                         xdcrExpected.getKey(), toByteArray(xdcrActual.getTuple().getString("KEY")));
                 checkEquals("Mismatched value column: expected %s, actual %s",
@@ -92,6 +94,7 @@ public class UUCVResolveChecker implements ConflictResolveChecker.ResolveChecker
                 checkEquals("Mismatched ACTION_TYPE: expected %s, actual %s", ACTION_TYPE.U, xdcrActual.getActionTypeEnum());
                 checkEquals("Mismatched CONFLICT_TYPE: expected %s, actual %s", CONFLICT_TYPE.NONE, xdcrActual.getConflictTypeEnum());
                 checkEquals("Mismatched DECISION: expected %s, actual %s", xdcrExpected.getDecision(), xdcrActual.getDecision());
+                checkEquals("Mismatched Divergence: expected %s, actual %s", xdcrExpected.getDivergenceType(), xdcrActual.getDivergenceType());
                 checkNotEquals("Mismatched key column: expected %s, actual %s",
                         xdcrExpected.getKey(), toByteArray(xdcrActual.getTuple().getString("KEY")));
                 checkNotEquals("Mismatched value column: expected %s, actual %s",
