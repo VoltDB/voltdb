@@ -199,7 +199,7 @@ public class PlannerTestAideDeCamp {
             e.printStackTrace();
         }
 
-        List<AbstractPlanNode> plannodes = new ArrayList<AbstractPlanNode>();
+        List<AbstractPlanNode> plannodes = new ArrayList<>();
         for (PlanNodeList nodeList : nodeLists) {
             plannodes.add(nodeList.getRootPlanNode());
         }
@@ -208,4 +208,7 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public String getCatalogString() {
+        return db.getCatalog().serialize();
+    }
 }
