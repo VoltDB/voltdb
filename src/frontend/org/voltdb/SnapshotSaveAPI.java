@@ -243,7 +243,10 @@ public class SnapshotSaveAPI
                             earlyResultTable.addRow(context.getHostId(), hostname,
                                     CoreUtils.getSiteIdFromHSId(context.getSiteId()), "SUCCESS", "");
                         } else {
-                            earlyResultTable = SnapshotUtil.constructNodeResultsTable();
+                            //If doing snapshot for only replicated table(s), earlyResultTable here
+                            //may not be empty even if the taskList of this site is null.
+                            //In that case, snapshot result is preserved by earlyResultTable.
+                            earlyResultTable = result;
                         }
                     }
                     else {

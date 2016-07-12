@@ -275,7 +275,7 @@ public abstract class SubPlanAssembler {
             assert(false);
             return false;
         }
-        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombinePredicate(indexPredicate);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {
@@ -456,7 +456,7 @@ public abstract class SubPlanAssembler {
                         // were based on constants and/or parameters.
                         for (AbstractExpression eq_comparator : retval.indexExprs) {
                             AbstractExpression otherExpr = eq_comparator.getRight();
-                            if (otherExpr.hasTVE()) {
+                            if (otherExpr.hasTupleValueSubexpression()) {
                                 // Can't index this IN LIST filter without some kind of three-way NLIJ,
                                 // so, add it to the post-filters.
                                 AbstractExpression in_list_comparator = inListExpr.getOriginalFilter();
@@ -1011,6 +1011,14 @@ public abstract class SubPlanAssembler {
         if (!m_parsedStmt.hasOrderByColumns()
                 || m_parsedStmt.orderByColumns().isEmpty()) {
             return 0;
+        } else if (m_parsedStmt instanceof ParsedSelectStmt) {
+            // If this parsed select statement has a windowed expression,
+            // we don't want to consider the order by at all.
+            // Note that this is the content of ENG-10474.
+            ParsedSelectStmt pss = (ParsedSelectStmt)m_parsedStmt;
+            if (pss.hasWindowedExpression()) {
+                return 0;
+            }
         }
         int nSpoilers = 0;
         int countOrderBys = m_parsedStmt.orderByColumns().size();
@@ -1178,7 +1186,7 @@ public abstract class SubPlanAssembler {
         for (AbstractExpression filter : filtersToCover) {
 
             // ENG-8203: Not going to try to use index with sub-query expression
-            if (filter.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).size() > 0) {
+            if (filter.hasSubquerySubexpression()) {
                 // Including RowSubqueryExpression and SelectSubqueryExpression
                 // SelectSubqueryExpression also can be scalar sub-query
                 continue;
@@ -1194,7 +1202,7 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasTVE()) {
+                        if (otherExpr.hasTupleValueSubexpression()) {
                             // This filter can not be used with the index, possibly due to interactions
                             // wih IN LIST processing that would require a three-way NLIJ.
                             binding = null;
@@ -1240,7 +1248,7 @@ public abstract class SubPlanAssembler {
                         }
                     }
                     if (targetComparator == ExpressionType.COMPARE_IN) {
-                        if (otherExpr.hasTVE()) {
+                        if (otherExpr.hasTupleValueSubexpression()) {
                             // This is a fancy edge case where the expression could only be indexed
                             // if it:
                             // A) does not reference the indexed table and
@@ -1293,7 +1301,7 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasTVE()) {
+                        if (otherExpr.hasTupleValueSubexpression()) {
                             // This filter can not be used with the index, probably due to interactions
                             // with IN LIST processing of another key component that would require a
                             // three-way NLIJ to be injected.
@@ -1539,11 +1547,11 @@ public abstract class SubPlanAssembler {
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
-        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
+        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;

@@ -52,12 +52,19 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
+    private final String m_clusterTag;
 
-    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework, ImporterStatsCollector statsCollector)
+    public ImportProcessor(
+            int myHostId,
+            ChannelDistributer distributer,
+            Framework framework,
+            ImporterStatsCollector statsCollector,
+            String clusterTag)
             throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
         m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
+        m_clusterTag = clusterTag;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -70,7 +77,8 @@ public class ImportProcessor implements ImportDataProcessor {
             m_bundle = bundle;
             m_importerFactory = (AbstractImporterFactory) o;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
-            m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory, m_distributer);
+            m_importerTypeMgr = new ImporterLifeCycleManager(
+                    m_importerFactory, m_distributer, m_clusterTag);
         }
 
         public String getImporterType() {

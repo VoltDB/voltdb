@@ -21,12 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdio>
-#include <string>
-#include <boost/foreach.hpp>
-#include <boost/unordered_map.hpp>
-
 #include "harness.h"
+
 #include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
@@ -35,6 +31,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/BinaryLogSinkWrapper.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
@@ -44,7 +42,12 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
+
+#include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
+
+#include <cstdio>
+#include <string>
 
 using namespace std;
 using namespace voltdb;
@@ -63,7 +66,10 @@ static int64_t addPartitionId(int64_t value) {
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId) : ExportTupleStream(partitionId, siteId) {}
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId)
+        : ExportTupleStream(partitionId, siteId)
+    { }
+
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                                            int64_t spHandle,
                                            int64_t seqNo,
@@ -74,6 +80,7 @@ public:
         receivedTuples.push_back(tuple);
         return 0;
     }
+
     std::vector<TableTuple> receivedTuples;
 };
 
@@ -102,55 +109,59 @@ protected:
 
 class MockVoltDBEngine : public VoltDBEngine {
 public:
-    MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
-        m_isActiveActiveEnabled = isActiveActiveEnabled;
-        m_context.reset(new ExecutorContext(1, 1, NULL, topend, pool,
-                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, clusterId));
+    MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
+                     DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
+      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, NULL, this,
+                                      "localhost", 2, drStream, drReplicatedStream, clusterId))
+    {
 
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(10, false);
+        std::vector<bool> exportColumnAllowNull(12, false);
         exportColumnAllowNull[2] = true;
         exportColumnAllowNull[3] = true;
         exportColumnAllowNull[8] = true;
-        exportColumnAllowNull[9] = true;
+        exportColumnAllowNull[11] = true;
         // See DDLCompiler.java to find conflict export table schema
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(3); //row type
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1); // action type
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(4); // conflict type
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // conflicts on PK
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1); // action decision
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // cluster id
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // timestamp
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // remote cluster id
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // remote timestamp
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1);  // flag of divergence
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1024); // table name
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT)); // local cluster id
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); // local timestamp
         exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(1048576); // tuple data
 
         m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[10] = { "ROW_TYPE", "ACTION_TYPE", "CONFLICT_TYPE", "CONFLICTS_ON_PRIMARY_KEY",
-                                           "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME", "TUPLE"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
+        string exportColumnNamesArray[12] = { "ROW_TYPE", "ACTION_TYPE", "CONFLICT_TYPE", "CONFLICTS_ON_PRIMARY_KEY",
+                                           "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
+                                           "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
 
         m_exportStream = new MockExportTupleStream(1, 1);
-        m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
-                                                               m_exportSchema, exportColumnName,
-                                                               m_exportStream, true);
+        m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
+                "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
+                m_exportSchema,
+                exportColumnName,
+                m_exportStream,
+                true));
         setHashinator(MockHashinator::newInstance());
     }
-    ~MockVoltDBEngine() {
-        delete m_conflictExportTable;
-    }
 
-    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
-    void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
-    Table* getPartitionedDRConflictTable() const{ return m_conflictExportTable; }
+    ~MockVoltDBEngine() { }
+
+    StreamedTable* getConflictStreamedTable() const { return m_conflictStreamedTable.get(); }
+
     ExportTupleStream* getExportTupleStream() { return m_exportStream; }
     ExecutorContext* getExecutorContext() { return m_context.get(); }
     void prepareContext() { m_context.get()->bindToThread(); }
 
 private:
-    bool m_isActiveActiveEnabled;
-    Table* m_conflictExportTable;
+    boost::scoped_ptr<StreamedTable> m_conflictStreamedTable;
     MockExportTupleStream* m_exportStream;
     TupleSchema* m_exportSchema;
     boost::scoped_ptr<ExecutorContext> m_context;
@@ -165,8 +176,8 @@ public:
         m_drReplicatedStreamReplica(16383, 64*1024),
         m_undoToken(0),
         m_spHandleReplica(0),
-        m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
-        m_engineReplica (new MockVoltDBEngine(false, CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
+        m_engine(new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
+        m_engineReplica(new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
     {
         m_drStream.setDefaultCapacity(BUFFER_SIZE);
         m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
@@ -442,6 +453,11 @@ public:
         m_engine->prepareContext();
     }
 
+    void enableActiveActive() {
+        m_engine->enableActiveActiveForTest(m_engine->getConflictStreamedTable(), NULL);
+        m_engineReplica->enableActiveActiveForTest(m_engineReplica->getConflictStreamedTable(), NULL);
+    }
+
     void createIndexes() {
         vector<int> firstColumnIndices;
         firstColumnIndices.push_back(1); // BIGINT
@@ -506,7 +522,17 @@ public:
         return temp_tuple;
     }
 
-    void createUniqueIndex(Table* table, int indexColumn, bool isPrimaryKey = false) {
+    void createUniqueIndexes() {
+        createUniqueIndexes(m_table);
+        createUniqueIndexes(m_tableReplica);
+    }
+
+    void createUniqueIndexes(PersistentTable* table) {
+        createUniqueIndex(table, 0, true);
+        createUniqueIndex(table, 1);
+    }
+
+    void createUniqueIndex(PersistentTable* table, int indexColumn, bool isPrimaryKey = false) {
         vector<int> columnIndices;
         columnIndices.push_back(indexColumn);
         TableIndexScheme scheme = TableIndexScheme("UniqueIndex", HASH_TABLE_INDEX,
@@ -701,9 +727,11 @@ protected:
 class StackCleaner {
 public:
     StackCleaner(TableTuple tuple) : m_tuple(tuple) {}
+
     ~StackCleaner() {
         m_tuple.freeObjectColumns();
     }
+
 private:
     TableTuple m_tuple;
 };
@@ -1012,8 +1040,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     m_engine->prepareContext();
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
+    enableActiveActive();
     createIndexes();
 
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1133,8 +1160,7 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
     m_engine->prepareContext();
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
+    enableActiveActive();
     createIndexes();
     simpleUpdateTest();
 }
@@ -1194,12 +1220,8 @@ TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
  * newRow:      <42, 34523, X>
  */
 TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
     ASSERT_FALSE(flush(99));
 
     // write transactions on replica
@@ -1250,17 +1272,14 @@ TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
  * DB B reports: <DELETE missing row>
  * existingRow: <null>
  * expectedRow: <42, 5555, X>
+ * deletedRow:  <>
  *               <INSERT no conflict>
  * existingRow: <null>
  * newRow:      <null>
  */
 TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert rows on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1303,7 +1322,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
-    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
 }
 
 /*
@@ -1318,17 +1337,14 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
  * DB B reports: <DELETE timestamp mismatch>
  * existingRow: <42, 1234, X>
  * expectedRow: <42, 5555, X>
+ * deletedRow:  <>
  *               <INSERT no conflict>
  * existingRow: <null>
  * newRow:      <null>
  */
 TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert one row on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1377,7 +1393,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
-    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
 }
 
 /*
@@ -1398,12 +1414,8 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
  * newRow:      <12, 33333, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
     ASSERT_FALSE(flush(98));
 
     // insert row on both side
@@ -1480,12 +1492,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
  * newRow:      <42, 54321, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert rows on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1558,12 +1566,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
  * newRow:      <42, 12345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert rows on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1640,12 +1644,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
  * newRow:      <42, 54321, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert one row on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1724,12 +1724,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
  * newRow:      <42, 12345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchRejected) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert one row on both side
     beginTxn(m_engine, 99, 99, 98, 70);
@@ -1809,12 +1805,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchRejected) {
  * newRow:      <42, 345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
-    m_engine->setIsActiveActiveDREnabled(true);
-    m_engineReplica->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0, true);
-    createUniqueIndex(m_tableReplica, 0, true);
-    createUniqueIndex(m_table, 1);
-    createUniqueIndex(m_tableReplica, 1);
+    enableActiveActive();
+    createUniqueIndexes();
 
     // insert one row on both side
     beginTxn(m_engine, 99, 99, 98, 70);

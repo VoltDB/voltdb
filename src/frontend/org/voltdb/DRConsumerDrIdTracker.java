@@ -35,6 +35,13 @@ import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
+/*
+ * WARNING:
+ * The implementation assumes that the range set is never completely empty in methods like
+ * getSafePointDrId, getFirstDrId, getLastDrId. However, the assumption is based on a single thread
+ * (DR partition buffer receiver thread) modifying and accessing this. When accessing this from other threads,
+ * we will need to be careful to make sure to add proper checks to ensure safe access.
+ */
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
 

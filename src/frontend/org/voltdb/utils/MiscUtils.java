@@ -169,6 +169,7 @@ public class MiscUtils {
                     return false;
                 }
 
+                @Override
                 public boolean isDrActiveActiveAllowed() {
                     return false;
                 }
@@ -526,7 +527,12 @@ public class MiscUtils {
     // check if we're running pro code
     public static boolean isPro() {
         if (m_isPro == null) {
-            m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+            //Allow running pro kit as community.
+            if (!Boolean.parseBoolean(System.getProperty("community", "false"))) {
+                m_isPro = null != MiscUtils.loadProClass("org.voltdb.CommandLogImpl", "Command logging", true);
+            } else {
+                m_isPro = false;
+            }
         }
         return m_isPro.booleanValue();
     }
@@ -610,41 +616,6 @@ public class MiscUtils {
         }
         catch (IOException e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Log (to the fatal logger) the list of ports in use.
-     * Uses "lsof -i" internally.
-     *
-     * @param log VoltLogger used to print output or warnings.
-     */
-    public static synchronized void printPortsInUse(VoltLogger log) {
-        try {
-            /*
-             * Don't do DNS resolution, don't use names for port numbers
-             */
-            ProcessBuilder pb = new ProcessBuilder("lsof", "-i", "-n", "-P");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
-            java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = br.readLine();
-            log.fatal("Logging ports that are bound for listening, " +
-                      "this doesn't include ports bound by outgoing connections " +
-                      "which can also cause a failure to bind");
-            log.fatal("The PID of this process is " + CLibrary.getpid());
-            if (str != null) {
-                log.fatal(str);
-            }
-            while((str = br.readLine()) != null) {
-                if (str.contains("LISTEN")) {
-                    log.fatal(str);
-                }
-            }
-        }
-        catch (Exception e) {
-            log.fatal("Unable to list ports in use at this time.");
         }
     }
 

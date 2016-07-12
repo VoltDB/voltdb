@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -180,12 +181,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     /**
      * @param exps the predicates to clone and combine into one predicate
      */
-    public void setPredicate(List<AbstractExpression> exps) {
-        assert(exps != null);
+    @SafeVarargs
+    public final void setPredicate(Collection<AbstractExpression>... colExps) {
+        assert(colExps != null);
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        m_predicate = ExpressionUtil.cloneAndCombinePredicates(exps);
+        m_predicate = ExpressionUtil.cloneAndCombinePredicates(colExps);
     }
 
     protected void setScanColumns(List<SchemaColumn> scanColumns)
@@ -355,9 +357,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
         for (AbstractExpression expr: exprs) {
-            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
         }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
@@ -421,16 +423,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // There's no need to be concerned about re-adjusting the irrelevant outputschema
         // based on the different schema of the original raw scan and the projection.
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
-        if (limit != null)
-        {
+        if (limit != null) {
             limit.m_outputSchema = m_outputSchema.clone();
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
+
         // Resolve subquery expression indexes
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
-        }
+        resolveSubqueryColumnIndexes();
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 
@@ -495,9 +494,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_predicate, aeClass));
-        return collected;
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_predicate != null) {
+            collected.addAll(m_predicate.findAllSubexpressionsOfClass(aeClass));
+        }
     }
 }

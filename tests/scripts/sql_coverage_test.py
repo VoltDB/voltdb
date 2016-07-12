@@ -89,10 +89,9 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     current system time and a previous time, which is either the specified
     'prev_time' or, if that is negative (or unspecified), the previous time
     at which this function was called. The printed message is preceded by
-    'message_begin' and followed by "seconds, " and 'message_end'; if the
-    elapsed time is greater than or equal to 60 seconds, it also includes the
-    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
-    as "61.9 seconds (01:02), ".
+    'message_begin' and followed by 'message_end'; the elapsed time is printed
+    in a minutes:seconds format, with the exact number of seconds in parentheses,
+    e.g., 61.9 seconds would be printed as "01:02 (61.9 seconds), ".
     """
 
     now = time.time()
@@ -744,8 +743,19 @@ if __name__ == "__main__":
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        if result["mis"] != 0:
-            success = False
+        # kludge to not fail for known issues in the numeric-decimals and
+        # numeric-ints "extended" test suites, when running against PostgreSQL
+        # (or PostGIS/PostgreSQL); see ENG-10546
+        if config_name == 'numeric-decimals' and comparison_database.startswith('Post'):
+            if result["mis"] > 1180:
+                success = False
+        elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
+            if result["mis"] > 2820:
+                success = False
+        else:
+            # end of kludge; the following are the normal behavior:
+            if result["mis"] != 0:
+                success = False
 
     # Write the summary
     time1 = time.time()

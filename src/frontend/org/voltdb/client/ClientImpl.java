@@ -568,9 +568,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         if (m_reconnectStatusListener != null) {
             m_distributer.removeClientStatusListener(m_reconnectStatusListener);
+            m_reconnectStatusListener.close();
         }
 
         m_distributer.shutdown();
+
+        ClientFactory.decreaseClientNum();
     }
 
     @Override

@@ -14,17 +14,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "stats/StatsAgent.h"
-#include "stats/StatsSource.h"
+#include "StatsAgent.h"
+
+#include "StatsSource.h"
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
-#include "storage/PersistentTableStats.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "indexes/IndexStats.h"
+#include "storage/TableStats.h"
+#include "storage/temptable.h"
+
 #include <cassert>
-#include <string>
-#include <vector>
 
 using namespace voltdb;
 using namespace std;
@@ -37,22 +37,14 @@ namespace
     // in some future happy world.  Go blow up the static methods
     // returning schema/table parts in StatsSource and it's subclasses
     // when this happens, too.
-    Table* getEmptyStatsTable(StatisticsSelectorType sst)
-    {
-        switch (sst)
-        {
+    TempTable* getEmptyStatsTable(StatisticsSelectorType sst) {
+        switch (sst) {
         case STATISTICS_SELECTOR_TYPE_TABLE:
-            {
-                return TableStats::generateEmptyTableStatsTable();
-            }
+            return TableStats::generateEmptyTableStatsTable();
         case STATISTICS_SELECTOR_TYPE_INDEX:
-            {
-                return IndexStats::generateEmptyIndexStatsTable();
-            }
+            return IndexStats::generateEmptyIndexStatsTable();
         default:
-            {
-                throwFatalException("Attempted to get unsupported stats type");
-            }
+            throwFatalException("Attempted to get unsupported stats type");
         }
     }
 }
@@ -65,14 +57,14 @@ StatsAgent::StatsAgent() {}
  * @param catalogId CatalogId of the resource
  * @param statsSource statsSource containing statistics for the resource
  */
-void StatsAgent::registerStatsSource(StatisticsSelectorType sst, CatalogId catalogId, StatsSource* statsSource)
-{
+void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
+                                     CatalogId catalogId,
+                                     StatsSource* statsSource) {
     m_statsCategoryByStatsSelector[sst].insert(
         pair<CatalogId, StatsSource*>(catalogId, statsSource));
 }
 
-void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst)
-{
+void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
     // get the map of id-to-source
     map<StatisticsSelectorType,
       multimap<CatalogId, StatsSource*> >::iterator it1 =
@@ -91,23 +83,22 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst)
  * @param interval Whether to return counters since the beginning or since the last time this was called
  * @param Timestamp to embed in each row
  */
-Table* StatsAgent::getStats(StatisticsSelectorType sst,
-                            vector<CatalogId> catalogIds,
-                            bool interval, int64_t now)
-{
+TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
+                                vector<CatalogId> catalogIds,
+                                bool interval, int64_t now) {
     if (catalogIds.size() < 1) {
         return NULL;
     }
 
     multimap<CatalogId, StatsSource*> *statsSources = &m_statsCategoryByStatsSelector[sst];
 
-    Table *statsTable = m_statsTablesByStatsSelector[sst];
+    TempTable *statsTable = m_statsTablesByStatsSelector[sst];
     if (statsTable == NULL) {
         statsTable = getEmptyStatsTable(sst);
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
-    statsTable->deleteAllTuples(false, false);
+    statsTable->deleteAllTempTuples();
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
         multimap<CatalogId, StatsSource*>::const_iterator iter;
@@ -128,9 +119,8 @@ Table* StatsAgent::getStats(StatisticsSelectorType sst,
     return statsTable;
 }
 
-StatsAgent::~StatsAgent()
-{
-    for (map<StatisticsSelectorType, Table*>::iterator i = m_statsTablesByStatsSelector.begin();
+StatsAgent::~StatsAgent() {
+    for (map<StatisticsSelectorType, TempTable*>::iterator i = m_statsTablesByStatsSelector.begin();
         i != m_statsTablesByStatsSelector.end(); i++) {
         delete i->second;
     }

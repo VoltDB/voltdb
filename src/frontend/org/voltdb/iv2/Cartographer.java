@@ -482,9 +482,9 @@ public class Cartographer extends StatsSource
                     }
                     // check if any node still in rejoin status
                     try {
-                        List<String> children = m_zk.getChildren(VoltZK.rejoinNodesBlocker, false);
-                        if (!children.isEmpty())
+                        if (m_zk.exists(VoltZK.rejoinNodeBlocker, false) != null) {
                             return false;
+                        }
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
                     return doPartitionsHaveReplicas(hid);
@@ -560,5 +560,4 @@ public class Cartographer extends StatsSource
         }
         return true;
     }
-
 }

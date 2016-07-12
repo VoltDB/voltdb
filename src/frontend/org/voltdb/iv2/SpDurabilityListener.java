@@ -45,6 +45,11 @@ public class SpDurabilityListener implements DurabilityListener {
         public void setLastDurableUniqueId(long uniqueId) {}
 
         @Override
+        public boolean isChanged() {
+            return false;
+        }
+
+        @Override
         public int getTaskListSize() {
             return 0;
         }
@@ -87,6 +92,11 @@ public class SpDurabilityListener implements DurabilityListener {
         }
 
         @Override
+        public boolean isChanged() {
+            return m_changed;
+        }
+
+        @Override
         public int getTaskListSize() {
             return 0;
         }
@@ -104,7 +114,7 @@ public class SpDurabilityListener implements DurabilityListener {
                 }
             }
         }
-    };
+    }
 
     class SyncCompletionChecks extends AsyncCompletionChecks {
         ArrayList<TransactionTask> m_pendingTransactions;
@@ -218,7 +228,9 @@ public class SpDurabilityListener implements DurabilityListener {
 
     @Override
     public void processDurabilityChecks(CommandLog.CompletionChecks completionChecks) {
-        m_spScheduler.processDurabilityChecks(completionChecks);
+        if (completionChecks.isChanged()) {
+            m_spScheduler.processDurabilityChecks(completionChecks);
+        }
     }
 
 }

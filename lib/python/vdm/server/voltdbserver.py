@@ -580,9 +580,9 @@ class VoltDatabase:
 
     def kill_server(self, server_id):
         try:
-            processId = self.Get_Voltdb_Process().processId
+            processId = self.Get_Voltdb_Process(self.database_id).processId
             if processId is not None and processId != -1:
-                os.kill(processId, signal.SIGKILL)
+                os.kill(int(processId), signal.SIGKILL)
                 return create_response('success', 200)
             else:
                 return create_response('process not found', 200)

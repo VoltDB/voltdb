@@ -212,50 +212,50 @@ public class ForeignHost {
     }
 
     /** Send a message to the network. This public method is re-entrant. */
-    void send(
-            final long destinations[],
-            final VoltMessage message)
-    {
+    void send(final long destinations[], final VoltMessage message) {
         if (destinations.length == 0) {
             return;
         }
 
-        m_network.enqueue(
-                new DeferredSerialization() {
-                    @Override
-                    public final void serialize(final ByteBuffer buf) throws IOException {
-                        buf.putInt(buf.capacity() - 4);
-                        buf.putLong(message.m_sourceHSId);
-                        buf.putInt(destinations.length);
-                        for (int ii = 0; ii < destinations.length; ii++) {
-                            buf.putLong(destinations[ii]);
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (!m_linkCutForTest.get()) {
+            m_network.enqueue(
+                    new DeferredSerialization() {
+                        @Override
+                        public final void serialize(final ByteBuffer buf) throws IOException {
+                            buf.putInt(buf.capacity() - 4);
+                            buf.putLong(message.m_sourceHSId);
+                            buf.putInt(destinations.length);
+                            for (int ii = 0; ii < destinations.length; ii++) {
+                                buf.putLong(destinations[ii]);
+                            }
+                            message.flattenToBuffer(buf);
+                            buf.flip();
                         }
-                        message.flattenToBuffer(buf);
-                        buf.flip();
-                    }
 
-                    @Override
-                    public final void cancel() {
-                    /*
-                     * Can this be removed?
-                     */
-                    }
+                        @Override
+                        public final void cancel() {
+                        /*
+                         * Can this be removed?
+                         */
+                        }
 
-                    @Override
-                    public String toString() {
-                        return message.getClass().getName();
-                    }
+                        @Override
+                        public String toString() {
+                            return message.getClass().getName();
+                        }
 
-                    @Override
-                    public int getSerializedSize() {
-                        final int len = 4            /* length prefix */
-                                + 8            /* source hsid */
-                                + 4            /* destinationCount */
-                                + 8 * destinations.length  /* destination list */
-                                + message.getSerializedSize();
-                        return len;
-                    }
-                });
+                        @Override
+                        public int getSerializedSize() {
+                            final int len = 4            /* length prefix */
+                                    + 8            /* source hsid */
+                                    + 4            /* destinationCount */
+                                    + 8 * destinations.length  /* destination list */
+                                    + message.getSerializedSize();
+                            return len;
+                        }
+                    });
+        }
 
         long current_time = EstTime.currentTimeMillis();
         long current_delta = current_time - m_lastMessageMillis.get();
@@ -397,6 +397,11 @@ public class ForeignHost {
     }
 
     public void sendPoisonPill(String err, int cause) {
+        // if this link is "gone silent" for partition tests, just drop the message on the floor
+        if (m_linkCutForTest.get()) {
+            return;
+        }
+
         byte errBytes[];
         try {
             errBytes = err.getBytes("UTF-8");

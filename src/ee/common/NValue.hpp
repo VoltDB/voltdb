@@ -1854,6 +1854,34 @@ private:
     }
 
 
+    int compareBooleanValue (const NValue &rhs) const {
+        assert(m_valueType == VALUE_TYPE_BOOLEAN);
+
+        // get the right hand side as an integer.
+        if (rhs.getValueType() == VALUE_TYPE_BOOLEAN) {
+            bool rhsValue = rhs.getBoolean();
+            bool lhsValue = getBoolean();
+            if (lhsValue == rhsValue) {
+                return 0;
+            }
+            // False < True.  So,
+            //    compare(False, True)  = 1
+            //    compare(True,  False) = -1
+            if (lhsValue) {
+                return -1;
+            }
+            return 1;
+        }
+        char message[128];
+        snprintf(message, 128,
+                 "Type %s cannot be cast for comparison to type %s",
+                 valueToString(rhs.getValueType()).c_str(),
+                 valueToString(getValueType()).c_str());
+         throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                            message);
+         // Not reached
+    }
+
     int compareTimestamp (const NValue& rhs) const {
         assert(m_valueType == VALUE_TYPE_TIMESTAMP);
 
@@ -2607,6 +2635,8 @@ inline int NValue::compare_withoutNull(const NValue& rhs) const {
         return comparePointValue(rhs);
     case VALUE_TYPE_GEOGRAPHY:
         return compareGeographyValue(rhs);
+    case VALUE_TYPE_BOOLEAN:
+        return compareBooleanValue(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
