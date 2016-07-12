@@ -122,8 +122,10 @@ typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 extern pthread_mutex_t sharedEngineMutex;
 extern pthread_cond_t sharedEngineCondition;
 extern SharedEngineLocalsType enginesByPartitionId;
+extern EngineLocals mpEngineLocals;
 extern std::atomic<int32_t> globalTxnStartCountdownLatch;
 extern int32_t SITES_PER_HOST;
+extern AbstractExecutor * mpExecutor;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes

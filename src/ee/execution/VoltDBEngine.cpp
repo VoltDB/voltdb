@@ -139,9 +139,11 @@ typedef boost::multi_index::multi_index_container<
 pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sharedEngineCondition;
 SharedEngineLocalsType enginesByPartitionId;
+EngineLocals mpEngineLocals;
 std::atomic<int32_t> globalTxnStartCountdownLatch(0);
 int32_t globalTxnEndCountdownLatch = 0;
 int32_t SITES_PER_HOST = -1;
+AbstractExecutor * mpExecutor = NULL;
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -200,11 +202,14 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     // Add the engine to the global list tracking replicated tables
     pthread_mutex_lock(&sharedEngineMutex);
     VOLT_ERROR("assigned engine for partition %d with mem %p", partitionId, ThreadLocalPool::getDataPoolPair());
-    enginesByPartitionId[partitionId] = EngineLocals(this);
     if (partitionId != 16383) {
+        enginesByPartitionId[partitionId] = EngineLocals(this);
         if (SITES_PER_HOST == 0) {
             SITES_PER_HOST = sitesPerHost;
             globalTxnStartCountdownLatch = SITES_PER_HOST;
+        }
+        if (createDrReplicatedStream) {
+            mpEngineLocals = EngineLocals(this);
         }
     }
     pthread_mutex_unlock(&sharedEngineMutex);
@@ -624,28 +629,21 @@ void VoltDBEngine::signalLastSiteFinished() {
     globalTxnEndCountdownLatch++;
     while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
         pthread_mutex_unlock(&sharedEngineMutex);
-#ifdef __linux__
         pthread_yield();
-#else
-        sched_yield();
-#endif
         pthread_mutex_lock(&sharedEngineMutex);
     }
     // We now know all other threads are waiting to be signaled
     globalTxnEndCountdownLatch = 0;
-//    VOLT_ERROR("partition %d kicking everyone awake with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
     pthread_cond_broadcast(&sharedEngineCondition);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 
 void VoltDBEngine::waitForLastSiteFinished() {
     pthread_mutex_lock(&sharedEngineMutex);
-//    VOLT_ERROR("partition %d falling asleep", m_partitionId);
     globalTxnEndCountdownLatch++;
     while (globalTxnEndCountdownLatch != 0) {
         pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     }
-//    VOLT_ERROR("partition %d waking up with mem %p", m_partitionId, ThreadLocalPool::getDataPoolPair());
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 
@@ -682,12 +680,13 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    if (countDownGlobalTxnStartCount()) {
+    bool lastSite = --globalTxnStartCountdownLatch == 0;
+
+    if (lastSite) {
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
-        VoltDBEngine* mpEngine = mpEngineLocals->engine;
-        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
+        VoltDBEngine* mpEngine = mpEngineLocals.engine;
+        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
 
         // load up all the tables, adding all tables
         if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
@@ -1213,12 +1212,13 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    if (countDownGlobalTxnStartCount()) {
+    bool lastSite = --globalTxnStartCountdownLatch == 0;
+
+    if (lastSite) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
-        VoltDBEngine* mpEngine = mpEngineLocals->engine;
-        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
+        VoltDBEngine* mpEngine = mpEngineLocals.engine;
+        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
 
         mpEngine->processCatalogDeletes(timestamp, true);
 

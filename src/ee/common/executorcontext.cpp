@@ -154,17 +154,20 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                 Table* targetTable = node->getTargetTable();
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
+                    if (mpEngineLocals.engine == m_engine) {
+                        mpExecutor = executor;
+                    }
                     if (VoltDBEngine::countDownGlobalTxnStartCount()) {
-                        EngineLocals* mpEngineLocals = &enginesByPartitionId[16383];
-                        ThreadLocalPool::assignThreadLocals(*mpEngineLocals);
+                        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
                         needsReleaseLock = true;
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...
-                        if (!executor->execute(*m_staticParams)) {
+                        if (!mpExecutor->execute(*m_staticParams)) {
                             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                "Unspecified execution error detected");
                         }
                         ++ctr;
+                        mpExecutor = NULL;
                         needsReleaseLock = false;
                         globalTxnStartCountdownLatch = SITES_PER_HOST;
                         // Assign the correct pool back to this thread
