@@ -24,19 +24,24 @@
 package org.voltdb.calciteadapter;
 
 import java.io.File;
+import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.Set;
 
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Statistic;
+import org.apache.calcite.sql.SqlCollation;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.Frameworks;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -98,9 +103,19 @@ public class TestCalcite extends TestCase {
             return new TableAdapter(table);
         }
 
-        public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt) {
-            SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString());
-            return typeFactory.createSqlType(sqlTypeName);
+        public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
+            SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
+            RelDataType rdt;
+            switch (vt) {
+            case STRING:
+                // This doesn't seem quite right...
+                rdt = typeFactory.createSqlType(sqlTypeName, prec);
+                rdt = typeFactory.createTypeWithCharsetAndCollation(rdt, Charset.forName("UTF-8"), SqlCollation.IMPLICIT);
+                break;
+                default:
+                    rdt = typeFactory.createSqlType(sqlTypeName);
+            }
+            return rdt;
         }
 
         @Override
@@ -115,8 +130,9 @@ public class TestCalcite extends TestCase {
 
             for (Column catColumn : m_catTable.getColumns()) {
                 VoltType vt = VoltType.get((byte)catColumn.getType());
-                RelDataType rdt = toRelDataType(typeFactory, vt);
-                builder.add(catColumn.getName(), rdt).nullable(catColumn.getNullable());
+                RelDataType rdt = toRelDataType(typeFactory, vt, catColumn.getSize());
+                rdt = typeFactory.createTypeWithNullability(rdt, catColumn.getNullable());
+                builder.add(catColumn.getName(), rdt);
             }
             return builder.build();
         }
@@ -173,19 +189,18 @@ public class TestCalcite extends TestCase {
             return null;
         }
 
-        private CatalogMap<Table> getTables() {
+        private CatalogMap<Table> getCatalogTables() {
             return m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
         }
 
         @Override
         public org.apache.calcite.schema.Table getTable(String arg0) {
-            return TableAdapter.fromTableCatalog(getTables().get(arg0));
+            return TableAdapter.fromTableCatalog(getCatalogTables().get(arg0));
         }
 
         @Override
         public Set<String> getTableNames() {
-            // TODO Auto-generated method stub
-            return null;
+            return getCatalogTables().keySet();
         }
 
         @Override
@@ -196,9 +211,9 @@ public class TestCalcite extends TestCase {
 
     }
 
-    public void testSchema() {
+    private SchemaPlus schemaPlusFromDDL(String ddl) {
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compileDDL("create table t (i integer primary key, v varchar(32));", compiler);
+        boolean success = compileDDL(ddl, compiler);
 
         assertTrue(success);
 
@@ -206,7 +221,38 @@ public class TestCalcite extends TestCase {
         SchemaAdapter schema = new SchemaAdapter(cat);
         assert(schema != null);
 
+        SchemaPlus rootSchema = Frameworks.createRootSchema(false);
+        rootSchema.add("voltdb", schema);
 
+        return rootSchema;
+    }
 
+    private void dumpRootSchema(SchemaPlus rootSchema) {
+        final RelDataTypeFactory typeFactory =
+                new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        Set<String> subSchemaNames = rootSchema.getSubSchemaNames();
+        for (String subSchemaName : subSchemaNames) {
+            System.out.println(subSchemaName);
+            Schema subSchema = rootSchema.getSubSchema(subSchemaName);
+            for (String tableName : subSchema.getTableNames()) {
+                System.out.println("  " + tableName);
+                org.apache.calcite.schema.Table table = subSchema.getTable(tableName);
+                RelDataType rowType = table.getRowType(typeFactory);
+                System.out.println("    " + rowType.getFullTypeString());
+            }
+        }
+    }
+
+    public void testSchema() {
+        String ddl = "create table test_calcite ("
+                + "i integer primary key, "
+                + "si smallint, "
+                + "ti tinyint,"
+                + "bi bigint,"
+                + "f float not null, "
+                + "v varchar(32));";
+        SchemaPlus rootSchema = schemaPlusFromDDL(ddl);
+        assertTrue(rootSchema != null);
+        dumpRootSchema(rootSchema);
     }
 }

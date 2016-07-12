@@ -72,5 +72,9 @@
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/calcite-core"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/calcite-linq4j"/>
+	<classpathentry kind="lib" path="lib/avatica-1.8.0.jar"/>
+	<classpathentry kind="lib" path="lib/eigenbase-properties-1.1.5.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
