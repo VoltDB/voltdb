@@ -311,7 +311,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 m_executorContext->setupForPlanFragments(NULL);
             }
             m_undoLog.release(undoToken);
-
             if (m_executorContext->drStream()) {
                 m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
             }
@@ -325,6 +324,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_currentUndoQuantum = NULL;
             m_executorContext->setupForPlanFragments(NULL);
             m_undoLog.undo(undoToken);
+            if (countDownGlobalTxnStartCount()) {
+                signalLastSiteFinished();
+            } else {
+                waitForLastSiteFinished();
+            }
         }
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
