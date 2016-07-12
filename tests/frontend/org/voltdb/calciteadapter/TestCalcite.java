@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
@@ -47,6 +48,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.Programs;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -206,6 +208,7 @@ public class TestCalcite extends TestCase {
       final FrameworkConfig config = Frameworks.newConfigBuilder()
               .parserConfig(SqlParser.Config.DEFAULT)
               .defaultSchema(schemaPlus)
+              .programs(Programs.heuristicJoinOrder(Programs.RULE_SET, true, 2))
               .build();
         return Frameworks.getPlanner(config);
     }
@@ -230,6 +233,6 @@ public class TestCalcite extends TestCase {
             .replace(EnumerableConvention.INSTANCE);
         RelNode transform = planner.transform(0, traitSet, convert);
 
-        System.out.println(transform.getDescription());
+        System.out.println(RelOptUtil.toString(transform));
     }
 }
