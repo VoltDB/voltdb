@@ -227,22 +227,23 @@ public:
         TableTuple srcTuple(srcTable->schema());
         StandAloneTupleStorage dstStorage(dstTable->schema());
         TableTuple& dstTuple = const_cast<TableTuple&>(dstStorage.tuple());
-        TableIterator iterator = srcTable->iteratorDeletingAsWeGo();
-        while (iterator.next(srcTuple)) {
+        TableIterator* iterator = srcTable->iteratorDeletingAsWeGo();
+        while (iterator->next(srcTuple)) {
 
             projector.exec(dstTuple, srcTuple);
 
             dstTable->insertTuple(dstTuple);
         }
+        delete iterator;
     }
 
     bool assertProjection(Table* srcTable, Table* dstTable, const OptimizedProjector& baselineProjector) {
         TableTuple srcTuple(srcTable->schema());
         TableTuple dstTuple(dstTable->schema());
-        TableIterator srcIterator = srcTable->iteratorDeletingAsWeGo();
-        TableIterator dstIterator = dstTable->iteratorDeletingAsWeGo();
-        while (srcIterator.next(srcTuple)) {
-            if (! dstIterator.next(dstTuple)) {
+        TableIterator* srcIterator = srcTable->iteratorDeletingAsWeGo();
+        TableIterator* dstIterator = dstTable->iteratorDeletingAsWeGo();
+        while (srcIterator->next(srcTuple)) {
+            if (! dstIterator->next(dstTuple)) {
                 std::cout << "Too few rows in dst table\n";
                 return false;
             }
@@ -266,10 +267,12 @@ public:
             }
         }
 
-        if (dstIterator.next(dstTuple)) {
+        if (dstIterator->next(dstTuple)) {
             std::cout << "Too many rows in dst table\n";
             return false;
         }
+        delete srcIterator;
+        delete dstIterator;
 
         return true;
     }

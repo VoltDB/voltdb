@@ -550,8 +550,9 @@ public:
     TableTuple verifyExistingTableForDelete(TableTuple &existingTuple, bool existingOlder) {
         Table *metaTable = m_topend.existingMetaRowsForDelete.get();
         TableTuple tempMetaTuple(metaTable->schema());
-        TableIterator metaIter = metaTable->iterator();
-        EXPECT_EQ(true, metaIter.next(tempMetaTuple));
+        TableIterator* metaIter = metaTable->makeIterator();
+        EXPECT_EQ(true, metaIter->next(tempMetaTuple));
+        delete metaIter;
         EXPECT_EQ(existingOlder, ValuePeeker::peekAsBigInt(tempMetaTuple.getNValue(metaTable->columnIndex("TIMESTAMP"))) < m_topend.remoteTimestamp);
 
         TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleForDR(existingTuple);

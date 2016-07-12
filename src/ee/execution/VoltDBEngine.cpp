@@ -279,7 +279,6 @@ VoltDBEngine::~VoltDBEngine() {
     // greatly increases the risk of accidentally freeing the same
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
-    VOLT_ERROR("starting deallocate for partition %d", m_partitionId);
 
     // clean up execution plans
     m_plans.reset();
@@ -878,7 +877,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             if (catalogTable->isreplicated()) {
                 if (updateReplicated) {
                     tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                                   m_compactionThreshold);
+                                                   m_compactionThreshold, this);
                     // use the delegate to init the table and create indexes n' stuff
                     tcd->init(*m_database, *catalogTable);
                     const std::string& tableName = tcd->getTable()->name();
@@ -891,7 +890,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
             }
             else {
                 tcd = new TableCatalogDelegate(catalogTable->signature(),
-                                               m_compactionThreshold);
+                                               m_compactionThreshold, this);
                 // use the delegate to init the table and create indexes n' stuff
                 tcd->init(*m_database, *catalogTable);
                 m_catalogDelegates[catalogTable->path()] = tcd;
@@ -917,7 +916,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                 for (int ii = 0; ii < survivingInfos.size(); ++ii) {
                     catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
                     PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
-                    // Use the now-current definiton of the target table, to be updated later, if needed.
+                    // Use the now-current definition of the target table, to be updated later, if needed.
                     TableCatalogDelegate* targetDelegate =
                         dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
                                                                             m_delegatesByName));

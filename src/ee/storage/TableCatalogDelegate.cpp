@@ -38,6 +38,7 @@
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+#include "execution/VoltDBEngine.h"
 #include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
@@ -55,7 +56,15 @@ namespace voltdb {
 TableCatalogDelegate::~TableCatalogDelegate()
 {
     if (m_table) {
-        m_table->decrementRefcount();
+        PersistentTable* persistent = getPersistentTable();
+        if (persistent && persistent->isReplicatedTable()) {
+            if (m_engine == mpEngineLocals.engine) {
+                m_table->decrementRefcount();
+            }
+        }
+        else {
+            m_table->decrementRefcount();
+        }
     }
 }
 

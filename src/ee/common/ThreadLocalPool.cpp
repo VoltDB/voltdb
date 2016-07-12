@@ -50,19 +50,14 @@ ThreadLocalPool::ThreadLocalPool() {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
         pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
-        PoolPairTypePtr newPoolPairPtr =
+        pthread_setspecific( m_key, static_cast<const void *>(
                 new PoolPairType(
-                        1, new PoolsByObjectSize());
-        VOLT_ERROR("setting memory to %p", newPoolPairPtr);
-        pthread_setspecific( m_key, static_cast<const void *>(newPoolPairPtr));
-//                new PoolPairType(
-//                        1, new PoolsByObjectSize())));
+                        1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
         PoolPairTypePtr p =
                 static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
         p->first++;
-        VOLT_ERROR("bumping ref for memory at %p (%d)", ThreadLocalPool::getDataPoolPair(), p->first);
     }
 }
 
@@ -81,7 +76,6 @@ ThreadLocalPool::~ThreadLocalPool() {
             delete p;
         } else {
             p->first--;
-            VOLT_ERROR("decrementing ref for memory at %p (%d)", ThreadLocalPool::getDataPoolPair(), p->first);
         }
     }
 }
