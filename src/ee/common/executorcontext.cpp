@@ -35,6 +35,15 @@ using namespace std;
 
 namespace voltdb {
 
+pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sharedEngineCondition;
+SharedEngineLocalsType enginesByPartitionId;
+EngineLocals mpEngineLocals;
+std::atomic<int32_t> globalTxnStartCountdownLatch(0);
+int32_t globalTxnEndCountdownLatch = 0;
+int32_t SITES_PER_HOST = -1;
+AbstractExecutor * mpExecutor = NULL;
+
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
@@ -114,6 +123,12 @@ ExecutorContext::~ExecutorContext() {
     pthread_setspecific(static_key, NULL);
 }
 
+void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
+{
+    pthread_setspecific(static_key, mapping.context);
+    ThreadLocalPool::assignThreadLocals(mapping);
+}
+
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
@@ -154,11 +169,11 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                 Table* targetTable = node->getTargetTable();
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
-                    if (mpEngineLocals.engine == m_engine) {
+                    if (mpEngineLocals.context == this) {
                         mpExecutor = executor;
                     }
                     if (VoltDBEngine::countDownGlobalTxnStartCount()) {
-                        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
+                        ExecutorContext::assignThreadLocals(mpEngineLocals);
                         needsReleaseLock = true;
                         // Call the execute method to actually perform whatever action
                         // it is that the node is supposed to do...
@@ -171,7 +186,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                         needsReleaseLock = false;
                         globalTxnStartCountdownLatch = SITES_PER_HOST;
                         // Assign the correct pool back to this thread
-                        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+                        ExecutorContext::assignThreadLocals(*ourEngineLocals);
                         VoltDBEngine::signalLastSiteFinished();
                     } else {
                         VoltDBEngine::waitForLastSiteFinished();
@@ -199,7 +214,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         if (needsReleaseLock) {
             globalTxnStartCountdownLatch = SITES_PER_HOST;
             // Assign the correct pool back to this thread
-            ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+            ExecutorContext::assignThreadLocals(*ourEngineLocals);
             VoltDBEngine::signalLastSiteFinished();
         }
 

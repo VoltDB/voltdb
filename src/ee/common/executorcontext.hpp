@@ -24,9 +24,11 @@
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
 #include "common/UniqueId.hpp"
+#include "common/ThreadLocalPool.h"
 
 #include <vector>
 #include <map>
+#include <atomic>
 
 namespace voltdb {
 
@@ -36,6 +38,7 @@ extern const int64_t VOLT_EPOCH_IN_MILLIS;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+struct EngineLocals;
 
 /*
  * EE site global data required by executors at runtime.
@@ -67,6 +70,8 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
+
+    static void assignThreadLocals(EngineLocals& locals);
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -186,6 +191,10 @@ class ExecutorContext {
         return m_currentDRTimestamp;
     }
 
+    VoltDBEngine* getContextEngine() {
+        return m_engine;
+    }
+
     /** Executor List for a given sub statement id */
     const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
     {
@@ -277,6 +286,30 @@ class ExecutorContext {
     CatalogId m_hostId;
     CatalogId m_drClusterId;
 };
+
+struct EngineLocals : public PoolLocals {
+    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
+    {}
+
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
+        context = rhs.context;
+        return *this;
+    }
+
+    ExecutorContext* context;
+};
+typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
+
+extern pthread_mutex_t sharedEngineMutex;
+extern pthread_cond_t sharedEngineCondition;
+extern SharedEngineLocalsType enginesByPartitionId;
+extern EngineLocals mpEngineLocals;
+extern std::atomic<int32_t> globalTxnStartCountdownLatch;
+extern int32_t globalTxnEndCountdownLatch;
+extern int32_t SITES_PER_HOST;
+extern AbstractExecutor * mpExecutor;
 
 }
 

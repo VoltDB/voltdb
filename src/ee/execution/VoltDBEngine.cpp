@@ -136,15 +136,6 @@ typedef boost::multi_index::multi_index_container<
 > PlanSet;
 
 
-pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t sharedEngineCondition;
-SharedEngineLocalsType enginesByPartitionId;
-EngineLocals mpEngineLocals;
-std::atomic<int32_t> globalTxnStartCountdownLatch(0);
-int32_t globalTxnEndCountdownLatch = 0;
-int32_t SITES_PER_HOST = -1;
-AbstractExecutor * mpExecutor = NULL;
-
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
 
@@ -198,21 +189,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
-
-    // Add the engine to the global list tracking replicated tables
-    pthread_mutex_lock(&sharedEngineMutex);
-    VOLT_ERROR("assigned engine for partition %d with mem %p", partitionId, ThreadLocalPool::getDataPoolPair());
-    if (partitionId != 16383) {
-        enginesByPartitionId[partitionId] = EngineLocals(this);
-        if (SITES_PER_HOST == 0) {
-            SITES_PER_HOST = sitesPerHost;
-            globalTxnStartCountdownLatch = SITES_PER_HOST;
-        }
-        if (createDrReplicatedStream) {
-            mpEngineLocals = EngineLocals(this);
-        }
-    }
-    pthread_mutex_unlock(&sharedEngineMutex);
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -269,6 +245,20 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId);
+
+    // Add the engine to the global list tracking replicated tables
+    pthread_mutex_lock(&sharedEngineMutex);
+    if (partitionId != 16383) {
+        enginesByPartitionId[partitionId] = EngineLocals();
+        if (SITES_PER_HOST == 0) {
+            SITES_PER_HOST = sitesPerHost;
+            globalTxnStartCountdownLatch = SITES_PER_HOST;
+        }
+        if (createDrReplicatedStream) {
+            mpEngineLocals = EngineLocals();
+        }
+    }
+    pthread_mutex_unlock(&sharedEngineMutex);
     return true;
 }
 
@@ -684,8 +674,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     if (lastSite) {
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        VoltDBEngine* mpEngine = mpEngineLocals.engine;
-        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
+        VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
+        ExecutorContext::assignThreadLocals(mpEngineLocals);
 
         // load up all the tables, adding all tables
         if (mpEngine->processCatalogAdditions(timestamp, true) == false) {
@@ -702,7 +692,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         // Assign the correct pool back to this thread
-        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+        ExecutorContext::assignThreadLocals(*ourEngineLocals);
         signalLastSiteFinished();
     }
     else {
@@ -882,7 +872,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
                     tcd->init(*m_database, *catalogTable);
                     const std::string& tableName = tcd->getTable()->name();
                     BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-                        VoltDBEngine* currEngine = enginePair.second.engine;
+                        VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                         currEngine->m_catalogDelegates[catalogTable->path()] = tcd;
                         currEngine->m_delegatesByName[tableName] = tcd;
                     }
@@ -1216,8 +1206,8 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
     if (lastSite) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
-        VoltDBEngine* mpEngine = mpEngineLocals.engine;
-        ThreadLocalPool::assignThreadLocals(mpEngineLocals);
+        VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
+        ExecutorContext::assignThreadLocals(mpEngineLocals);
 
         mpEngine->processCatalogDeletes(timestamp, true);
 
@@ -1233,7 +1223,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         mpEngine->m_catalog->purgeDeletions();
 
         globalTxnStartCountdownLatch = SITES_PER_HOST;
-        ThreadLocalPool::assignThreadLocals(*ourEngineLocals);
+        ExecutorContext::assignThreadLocals(*ourEngineLocals);
         signalLastSiteFinished();
     }
     else {
@@ -1338,7 +1328,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
         if (catTable->isreplicated()) {
             if (updateReplicated) {
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-                    VoltDBEngine* currEngine = enginePair.second.engine;
+                    VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
                     currEngine->m_tablesByName[tcd->getTable()->name()] = localTable;
                 }
@@ -1360,7 +1350,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
                 if (catTable->isreplicated()) {
                     assert(updateReplicated);
                     BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
-                        VoltDBEngine* currEngine = enginePair.second.engine;
+                        VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                         currEngine->m_tablesBySignatureHash[hash] = persistentTable;
                     }
                 }

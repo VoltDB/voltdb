@@ -58,7 +58,7 @@ TableCatalogDelegate::~TableCatalogDelegate()
     if (m_table) {
         PersistentTable* persistent = getPersistentTable();
         if (persistent && persistent->isReplicatedTable()) {
-            if (m_engine == mpEngineLocals.engine) {
+            if (m_engine == mpEngineLocals.context->getContextEngine()) {
                 m_table->decrementRefcount();
             }
         }
