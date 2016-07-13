@@ -675,7 +675,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    bool lastSite = --globalTxnStartCountdownLatch == 0;
+    bool lastSite = countDownGlobalTxnStartCount();
 
     if (lastSite) {
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
@@ -1215,7 +1215,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    bool lastSite = --globalTxnStartCountdownLatch == 0;
+    bool lastSite = countDownGlobalTxnStartCount();
 
     if (lastSite) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
@@ -1312,13 +1312,18 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
     // 1. See header comments explaining m_snapshottingTables.
     // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
     // 3. Clear everything else.
-    m_tables.clear();
-    m_tablesByName.clear();
-    m_tablesBySignatureHash.clear();
+    if (updateReplicated) {
+        BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+            VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+            currEngine->m_tables.clear();
+            currEngine->m_tablesByName.clear();
+            currEngine->m_tablesBySignatureHash.clear();
 
-    // need to re-map all the table ids / indexes
-    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
-    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
+            // need to re-map all the table ids / indexes
+            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
+            currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
+        }
+    }
 
     // walk the table delegates and update local table collections
     BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
