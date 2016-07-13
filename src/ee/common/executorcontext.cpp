@@ -159,8 +159,9 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
 
-            if (executor->getPlanNode()->getPlanNodeType() == PLAN_NODE_TYPE_INSERT) {
-                InsertPlanNode* node = dynamic_cast<InsertPlanNode*>(executor->getPlanNode());
+            PlanNodeType nextPlanNodeType = executor->getPlanNode()->getPlanNodeType();
+            if (nextPlanNodeType >= PLAN_NODE_TYPE_UPDATE && nextPlanNodeType <= PLAN_NODE_TYPE_DELETE) {
+                AbstractOperationPlanNode* node = dynamic_cast<AbstractOperationPlanNode*>(executor->getPlanNode());
                 assert(node);
                 Table* targetTable = node->getTargetTable();
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);

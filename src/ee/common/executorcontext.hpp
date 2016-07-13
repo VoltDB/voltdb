@@ -28,7 +28,6 @@
 
 #include <vector>
 #include <map>
-#include <atomic>
 
 namespace voltdb {
 

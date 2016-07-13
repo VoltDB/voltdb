@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include <pthread.h>
+#include <atomic>
 
 namespace voltdb {
 
