@@ -53,6 +53,10 @@ public:
         m_history->m_released = true;
         m_history->m_releasedIndex = staticReleaseIndex++;
     }
+
+    bool isReplicatedTable() {
+        return false;
+    }
 private:
     MockUndoActionHistory *m_history;
 };

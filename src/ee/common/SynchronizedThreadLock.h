@@ -15,37 +15,39 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STREAMEDTABLEUNDOACTION_HPP
-#define STREAMEDTABLEUNDOACTION_HPP
+#ifndef SYNCHRONIZEDTHREADLOCK_H_
+#define SYNCHRONIZEDTHREADLOCK_H_
 
-#include "common/UndoAction.h"
+//#include "boost/scoped_ptr.hpp"
+//#include "boost/unordered_map.hpp"
+
+#include <cassert>
+#include <map>
+#include <stack>
+#include <string>
+#include <vector>
+#include <pthread.h>
 
 namespace voltdb {
 
-class StreamedTableUndoAction : public voltdb::UndoAction {
+extern pthread_mutex_t sharedEngineMutex;
+extern pthread_cond_t sharedEngineCondition;
+extern std::atomic<int32_t> globalTxnStartCountdownLatch;
+extern int32_t globalTxnEndCountdownLatch;
+extern int32_t SITES_PER_HOST;
 
-  public:
-
-    StreamedTableUndoAction(StreamedTable *table, size_t mark)
-        : m_table(table), m_mark(mark)
-    {
-    }
-
-    virtual void undo() {
-        m_table->undo(m_mark);
-    }
-
-    virtual void release() {
-    }
-
-    virtual bool isReplicatedTable() { return false; }
-
-  private:
-    StreamedTable *m_table;
-    size_t m_mark;
-
+class SynchronizedThreadLock {
+public:
+    static void init(int32_t sitesPerHost);
+    /**
+     * Cross-site synchronization functions
+     */
+    static bool countDownGlobalTxnStartCount();
+    static void signalLastSiteFinished();
+    static void waitForLastSiteFinished();
 };
 
 }
+
 
 #endif

@@ -68,6 +68,7 @@
 #include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/SynchronizedThreadLock.h"
 #include "executors/abstractexecutor.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
@@ -251,10 +252,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     if (partitionId != 16383) {
         enginesByPartitionId[partitionId] = EngineLocals();
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
-        if (SITES_PER_HOST == 0) {
-            SITES_PER_HOST = sitesPerHost;
-            globalTxnStartCountdownLatch = SITES_PER_HOST;
-        }
+        SynchronizedThreadLock::init(sitesPerHost);
         if (createDrReplicatedStream) {
             mpEngineLocals = EngineLocals();
             VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocal.context);
@@ -615,33 +613,6 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-void VoltDBEngine::signalLastSiteFinished() {
-    pthread_mutex_lock(&sharedEngineMutex);
-    globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
-        pthread_mutex_unlock(&sharedEngineMutex);
-#ifdef __linux__
-        pthread_yield();
-#else
-        sched_yield();
-#endif
-        pthread_mutex_lock(&sharedEngineMutex);
-    }
-    // We now know all other threads are waiting to be signaled
-    globalTxnEndCountdownLatch = 0;
-    pthread_cond_broadcast(&sharedEngineCondition);
-    pthread_mutex_unlock(&sharedEngineMutex);
-}
-
-void VoltDBEngine::waitForLastSiteFinished() {
-    pthread_mutex_lock(&sharedEngineMutex);
-    globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != 0) {
-        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
-    }
-    pthread_mutex_unlock(&sharedEngineMutex);
-}
-
 bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catalogPayload) {
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
@@ -675,9 +646,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    bool lastSite = countDownGlobalTxnStartCount();
-
-    if (lastSite) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
         VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
@@ -699,12 +668,12 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         // Assign the correct pool back to this thread
         ExecutorContext::assignThreadLocals(*ourEngineLocals);
-        signalLastSiteFinished();
+        SynchronizedThreadLock::signalLastSiteFinished();
     }
     else {
         // Unfortunately the site thread calls getStats() before all the tables are created so we need to
         // block the site thread until the replicated tables have been applied in all partitions
-        waitForLastSiteFinished();
+        SynchronizedThreadLock::waitForLastSiteFinished();
     }
 
     // load up all the tables, adding all tables
@@ -1215,9 +1184,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         return false;
     }
 
-    bool lastSite = countDownGlobalTxnStartCount();
-
-    if (lastSite) {
+    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
         VOLT_ERROR("updating catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
@@ -1236,12 +1203,12 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
         globalTxnStartCountdownLatch = SITES_PER_HOST;
         ExecutorContext::assignThreadLocals(*ourEngineLocals);
-        signalLastSiteFinished();
+        SynchronizedThreadLock::signalLastSiteFinished();
     }
     else {
         // Unfortunately the site thread calls getStats() before all the tables are created so we need to
         // block the site thread until the replicated tables have been applied in all partitions
-        waitForLastSiteFinished();
+        SynchronizedThreadLock::waitForLastSiteFinished();
     }
 
     processCatalogDeletes(timestamp, false);

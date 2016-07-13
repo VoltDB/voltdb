@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+#include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
@@ -35,13 +36,8 @@ using namespace std;
 
 namespace voltdb {
 
-pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t sharedEngineCondition;
 SharedEngineLocalsType enginesByPartitionId;
 EngineLocals mpEngineLocals;
-std::atomic<int32_t> globalTxnStartCountdownLatch(0);
-int32_t globalTxnEndCountdownLatch = 0;
-int32_t SITES_PER_HOST = -1;
 AbstractExecutor * mpExecutor = NULL;
 
 static pthread_key_t static_key;
@@ -172,7 +168,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                     if (mpEngineLocals.context == this) {
                         mpExecutor = executor;
                     }
-                    if (VoltDBEngine::countDownGlobalTxnStartCount()) {
+                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
                         ExecutorContext::assignThreadLocals(mpEngineLocals);
                         needsReleaseLock = true;
                         // Call the execute method to actually perform whatever action
@@ -187,9 +183,9 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                         globalTxnStartCountdownLatch = SITES_PER_HOST;
                         // Assign the correct pool back to this thread
                         ExecutorContext::assignThreadLocals(*ourEngineLocals);
-                        VoltDBEngine::signalLastSiteFinished();
+                        SynchronizedThreadLock::signalLastSiteFinished();
                     } else {
-                        VoltDBEngine::waitForLastSiteFinished();
+                        SynchronizedThreadLock::waitForLastSiteFinished();
                     }
                 } else {
                     // Call the execute method to actually perform whatever action
@@ -215,7 +211,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
             globalTxnStartCountdownLatch = SITES_PER_HOST;
             // Assign the correct pool back to this thread
             ExecutorContext::assignThreadLocals(*ourEngineLocals);
-            VoltDBEngine::signalLastSiteFinished();
+            SynchronizedThreadLock::signalLastSiteFinished();
         }
 
         // Clean up any tempTables when the plan finishes abnormally.

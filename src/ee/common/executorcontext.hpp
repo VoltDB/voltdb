@@ -286,7 +286,6 @@ class ExecutorContext {
     CatalogId m_hostId;
     CatalogId m_drClusterId;
 };
-
 struct EngineLocals : public PoolLocals {
     inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
     inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
@@ -302,15 +301,9 @@ struct EngineLocals : public PoolLocals {
 };
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
 
-extern pthread_mutex_t sharedEngineMutex;
-extern pthread_cond_t sharedEngineCondition;
 extern SharedEngineLocalsType enginesByPartitionId;
 extern EngineLocals mpEngineLocals;
-extern std::atomic<int32_t> globalTxnStartCountdownLatch;
-extern int32_t globalTxnEndCountdownLatch;
-extern int32_t SITES_PER_HOST;
 extern AbstractExecutor * mpExecutor;
-
 }
 
 #endif

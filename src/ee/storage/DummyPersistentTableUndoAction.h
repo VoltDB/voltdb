@@ -15,30 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDOINSERTACTION_H_
-#define PERSISTENTTABLEUNDOINSERTACTION_H_
+#ifndef DUMMYPERSISTENTTABLEUNDOACTION_H_
+#define DUMMYPERSISTENTTABLEUNDOACTION_H_
 
 #include "common/UndoAction.h"
 #include "common/types.h"
-#include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
-class PersistentTableUndoInsertAction: public voltdb::UndoAction {
+class DummyPersistentTableUndoAction: public voltdb::UndoAction {
 public:
-    inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *table)
-        : m_tuple(insertedTuple), m_table(table)
+    inline DummyPersistentTableUndoAction(bool isReplicatedTable)
+        : m_isReplicatedTable(isReplicatedTable)
     { }
 
-    virtual ~PersistentTableUndoInsertAction() { }
+    virtual ~DummyPersistentTableUndoAction() { }
 
     /*
      * Undo whatever this undo action was created to undo
      */
     virtual void undo() {
-        m_table->deleteTupleForUndo(m_tuple);
     }
 
     /*
@@ -50,13 +47,12 @@ public:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_table->getTable().isReplicatedTable(); }
+    virtual bool isReplicatedTable() { return m_isReplicatedTable; }
 
 private:
-    char* m_tuple;
-    PersistentTableSurgeon *m_table;
+    bool m_isReplicatedTable;
 };
 
 }
 
-#endif /* PERSISTENTTABLEUNDOINSERTACTION_H_ */
+#endif

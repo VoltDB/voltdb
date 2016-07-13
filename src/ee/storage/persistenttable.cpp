@@ -55,6 +55,7 @@
 #include "PersistentTableUndoDeleteAction.h"
 #include "PersistentTableUndoTruncateTableAction.h"
 #include "PersistentTableUndoUpdateAction.h"
+#include "DummyPersistentTableUndoAction.h"
 #include "TableCatalogDelegate.hpp"
 #include "tablefactory.h"
 #include "tableiterator.h"
@@ -592,13 +593,34 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
         /*
          * Create and register an undo action.
          */
-        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
-            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as a placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    // do the actual work
+                    char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+                   //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+                   //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+                   //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+                   uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(false));
+                }
+            }
+        } else {
+            UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+            if (uq) {
+                char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+                //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+                //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+                //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+                uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+            }
         }
     }
 

@@ -29,14 +29,16 @@ DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
     {
     }
 
-    void undo() {
+    virtual void undo() {
         if (m_stream) {
             m_stream->rollbackTo(m_mark, m_cost);
         }
     }
 
-    void release() {
+    virtual void release() {
     }
+
+    virtual bool isReplicatedTable() { return false; }
 
 private:
     AbstractDRTupleStream *m_stream;
