@@ -1996,7 +1996,7 @@
     <a id="btnSaveQueryConfirmation" href="#saveQueryPopup" style="display: none;"></a>
     <div id="saveQueryPopup" style="display: none; width:20px;">
         <div id="saveQueryInnerPopup">
-            <div class="overlay-title icon-alert">
+            <div id="divSaveQueryConfirmation" class="overlay-title icon-alert">
                 <div id="saveQueryHeader" class="addConfigHeader">Save Query</div>
             </div>
             <div id="saveQueryControls">
@@ -2012,11 +2012,11 @@
                                         <label id="errorQueryName" for="txtQueryName" class="error errorHeightFix" style="display: none;"></label>
                                     </td>
                                 </tr>
-                            <tr id = 'queryError'>
-                               <td colspan="2">
-                                   <span class="error">Query field is empty. Go back and fill the query field to save queries.</span>
-                               </td>
-                            </tr>
+                                <tr id = 'queryError'>
+                                   <td colspan="2">
+                                       <span class="error">Query is empty.</span>
+                                   </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

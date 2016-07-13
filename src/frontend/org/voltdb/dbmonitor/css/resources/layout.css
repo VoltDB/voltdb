@@ -2037,7 +2037,7 @@ border:1px solid #FFF;
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
 .workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
 .disableCloserTab { opacity:0.5;}
-#queryError span.error{ color: #c70000; }
+#queryError span.error{ color: #c70000; font-size:13px; }
 
 /*********************jquery ui class override ends*********************/
 
