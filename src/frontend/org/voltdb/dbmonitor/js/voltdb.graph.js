@@ -934,7 +934,6 @@
             var latencyArrMin = []
             var latencyArrDay = []
 
-
             if(localStorage.latencyMin != undefined)
                 latencyArrMin = JSON.parse(localStorage.latencyMin)
 
@@ -1229,7 +1228,7 @@
             }
             else{
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-//                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
             }
 
             localStorage.transDetails = JSON.stringify(transDetailsArr)

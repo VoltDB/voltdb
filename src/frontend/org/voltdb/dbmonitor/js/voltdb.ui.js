@@ -2,71 +2,7 @@
 var ispopupRevoked = false;
 var table = '';
 
-var validNavigation = 0;
-
-function endSession()
-{
-    $.each(localStorage, function(key, value){
-        if(key != 'queries'){
-            localStorage.removeItem(key)
-        }
-     });
-
-}
-
-function bindDOMEvents() {
-/*
-
-* unload works on both closing tab and on refreshing tab.
-
-*/
-    document.onkeydown = fkey;
-    document.onkeypress = fkey
-    document.onkeyup = fkey;
-
-var wasPressed = false;
-
-function fkey(e){
-        e = e || window.event;
-        if( wasPressed ) return;
-        if (e.keyCode == 116) {
-            validNavigation = 1;
-            wasPressed = true;
-        }
- }
-
-
-    $(window).unload(function()
-    {
-       if (validNavigation==0)
-       {
-         endSession();
-       }
-    })
-
-
-    // Attach the event click for all links in the page
-    $("a").bind("click", function()
-    {
-       validNavigation = 1;
-    });
-
-     // Attach the event submit for all forms in the page
-     $("form").bind("submit", function()
-    {
-       validNavigation = 1;
-    });
-
-     // Attach the event click for all inputs in the page
-     $("input[type=submit]").bind("click", function()
-    {
-       validNavigation = 1;
-    });
-
-}
-
 $(document).ready(function () {
-    bindDOMEvents();
     $("#helppopup").load("help.htm", function () {
     });
      var defaultValue = 30;
@@ -89,17 +25,36 @@ $(document).ready(function () {
 
     //clear the localStorage for DataTables in DR Section
 
-    $.each(localStorage, function(key, value){
-        if (key.indexOf("DataTables_") > -1){
-            localStorage.removeItem(key)
+    for(var i=0, len=localStorage.length; i<len; i++) {
+        var key = localStorage.key(i);
+        var value = localStorage[key];
+        if(key != 'queries' && key != 'queryNameList' && key != 'key' ){
+                if(value != undefined){
+                data = $.parseJSON(value);
+                }
+                if(!data.hasOwnProperty('time')){
+                    if($.cookie('sessionCookie') == undefined){
+                        localStorage.removeItem(key)
+                    }
+                } else {
+                    if(data['time'] == '0' ){
+                        if($.cookie('sessionCookie') == undefined){
+                            localStorage.removeItem(key)
+                        }
+                    } else {
+                        var oneDay = 24*60*60*1000; // hours*minutes*seconds*milliseconds
+                        var sessionStartTime = new Date(data['time']);
+                        var currentTime = new Date();
+                        var difference = Math.round(Math.abs((sessionStartTime.getTime() - currentTime.getTime())/(oneDay)));
+                    if(difference >= 365){
+                        localStorage.removeItem(key)
+                    }
+                }
+            }
         }
-//
-//        if(key != 'queries' && key != 'queryNameList' && key != 'cpuDetails'
-//        && key != 'memoryDetails' && key != 'transDetails' && key != 'partitionDetails' && key != 'latency' && key != 'cmdLog'
-//        && key != 'memoryDetailsMin' ){
-//            localStorage.removeItem(key)
-//        }
-    });
+    }
+
+    $.cookie('sessionCookie', 'true')
 
 
 
