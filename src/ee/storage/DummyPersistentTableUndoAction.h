@@ -20,14 +20,15 @@
 
 #include "common/UndoAction.h"
 #include "common/types.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
 class DummyPersistentTableUndoAction: public voltdb::UndoAction {
 public:
-    inline DummyPersistentTableUndoAction(bool isReplicatedTable)
-        : m_isReplicatedTable(isReplicatedTable)
+    inline DummyPersistentTableUndoAction(voltdb::PersistentTableSurgeon *table)
+        : m_table(table)
     { }
 
     virtual ~DummyPersistentTableUndoAction() { }
@@ -47,10 +48,10 @@ public:
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_isReplicatedTable; }
+    virtual bool isReplicatedTable() { return m_table->getTable().isReplicatedTable(); }
 
 private:
-    bool m_isReplicatedTable;
+    PersistentTableSurgeon *m_table;
 };
 
 }

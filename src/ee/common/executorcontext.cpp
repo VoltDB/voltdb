@@ -166,9 +166,11 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
                     if (mpEngineLocals.context == this) {
+                        VOLT_ERROR("Executor Assigned");
                         mpExecutor = executor;
                     }
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+                        VOLT_ERROR("Entered replicated insert on partition %d", m_partitionId);
                         ExecutorContext::assignThreadLocals(mpEngineLocals);
                         needsReleaseLock = true;
                         // Call the execute method to actually perform whatever action
@@ -180,11 +182,13 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                         ++ctr;
                         mpExecutor = NULL;
                         needsReleaseLock = false;
-                        globalTxnStartCountdownLatch = SITES_PER_HOST;
                         // Assign the correct pool back to this thread
+
+                        VOLT_ERROR("Exiting replicated insert on partition %d", m_partitionId);
                         ExecutorContext::assignThreadLocals(*ourEngineLocals);
                         SynchronizedThreadLock::signalLastSiteFinished();
                     } else {
+                        VOLT_ERROR("Waiting for replicated insert on partition %d", m_partitionId);
                         SynchronizedThreadLock::waitForLastSiteFinished();
                     }
                 } else {
@@ -208,7 +212,6 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         }
     } catch (const SerializableEEException &e) {
         if (needsReleaseLock) {
-            globalTxnStartCountdownLatch = SITES_PER_HOST;
             // Assign the correct pool back to this thread
             ExecutorContext::assignThreadLocals(*ourEngineLocals);
             SynchronizedThreadLock::signalLastSiteFinished();

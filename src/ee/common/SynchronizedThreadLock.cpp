@@ -16,6 +16,7 @@
  */
 
 #include "SynchronizedThreadLock.h"
+#include "executorcontext.hpp"
 
 namespace voltdb {
 
@@ -53,6 +54,7 @@ void SynchronizedThreadLock::signalLastSiteFinished()
     }
     // We now know all other threads are waiting to be signaled
     globalTxnEndCountdownLatch = 0;
+    globalTxnStartCountdownLatch = SITES_PER_HOST;
     pthread_cond_broadcast(&sharedEngineCondition);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
@@ -61,9 +63,7 @@ void SynchronizedThreadLock::waitForLastSiteFinished()
 {
     pthread_mutex_lock(&sharedEngineMutex);
     globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != 0) {
-        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
-    }
+    pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 }

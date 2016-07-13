@@ -596,7 +596,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
         if (isReplicatedTable()) {
             // For shared replicated table, in the same host site with lowest id
             // will create the actual undo action, other sites register a dummy
-            // undo action as a placeholder
+            // undo action as placeholder
             BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                 UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
                 UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
@@ -609,7 +609,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
                    uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
                 } else {
                     // put a placeholder
-                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(false));
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
                 }
             }
         } else {
