@@ -27,28 +27,13 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-import org.apache.calcite.DataContext;
-import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.adapter.enumerable.EnumerableProject;
-import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.adapter.enumerable.EnumerableRelImplementor;
-import org.apache.calcite.adapter.enumerable.EnumerableRules;
-import org.apache.calcite.adapter.enumerable.EnumerableTableScan;
-import org.apache.calcite.adapter.enumerable.EnumerableRel.Prefer;
-import org.apache.calcite.adapter.enumerable.EnumerableRel.Result;
-import org.apache.calcite.linq4j.Enumerable;
-import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptQuery;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
 import org.apache.calcite.plan.RelOptUtil;
@@ -58,26 +43,17 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelInput;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelShuttle;
-import org.apache.calcite.rel.RelVisitor;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalTableScan;
-import org.apache.calcite.rel.metadata.Metadata;
 import org.apache.calcite.rel.metadata.RelMdCollation;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.schema.SchemaPlus;
@@ -94,7 +70,6 @@ import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Util;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -103,6 +78,8 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 
@@ -172,7 +149,6 @@ public class TestCalcite extends TestCase {
 
         @Override
         public TableType getJdbcTableType() {
-            // TODO Auto-generated method stub
             return Schema.TableType.TABLE;
         }
 
@@ -195,13 +171,11 @@ public class TestCalcite extends TestCase {
 
                 @Override
                 public Double getRowCount() {
-                    // TODO Auto-generated method stub
                     return null;
                 }
 
                 @Override
                 public boolean isKey(ImmutableBitSet columns) {
-                    // TODO Auto-generated method stub
                     return false;
                 }
 
@@ -212,7 +186,6 @@ public class TestCalcite extends TestCase {
 
                 @Override
                 public RelDistribution getDistribution() {
-                    // TODO Auto-generated method stub
                     return null;
                 }
 
@@ -276,17 +249,51 @@ public class TestCalcite extends TestCase {
       }
 
     public static interface VoltDBRel extends RelNode  {
+        public AbstractPlanNode toPlanNode();
     }
 
     public static class VoltDBTableScan extends TableScan implements VoltDBRel {
 
         final VoltDBTable m_voltDBTable;
+        final List<RexNode> m_projectExpressions;
+        final RelDataType m_rowType;
 
         protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
                 VoltDBTable voltDBTable) {
               super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
               this.m_voltDBTable = voltDBTable;
+              m_projectExpressions = null; // init to all fields here?
+              m_rowType = null;
             }
+
+        protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
+                VoltDBTable voltDBTable, List<RexNode> projects, RelDataType rowType) {
+              super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
+              this.m_voltDBTable = voltDBTable;
+              m_projectExpressions = projects;
+              m_rowType = rowType;
+            }
+
+        public VoltDBTable getVoltDBTable() {
+            return m_voltDBTable;
+        }
+
+        @Override public RelDataType deriveRowType() {
+            if (m_projectExpressions == null) {
+                return table.getRowType();
+            }
+            else {
+                return m_rowType;
+            }
+          }
+
+        @Override
+        public AbstractPlanNode toPlanNode() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+
     }
 
 public static class VoltDBProject extends Project implements VoltDBRel {
@@ -333,6 +340,12 @@ public static class VoltDBProject extends Project implements VoltDBRel {
           return new VoltDBProject(getCluster(), traitSet, input,
               projects, rowType);
         }
+
+        @Override
+        public AbstractPlanNode toPlanNode() {
+            // TODO Auto-generated method stub
+            return null;
+        }
 }
 
 static class VoltDBProjectRule extends ConverterRule {
@@ -357,20 +370,33 @@ static class VoltDBProjectScanMergeRule extends RelOptRule {
 
     public VoltDBProjectScanMergeRule() {
         super(operand(VoltDBProject.class, operand(VoltDBTableScan.class, none())));
-        // TODO Auto-generated constructor stub
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        // TODO Auto-generated method stub
-        assert false;
-    }
+        VoltDBProject project = call.rel(0);
 
+        VoltDBTableScan scan = call.rel(1);
+        VoltDBTableScan newScan = new VoltDBTableScan(
+                scan.getCluster(),
+                scan.getTable(),
+                scan.getVoltDBTable(),
+                project.getProjects(),
+                project.getRowType());
+        call.transformTo(newScan);
+    }
 }
 
     static class VoltDBRules {
         public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
-        public static final ConverterRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectRule();
+        public static final RelOptRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectScanMergeRule();
+    }
+
+    private static AbstractPlanNode calciteToVoltDBPlan(VoltDBRel rel) {
+        AbstractPlanNode root = rel.toPlanNode();
+        SendPlanNode sendNode = new SendPlanNode();
+        sendNode.addAndLinkChild(root);
+        return sendNode;
     }
 
     private SchemaPlus schemaPlusFromDDL(String ddl) {
@@ -437,6 +463,11 @@ static class VoltDBProjectScanMergeRule extends RelOptRule {
 
         System.out.println("**** Optimized relation expression ****\n" +
                 RelOptUtil.toString(transform) + "\n");
+
+        AbstractPlanNode plan = calciteToVoltDBPlan((VoltDBRel)transform);
+        System.out.println("**** Converted to VoltDB Plan ****\n" +
+                plan.toExplainPlanString() + "\n");
+
         planner.close();
         planner.reset();
         System.out.println("*****************************************\n\n");
