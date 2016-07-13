@@ -76,5 +76,7 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/calcite-linq4j"/>
 	<classpathentry kind="lib" path="lib/avatica-1.8.0.jar"/>
 	<classpathentry kind="lib" path="lib/eigenbase-properties-1.1.5.jar"/>
+	<classpathentry kind="lib" path="lib/commons-compiler-2.7.6.jar"/>
+	<classpathentry kind="lib" path="lib/janino-2.7.6.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>
