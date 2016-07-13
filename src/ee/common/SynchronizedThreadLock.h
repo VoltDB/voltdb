@@ -26,6 +26,7 @@
 #include <stack>
 #include <string>
 #include <vector>
+#include <atomic>
 #include <pthread.h>
 #include <atomic>
 
