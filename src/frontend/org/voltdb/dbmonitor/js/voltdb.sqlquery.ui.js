@@ -134,9 +134,15 @@ $(document).ready(function () {
             if(queryText == ''){
                 $('#btnSaveQueryOk').hide()
                 $('#queryError').show()
+                $('#Tr1').hide()
+                $('#saveQueryHeader').html('Error')
+                $('#divSaveQueryConfirmation').addClass('errorIcon')
             } else {
                 $('#btnSaveQueryOk').show()
                 $('#queryError').hide()
+                $('#Tr1').show()
+                $('#saveQueryHeader').html('Save Query')
+                $('#divSaveQueryConfirmation').removeClass('errorIcon')
             }
 
             $.validator.addMethod(
