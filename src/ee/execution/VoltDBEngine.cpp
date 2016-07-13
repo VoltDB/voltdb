@@ -620,7 +620,11 @@ void VoltDBEngine::signalLastSiteFinished() {
     globalTxnEndCountdownLatch++;
     while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
         pthread_mutex_unlock(&sharedEngineMutex);
+#ifdef __linux__
         pthread_yield();
+#else
+        sched_yield();
+#endif
         pthread_mutex_lock(&sharedEngineMutex);
     }
     // We now know all other threads are waiting to be signaled
