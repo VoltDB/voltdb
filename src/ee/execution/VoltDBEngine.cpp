@@ -615,7 +615,8 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-void VoltDBEngine::signalLastSiteFinished() {
+void VoltDBEngine::signalLastSiteFinished(EngineLocals* originalContext) {
+    ExecutorContext::assignThreadLocals(*originalContext);
     pthread_mutex_lock(&sharedEngineMutex);
     globalTxnEndCountdownLatch++;
     while (globalTxnEndCountdownLatch != SITES_PER_HOST) {
@@ -629,6 +630,7 @@ void VoltDBEngine::signalLastSiteFinished() {
     }
     // We now know all other threads are waiting to be signaled
     globalTxnEndCountdownLatch = 0;
+    globalTxnStartCountdownLatch = SITES_PER_HOST;
     pthread_cond_broadcast(&sharedEngineCondition);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
@@ -636,9 +638,7 @@ void VoltDBEngine::signalLastSiteFinished() {
 void VoltDBEngine::waitForLastSiteFinished() {
     pthread_mutex_lock(&sharedEngineMutex);
     globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != 0) {
-        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
-    }
+    pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 
@@ -696,10 +696,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         // This must be done after loading all the tables.
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
-        globalTxnStartCountdownLatch = SITES_PER_HOST;
         // Assign the correct pool back to this thread
-        ExecutorContext::assignThreadLocals(*ourEngineLocals);
-        signalLastSiteFinished();
+        signalLastSiteFinished(ourEngineLocals);
     }
     else {
         // Unfortunately the site thread calls getStats() before all the tables are created so we need to
@@ -860,9 +858,6 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
 bool
 VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated)
 {
-    VOLT_ERROR("loading %s catalog for partition %d with context %p",
-            (updateReplicated?"REPLICATED":"PARTITIONED"),
-            m_partitionId, ExecutorContext::getExecutorContext());
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -1234,9 +1229,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
         mpEngine->initMaterializedViewsAndLimitDeletePlans(true);
 
-        globalTxnStartCountdownLatch = SITES_PER_HOST;
-        ExecutorContext::assignThreadLocals(*ourEngineLocals);
-        signalLastSiteFinished();
+        signalLastSiteFinished(ourEngineLocals);
     }
     else {
         // Unfortunately the site thread calls getStats() before all the tables are created so we need to
@@ -1345,9 +1338,6 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
         const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
             if (updateReplicated) {
-                VOLT_ERROR("loading REPLICATED table %d (%s) from partition %d with context %p",
-                        relativeIndexOfTable, tableName.c_str(),
-                        m_partitionId, ExecutorContext::getExecutorContext());
                 BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                     VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
                     currEngine->m_tables[relativeIndexOfTable] = localTable;
@@ -1362,9 +1352,6 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated)
             if (updateReplicated) {
                 continue;
             }
-            VOLT_ERROR("loading Partitioned table %d (%s) for partition %d with context %p",
-                    relativeIndexOfTable, tableName.c_str(),
-                    m_partitionId, ExecutorContext::getExecutorContext());
             m_tables[relativeIndexOfTable] = localTable;
             m_tablesByName[tableName] = localTable;
         }

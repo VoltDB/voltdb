@@ -324,11 +324,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_currentUndoQuantum = NULL;
             m_executorContext->setupForPlanFragments(NULL);
             m_undoLog.undo(undoToken);
-            if (countDownGlobalTxnStartCount()) {
-                signalLastSiteFinished();
-            } else {
-                waitForLastSiteFinished();
-            }
+//            if (countDownGlobalTxnStartCount()) {
+//                signalLastSiteFinished();
+//            } else {
+//                waitForLastSiteFinished();
+//            }
         }
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
@@ -421,7 +421,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Cross-site synchronization functions
          */
-        static void signalLastSiteFinished();
+        static void signalLastSiteFinished(EngineLocals* originalContext);
         static void waitForLastSiteFinished();
 
         static bool countDownGlobalTxnStartCount() {
