@@ -456,10 +456,28 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                                 "active undo quantum, and presumably an active transaction that should be there",
                                 m_name.c_str());
         }
-        emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
-        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
-        // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+                    emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+                    // Create and register an undo action.
+                    uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+            }
+        } else {
+            emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+            emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+            // Create and register an undo action.
+            uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        }
     }
     else {
         if (fallible) {
@@ -794,14 +812,38 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (uq) {
-        /*
-         * Create and register an undo action with copies of the "before" and "after" tuple storage
-         * and the "before" and "after" object pointers for non-inlined columns that changed.
-         */
-        char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
-        uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
-                                                                         oldObjects, newObjects,
-                                                                         &m_surgeon, someIndexGotUpdated));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    // do the actual work
+                    /*
+                     * Create and register an undo action with copies of the "before" and "after" tuple storage
+                     * and the "before" and "after" object pointers for non-inlined columns that changed.
+                     */
+                    char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+                    uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                                                                                     oldObjects, newObjects,
+                                                                                     &m_surgeon, someIndexGotUpdated));
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+            }
+        } else {
+            /*
+             * Create and register an undo action with copies of the "before" and "after" tuple storage
+             * and the "before" and "after" object pointers for non-inlined columns that changed.
+             */
+            char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                                                                             oldObjects, newObjects,
+                                                                             &m_surgeon, someIndexGotUpdated));
+        }
     }
     else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -931,15 +973,37 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     if (fallible) {
-        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            target.setPendingDeleteOnUndoReleaseTrue();
-            ++m_tuplesPinnedByUndo;
-            ++m_invisibleTuplesPendingDeleteCount;
-            // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
-            return;
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    // do the actual work
+                    target.setPendingDeleteOnUndoReleaseTrue();
+                    ++m_tuplesPinnedByUndo;
+                    ++m_invisibleTuplesPendingDeleteCount;
+                   uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+                return;
+            }
+        } else {
+            UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+            if (uq) {
+                target.setPendingDeleteOnUndoReleaseTrue();
+                ++m_tuplesPinnedByUndo;
+                ++m_invisibleTuplesPendingDeleteCount;
+                // Create and register an undo action.
+                uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+                return;
+            }
         }
+
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
