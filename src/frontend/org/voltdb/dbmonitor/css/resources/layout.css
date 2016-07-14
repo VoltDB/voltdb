@@ -3879,7 +3879,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     }
 
     .displayPre {
-        height: 115px;
+        height: 172px;
     }
 
     ul.rightShowhideList {
@@ -4224,6 +4224,13 @@ fieldset { border:1px solid #ccc; padding:20px;}
     .drHeightIndividual {
         min-height: 150px;
     }
+
+}
+@media (max-width: 1024px) {
+        .sliderGraph,.labelSlider { float:none;}
+        .labelSlider { right:0;}
+        .sliderMain { margin-bottom:10px;}
+
 }
 
 @media (min-width: 480px) and (max-width:540px) {
@@ -4423,6 +4430,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 	.clsQueryWrapper { float:none;}
 	.queryTimeClass { float:none;}
 	.clsQueryBtns { float:none;}
+
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
