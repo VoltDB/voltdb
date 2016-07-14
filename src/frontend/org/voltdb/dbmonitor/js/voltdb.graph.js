@@ -1261,7 +1261,12 @@
             else{
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                 transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
-                transDetailsMin = MonitorGraphUI.saveLocalStorage(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
+                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
+                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0) || calculatedValue == 0) {
+                        transDetailsMin = MonitorGraphUI.saveLocalStorage(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                    }
+                }
                 transDetailsDay = MonitorGraphUI.saveLocalStorage(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
             }
 
@@ -1309,7 +1314,6 @@
             if(localStorage.cpuDetailsDay != undefined)
                 cpuDetailsArrDay = JSON.parse(localStorage.cpuDetailsDay)
 
-//            var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
             var cpuDataMin = monitor.cpuDataMin;
             var cpuDataDay = monitor.cpuDataHrs;
@@ -1335,12 +1339,14 @@
                         "y": cpuDetailsArrMin[j].percentUsed
                     })
                 }
-//                for(var k = 0; k< cpuDetailsArrDay.length; k++){
-//                    sliceFirstData(monitor.cpuDataDay, dataView.Days );
-//                    monitor.cpuDataDay.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
-//                        "y": cpuDetailsArrDay[k].percentUsed
-//                    })
-//                }
+
+                for(var k = 0; k< cpuDetailsArrDay.length; k++){
+                    sliceFirstData(monitor.cpuDataHrs, dataView.Days );
+                    monitor.cpuDataHrs.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
+                        "y": cpuDetailsArrDay[k].percentUsed
+                    })
+                }
+
             }
 
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
@@ -1469,6 +1475,12 @@
                         "y": partitionDetailsArrMin[i].percentUsed
                     })
                 }
+                for(var k = 0; k< partitionDetailsArrDay.length; k++){
+                    sliceFirstData(monitor.partitionDataDay, dataView.Days);
+                    monitor.partitionDataDay.push({"x": new Date(partitionDetailsArrDay[k].timestamp),
+                        "y": partitionDetailsArrDay[k].percentUsed
+                    })
+                }
             }
             if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
                 return;
@@ -1564,10 +1576,45 @@
             var drDataMin = monitor.drReplicationDataMin;
             var drDataDay = monitor.drReplicationDataDay;
             var drDetail = drDetails;
+            var drDetailsArr = []
+            var drDetailsArrMin = []
+            var drDetailsArrDay = []
+
+            if(localStorage.drDetailsMin != undefined)
+                drDetailsArrMin = JSON.parse(localStorage.drDetailsMin)
+
+            if(localStorage.drDetailsDay != undefined)
+                drDetailsArrDay = JSON.parse(localStorage.drDetailsDay)
 
 
             if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
                 return;
+
+            if(localStorage.drDetails != undefined)
+                drDetailsArr = JSON.parse(localStorage.drDetails)
+
+            if(monitor.drFirstData){
+                for(var i = 0; i< drDetailsArr.length; i++){
+                    sliceFirstData(monitor.drReplicationData, dataView.Seconds);
+                    monitor.drReplicationData.push({"x": new Date(drDetailsArr[i].timestamp),
+                        "y": drDetailsArr[i].replicationRate
+                    })
+                }
+                for(var j = 0; j< drDetailsArrMin.length; j++){
+                    sliceFirstData(monitor.drReplicationDataMin, dataView.Minutes);
+                    monitor.drReplicationDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
+                        "y": drDetailsArrMin[j].replicationRate
+                    })
+                }
+
+                for(var k = 0; k< drDetailsArrDay.length; k++){
+                    sliceFirstData(monitor.drReplicationDataDay, dataView.Days );
+                    monitor.drReplicationDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
+                        "y": drDetailsArrDay[k].replicationRate
+                    })
+                }
+
+            }
 
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
             if (timeStamp >= monitor.drMaxTimeStamp) {
@@ -1577,8 +1624,10 @@
                     drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                     if (timeStamp == monitor.drMaxTimeStamp) {
                         drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
+                        drDetailsArrMin = MonitorGraphUI.saveLocalStorage(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": drDataMin[drDataMin.length - 1].y}, MonitorGraphUI.timeUnit.min  )
                     } else {
                         drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                        drDetailsArrMin = MonitorGraphUI.saveLocalStorage(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint}, MonitorGraphUI.timeUnit.min  )
                     }
                     MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
                     drSecCount = 0;
@@ -1587,8 +1636,10 @@
                     drDataDay = sliceFirstData(drDataDay, dataView.Days);
                     if (timeStamp == monitor.drMaxTimeStamp) {
                         drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
+                        drDetailsArrDay = MonitorGraphUI.saveLocalStorage(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": drDataDay[drDataDay.length - 1].y}, MonitorGraphUI.timeUnit.day  )
                     } else {
                         drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                        drDetailsArrDay = MonitorGraphUI.saveLocalStorage(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint}, MonitorGraphUI.timeUnit.day  )
                     }
                     MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
                     drMinCount = 0;
@@ -1596,9 +1647,16 @@
                 drData = sliceFirstData(drData, dataView.Seconds);
                 if (timeStamp == monitor.drMaxTimeStamp) {
                     drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
+                    drDetailsArr = MonitorGraphUI.saveLocalStorage(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
                 } else {
                     drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                    drDetailsArr = MonitorGraphUI.saveLocalStorage(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y}, plottingPoint  )
                 }
+
+                localStorage.drDetails = JSON.stringify(drDetailsArr)
+                localStorage.drDetailsMin = JSON.stringify(drDetailsArrMin)
+                localStorage.drDetailsDay = JSON.stringify(drDetailsArrDay)
+
                 MonitorGraphUI.Monitors.drReplicationData = drData;
                 monitor.drFirstData = false;
 
@@ -1655,6 +1713,12 @@
                     sliceFirstData(monitor.cmdLogDataMin, dataView.Minutes);
                     monitor.cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
                         "y": cmdLogArrMin[j].outstandingTxn
+                    })
+                }
+                for(var k = 0; k< cmdLogArrDay.length; k++){
+                    sliceFirstData(monitor.cmdLogDataDay, dataView.Days);
+                    monitor.cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
+                        "y": cmdLogArrDay[k].outstandingTxn
                     })
                 }
             }
