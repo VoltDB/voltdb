@@ -20,8 +20,16 @@ COMMUNITY = os.environ.get('community', None)
 PRO = os.environ.get('pro', None)
 
 # Channel to message in case something goes wrong
-ADMIN_CHANNEL = 'D1JG6N2A2'
+ADMIN_CHANNEL = os.environ.get('admin', None)
 
+# Other channels
+GENERAL_CHANNEL = os.environ.get('general', None)
+RANDOM_CHANNEL = os.environ.get('random', None)
+
+
+# Queries
+
+# Test Leaderboard - See the tests that have been failing the most since a certain build.
 TL_QUERY = ("""
   SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
@@ -33,6 +41,7 @@ GROUP BY tf.name
 ORDER BY 2 DESC
 """)
 
+# Days Leaderboard - See the tests that has been failing the most in the past amount of days.
 D_QUERY = ("""
   SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
@@ -44,6 +53,7 @@ GROUP BY tf.name
 ORDER BY 2 DESC
 """)
 
+# Build Range Leaderboard - See the tests that have been failing the most in a range of builds.
 BR_QUERY = ("""
     SELECT tf.name AS 'Test name',
            COUNT(*) AS 'Number of failures in this build range'
@@ -60,6 +70,7 @@ INNER JOIN `junit-builds` AS jr
   ORDER BY 2 DESC
 """)
 
+# Test On Master - See if test is also failing on master and how recently.
 TOM_QUERY = ("""
     SELECT MAX(tf.build) AS 'Most recent failure on master',
            MAX(jr.build) AS 'Most recent build of master'
@@ -71,6 +82,7 @@ RIGHT JOIN `junit-builds` AS jr
            jr.name=%(job)s
 """)
 
+# Leaderboard - See a specific leaderboard for two jobs.
 L_QUERY = ("""
   SELECT job AS 'Job name',
          name AS 'Test name',
@@ -101,6 +113,7 @@ L_QUERY = ("""
 ORDER BY 5 DESC
 """)
 
+# All Failures - See all failures for a job over time and view them as most recent.
 AF_QUERY = ("""
   SELECT tf.name AS 'Test name',
          tf.build as 'Build',
@@ -148,6 +161,11 @@ class JenkinsBot(object):
 
         return True
 
+    def can_reply(self, incoming):
+        return (len(incoming) > 0 and incoming[0].get('text', None) is not None
+                and incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None
+                and incoming[0]['channel'] != GENERAL_CHANNEL and incoming[0]['channel'] != RANDOM_CHANNEL)
+
     def listen(self):
         """
         Establishes session and responds to commands
@@ -168,8 +186,7 @@ class JenkinsBot(object):
             try:
                 # Wait for and respond to incoming data that is: text, not from a bot, not a file.
                 incoming = list(self.client.rtm_read())
-                if (len(incoming) > 0 and incoming[0].get('text', None) is not None and
-                    incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None):
+                if (self.can_reply(incoming)):
                     text = incoming[0]['text']
                     channel = incoming[0]['channel']
                     if 'end-session' in text:
@@ -250,6 +267,7 @@ class JenkinsBot(object):
         """
         Make a query then upload a text file with tables to the channels.
         """
+
         try:
             database = mysql.connector.connect(host=os.environ.get('dbhost', None),
                                                user=os.environ.get('dbuser', None),
