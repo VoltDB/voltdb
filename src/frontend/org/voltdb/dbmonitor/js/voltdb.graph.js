@@ -1055,7 +1055,6 @@
             var memoryDetailsArrMin = []
             var memoryDetailsArrDay = []
 
-            debugger;
             if(localStorage.memoryDetailsMin != undefined)
                 memoryDetailsArrMin = JSON.parse(localStorage.memoryDetailsMin)
 
@@ -1210,7 +1209,7 @@
 //                }
             }
 
-
+            transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
             if ($.isEmptyObject(transacDetail) || transacDetail == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["TimeStamp"] == undefined || transacDetail["currentTimerTick"] == undefined)
                 return;
 
@@ -1262,6 +1261,8 @@
             else{
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                 transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                transDetailsMin = MonitorGraphUI.saveLocalStorage(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                transDetailsDay = MonitorGraphUI.saveLocalStorage(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
             }
 
             localStorage.transDetails = JSON.stringify(transDetailsArr)
@@ -1648,6 +1649,12 @@
                     sliceFirstData(monitor.cmdLogData, dataView.Seconds);
                     monitor.cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
                         "y": cmdLogArr[i].outstandingTxn
+                    })
+                }
+                for(var j = 0; j< cmdLogArrMin.length; j++){
+                    sliceFirstData(monitor.cmdLogDataMin, dataView.Minutes);
+                    monitor.cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
+                        "y": cmdLogArrMin[j].outstandingTxn
                     })
                 }
             }
