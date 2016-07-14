@@ -225,6 +225,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         } else {
             m_aggResultColumns = m_displayColumns;
         }
+
+        // If we have seen any windowed expressions we will have
+        // saved them in m_windowedExpressions by now.  We need to
+        // verify their validity.
+        verifyWindowedExpressions();
+
         /*
          * Calculate the content determinism message before we place the TVEs in
          * the columns. After the TVEs are placed the actual expressions are
@@ -751,11 +757,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ExpressionUtil.finalizeValueTypes(colExpr);
 
         calculateColumnNames(child, col, colExpr);
-
-        // If we have seen any windowed expressions we will have
-        // saved them in m_windowedExpressions by now.  We need to
-        // verify their validity.
-        verifyWindowedExpressions();
 
         // Remember the column expression.
         col.expression = colExpr;

@@ -147,7 +147,9 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
                       "Aggregate windowed expressions with RANGE " +
                       "window frame units can have only integer or TIMESTAMP value types.");
-
+        // Windowed expressions can only appear in the display list.
+        failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
+        			  "Windowed expressions can only appear in the select list.");
     }
 
     public void testOrderByAndPartitionByExpressions() throws Exception {
@@ -163,6 +165,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
             assertFalse("OrderBy expressions in windowed expressions don't compile", true);
         }
     }
+
 
     // This is not actually a test.  This is here just to generate a
     // catalog and a plan for the PartitionByExecutor test.  It doesn't really
