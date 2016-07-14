@@ -950,6 +950,12 @@
                         "y": latencyArr[i].latency
                     })
                 }
+                 for(var j = 0; j< latencyArrMin.length; j++){
+                    sliceFirstData(monitor.latDataMin, dataView.Minutes);
+                    monitor.latDataMin.push({"x": new Date(latencyArrMin[j].timestamp),
+                        "y": latencyArrMin[j].latency
+                    })
+                }
             }
 
             // Compute latency statistics
@@ -1049,7 +1055,7 @@
             var memoryDetailsArrMin = []
             var memoryDetailsArrDay = []
 
-
+            debugger;
             if(localStorage.memoryDetailsMin != undefined)
                 memoryDetailsArrMin = JSON.parse(localStorage.memoryDetailsMin)
 
@@ -1066,7 +1072,22 @@
                         "y": memoryDetailsArr[i].physicalMemory
                     })
                 }
+                for(var j = 0; j< memoryDetailsArrMin.length; j++){
+                    sliceFirstData(monitor.memDataMin, dataView.Minutes);
+                    monitor.memDataMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
+                        "y": memoryDetailsArrMin[j].physicalMemory
+                    })
+                }
+                for(var k = 0; k< memoryDetailsArrDay.length; k++){
+                    sliceFirstData(monitor.memDataDay, dataView.Days);
+                    monitor.memDataDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
+                        "y": memoryDetailsArrDay[k].physicalMemory
+                    })
+                }
             }
+
+
+
 
             if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
                 return;
@@ -1175,6 +1196,18 @@
                         "y": transDetailsArr[i].transaction
                     })
                 }
+                for(var j = 0; j< transDetailsArrMin.length; j++){
+                    sliceFirstData(monitor.tpsDataMin, dataView.Minutes);
+                    monitor.tpsDataMin.push({"x": new Date(transDetailsArrMin[j].timestamp),
+                        "y": transDetailsArrMin[j].transaction
+                    })
+                }
+//                for(var k = 0; k< transDetailsArrDay.length; k++){
+//                    sliceFirstData(monitor.tpsDataDay, dataView.Day);
+//                    monitor.tpsDataDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
+//                        "y": transDetailsArrDay[k].transaction
+//                    })
+//                }
             }
 
 
@@ -1295,6 +1328,18 @@
                         "y": cpuDetailsArr[i].percentUsed
                     })
                 }
+                for(var j = 0; j< cpuDetailsArrMin.length; j++){
+                    sliceFirstData(monitor.cpuDataMin, dataView.Minutes);
+                    monitor.cpuDataMin.push({"x": new Date(cpuDetailsArrMin[j].timestamp),
+                        "y": cpuDetailsArrMin[j].percentUsed
+                    })
+                }
+//                for(var k = 0; k< cpuDetailsArrDay.length; k++){
+//                    sliceFirstData(monitor.cpuDataDay, dataView.Days );
+//                    monitor.cpuDataDay.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
+//                        "y": cpuDetailsArrDay[k].percentUsed
+//                    })
+//                }
             }
 
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
@@ -1388,6 +1433,7 @@
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
+
             var monitor = MonitorGraphUI.Monitors;
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
                 getPartitionData();
@@ -1414,6 +1460,12 @@
                     sliceFirstData(monitor.partitionData, dataView.Seconds);
                     monitor.partitionData.push({"x": new Date(partitionDetailsArr[i].timestamp),
                         "y": partitionDetailsArr[i].percentUsed
+                    })
+                }
+                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
+                    sliceFirstData(monitor.partitionDataMin, dataView.Minutes);
+                    monitor.partitionDataMin.push({"x": new Date(partitionDetailsArrMin[j].timestamp),
+                        "y": partitionDetailsArrMin[i].percentUsed
                     })
                 }
             }

@@ -6,9 +6,11 @@ $(document).ready(function () {
     $("#helppopup").load("help.htm", function () {
     });
      var defaultValue = 30;
+
      if ($.cookie("retainedTimeInterval") != undefined){
         defaultValue = $.cookie("retainedTimeInterval")
      }
+
      $( "#slider-range-min" ).slider({
                   range: "min",
                   value: defaultValue,
@@ -19,6 +21,7 @@ $(document).ready(function () {
                     $.cookie("retainedTimeInterval", ui.value, { expires: 365 })
                   }
                 });
+
 
 
      $( "#timeInterval" ).val( defaultValue );
@@ -2196,7 +2199,6 @@ var loadPage = function (serverName, portid) {
     //refreshGraphAndDataInLoop(getRefreshTime(), VoltDbUI.getCookie("graph-view"));
 
     configureUserPreferences();
-    configureChartSettings();
     adjustGraphSpacing();
     saveThreshold();
 
@@ -2212,52 +2214,6 @@ var loadPage = function (serverName, portid) {
 
     VoltDbUI.refreshConnectionTime('20000');
 };
-
-var configureChartSettings = function() {
-
-    $('#showRetainData').popup(
-        {
-            open: function (event, ui, ele) {
-
-               $( "#slider-range-min" ).slider({
-                  range: "min",
-                  value: 30,
-                  min: 1,
-                  max: 100,
-                  slide: function( event, ui ) {
-                    $( "#timeInterval" ).val(ui.value );
-                  }
-                });
-                $( "#timeInterval" ).val( $( "#slider-range-min" ).slider( "value" ) );
-
-                 $("#checkAll").change(function() {
-                    if(this.checked) {
-                        $('#chkCpu').prop('checked', true)
-                        $('#chkRam').prop('checked', true)
-                        $('#chkLatency').prop('checked', true)
-                        $('#chkTransaction').prop('checked', true)
-                        $('#chkPartitionIdle').prop('checked', true)
-                        $('#chkDr').prop('checked', true)
-                        $('#chkCmdLog').prop('checked', true)
-                    }
-                    else{
-                        $('#chkCpu').prop('checked', false)
-                        $('#chkRam').prop('checked', false)
-                        $('#chkLatency').prop('checked', false)
-                        $('#chkTransaction').prop('checked', false)
-                        $('#chkPartitionIdle').prop('checked', false)
-                        $('#chkDr').prop('checked', false)
-                        $('#chkCmdLog').prop('checked', false)
-                    }
-                });
-            },
-            save: function () {
-
-            }
-
-        });
-
-}
 
 
 
