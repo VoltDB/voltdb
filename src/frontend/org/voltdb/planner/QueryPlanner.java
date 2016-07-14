@@ -26,6 +26,8 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
+import org.voltdb.calciteadapter.CalcitePlanner;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -232,7 +234,7 @@ public class QueryPlanner {
     public String parameterize() {
         m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
 
-        Set<Integer> paramIds = new HashSet<Integer>();
+        Set<Integer> paramIds = new HashSet<>();
         ParameterizationInfo.findUserParametersRecursively(m_xmlSQL, paramIds);
         m_adhocUserParamsCount = paramIds.size();
 
@@ -319,6 +321,13 @@ public class QueryPlanner {
         if (m_isUpsert) {
             replacePlanForUpsert(plan);
         }
+        return plan;
+    }
+
+    public CompiledPlan planUsingCalcite() throws PlanningErrorException {
+        // reset any error message
+        m_recentErrorMsg = null;
+        CompiledPlan plan = CalcitePlanner.plan(m_db, m_sql);
         return plan;
     }
 

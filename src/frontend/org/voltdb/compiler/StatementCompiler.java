@@ -91,6 +91,7 @@ public abstract class StatementCompiler {
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
+        assert (xml == null);
 
         // Cleanup whitespace newlines for catalog compatibility
         // and to make statement parsing easier.
@@ -182,14 +183,7 @@ public abstract class StatementCompiler {
                 costModel, null, joinOrder, detMode);
         try {
             try {
-                if (xml != null) {
-                    planner.parseFromXml(xml);
-                }
-                else {
-                    planner.parse();
-                }
-
-                plan = planner.plan();
+                plan = planner.planUsingCalcite();
                 assert(plan != null);
             }
             catch (PlanningErrorException e) {
@@ -314,8 +308,9 @@ public abstract class StatementCompiler {
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        return compileStatementAndUpdateCatalog(compiler, hsql, db, estimates, catalogStmt,
-                null, sqlText, joinOrder, detMode, partitioning);
+        return compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+                null, // VoltXML
+                sqlText, joinOrder, detMode, partitioning);
     }
 
     /**
