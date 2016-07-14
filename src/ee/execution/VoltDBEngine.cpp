@@ -727,17 +727,30 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
         if (streamedtable) {
             continue;
         }
-
-        // identify empty tables and mark for deletion
         if (table->activeTupleCount() == 0) {
-            deletions.insert(delegatePair.first);
+            PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
+            if (persistenttable) {
+                if (persistenttable->isReplicatedTable()) {
+                    if (updateReplicated) {
+                        // identify empty tables and mark for deletion
+                        deletions.insert(delegatePair.first);
+                    }
+                } else {
+                    if (!updateReplicated) {
+                        // identify empty tables and mark for deletion
+                        deletions.insert(delegatePair.first);
+                    }
+                }
+            }
         }
     }
 
     // delete tables in the set
+    bool isReplicatedTable;
     BOOST_FOREACH (std::string path, deletions) {
         VOLT_TRACE("delete path:");
 
+        isReplicatedTable = false;
         std::map<std::string, TableCatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
            continue;
@@ -750,18 +763,32 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
          * that no more data is coming for the previous generation
          */
         assert(tcd);
-        if (tcd) {
-            Table *table = tcd->getTable();
+        Table *table = tcd->getTable();
+        PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
+        if (persistenttable && persistenttable->isReplicatedTable()) {
+            isReplicatedTable = true;
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+               VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+               currEngine->m_delegatesByName.erase(table->name());
+           }
+        } else {
             m_delegatesByName.erase(table->name());
-            StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
-            if (streamedtable) {
-                const std::string signature = tcd->signature();
-                streamedtable->setSignatureAndGeneration(signature, timestamp);
-                m_exportingTables.erase(signature);
-            }
-            delete tcd;
         }
-        m_catalogDelegates.erase(pos);
+        StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
+        if (streamedtable) {
+            const std::string signature = tcd->signature();
+            streamedtable->setSignatureAndGeneration(signature, timestamp);
+            m_exportingTables.erase(signature);
+        }
+        delete tcd;
+        if (isReplicatedTable) {
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+               VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+               currEngine->m_catalogDelegates.erase(pos);
+           }
+        } else {
+            m_catalogDelegates.erase(pos);
+        }
     }
 }
 
@@ -1209,7 +1236,15 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         SynchronizedThreadLock::waitForLastSiteFinished();
     }
 
+    BOOST_FOREACH (LabeledTCD delegatePair, m_catalogDelegates) {
+       VOLT_ERROR("Partition %d loaded table %s at address %p", m_partitionId, delegatePair.first.c_str(), delegatePair.second);
+   }
+
     processCatalogDeletes(timestamp, false);
+
+    BOOST_FOREACH (LabeledTCD delegatePair, m_catalogDelegates) {
+       VOLT_ERROR("Partition %d loaded table %s at address %p", m_partitionId, delegatePair.first.c_str(), delegatePair.second);
+   }
 
     if (processCatalogAdditions(timestamp, false) == false) {
         VOLT_ERROR("Error processing catalog additions.");
