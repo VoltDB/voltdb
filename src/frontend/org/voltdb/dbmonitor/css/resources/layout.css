@@ -2036,6 +2036,9 @@ border:1px solid #FFF;
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
 .workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
+.disableCloserTab { opacity:0.5;}
+#queryError span.error{ color: #c70000; font-size:13px; }
+
 /*********************jquery ui class override ends*********************/
 
 .exportType {
@@ -3778,6 +3781,7 @@ label.errorTimeOut {
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
 /********************jquery us css override end*****************/
+.errorHeightFix { line-height:12px!important; position:relative; top:-6px;}
 
 
 /*********************************************media Qu********************/
