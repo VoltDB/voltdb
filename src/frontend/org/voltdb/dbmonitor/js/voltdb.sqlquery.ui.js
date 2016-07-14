@@ -73,10 +73,11 @@ $(document).ready(function () {
             });
             var popup = $(this)[0];
             $("#btnQueryTimeoutConfigSave").unbind("click");
-            $("#btnQueryTimeoutConfigSave").on("click", function(){
+            $("#btnQueryTimeoutConfigSave").on("click", function(e){
                 if (!$("#formQueryTimeoutConfiguration").valid()) {
                     e.preventDefault();
                     e.stopPropagation();
+                    return;
                 }
                 var timeoutTime = $("#txtQueryTimeoutConfig").val();
                 if(timeoutTime == ""){
@@ -1097,15 +1098,19 @@ $(document).ready(function () {
         };
 
         this.SaveQueryTimeout = function(timeoutTime){
-            saveCookie("timeoutTime", timeoutTime);
+            saveInLocalStorage("timeoutTime", timeoutTime);
         }
 
         this.getCookie = function (name) {
-            return $.cookie(name + "_" + VoltDBConfig.GetPortId());
+            var value =  undefined
+            var data = localStorage.getItem(name + "_" + VoltDBConfig.GetPortId())
+            if(data != undefined)
+                value =  $.parseJSON(data)
+            return value == undefined ? value : value['value']
         }
 
         this.removeCookie = function (name) {
-            return $.removeCookie(name + "_" + VoltDBConfig.GetPortId());
+            return localStorage.removeItem(name + "_" + VoltDBConfig.GetPortId());
         }
     });
     window.SQLQueryRender = SQLQueryRender = new iSqlQueryRender();
