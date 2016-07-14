@@ -30,5 +30,5 @@ polygon-value           ::= {ng-polygon-value}
 top-clause              ::= []
 
 # And, redefine UPSERT to be INSERT [or UPDATE??], since PostgreSQL does not
-# support UPSERT (nor does HSQLDBB, I think??)
+# support UPSERT (nor does HSQLDB, I think??)
 upsert-statement        ::= {insert-statement}
