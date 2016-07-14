@@ -152,8 +152,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
     // therefore dependency tracking is not needed here.
     size_t ttl = executorList.size();
     int ctr = 0;
-
-    EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
+    EngineLocals* ourEngineLocals = NULL;
     bool needsReleaseLock = false;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
@@ -167,11 +166,12 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                 PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
                 if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
                     if (mpEngineLocals.context == this) {
-                        VOLT_ERROR("Executor Assigned");
                         mpExecutor = executor;
                     }
                     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-                        VOLT_ERROR("Entered replicated insert on partition %d", m_partitionId);
+                        if (!ourEngineLocals) {
+                            ourEngineLocals = &enginesByPartitionId[m_partitionId];
+                        }
                         ExecutorContext::assignThreadLocals(mpEngineLocals);
                         needsReleaseLock = true;
                         // Call the execute method to actually perform whatever action
@@ -185,11 +185,9 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
                         needsReleaseLock = false;
                         // Assign the correct pool back to this thread
 
-                        VOLT_ERROR("Exiting replicated insert on partition %d", m_partitionId);
                         ExecutorContext::assignThreadLocals(*ourEngineLocals);
                         SynchronizedThreadLock::signalLastSiteFinished();
                     } else {
-                        VOLT_ERROR("Waiting for replicated insert on partition %d", m_partitionId);
                         SynchronizedThreadLock::waitForLastSiteFinished();
                     }
                 } else {

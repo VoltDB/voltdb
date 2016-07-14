@@ -36,6 +36,7 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost)
 
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount()
 {
+    assert(globalTxnStartCountdownLatch > 0);
     return --globalTxnStartCountdownLatch == 0;
 }
 

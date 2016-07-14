@@ -1231,6 +1231,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                         bool returnUniqueViolations,
                         bool shouldDRStream)
 {
+    EngineLocals* ourEngineLocals = NULL;
+    bool needsReleaseLock = false;
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
@@ -1255,11 +1257,31 @@ VoltDBEngine::loadTable(int32_t tableId,
                    (int) tableId, ret->name().c_str());
         return false;
     }
-
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
+        if (table->isReplicatedTable()) {
+            if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+                ourEngineLocals = &enginesByPartitionId[m_partitionId];
+                ExecutorContext::assignThreadLocals(mpEngineLocals);
+                needsReleaseLock = true;
+                table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
+                needsReleaseLock = false;
+                ExecutorContext::assignThreadLocals(*ourEngineLocals);
+                SynchronizedThreadLock::signalLastSiteFinished();
+            }
+            else {
+                SynchronizedThreadLock::waitForLastSiteFinished();
+            }
+        }
+        else {
+            table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
+        }
     }
     catch (const SerializableEEException &e) {
+        if (needsReleaseLock) {
+            // Assign the correct pool back to this thread
+            ExecutorContext::assignThreadLocals(*ourEngineLocals);
+            SynchronizedThreadLock::signalLastSiteFinished();
+        }
         throwFatalException("%s", e.message().c_str());
     }
     return true;
