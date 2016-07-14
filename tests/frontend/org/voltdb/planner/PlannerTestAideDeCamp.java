@@ -68,6 +68,7 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
+        String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
@@ -169,7 +170,7 @@ public class PlannerTestAideDeCamp {
             catalogParam.setIndex(i);
         }
 
-        List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
+        List<PlanNodeList> nodeLists = new ArrayList<>();
         nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
         if (plan.subPlanGraph != null) {
             nodeLists.add(new PlanNodeList(plan.subPlanGraph));

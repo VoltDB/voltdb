@@ -39,12 +39,14 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */#ifndef TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
+ */
+#ifndef TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 #define TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 
 #include "execution/VoltDBEngine.h"
 #include "common/ValueFactory.hpp"
 #include "test_utils/LoadTableFrom.hpp"
+#include "test_utils/plan_testing_config.h"
 
 typedef int64_t fragmentId_t;
 
@@ -85,21 +87,33 @@ public:
      * This needs a catalog string and a random seed.  The random seed is
      * used to generate initial data for the table.
      */
-    PlanTestingBaseClass(uint32_t random_seed = (unsigned int)time(NULL))
-            : m_cluster_id(1),
-              m_database_id(0),
-              m_site_id(1),
-              m_catalog(NULL),
-              m_cluster(NULL),
-              m_database(NULL),
-              m_constraint(NULL),
-              m_isinitialized(false)
+    PlanTestingBaseClass()
+        : m_cluster_id(1),
+        m_database_id(0),
+        m_site_id(1),
+        m_catalog(NULL),
+        m_cluster(NULL),
+        m_database(NULL),
+        m_constraint(NULL),
+        m_isinitialized(false),
+        m_fragmentNumber(100)
     { }
 
-    void initialize(const char *catalog_string,
-                    uint32_t  random_seed = (uint32_t)time(NULL)) {
-        srand(random_seed);
-        m_catalog_string = catalog_string;
+    void initialize(const char   *catalogString,
+                    uint32_t  randomSeed = (uint32_t)time(NULL)) {
+        initialize(catalogString, 0, NULL, randomSeed);
+    }
+
+    void initialize(const DBConfig  &db,
+                    uint32_t  randomSeed = (uint32_t)time(NULL)) {
+        initialize(db.m_catalogString, db.m_numTables, db.m_tables, randomSeed);
+    }
+    void initialize(const char         *catalogString,
+                    int                 numTables,
+                    const TableConfig **tables,
+                    uint32_t            randomSeed) {
+        srand(randomSeed);
+        m_catalog_string = catalogString;
         /*
          * Initialize the engine.  We create our own
          * topend, to make sure we can supply fragments
@@ -136,6 +150,9 @@ public:
         ASSERT_LT(0,    m_database_id);
 
         m_isinitialized = true;
+        for (int idx = 0; idx < numTables; idx += 1) {
+            initTable(tables[idx]);
+        }
     }
     ~PlanTestingBaseClass() {
             //
@@ -146,29 +163,61 @@ public:
 
     voltdb::PersistentTable *getPersistentTableAndId(const std::string &name, int *id) {
         catalog::Table *tbl = m_database->tables().get(name);
+        assert(tbl != NULL);
         if (id != NULL) {
             *id = tbl->relativeIndex();
         }
         return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
     }
 
-    void initializeTableOfInt(std::string tableName, voltdb::PersistentTable *&table, int &table_id, int nRows, int nCols, int32_t *vals) {
-        table = getPersistentTableAndId(tableName.c_str(), &table_id);
-        assert(table != NULL);
+    void initTable(const voltdb::PersistentTable **table,
+                   int                            *table_id,
+                   const TableConfig              *oneTable) {
+        initializeTableOfInt(oneTable->m_tableName,
+                             table,
+                             table_id,
+                             oneTable->m_numRows,
+                             oneTable->m_numCols,
+                             oneTable->m_contents);
+    }
 
+    void initTable(const TableConfig *oneTable) {
+        initTable(NULL, NULL, oneTable);
+    }
+
+    void initializeTableOfInt(std::string                     tableName,
+                              const voltdb::PersistentTable **table,
+                              int                            *tableId,
+                              int                             nRows,
+                              int                             nCols,
+                              const int32_t                  *vals) {
+        voltdb::PersistentTable *pTable = getPersistentTableAndId(tableName.c_str(), tableId);
+        assert(pTable != NULL);
+        if (table != NULL) {
+            *table = pTable;
+        }
         for (int row = 0; row < nRows; row += 1) {
-            voltdb::TableTuple &tuple = table->tempTuple();
+            voltdb::TableTuple &tuple = pTable->tempTuple();
             for (int col = 0; col < nCols; col += 1) {
                 int32_t val = vals[(row*nCols) + col];
                 voltdb::NValue nval = voltdb::ValueFactory::getIntegerValue(val);
                 tuple.setNValue(col, nval);
             }
-            if (!table->insertTuple(tuple)) {
+            if (!pTable->insertTuple(tuple)) {
                 return;
             }
         }
     }
 
+    /**
+     * Execute a single test.  Execute the test's fragment, and then
+     * validate the output table.
+     */
+    void executeTest(const TestConfig &test) {
+        // The fragment number doesn't really matter here.
+        executeFragment(m_fragmentNumber, test.m_planString);
+        validateResult((const int32_t *)test.m_outputTable, test.m_numOutputRows, test.m_numOutputCols);
+    }
     /**
      * Given a PlanFragmentInfo data object, make the m_engine execute it,
      * and validate the results.
@@ -196,7 +245,7 @@ public:
      * know how much of the buffer is actually used.  So we
      * need to query the engine.
      */
-    void validateResult(int *answer, int nRows, int nCols) {
+    void validateResult(const int *answer, int nRows, int nCols) {
         size_t result_size = m_engine->getResultsSize();
         boost::scoped_ptr<voltdb::TempTable> result(voltdb::loadTableFrom(m_result_buffer.get(), result_size));
         assert(result.get() != NULL);
@@ -247,5 +296,7 @@ protected:
     boost::shared_array<char>m_exception_buffer;
     boost::shared_array<char>m_parameter_buffer;
     bool                     m_isinitialized;
+    int                      m_fragmentNumber;
 };
+
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */
