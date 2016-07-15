@@ -1421,6 +1421,7 @@ ul.listStalled li.pullback {
 	padding: 10px 0;
 	text-align: left;
 }
+
 a.clustBtn {
 	display: inline-block;
 	background-image: linear-gradient( #FFFFFF, #f3f3f3 );
@@ -1615,7 +1616,7 @@ select {
 	border-color: #ccc;
 }
 }
-.startFail, .stalledState { padding:15px;}
+.startFail, .stalledState, .clsShutdownCluster { padding:15px;}
 .startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0; width:100%;}
 .redcData {color: #ff0000; padding-right:5px; font-size:25px;}
 .warningData {color: #ff0000;font-size: 15px;}
@@ -1623,6 +1624,14 @@ select {
 .startAdminMode { margin:10px 0 0 0; padding:0;}
 .startAdminMode input[type="checkbox"] { position:relative; top:-2px;}
 .startAdminMode label { font-weight:normal;}
+.clsShutdownCluster .clsShutdownClusterContainer { margin:0 0 15px 0; width:100%; text-align:left; }
+.btnClsShutdownCluster { text-align:center; margin-top:15px;}
+.clsShutdownCluster .clsShutdownClusterContainer .modal-content .modal-body p {font-size:13px;font-weight:normal;}
+.databaseRg1 { margin-top:2%; margin-bottom:2%}
+.clsShutdownWarning { color:#FF0000; margin-right:2px;}
+.divShutdownMsg p { line-height:20px;}
+.clsShutdownBtn { background:#aa1f2f; color:#FFF;}
+
 /**************Button start/Stop ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
