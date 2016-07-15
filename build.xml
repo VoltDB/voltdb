@@ -83,9 +83,6 @@
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
 <property name='depcache'                    value='.depcache' />
-<property name='project.parsergen.dir'       location='${src.gpl.dir}/org/voltdb/compiler/projectfile' />
-<property name='project.parsergen.pkg'       value='org.voltdb.compiler.projectfile' />
-<property name='project.parsergen.xsd'       value='org/voltdb/compiler/ProjectFileSchema.xsd' />
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
@@ -787,7 +784,6 @@ DISTRIBUTION
     </copy>
 
     <!-- add the Project and Deployment file schemas to the dist -->
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
 
     <!-- add misc. other tools in the tools directory -->
