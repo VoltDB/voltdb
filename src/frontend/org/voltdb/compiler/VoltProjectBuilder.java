@@ -43,7 +43,6 @@ import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
@@ -92,7 +91,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public class VoltProjectBuilder {
 
-    final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
+    final LinkedHashSet<String> m_schemas = new LinkedHashSet<>();
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
@@ -243,8 +242,8 @@ public class VoltProjectBuilder {
         }
     }
 
-    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
-    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
+    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<>();
+    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<>();
 
     // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
@@ -263,7 +262,7 @@ public class VoltProjectBuilder {
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();
 
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<String, ProcInfoData>();
+    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
 
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
@@ -293,8 +292,8 @@ public class VoltProjectBuilder {
 
     private List<String> m_diagnostics;
 
-    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<HashMap<String, Object>>();
-    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<HashMap<String, Object>>();
+    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
+    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<>();
 
     private Integer m_deadHostTimeout = null;
 
@@ -490,7 +489,7 @@ public class VoltProjectBuilder {
     }
 
     public void addProcedures(final Class<?>... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final Class<?> procedure : procedures)
             procArray.add(new ProcedureInfo(new String[0], procedure));
         addProcedures(procArray);
@@ -500,7 +499,7 @@ public class VoltProjectBuilder {
      * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final ProcedureInfo procedure : procedures)
             procArray.add(procedure);
         addProcedures(procArray);
@@ -508,7 +507,7 @@ public class VoltProjectBuilder {
 
     public void addProcedures(final Iterable<ProcedureInfo> procedures) {
         // check for duplicates and existings
-        final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
+        final HashSet<ProcedureInfo> newProcs = new HashSet<>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
             newProcs.add(procedure);
@@ -548,7 +547,7 @@ public class VoltProjectBuilder {
     }
 
     public void addSupplementalClasses(final Class<?>... supplementals) {
-        final ArrayList<Class<?>> suppArray = new ArrayList<Class<?>>();
+        final ArrayList<Class<?>> suppArray = new ArrayList<>();
         for (final Class<?> supplemental : supplementals)
             suppArray.add(supplemental);
         addSupplementalClasses(suppArray);
@@ -556,7 +555,7 @@ public class VoltProjectBuilder {
 
     public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
         // check for duplicates and existings
-        final HashSet<Class<?>> newSupps = new HashSet<Class<?>>();
+        final HashSet<Class<?>> newSupps = new HashSet<>();
         for (final Class<?> supplemental : supplementals) {
             assert(newSupps.contains(supplemental) == false);
             assert(m_supplementals.contains(supplemental) == false);
@@ -639,7 +638,7 @@ public class VoltProjectBuilder {
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
-        HashMap<String, Object> importConnector = new HashMap<String, Object>();
+        HashMap<String, Object> importConnector = new HashMap<>();
         importConnector.put("ilEnabled", enabled);
         importConnector.put("ilModule", importBundle);
 
@@ -666,7 +665,7 @@ public class VoltProjectBuilder {
     }
 
     public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
-        HashMap<String, Object> exportConnector = new HashMap<String, Object>();
+        HashMap<String, Object> exportConnector = new HashMap<>();
         exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
         exportConnector.put("elEnabled", enabled);
 
@@ -862,12 +861,7 @@ public class VoltProjectBuilder {
         }
 
         boolean success = false;
-        try {
-            success = compiler.compileFromDDL(jarPath, schemaPath);
-        } catch (VoltCompilerException e1) {
-            e1.printStackTrace();
-            return false;
-        }
+        success = compiler.compileFromDDL(jarPath, schemaPath);
 
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
@@ -1324,7 +1318,7 @@ public class VoltProjectBuilder {
     public void enableDiagnostics() {
         // This empty dummy value enables the feature and provides a default fallback return value,
         // but gets replaced in the normal code path.
-        m_diagnostics = new ArrayList<String>();
+        m_diagnostics = new ArrayList<>();
     }
 
     /** Access the VoltCompiler's recent plan output, for diagnostic purposes */
