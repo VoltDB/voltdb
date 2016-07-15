@@ -858,7 +858,7 @@ public class DDLCompiler {
             else {
                 // Hand-check against the two default roles which shall not be
                 // dropped.
-                if (roleName.equals(CatalogUtil.ADMIN.toUpperCase()) || roleName.equals("USER")) {
+                if (roleName.equals("ADMINISTRATOR") || roleName.equals("USER")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                                 "You may not drop the built-in role \"%s\".",
                                 roleName));

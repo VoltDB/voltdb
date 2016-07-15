@@ -975,7 +975,7 @@ public class VoltCompiler {
     {
         // admin
         m_catalog.execute("add /clusters#cluster/databases#database groups administrator");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get(CatalogUtil.ADMIN),
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user

@@ -406,7 +406,7 @@ public abstract class CatalogSchemaTools {
      */
     public static void toSchema(StringBuilder sb, Group grp) {
         // Don't output the default roles because user cannot change them.
-        if (grp.getTypeName().equalsIgnoreCase(CatalogUtil.ADMIN) || grp.getTypeName().equalsIgnoreCase("USER")) {
+        if (grp.getTypeName().equalsIgnoreCase("ADMINISTRATOR") || grp.getTypeName().equalsIgnoreCase("USER")) {
             return;
         }
 

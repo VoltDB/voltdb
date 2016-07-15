@@ -79,7 +79,6 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -599,7 +598,7 @@ public class VoltProjectBuilder {
         m_securityEnabled = enabled;
         if (createAdminUser) {
             addUsers(new UserInfo[]
-                    {new UserInfo("defaultadmin", "admin", new String[] {CatalogUtil.ADMIN.toUpperCase()})});
+                    {new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"})});
         }
     }
 
