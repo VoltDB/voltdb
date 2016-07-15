@@ -1201,12 +1201,12 @@
                         "y": transDetailsArrMin[j].transaction
                     })
                 }
-//                for(var k = 0; k< transDetailsArrDay.length; k++){
-//                    sliceFirstData(monitor.tpsDataDay, dataView.Day);
-//                    monitor.tpsDataDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
-//                        "y": transDetailsArrDay[k].transaction
-//                    })
-//                }
+                for(var k = 0; k< transDetailsArrDay.length; k++){
+                    sliceFirstData(monitor.tpsDataDay, dataView.Day);
+                    monitor.tpsDataDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
+                        "y": transDetailsArrDay[k].transaction
+                    })
+                }
             }
 
             transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
@@ -1215,7 +1215,7 @@
 
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
-
+            
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 
@@ -1259,15 +1259,33 @@
                 monitor.tpsFirstData = false;
             }
             else{
-                datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
-                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
-                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0) || calculatedValue == 0) {
-                        transDetailsMin = MonitorGraphUI.saveLocalStorage(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+                var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
+                if (tpsSecCount >= 6 || monitor.tpsFirstData) {
+                    datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
+                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                        transDetailsMin = MonitorGraphUI.saveLocalStorage(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.Min  )
+                        datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                     }
+                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    tpsSecCount = 0;
                 }
-                transDetailsDay = MonitorGraphUI.saveLocalStorage(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+
+                if (tpsMinCount >= 60 || monitor.tpsFirstData) {
+                    datatransDay = sliceFirstData(datatransDay, dataView.Days);
+                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                        transDetailsDay = MonitorGraphUI.saveLocalStorage(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.Day  )
+                        datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
+                    }
+                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    tpsMinCount = 0;
+                }
+                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
+
+                if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                    datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
+                    MonitorGraphUI.Monitors.tpsData = datatrans;
+                }
+                monitor.tpsFirstData = false;
             }
 
             localStorage.transDetails = JSON.stringify(transDetailsArr)
