@@ -56,7 +56,8 @@ public class TestQueryTimeout extends RegressionSuite {
     };
 
     private void checkCallbackTimeoutError(String errorMsg) {
-        assertTrue(m_errorStatusString.contains(errorMsg));
+        assertTrue(m_errorStatusString + " did not contain " + ERRORMSG,
+                   m_errorStatusString.contains(errorMsg));
     }
 
     private void checkCallbackSuccess() {
@@ -110,8 +111,10 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure("ReplicatedReadOnlyProc");
             fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         // It's a write procedure and it's timed out safely because the MPI has not issue
@@ -119,14 +122,17 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure("ReplicatedReadWriteProc");
             fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         // It's a write procedure and should not be timed out.
         try {
             client.callProcedure("ReplicatedWriteReadProc");
-        } catch(Exception ex) {
+        }
+        catch (Exception ex) {
             fail("Write procedure should not be timed out");
         }
     }
@@ -151,22 +157,26 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure("PartitionReadOnlyProc");
             fail();
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         // Read on partition table should not have MPI optimizations
         // so the MPI should mark it write and not time out the procedure
         try {
             client.callProcedure("PartitionReadWriteProc");
-        } catch(Exception ex) {
+        }
+        catch (Exception ex) {
             fail("Write procedure should not be timed out");
         }
 
         // It's a write procedure and should not be timed out.
         try {
             client.callProcedure("PartitionWriteReadProc");
-        } catch(Exception ex) {
+        }
+        catch (Exception ex) {
             fail("Write procedure should not be timed out");
         }
     }
@@ -180,8 +190,10 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
             fail(procName + PROMPTMSG);
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
@@ -190,11 +202,13 @@ public class TestQueryTimeout extends RegressionSuite {
         if (sync) {
             try {
                 client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
-            } catch(Exception ex) {
+            }
+            catch (Exception ex) {
                 System.err.println(ex.getMessage());
                 fail(procName + " is supposed to succeed!");
             }
-        } else {
+        }
+        else {
             client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
             client.drain();
             checkCallbackSuccess();
@@ -207,8 +221,10 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
             fail(procName + PROMPTMSG);
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
@@ -221,8 +237,10 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
             fail(procName + PROMPTMSG);
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
@@ -233,10 +251,13 @@ public class TestQueryTimeout extends RegressionSuite {
             try {
                 client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
                 fail(procName + PROMPTMSG);
-            } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(ERRORMSG));
             }
-        } else {
+            catch (Exception ex) {
+                assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                           ex.getMessage().contains(ERRORMSG));
+            }
+        }
+        else {
             client.callProcedureWithTimeout(m_callback, TIMEOUT*50, procName, params);
             client.drain();
             checkCallbackTimeoutError(ERRORMSG);
@@ -249,8 +270,10 @@ public class TestQueryTimeout extends RegressionSuite {
         try {
             client.callProcedure(procName, params);
             fail(procName + PROMPTMSG);
-        } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                       ex.getMessage().contains(ERRORMSG));
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
@@ -262,7 +285,8 @@ public class TestQueryTimeout extends RegressionSuite {
 
         try {
             client.callProcedure(procName, params);
-        } catch(Exception ex) {
+        }
+        catch (Exception ex) {
             fail(procName + " is supposed to succeed, but failed with message +\n" + ex.getMessage());
         }
 
@@ -273,10 +297,13 @@ public class TestQueryTimeout extends RegressionSuite {
             try {
                 client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
                 fail(procName + PROMPTMSG);
-            } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(ERRORMSG));
             }
-        } else {
+            catch (Exception ex) {
+                assertTrue(ex.toString() + " did not contain " + ERRORMSG,
+                           ex.getMessage().contains(ERRORMSG));
+            }
+        }
+        else {
             client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
             client.drain();
             checkCallbackTimeoutError(ERRORMSG);;
@@ -288,7 +315,8 @@ public class TestQueryTimeout extends RegressionSuite {
         // run the same procedure again to verify the global timeout value still applies
         try {
             client.callProcedure(procName, params);
-        } catch(Exception ex) {
+        }
+        catch (Exception ex) {
             fail(procName + " is supposed to succeed!");
         }
 
@@ -328,8 +356,8 @@ public class TestQueryTimeout extends RegressionSuite {
                 checkTimeoutIncreasedProcSucceed(sync, client, "AdHocPartitionReadOnlyProc");
                 // first replicated read will be treated as READ ONLY
                 checkTimeoutIncreasedProcSucceed(sync, client, "ReplicatedReadWriteProc");
-
-            } else {
+            }
+            else {
                 checkTimeoutIncreasedProcFailed(sync, client, "SPPartitionReadOnlyProc", 1);
                 checkTimeoutIncreasedProcFailed(sync, client, "PartitionReadOnlyProc");
                 checkTimeoutIncreasedProcFailed(sync, client, "ReplicatedReadOnlyProc");
@@ -389,27 +417,34 @@ public class TestQueryTimeout extends RegressionSuite {
 
     private void subtestNegativeIndividualProcTimeout(Client client) throws IOException, ProcCallException, InterruptedException {
         // negative timeout value
+        String errorMsg = "Timeout value can't be negative";
         try {
             client.callProcedureWithTimeout(TIMEOUT * -1, "PartitionReadOnlyProc");
             fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + errorMsg,
+                       ex.getMessage().contains(errorMsg));
         }
 
         try {
             client.callProcedureWithTimeout(m_callback, TIMEOUT * -1, "PartitionReadOnlyProc");
             client.drain();
             fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + errorMsg,
+                       ex.getMessage().contains(errorMsg));
         }
 
         // Integer overflow
         try {
             client.callProcedureWithTimeout(TIMEOUT * Integer.MAX_VALUE, "PartitionReadOnlyProc");
             fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("Timeout value can't be negative"));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.toString() + " did not contain " + errorMsg,
+                       ex.getMessage().contains(errorMsg));
         }
 
         // underflow, asynchronously should be on the same path...
@@ -421,11 +456,13 @@ public class TestQueryTimeout extends RegressionSuite {
         if (sync) {
             try {
                 client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
-            } catch(Exception ex) {
+            }
+            catch (Exception ex) {
                 System.err.println(ex.getMessage());
                 fail(procName + " is supposed to succeed!");
             }
-        } else {
+        }
+        else {
             client.callProcedureWithTimeout(m_callback, TIMEOUT / 500, procName, params);
             client.drain();
             checkCallbackSuccess();
@@ -471,8 +508,9 @@ public class TestQueryTimeout extends RegressionSuite {
                 ;
         try {
             project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
+        }
+        catch (IOException e) {
+            fail();
         }
         project.addProcedures(PROCEDURES);
         project.setQueryTimeout(TIMEOUT);
@@ -496,7 +534,12 @@ public class TestQueryTimeout extends RegressionSuite {
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
+/* disabled until we work the kinks out of ipc support for fragment progress updates
+        config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+*/
         // Cluster
         config = new LocalCluster("querytimeout-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
