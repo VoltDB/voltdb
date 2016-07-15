@@ -718,6 +718,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    private void setParsedColumnNamesAndAliases(ParsedColInfo col, VoltXMLElement columnRefElmt) {
+        if (col.expression instanceof TupleValueExpression) {
+            // Set the column data from the TVE itself rather than from the VoltXML.
+            // For example, the original select SELECT TA.CA FROM (SELECT C CA FROM T) TA;
+            // could be simplified to be as simple as SELECT TA.C CA FROM T TA;
+            // The TVE will reflect this change while the VoltXML won't
+            // At the moment, this optimization is only allowed if all display columns from
+            // the subquery are TVEs
+            TupleValueExpression tvexpr = (TupleValueExpression) col.expression;
+            col.columnName = tvexpr.getColumnName();
+            col.tableName = tvexpr.getTableName();
+            col.tableAlias = tvexpr.getTableAlias();
+            col.alias = tvexpr.getColumnAlias();
+            return;
+        }
+
+        col.columnName = columnRefElmt.attributes.get("column");
+        col.tableName = columnRefElmt.attributes.get("table");
+        col.tableAlias = columnRefElmt.attributes.get("tablealias");
+        col.alias = columnRefElmt.attributes.get("alias");
+    }
+
     private void parseDisplayColumn(int index, VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
@@ -802,25 +824,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col) {
         // Calculate the names.
         if (child.name.equals("columnref")) {
-            if (colExpr instanceof TupleValueExpression) {
-                // Set the column data from the TVE itself rather than from the VoltXML.
-                // For example, the original select SELECT TA.CA FROM (SELECT C CA FROM T) TA;
-                // could be simplified to be as simple as SELECT TA.C CA FROM T TA;
-                // The TVE will reflect this change while the VoltXML won't
-                // At the moment, this optimization is only allowed if all display columns from
-                // the subquery are TVEs
-                TupleValueExpression tvexpr = (TupleValueExpression)col.expression;
-                col.columnName = tvexpr.getColumnName();
-                col.tableName = tvexpr.getTableName();
-                col.tableAlias = tvexpr.getTableAlias();
-                col.alias = tvexpr.getColumnAlias();
-            }
-            else {
-                col.columnName = child.attributes.get("column");
-                col.tableName = child.attributes.get("table");
-                col.tableAlias = child.attributes.get("tablealias");
-                col.alias = child.attributes.get("alias");
-            }
+            col.expression = colExpr;
+            setParsedColumnNamesAndAliases(col, child);
         }
         else if (child.name.equals("tablesubquery")) {
             // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
@@ -912,10 +917,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException("A GROUP BY clause does not allow a BOOLEAN expression.");
         }
         if (groupByNode.name.equals("columnref")) {
-            groupbyCol.alias = groupByNode.attributes.get("alias");
-            groupbyCol.columnName = groupByNode.attributes.get("column");
-            groupbyCol.tableName = groupByNode.attributes.get("table");
-            groupbyCol.tableAlias = groupByNode.attributes.get("tablealias");
+            setParsedColumnNamesAndAliases(groupbyCol, groupByNode);
             if (groupbyCol.tableAlias == null) {
                 groupbyCol.tableAlias = groupbyCol.tableName;
             }

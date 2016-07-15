@@ -106,10 +106,10 @@ public class ParsedColInfo implements Cloneable {
         orderCol.expression = adjuster.adjust(orderExpr);
 
         // Cases:
-        // child could be columnref, in which case it's just a normal column.
+        // child could be columnref, in which case it's either a normal column or an expression.
+        // The latter could be a case if this column came from a subquery that was optimized out.
         // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        if (child.name.equals("columnref")) {
-            assert(orderExpr instanceof TupleValueExpression);
+        if (orderExpr instanceof TupleValueExpression) {
             TupleValueExpression tve = (TupleValueExpression) orderExpr;
             orderCol.columnName = tve.getColumnName();
             orderCol.tableName = tve.getTableName();
@@ -131,7 +131,8 @@ public class ParsedColInfo implements Cloneable {
                     (child.name.equals("aggregation") == false) &&
                     (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
-                    (child.name.equals("rank") == false)) {
+                    (child.name.equals("rank") == false) &&
+                    (child.name.equals("columnref") == false)) {
                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
            }
         }

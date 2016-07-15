@@ -2287,7 +2287,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
     public void testSubquerySimplification() {
         String sql;
         String equivalentSql;
-        List<String[]> ignoreList;
+        List<String[]> ignoreList = null;
 
         // Ambiguous column differentiator test
         sql = "select * from (select D, C as D from R1) T;";
@@ -2361,6 +2361,37 @@ public class TestPlansSubQueries extends PlannerTestCase {
         ignoreList.add(new String[]{"\"SUBQUERY_ID\":2", "\"SUBQUERY_ID\":1"});
         ignoreList.add(new String[]{"\"STATEMENT_ID\":2", "\"STATEMENT_ID\":1"});
         checkSubquerySimplification(sql, equivalentSql, ignoreList);
+
+        // ORDER BY expression column
+        sql = "select C from (select A, C + 1 C from R1) T ORDER BY C";
+        equivalentSql = "select C + 1 C from R1 T ORDER BY C";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // FROM Subquery with main query Aggregates
+        sql = "select MAX(D) from (select A D, C A from R1) T";
+        equivalentSql = "select MAX(A) from R1 T";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select MAX(A1), C from (select A + 1 A1, C from R1) T GROUP BY C";
+        equivalentSql = "select MAX(A + 1), C from R1 T GROUP BY C";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        // GROUP BY expression column
+        sql = "select MAX(A), C from (select A, C + 1 C from R1) T GROUP BY C";
+        equivalentSql = "select MAX(A), C + 1 C from R1 T GROUP BY (C + 1)";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select MAX(D), A from (select A D, C A from R1) T GROUP BY A HAVING MAX(D) > 5";
+        equivalentSql = "select MAX(A), C A from R1 T GROUP BY C HAVING MAX(A) > 5";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select MAX(D), A from (select A + 1 D, C A from R1) T GROUP BY A HAVING MAX(D) > 5";
+        equivalentSql = "select MAX(A + 1), C A from R1 T GROUP BY C HAVING MAX(A + 1) > 5";
+        checkSubquerySimplification(sql, equivalentSql);
+
+        sql = "select distinct * from (select A D, D from R1) T";
+        equivalentSql = "select distinct A D, D from R1 T";
+        checkSubquerySimplification(sql, equivalentSql);
 
         // Inner Join two FROM subqueries
         sql = "SELECT T1.TC, T2.TA FROM (SELECT C  TC FROM R1 WHERE R1.C > 0) T1 JOIN " +

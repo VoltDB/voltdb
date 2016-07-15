@@ -3453,6 +3453,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         sql = "select * from (select * from (select * from R5) T1) T2;";
         validateTableOfLongs(client, sql, new long[][] {{1,2,3}, {4,5,6}});
 
+        sql = "select MAX(C), D from (select A C, C D from R5) T1 GROUP BY D HAVING MAX(C) > 1;";
+        validateTableOfLongs(client, sql, new long[][] {{4,5}});
     }
 
     static public junit.framework.Test suite() {
