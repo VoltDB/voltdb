@@ -784,10 +784,10 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated)
         if (isReplicatedTable) {
             BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
                VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
-               currEngine->m_catalogDelegates.erase(pos);
+               currEngine->m_catalogDelegates.erase(path);
            }
         } else {
-            m_catalogDelegates.erase(pos);
+            m_catalogDelegates.erase(path);
         }
     }
 }
@@ -1236,15 +1236,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         SynchronizedThreadLock::waitForLastSiteFinished();
     }
 
-    BOOST_FOREACH (LabeledTCD delegatePair, m_catalogDelegates) {
-       VOLT_ERROR("Partition %d loaded table %s at address %p", m_partitionId, delegatePair.first.c_str(), delegatePair.second);
-   }
-
     processCatalogDeletes(timestamp, false);
-
-    BOOST_FOREACH (LabeledTCD delegatePair, m_catalogDelegates) {
-       VOLT_ERROR("Partition %d loaded table %s at address %p", m_partitionId, delegatePair.first.c_str(), delegatePair.second);
-   }
 
     if (processCatalogAdditions(timestamp, false) == false) {
         VOLT_ERROR("Error processing catalog additions.");
