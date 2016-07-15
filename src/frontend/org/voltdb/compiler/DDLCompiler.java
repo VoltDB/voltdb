@@ -78,14 +78,11 @@ import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
-import org.voltdb.planner.parseinfo.BranchNode;
-import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
-import org.voltdb.types.JoinType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -861,7 +858,7 @@ public class DDLCompiler {
             else {
                 // Hand-check against the two default roles which shall not be
                 // dropped.
-                if (roleName.equals("ADMINISTRATOR") || roleName.equals("USER")) {
+                if (roleName.equals(CatalogUtil.ADMIN.toUpperCase()) || roleName.equals("USER")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                                 "You may not drop the built-in role \"%s\".",
                                 roleName));

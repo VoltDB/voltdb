@@ -49,7 +49,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -102,6 +101,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -975,7 +975,7 @@ public class VoltCompiler {
     {
         // admin
         m_catalog.execute("add /clusters#cluster/databases#database groups administrator");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get(CatalogUtil.ADMIN),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user

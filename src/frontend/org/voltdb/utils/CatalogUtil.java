@@ -150,6 +150,8 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
 
+    public static final String ADMIN = "administrator";
+
     // DR conflicts export table name prefix
     public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
     public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
@@ -167,7 +169,6 @@ public abstract class CatalogUtil {
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
-    private static final String BAD_PASSWORD_WARN = "Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.";
 
     private static boolean m_exportEnabled = false;
 
@@ -1007,7 +1008,7 @@ public abstract class CatalogUtil {
                     continue;
 
                 for (String role : extractUserRoles(user)) {
-                    if (role.equalsIgnoreCase("ADMINISTRATOR")) {
+                    if (role.equalsIgnoreCase(ADMIN)) {
                         foundAdminUser = true;
                         break;
                     }
@@ -1836,9 +1837,9 @@ public abstract class CatalogUtil {
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
      * @param users A reference to the <users> element of the deployment.xml file.
-     * @throws UsersInfoException
+     * @throws RuntimeException when there is an user with invalid masked password.
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users) throws UsersInfoException {
+    private static void setUsersInfo(Catalog catalog, UsersType users) throws Exception {
         if (users == null) {
             return;
         }
@@ -1852,9 +1853,10 @@ public abstract class CatalogUtil {
         SecureRandom sr = new SecureRandom();
         int maskInvalidAdminNum = 0;
         int adminNum = 0;
+
         for (UsersType.User user : users.getUser()) {
             Set<String> roles = extractUserRoles(user);
-            if (roles.contains("administrator")) {
+            if (roles.contains(ADMIN)) {
                 adminNum++;
             }
             String sha1hex = user.getPassword();
@@ -1867,12 +1869,17 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                if (roles.contains("administrator")) {
+                if (roles.contains(ADMIN)) {
                     maskInvalidAdminNum++;
                 }
-                // if one user has invalid password, give a warn and skip.
+                // if one user has invalid password, give a warn.
                 hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file");
-                continue;
+                //disable user with invalid masked password
+                String disablePassword = StringUtils.repeat('F', 104);
+                user.setPassword(disablePassword);
+                int sha1len = ClientAuthScheme.getHexencodedDigestLength(ClientAuthScheme.HASH_SHA1);
+                sha1hex = disablePassword.substring(0, sha1len);
+                sha256hex = disablePassword.substring(sha1len);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1906,7 +1913,7 @@ public abstract class CatalogUtil {
         }
         // if all administrators have invalid password, throws an exception.
         if (maskInvalidAdminNum == adminNum) {
-            throw new UsersInfoException("No administrator user has valid password.");
+            throw new RuntimeException("No administrator user has valid password.");
         }
     }
 
