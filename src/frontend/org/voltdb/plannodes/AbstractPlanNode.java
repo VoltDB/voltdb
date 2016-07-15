@@ -105,7 +105,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     // The output schema for this node
     protected boolean m_hasSignificantOutputSchema;
-    protected NodeSchema m_outputSchema;
+    public NodeSchema m_outputSchema;
 
     /**
      * Some PlanNodes can take advantage of inline PlanNodes to perform
@@ -159,7 +159,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * is not inserted in the plan graph and has a unique plan node id.
      */
     protected void produceCopyForTransformation(AbstractPlanNode copy) {
-        copy.m_outputSchema = m_outputSchema;
+        copy.setOutputSchema(m_outputSchema);
         copy.m_hasSignificantOutputSchema = m_hasSignificantOutputSchema;
         copy.m_outputColumnHints = m_outputColumnHints;
         copy.m_estimatedOutputTupleCount = m_estimatedOutputTupleCount;
@@ -945,7 +945,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (m_hasSignificantOutputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA.name());
             stringer.array();
-            for (SchemaColumn column : m_outputSchema.getColumns()) {
+            for (SchemaColumn column : getOutputSchema().getColumns()) {
                 column.toJSONString(stringer, true);
             }
             stringer.endArray();
@@ -1004,8 +1004,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             String nodePlan = explainPlanForNode(indent);
             sb.append(nodePlan);
 
-            if (m_verboseExplainForDebugging && m_outputSchema != null) {
-                sb.append(indent + " " + m_outputSchema.toExplainPlanString());
+            if (m_verboseExplainForDebugging && getOutputSchema() != null) {
+                sb.append(indent + " " + getOutputSchema().toExplainPlanString());
             }
 
             sb.append("\n");

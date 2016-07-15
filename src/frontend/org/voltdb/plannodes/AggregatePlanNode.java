@@ -385,7 +385,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         aggExpr.finalizeValueTypes();
 
         int outputSchemaIndex = m_aggregateOutputColumns.get(index);
-        SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
+        SchemaColumn schemaCol = getOutputSchema().getColumns().get(outputSchemaIndex);
         AbstractExpression schemaExpr = schemaCol.getExpression();
         schemaExpr.setValueType(aggExpr.getValueType());
         schemaExpr.setValueSize(aggExpr.getValueSize());

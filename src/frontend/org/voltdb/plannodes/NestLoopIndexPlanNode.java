@@ -65,9 +65,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // Note that the inner table's contribution to the join_tuple doesn't include
         // all the columns from the inner table---just the ones needed as determined by
         // the inlined scan's own inlined projection, as described above.
-        m_outputSchemaPreInlineAgg =
-            m_children.get(0).getOutputSchema().
-            join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
+        setOutputSchemaPreInlineAgg(m_children.get(0).getOutputSchema().
+        join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE());
         m_hasSignificantOutputSchema = true;
 
         generateRealOutputSchema(db);
@@ -92,7 +91,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null) {
             // output schema of limit node has not been used
-            limit.m_outputSchema = m_outputSchemaPreInlineAgg;
+            limit.setOutputSchema(getOutputSchemaPreInlineAgg());
             limit.m_hasSignificantOutputSchema = false;
         }
 
@@ -129,8 +128,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolveSubqueryColumnIndexes();
 
         // Resolve TVE indexes for each schema column.
-        for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
-            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumns().get(i);
+        for (int i = 0; i < getOutputSchemaPreInlineAgg().size(); ++i) {
+            SchemaColumn col = getOutputSchemaPreInlineAgg().getColumns().get(i);
 
             // These are all TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);

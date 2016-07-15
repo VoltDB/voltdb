@@ -121,7 +121,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
             TupleValueExpression tve = (TupleValueExpression) colExpr;
             tve.setColumnIndexUsingSchema(inputSchema);
         }
-        m_outputSchema.sortByTveIndex();
+        getOutputSchema().sortByTveIndex();
 
         resolveSortIndexesUsingSchema(inputSchema);
     }

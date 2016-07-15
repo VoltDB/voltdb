@@ -30,6 +30,9 @@ import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -37,6 +40,7 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.Programs;
+import org.apache.calcite.util.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -59,7 +63,10 @@ public class CalcitePlanner {
 
     // unneeded for now???
     static class VoltDBProjectRule extends ConverterRule {
-        VoltDBProjectRule() {
+
+        private static final VoltDBProjectRule INSTANCE = new VoltDBProjectRule();
+
+        private VoltDBProjectRule() {
           super(LogicalProject.class, RelOptUtil.PROJECT_PREDICATE, Convention.NONE,
               VoltDBConvention.INSTANCE, "VoltDBProjectRule");
         }
@@ -131,6 +138,8 @@ public class CalcitePlanner {
                   traitSet,
                   left,
                   right,
+//                  join.getInput(0),
+//                  join.getInput(1),
                   join.getCondition(),
                   join.getVariablesSet(),
                   join.getJoinType());
@@ -139,24 +148,50 @@ public class CalcitePlanner {
       }
 
 
-    private static class VoltDBCalcJoinMergeRule extends RelOptRule {
+    private static class VoltDBProjectJoinMergeRule extends RelOptRule {
 
-        public static final VoltDBCalcJoinMergeRule INSTANCE = new VoltDBCalcJoinMergeRule();
+        public static final VoltDBProjectJoinMergeRule INSTANCE = new VoltDBProjectJoinMergeRule();
 
-        private VoltDBCalcJoinMergeRule() {
-            super(operand(LogicalCalc.class, operand(VoltDBJoin.class, any())));
+        private VoltDBProjectJoinMergeRule() {
+            super(operand(VoltDBProject.class, operand(VoltDBJoin.class, any())));
         }
 
         @Override
         public void onMatch(RelOptRuleCall call) {
-            LogicalCalc calc = call.rel(0);
+            VoltDBProject proj= call.rel(0);
             VoltDBJoin join = call.rel(1);
-            call.transformTo(join.copy(calc.getProgram()));
+
+            RexBuilder rexBuilder = proj.getCluster().getRexBuilder();
+            RexProgramBuilder rpb = new RexProgramBuilder(join.getRowType(), rexBuilder);
+
+            int i = 0;
+            for (Pair<RexNode, String> item : proj.getNamedProjects()) {
+                rpb.addProject(item.left, item.right);
+            }
+            call.transformTo(join.copy(rpb.getProgram()));
         }
 
     }
 
-    private static class VoltDBRules {
+  private static class VoltDBCalcJoinMergeRule extends RelOptRule {
+
+      public static final VoltDBCalcJoinMergeRule INSTANCE = new VoltDBCalcJoinMergeRule();
+
+      private VoltDBCalcJoinMergeRule() {
+          super(operand(LogicalCalc.class, operand(VoltDBJoin.class, any())));
+      }
+
+      @Override
+      public void onMatch(RelOptRuleCall call) {
+          LogicalCalc calc = call.rel(0);
+          VoltDBJoin join = call.rel(1);
+
+          call.transformTo(join.copy(calc.getProgram()));
+      }
+
+  }
+
+  private static class VoltDBRules {
         //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
         //public static final RelOptRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectScanMergeRule();
 
@@ -164,14 +199,20 @@ public class CalcitePlanner {
             List<RelOptRule> rules = new ArrayList<>();
 
             rules.add(VoltDBCalcScanMergeRule.INSTANCE);
-
+            rules.add(VoltDBProjectRule.INSTANCE);
+            rules.add(VoltDBProjectRule.INSTANCE);
             rules.add(VoltDBJoinRule.INSTANCE);
+
             rules.add(VoltDBCalcJoinMergeRule.INSTANCE);
+
+            // We don't actually handle this.
+            //rules.add(VoltDBProjectJoinMergeRule.INSTANCE);
 
             rules.add(CalcMergeRule.INSTANCE);
             rules.add(FilterCalcMergeRule.INSTANCE);
             rules.add(FilterToCalcRule.INSTANCE);
             rules.add(ProjectCalcMergeRule.INSTANCE);
+            rules.add(ProjectToCalcRule.INSTANCE);
             rules.add(ProjectToCalcRule.INSTANCE);
 
 

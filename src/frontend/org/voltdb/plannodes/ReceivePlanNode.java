@@ -50,7 +50,7 @@ public class ReceivePlanNode extends AbstractReceivePlanNode {
     @Override
     public void resolveColumnIndexes()
     {
-        resolveColumnIndexes(m_outputSchema);
+        resolveColumnIndexes(getOutputSchema());
     }
 
     @Override

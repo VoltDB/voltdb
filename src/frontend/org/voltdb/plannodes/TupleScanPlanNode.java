@@ -85,7 +85,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
                         tve);
                 ++columnIdx;
             }
-            m_outputSchema = m_tableSchema;
+            setOutputSchema(m_tableSchema);
             m_hasSignificantOutputSchema = true;
         }
     }
@@ -100,7 +100,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
             TupleValueExpression tve = (TupleValueExpression) colExpr;
             tve.setColumnIndexUsingSchema(m_tableSchema);
         }
-        m_outputSchema.sortByTveIndex();
+        getOutputSchema().sortByTveIndex();
     }
 
     @Override
@@ -134,12 +134,12 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
         if (jobj.has(Members.PARAM_IDX.name())) {
             JSONArray paramIdxArray = jobj.getJSONArray(Members.PARAM_IDX.name());
             int paramSize = paramIdxArray.length();
-            assert(m_outputSchema != null && paramSize == m_outputSchema.size());
+            assert(getOutputSchema() != null && paramSize == getOutputSchema().size());
             for (int i = 0; i < paramSize; ++i) {
                 int paramIdx = paramIdxArray.getInt(i);
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(paramIdx);
-                AbstractExpression expr = m_outputSchema.getColumns().get(i).getExpression();
+                AbstractExpression expr = getOutputSchema().getColumns().get(i).getExpression();
                 pve.setValueSize(expr.getValueSize());
                 pve.setValueType(expr.getValueType());
                 m_columnList.add(pve);

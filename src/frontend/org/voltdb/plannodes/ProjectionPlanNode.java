@@ -49,8 +49,8 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         super.validate();
 
         // Validate Expression Trees
-        for (int ctr = 0; ctr < m_outputSchema.getColumns().size(); ctr++) {
-            SchemaColumn column = m_outputSchema.getColumns().get(ctr);
+        for (int ctr = 0; ctr < getOutputSchema().getColumns().size(); ctr++) {
+            SchemaColumn column = getOutputSchema().getColumns().get(ctr);
             AbstractExpression exp = column.getExpression();
             if (exp == null) {
                 throw new Exception("ERROR: The Output Column Expression at position '" + ctr + "' is NULL");
@@ -102,7 +102,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             }
             ++colIndex;
         }
-        m_outputSchema = new_schema;
+        setOutputSchema(new_schema);
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries

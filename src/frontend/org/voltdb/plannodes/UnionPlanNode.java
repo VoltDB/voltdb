@@ -77,8 +77,8 @@ public class UnionPlanNode extends AbstractPlanNode {
         assert(m_children.size() > 1);
         // The output schema for the union is the output schema from the first expression
         m_children.get(0).generateOutputSchema(db);
-        m_outputSchema = m_children.get(0).getOutputSchema();
-        ArrayList<SchemaColumn> outputColumns = m_outputSchema.getColumns();
+        setOutputSchema(m_children.get(0).getOutputSchema());
+        ArrayList<SchemaColumn> outputColumns = getOutputSchema().getColumns();
 
         // Then generate schemas for the remaining ones and make sure that they are identical
         for (int i = 1; i < m_children.size(); ++i)
@@ -99,7 +99,7 @@ public class UnionPlanNode extends AbstractPlanNode {
 
         assert(! hasInlineVarcharOrVarbinary());
 
-        m_outputSchema = m_children.get(0).getOutputSchema();
+        setOutputSchema(m_children.get(0).getOutputSchema());
         m_hasSignificantOutputSchema = false; // It's just the first child's
         // Then check that they have the same types
    }

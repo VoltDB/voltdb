@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -13,7 +15,6 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
-import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
 import org.voltdb.VoltType;
@@ -32,13 +33,30 @@ public class RexConverter {
 
         public static final ConvertingVisitor INSTANCE = new ConvertingVisitor();
 
+        int m_numLhsFieldsForJoin = -1;
+
         protected ConvertingVisitor() {
             super(false);
         }
 
+        public ConvertingVisitor(int numLhsFields) {
+            super(false);
+            m_numLhsFieldsForJoin = numLhsFields;
+        }
+
         @Override
         public TupleValueExpression visitInputRef(RexInputRef inputRef) {
-            TupleValueExpression tve = new TupleValueExpression("", "", "", "", inputRef.getIndex(), inputRef.getIndex());
+            int index = inputRef.getIndex();
+            int tableIndex = 0;
+
+            if (m_numLhsFieldsForJoin >= 0 && index >= m_numLhsFieldsForJoin) {
+                index -= m_numLhsFieldsForJoin;
+                tableIndex = 1;
+            }
+
+
+            TupleValueExpression tve = new TupleValueExpression("", "", "", "", index, index);
+            tve.setTableIndex(tableIndex);
             TypeConverter.setType(tve, inputRef.getType());
             return tve;
           }
@@ -69,7 +87,7 @@ public class RexConverter {
 
             List<AbstractExpression> aeOperands = new ArrayList<>();
             for (RexNode operand : call.operands) {
-                AbstractExpression ae = operand.accept(ConvertingVisitor.INSTANCE);
+                AbstractExpression ae = operand.accept(this);
                 assert ae != null;
                 aeOperands.add(ae);
             }
@@ -118,6 +136,40 @@ public class RexConverter {
         AbstractExpression ae = rexNode.accept(ConvertingVisitor.INSTANCE);
         assert ae != null;
         return ae;
+    }
+
+    public static AbstractExpression convertJoinPred(int numLhsFields,
+            RexNode condition) {
+        AbstractExpression ae = condition.accept(new ConvertingVisitor(numLhsFields));
+        assert ae != null;
+        return ae;
+    }
+
+    public static NodeSchema convertToVoltDBNodeSchema(RelDataType rowType) {
+        NodeSchema nodeSchema = new NodeSchema();
+
+        RelRecordType ty = (RelRecordType) rowType;
+        List<String> names = ty.getFieldNames();
+        int i = 0;
+        for (RelDataTypeField item : ty.getFieldList()) {
+            TupleValueExpression tve = new TupleValueExpression("", "", "", names.get(i), i, i);
+            TypeConverter.setType(tve, item.getType());
+            nodeSchema.addColumn(new SchemaColumn("", "", "", names.get(i), tve, i));
+            ++i;
+        }
+        return nodeSchema;
+    }
+
+    public static NodeSchema convertToVoltDBNodeSchema(
+            List<Pair<RexNode, String>> namedProjects) {
+        NodeSchema nodeSchema = new NodeSchema();
+        int i = 0;
+        for (Pair<RexNode, String> item : namedProjects) {
+            AbstractExpression ae = item.left.accept(ConvertingVisitor.INSTANCE);
+            nodeSchema.addColumn(new SchemaColumn("", "", "", item.right, ae, i));
+        }
+
+        return nodeSchema;
     }
 
 }

@@ -14,6 +14,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.Util;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 
 import com.google.common.base.Supplier;
 
@@ -64,7 +65,10 @@ class VoltDBProject extends Project implements VoltDBRel {
 
         @Override
         public AbstractPlanNode toPlanNode() {
-            // TODO Auto-generated method stub
-            return null;
+            AbstractPlanNode child = ((VoltDBRel)getInput(0)).toPlanNode();
+            ProjectionPlanNode ppn = new ProjectionPlanNode();
+            ppn.setOutputSchema(RexConverter.convertToVoltDBNodeSchema(getNamedProjects()));
+            ppn.addAndLinkChild(child);
+            return ppn;
         }
 }

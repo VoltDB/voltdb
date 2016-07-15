@@ -56,9 +56,9 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggrNode != null) {
             aggrNode.generateOutputSchema(db);
-            m_outputSchema = aggrNode.getOutputSchema().copyAndReplaceWithTVE();
+            setOutputSchema(aggrNode.getOutputSchema().copyAndReplaceWithTVE());
         } else {
-            m_outputSchema = m_outputSchemaPreInlineAgg;
+            setOutputSchema(m_outputSchemaPreInlineAgg);
         }
 
         // except, while technically the resulting output schema is just a pass-through,
@@ -80,15 +80,15 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         AggregatePlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggrNode != null) {
             aggrNode.resolveColumnIndexesUsingSchema(m_outputSchemaPreInlineAgg);
-            m_outputSchema = aggrNode.getOutputSchema().clone();
-            m_outputSchema.sortByTveIndex();
+            setOutputSchema(aggrNode.getOutputSchema().clone());
+            getOutputSchema().sortByTveIndex();
         }
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        if (m_outputSchemaPreInlineAgg != m_outputSchema) {
+        if (m_outputSchemaPreInlineAgg != getOutputSchema()) {
             stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
             stringer.array();
             for (SchemaColumn column : m_outputSchemaPreInlineAgg.getColumns()) {

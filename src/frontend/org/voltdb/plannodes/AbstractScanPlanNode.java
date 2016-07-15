@@ -330,7 +330,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                     new ProjectionPlanNode(m_tableScanSchema);
             addInlinePlanNode(projectionNode);
             // a bit redundant but logically consistent
-            m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
+            setOutputSchema(projectionNode.getOutputSchema().copyAndReplaceWithTVE());
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else {
@@ -341,7 +341,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // where there are no columns in the table that are accessed.
             //
             // Just fill m_outputSchema with the table's columns.
-            m_outputSchema = m_tableSchema.clone();
+            setOutputSchema(m_tableSchema.clone());
             m_hasSignificantOutputSchema = true;
         }
         m_preAggOutputSchema = m_outputSchema;
@@ -407,7 +407,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 TupleValueExpression tve = (TupleValueExpression) colExpr;
                 tve.setColumnIndexUsingSchema(m_tableSchema);
             }
-            m_outputSchema.sortByTveIndex();
+            getOutputSchema().sortByTveIndex();
         }
 
         // The outputschema of an inline limit node is completely irrelevant to the EE except that
@@ -421,7 +421,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // based on the different schema of the original raw scan and the projection.
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null) {
-            limit.m_outputSchema = m_outputSchema.clone();
+            limit.setOutputSchema(getOutputSchema().clone());
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
 
