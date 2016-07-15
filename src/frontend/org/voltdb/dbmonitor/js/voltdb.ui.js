@@ -28,8 +28,13 @@ $(document).ready(function () {
 
     //clear the localStorage for DataTables in DR Section
 
+    var tmp = [];
     for(var i=0, len=localStorage.length; i<len; i++) {
-        var key = localStorage.key(i);
+        tmp.push(localStorage.key(i))
+    }
+
+    for(var i=0, len=tmp.length; i<len; i++) {
+        var key = tmp[i];
         var value = localStorage[key];
         if(key != 'queries' && key != 'queryNameList' && key != 'key' ){
                 if(value != undefined){
@@ -43,6 +48,7 @@ $(document).ready(function () {
                     if(data['time'] == '0' ){
                         if($.cookie('sessionCookie') == undefined){
                             localStorage.removeItem(key)
+
                         }
                     } else {
                         var oneDay = 24*60*60*1000; // hours*minutes*seconds*milliseconds
