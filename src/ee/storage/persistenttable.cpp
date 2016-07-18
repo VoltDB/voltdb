@@ -816,13 +816,14 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    // handle any materialized views, hide the tuple from the scan temporarily.
+    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     for (auto viewToTrigger : m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
-    // handle any materialized views, hide the tuple from the scan temporarily.
-    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
