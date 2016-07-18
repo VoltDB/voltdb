@@ -25,8 +25,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -52,18 +50,8 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).generateOutputSchema(db);
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
-        // The first column is the aggregate.
-        TupleValueExpression tve = new TupleValueExpression(AbstractParsedStmt.TEMP_TABLE_NAME,
-                                                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                                                            AbstractParsedStmt.WINDOWED_AGGREGATE_COLUMN_NAME,
-                                                            AbstractParsedStmt.WINDOWED_AGGREGATE_COLUMN_NAME,
-                                                            0);
-        tve.setExpressionType(ExpressionType.VALUE_TUPLE);
-        tve.setValueType(m_windowedExpression.getValueType());
-        tve.setValueSize(m_windowedExpression.getValueSize());
-        // This doesn't really matter, since we will be
-        // generating this.  But it can't be negative.
-        tve.setColumnIndex(0);
+        // We already created the TVE for this expression.
+        TupleValueExpression tve = m_windowedExpression.getDisplayListExpression();
         SchemaColumn aggCol = new SchemaColumn(tve.getTableName(),
                                                tve.getTableAlias(),
                                                tve.getColumnName(),

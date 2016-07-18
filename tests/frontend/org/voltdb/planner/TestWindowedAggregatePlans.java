@@ -149,7 +149,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
                       "window frame units can have only integer or TIMESTAMP value types.");
         // Windowed expressions can only appear in the display list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
-        			  "Windowed expressions can only appear in the select list.");
+                      "Windowed expressions can only appear in the select list.");
     }
 
     public void testOrderByAndPartitionByExpressions() throws Exception {
@@ -160,7 +160,7 @@ public class TestWindowedAggregatePlans extends PlannerTestCase {
             assertFalse("PartitionBy expressions in windowed expressions don't compile", true);
         }
         try {
-            node = compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA;");
+            node = compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA order by B*B;");
         } catch (Exception ex) {
             assertFalse("OrderBy expressions in windowed expressions don't compile", true);
         }

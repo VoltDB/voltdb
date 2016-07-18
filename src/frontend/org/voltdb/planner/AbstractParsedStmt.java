@@ -120,6 +120,11 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
+    // We need to remember if we are parsing in the display column,
+    // so that we don't parse windowed expressions elsewhere.
+    protected boolean m_parsingInDisplayColumns = false;
+
+
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
     static final String DELETE_NODE_NAME = "delete";
@@ -537,6 +542,21 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
         // Parse individual rank expressions
+        if (!m_parsingInDisplayColumns) {
+            // We are parsing a windowed expression outside of the display list.  This
+            // sometimes happens because we have used a display list alias in the order by.  So, we
+            // don't really have to parse this again.  We just return the tve we created
+            // when we parsed the windowed expression initially.
+            //
+            // If however, we have a rank expression outside the display list,
+            // and there is no other rank expression around, then this is an
+            // error.
+            if (m_windowedExpressions.size() > 0) {
+                return m_windowedExpressions.get(0).getDisplayListExpression();
+            } else {
+                throw new PlanningErrorException("Windowed expressions can only appear in the select list.");
+            }
+        }
         List<AbstractExpression> partitionbyExprs = new ArrayList<>();
         List<AbstractExpression> orderbyExprs = new ArrayList<>();
         List<SortDirectionType>  orderbyDirs  = new ArrayList<>();
@@ -566,7 +586,11 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
-
+        String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
+        String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
+        if (exprNode.attributes.containsKey("alias")) {
+            alias = exprNode.attributes.get("alias");
+        }
         WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
                                                              partitionbyExprs,
                                                              orderbyExprs,
@@ -574,11 +598,12 @@ public abstract class AbstractParsedStmt {
         // Only offset 0 is useful.  But we keep the index anyway.
         int offset = m_windowedExpressions.size();
         m_windowedExpressions.add(rankExpr);
-        TupleValueExpression tve = new TupleValueExpression(TEMP_TABLE_NAME,                TEMP_TABLE_NAME,
-                                                            WINDOWED_AGGREGATE_COLUMN_NAME, WINDOWED_AGGREGATE_COLUMN_NAME);
+        TupleValueExpression tve = new TupleValueExpression(TEMP_TABLE_NAME, TEMP_TABLE_NAME,
+                                                            alias,           alias);
         tve.setColumnIndex(offset);
         tve.setValueType(rankExpr.getValueType());
         tve.setValueSize(rankExpr.getValueSize());
+        rankExpr.setDisplayListExpression(tve);
         return tve;
     }
 

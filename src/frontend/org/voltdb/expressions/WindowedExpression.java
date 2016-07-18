@@ -248,5 +248,19 @@ public class WindowedExpression extends AbstractExpression {
         }
         return -1;
     }
+
+    // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
+    // the display list has a TVE which references the column which holds the values this aggregate
+    // expression will compute.  This field holds this TVE.
+    private TupleValueExpression m_displayListExpression;
+
+    public final TupleValueExpression getDisplayListExpression() {
+        return m_displayListExpression;
+    }
+
+    public final void setDisplayListExpression(TupleValueExpression displayListExpression) {
+        m_displayListExpression = displayListExpression;
+    }
+
 }
 
