@@ -165,7 +165,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
     // Atomically allows the catalog reference to change between access
-    private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
+    private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<>(null);
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
@@ -183,7 +183,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
+            new ConcurrentHashMap<>(2048, .75f, 128);
 
     private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
 
@@ -213,7 +213,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * what has been admitted.
      */
     private final CopyOnWriteArrayList<AdmissionControlGroup> m_allACGs =
-            new CopyOnWriteArrayList<AdmissionControlGroup>();
+            new CopyOnWriteArrayList<>();
 
     /*
      * A thread local is a convenient way to keep the ACG out of volt core. The lookup is paired
@@ -348,7 +348,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (m_socket != null) {
                     boolean success = false;
                     //Populated on timeout
-                    AtomicReference<String> timeoutRef = new AtomicReference<String>();
+                    AtomicReference<String> timeoutRef = new AtomicReference<>();
                     try {
                         final InputHandler handler = authenticate(m_socket, timeoutRef);
                         if (handler != null) {
@@ -1032,7 +1032,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+            hostLog.warn("ClientInterface.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
@@ -1143,7 +1143,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
-            LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
+            LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<>();
             @Override
             public void deliver(final VoltMessage message) {
                 if (message instanceof InitiateResponseMessage) {
@@ -2451,7 +2451,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param now Current time in milliseconds
      */
     private final void checkForDeadConnections(final long now) {
-        final ArrayList<Pair<Connection, Integer>> connectionsToRemove = new ArrayList<Pair<Connection, Integer>>();
+        final ArrayList<Pair<Connection, Integer>> connectionsToRemove = new ArrayList<>();
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
             // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
             if (VoltPort.class == cihm.connection.getClass()) {
@@ -2582,7 +2582,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Procedure catProc = sysProc.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.procName = procedureName;
-        spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+        spi.params = new FutureTask<>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
                 ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
@@ -2747,7 +2747,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public Map<Long, Pair<String, long[]>> getLiveClientStats()
     {
         final Map<Long, Pair<String, long[]>> client_stats =
-            new HashMap<Long, Pair<String, long[]>>();
+            new HashMap<>();
 
         // m_cihm hashes connectionId to a ClientInterfaceHandleManager
         // ClientInterfaceHandleManager has the connection object.
@@ -2760,7 +2760,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
                 long outstandingTxns = e.getValue().getOutstandingTxns();
                 client_stats.put(
-                        e.getKey(), new Pair<String, long[]>(
+                        e.getKey(), new Pair<>(
                             e.getValue().connection.getHostnameOrIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
@@ -2811,7 +2811,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
         ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> statsIterators =
-                new ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
+                new ArrayList<>();
         for(AdmissionControlGroup acg : m_allACGs) {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
@@ -2819,7 +2819,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public List<AbstractHistogram> getLatencyStats() {
-        List<AbstractHistogram> latencyStats = new ArrayList<AbstractHistogram>();
+        List<AbstractHistogram> latencyStats = new ArrayList<>();
         for (AdmissionControlGroup acg : m_allACGs) {
             latencyStats.add(acg.getLatencyInfo());
         }
