@@ -98,6 +98,9 @@ public abstract class PBDSegment {
      * although incredibly unlikely
      */
     abstract int uncompressedBytesToRead(String cursorId);
+    
+    // TODO: javadoc
+    abstract int size();
 
     abstract protected long readOffset(String cursorId);
     abstract protected void rewindReadOffset(String cursorId, int byBytes);

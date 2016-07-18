@@ -400,6 +400,13 @@ class PBDMMapSegment extends PBDSegment {
 
     @Override
     // MJ TODO:
+    public int size() {
+        if (m_closed) throw new RuntimeException("closed");
+        return Math.max(0, m_buf.b().getInt(SIZE_OFFSET) - m_bytesRead);
+    }
+
+    @Override
+    // MJ TODO:
     protected long readOffset(String cursorId)
     {
         return m_readBuf.position();

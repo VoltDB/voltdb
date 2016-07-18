@@ -37,7 +37,6 @@ import java.util.Map;
  */
 public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
-    private static final String INTERNAL_CURSOR_ID = "PBDRegular_Internal";
 
     private Map<String, SegmentReader> m_readCursors = new HashMap<>();
     //Index of the next object to read, not an offset into the file
@@ -93,7 +92,7 @@ public class PBDRegularSegment extends PBDSegment {
     public int getNumEntries() throws IOException
     {
         if (m_closed) {
-            openForRead(INTERNAL_CURSOR_ID);
+            open(false, false);
         }
         if (m_fc.size() > 0) {
             m_tmpHeaderBuf.b().clear();
@@ -129,7 +128,7 @@ public class PBDRegularSegment extends PBDSegment {
     public boolean isOpenForReading(String cursorId) {
         return m_readCursors.containsKey(cursorId);
     }
-    
+
     @Override
     public void openForRead(String cursorId) throws IOException
     {
@@ -137,7 +136,7 @@ public class PBDRegularSegment extends PBDSegment {
         if (m_readCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }
-        
+
         m_readCursors.put(cursorId, new SegmentReader(cursorId));
         if (m_closed) {
             open(false, false);
@@ -148,7 +147,7 @@ public class PBDRegularSegment extends PBDSegment {
     protected void openForWrite(boolean emptyFile) throws IOException {
         open(true, emptyFile);
     }
-    
+
     private void open(boolean forWrite, boolean emptyFile) throws IOException {
         if (!m_closed) {
             throw new IOException("Segment is already opened");
@@ -172,7 +171,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         m_closed = false;
     }
-    
+
 
     @Override
     protected void initNumEntries(int count, int size) throws IOException {
@@ -249,22 +248,27 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public boolean hasMoreEntries(String cursorId) throws IOException
-    {
+    public boolean hasMoreEntries(String cursorId) throws IOException {
         if (m_closed) throw new IOException("Segment closed");
+
+        if (m_readCursors.size() == 0) return false;
+
         return m_readCursors.get(cursorId).m_objectReadIndex < m_numOfEntries;
     }
-    
+
     @Override
     public boolean hasAllFinishedReading() throws IOException {
         if (m_closed) throw new IOException("Segment closed");
-        
-        for (SegmentReader reader : m_readCursors.values()) {
+
+        if (m_readCursors.size() == 0) return false;
+
+        for (String cid : m_readCursors.keySet()) {
+            SegmentReader reader = m_readCursors.get(cid);
             if (reader.m_objectReadIndex < m_numOfEntries) {
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -273,18 +277,19 @@ public class PBDRegularSegment extends PBDSegment {
         if (m_closed) throw new IOException("Segment closed");
         return m_readCursors.get(cursorId).m_discardCount == m_numOfEntries;
     }
-    
+
     @Override
     public boolean isSegmentEmpty() throws IOException {
         if (m_closed) throw new IOException("Segment closed");
-        
-        for (SegmentReader reader : m_readCursors.values()) {
-            if (reader.m_discardCount == m_numOfEntries) {
-                return true;
+
+        for (String cid : m_readCursors.keySet()) {
+            SegmentReader reader = m_readCursors.get(cid);
+            if (reader.m_discardCount < m_numOfEntries) {
+                return false;
             }
         }
-        
-        return false;
+
+        return true;
     }
 
     @Override
@@ -457,6 +462,11 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
+    public int size() {
+        return m_size;
+    }
+
+    @Override
     protected long readOffset(String cursorId)
     {
         return m_readCursors.get(cursorId).m_readOffset;
@@ -485,7 +495,7 @@ public class PBDRegularSegment extends PBDSegment {
         }
         return written;
     }
-    
+
     private class SegmentReader {
         @SuppressWarnings("unused")
         private final String m_cursorId;
@@ -494,7 +504,7 @@ public class PBDRegularSegment extends PBDSegment {
         private int m_objectReadIndex = 0;
         private int m_bytesRead = 0;
         private int m_discardCount;
-        
+
         public SegmentReader(String cursorId) {
             m_cursorId = cursorId;
         }

@@ -22,24 +22,9 @@
  */
 package org.voltdb.utils;
 
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertNull;
-import static junit.framework.Assert.fail;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import junit.framework.Assert;
 
 import org.junit.After;
 import org.junit.Before;
@@ -47,10 +32,6 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
-import org.voltdb.utils.BinaryDeque.TruncatorResponse;
-
-import com.google_voltpatches.common.collect.Sets;
 
 public class TestPBDMultipleReaders {
 
@@ -58,81 +39,56 @@ public class TestPBDMultipleReaders {
 
     private PersistentBinaryDeque m_pbd;
     
-    private class PBDReader implements Runnable {
+    private class PBDReader {
         private String m_readerId;
-        private PBDReader m_dependsOn;
         private int m_totalRead;
-        private Exception m_error;
-        private boolean m_isLastReader;
         
-        public PBDReader(String readerId, PBDReader dependsOn, boolean isLastReader) throws IOException {
+        public PBDReader(String readerId) throws IOException {
             m_readerId = readerId;
-            m_dependsOn = dependsOn;
-            m_isLastReader = isLastReader;
             m_pbd.openForRead(m_readerId);
         }
         
-        public void run() {
-            try {
-                TreeSet<String> segments = TestPersistentBinaryDeque.getSortedDirectoryListing();
-                while (true) {
-                    System.out.println(m_readerId + " totalRead=" + m_totalRead);
-                    if (m_dependsOn != null && m_dependsOn.getTotalRead() <= m_totalRead) {
-                        Thread.sleep(250);
-                        continue;
-                    }
-                    BBContainer bbC = m_pbd.poll(m_readerId, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
-                    if (bbC==null) {
-                        System.out.println("bbC is null. Breaking out");
-                        break;
-                    }
-                    bbC.discard();
-                    int segmentsReadFully = (m_totalRead+1)/47;
-                    if (!m_isLastReader) {
-                        int min = segments.size() - (segmentsReadFully - (segmentsReadFully%47==0 ? 1 : 0));
-                        assertTrue(TestPersistentBinaryDeque.getSortedDirectoryListing().size() >= min);
-                    } else {
-                        assertEquals(segments.size()-segmentsReadFully,
-                                TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-                    }
-                    m_totalRead++;
+        public void readToEndOfSegment() throws Exception {
+            int end = (m_totalRead/47 + 1) * 47;
+            boolean done = false;
+            for (int i=m_totalRead; i<end && !done; i++) {
+                BBContainer bbC = m_pbd.poll(m_readerId, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+                if (bbC==null) {
+                    done = true;
+                    continue;
                 }
-            } catch(Exception e) {
-                e.printStackTrace(); //TODO: remove
-                m_error = e;
+                Thread.sleep(50);
+                bbC.discard();
             }
-            System.out.println("Exiting thread");
-        }
-        
-        public int getTotalRead() {
-            return m_totalRead;
         }
     }
 
     @Test
     public void testMultipleParallelReaders() throws Exception {
-        int numBuffers = 200;
+        int numBuffers = 100;
         for (int i=0; i<numBuffers; i++) {
             m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)) );
         }
+        int numSegments = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
         
-        int numReaders = 2;
-        PBDReader prevReader = null;
+        int numReaders = 3;
         PBDReader[] readers = new PBDReader[numReaders];
-        ExecutorService es = Executors.newFixedThreadPool(numReaders);
         for (int i=0; i<numReaders; i++) {
-            readers[i] = new PBDReader("reader" + i, prevReader, (i == (numReaders-1)));
-            prevReader = readers[i];
-            es.submit(readers[i]);
+            readers[i] = new PBDReader("reader" + i);
         }
         
-        es.shutdown();
-        es.awaitTermination(60, TimeUnit.SECONDS);
-        for (int i=0; i<numReaders; i++) {
-            if (readers[i].m_error != null) {
-                readers[i].m_error.printStackTrace();
-                fail();
+        int currNumSegments = numSegments;
+        for (int i=0; i<numSegments; i++) {
+            // One reader finishing shouldn't discard the segment
+            readers[0].readToEndOfSegment();
+            assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
+
+            // Once all readers finish reading, the segment should get discarded.
+            for (int j=1; j<numReaders; j++) {
+                readers[j].readToEndOfSegment();
             }
+            if (i < numSegments-1) currNumSegments--;
+            assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         }
     }
     

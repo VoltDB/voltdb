@@ -71,6 +71,7 @@ public interface BinaryDeque {
 
     //TODO: add javadoc
     public void openForRead(String cursorId) throws IOException;
+
     /**
      * Remove and return the object at the head of the queue
      * @param ocf
@@ -98,7 +99,9 @@ public interface BinaryDeque {
     public boolean initializedFromExistingFiles();
 
     public long sizeInBytes(String cursorId) throws IOException;
+    public long sizeInBytes() throws IOException;
     public int getNumObjects(String cursorId) throws IOException;
+    public int getNumObjects() throws IOException;
 
     public void closeAndDelete() throws IOException;
 

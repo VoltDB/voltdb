@@ -61,11 +61,11 @@ public class StreamBlockQueue {
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
         m_nonce = nonce;
+        m_persistentDeque.openForRead(m_nonce);
     }
 
     public boolean isEmpty() throws IOException {
-        // MJ TODO:
-        if (m_memoryDeque.isEmpty() && m_persistentDeque.isEmpty("test")) {
+        if (m_memoryDeque.isEmpty() && m_persistentDeque.isEmpty(m_nonce)) {
             return true;
         }
         return false;
@@ -83,7 +83,7 @@ public class StreamBlockQueue {
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll("test", PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            cont = m_persistentDeque.poll(m_nonce, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -250,7 +250,7 @@ public class StreamBlockQueue {
                                                     //to make book keeping consistent when flushed to disk
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_persistentDeque.sizeInBytes("test") - (8 * m_persistentDeque.getNumObjects("test"));
+        return memoryBlockUsage + m_persistentDeque.sizeInBytes(m_nonce) - (8 * m_persistentDeque.getNumObjects(m_nonce));
     }
 
     public void close() throws IOException {
@@ -271,7 +271,7 @@ public class StreamBlockQueue {
 
     public void truncateToTxnId(final long txnId, final int nullArrayLength) throws IOException {
         assert(m_memoryDeque.isEmpty());
-        m_persistentDeque.parseAndTruncate("test", new BinaryDequeTruncator() {
+        m_persistentDeque.parseAndTruncate(m_nonce, new BinaryDequeTruncator() {
 
         @Override
         public TruncatorResponse parse(BBContainer bbc) {

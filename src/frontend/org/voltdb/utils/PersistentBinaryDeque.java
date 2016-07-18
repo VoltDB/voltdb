@@ -78,22 +78,22 @@ public class PersistentBinaryDeque implements BinaryDeque {
         private final String m_cursorId;
         long m_segmentId;
         int m_numObjects;
-        
+
         public ReadCursor(String cursorId) throws IOException {
             m_cursorId = cursorId;
             m_segmentId = m_segments.firstKey();
             m_numObjects = countNumObjects();
         }
-        
+
         private int countNumObjects() throws IOException {
             int numObjects = 0;
             for (PBDSegment segment : m_segments.values()) {
                 numObjects += segment.getNumEntries();
             }
-            
+
             return numObjects;
         }
-        
+
         public BBContainer poll(OutputContainerFactory ocf) throws IOException {
             assertions();
 
@@ -103,7 +103,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             // It is possible that the last segment got removed
             long firstSegmentId = peekFirstSegment().segmentId();
             while (m_segmentId < firstSegmentId) m_segmentId++;
-            
+
             long currSegmentId = m_segmentId;
             while (m_segments.containsKey(currSegmentId)) {
                 PBDSegment s = m_segments.get(currSegmentId);
@@ -129,7 +129,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             assert (retcont.b() != null);
             return wrapRetCont(segment, retcont);
         }
-        
+
         private void decrementNumObjects() {
             m_numObjects--;
             assert(m_numObjects >= 0);
@@ -461,7 +461,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         rewindCursors();
         assertions();
     }
-    
+
     private void rewindCursors() {
         long firstSegmentId = peekFirstSegment().segmentId();
         for (ReadCursor cursor : m_readCursors.values()) {
@@ -473,16 +473,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized BBContainer poll(String cursorId, OutputContainerFactory ocf) throws IOException {
         assertions();
         openForRead(cursorId);
-        
+
         return m_readCursors.get(cursorId).poll(ocf);
     }
-    
+
     @Override
     public void openForRead(String cursorId) throws IOException {
         if (m_closed) {
             throw new IOException("Closed");
         }
-        
+
         if (!m_readCursors.containsKey(cursorId)) {
             ReadCursor cursor = new ReadCursor(cursorId);
             m_readCursors.put(cursorId, cursor);
@@ -619,6 +619,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
             if (wasClosed) {
                 segment.close();
             }
+        }
+        return size;
+    }
+
+    @Override
+    public synchronized long sizeInBytes() throws IOException {
+        long size = 0;
+        for (PBDSegment segment : m_segments.values()) {
+            size += segment.size();
         }
         return size;
     }
@@ -768,19 +777,20 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
-    /*
-    private void decrementNumObjects() {
-        for (ReadCursor cursor : m_readCursors.values()) {
-            cursor.m_numObjects--;
-            assert(cursor.m_numObjects >= 0);
-        }
-    }
-    */
-
     @Override
     public int getNumObjects(String cursorId) throws IOException {
         openForRead(cursorId);
         return m_readCursors.get(cursorId).m_numObjects;
+    }
+
+    @Override
+    public int getNumObjects() throws IOException {
+        int numObjects = 0;
+        for (PBDSegment segment : m_segments.values()) {
+            numObjects += segment.getNumEntries();
+        }
+
+        return numObjects;
     }
 
     @Override
