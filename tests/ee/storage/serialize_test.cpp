@@ -191,7 +191,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -229,7 +229,7 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
     for (int i = 0; i < colnum; ++i) {
@@ -273,7 +273,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, NULL);
 
     checkNullStrings(deserialized, tuple);
 
@@ -302,7 +302,7 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     TempTableLimits limits;
     voltdb::TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
     Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, nullColumnNames, &limits);
-    deserialized->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, NULL);
+    deserialized->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, NULL);
 
     checkNullStrings(deserialized, tuple);
     delete deserialized;

@@ -618,7 +618,12 @@ private:
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(TableTuple &tuple,
-                                    TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
+                                    TypedSerializeOutput<ReferenceSerializeOutputBuffer> *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRows);
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    TypedSerializeOutput<FallbackSerializeOutputBuffer> *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);

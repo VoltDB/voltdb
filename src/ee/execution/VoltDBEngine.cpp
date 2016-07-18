@@ -150,8 +150,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_hashinator(NULL),
       m_isActiveActiveDREnabled(false),
       m_staticParams(MAX_PARAM_COUNT),
-	  m_resultOutput(&m_resultOutputSerializer),
-	  m_exceptionOutput(&m_exceptionOutputSerializer),
+      m_resultOutput(&m_resultOutputSerializer),
+      m_exceptionOutput(&m_exceptionOutputSerializer),
       m_pfCount(0),
       m_currentInputDepId(-1),
       m_stringPool(16777216, 2),
@@ -337,8 +337,8 @@ template<class T> void VoltDBEngine::serializeTable(int32_t tableId, T &out) con
     }
     table->serializeTo(out);
 }
-template void VoltDBEngine::serializeTable <TypedSerializeOutput<SerializeOutputBuffer>> (int32_t tableId, TypedSerializeOutput<SerializeOutputBuffer> &out) const;
-
+template void VoltDBEngine::serializeTable <TypedSerializeOutput<ReferenceSerializeOutputBuffer>> (int32_t tableId, TypedSerializeOutput<ReferenceSerializeOutputBuffer> &out) const;
+template void VoltDBEngine::serializeTable <TypedSerializeOutput<FallbackSerializeOutputBuffer>> (int32_t tableId, TypedSerializeOutput<FallbackSerializeOutputBuffer> &out) const;
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------

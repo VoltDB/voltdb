@@ -376,7 +376,9 @@ template<class T> bool Table::serializeTo(T &serialize_io) {
 
     return true;
 }
-template bool Table::serializeTo<TypedSerializeOutput<SerializeOutputBuffer>>(TypedSerializeOutput<SerializeOutputBuffer> &serialize_io);
+template bool Table::serializeTo<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(TypedSerializeOutput<ReferenceSerializeOutputBuffer> &serialize_io);
+template bool Table::serializeTo<TypedSerializeOutput<FallbackSerializeOutputBuffer>>(TypedSerializeOutput<FallbackSerializeOutputBuffer> &serialize_io);
+template bool Table::serializeTo<TypedSerializeOutput<CopySerializeOutputBuffer>>(TypedSerializeOutput<CopySerializeOutputBuffer> &serialize_io);
 template bool Table::serializeTo<TypedSerializeOutput<SerializeOutputFile>>(TypedSerializeOutput<SerializeOutputFile> &serialize_io);
 
 bool Table::serializeToWithoutTotalSize(TypedSerializeOutput<ReferenceSerializeOutputBuffer> &serialize_io) {
@@ -483,9 +485,13 @@ template <class T> void Table::loadTuplesFromNoHeader(SerializeInputBE &serializ
         }
     }
 }
-template void Table::loadTuplesFromNoHeader <TypedSerializeOutput<SerializeOutputBuffer>> (SerializeInputBE &serialize_io,
+template void Table::loadTuplesFromNoHeader <TypedSerializeOutput<ReferenceSerializeOutputBuffer>> (SerializeInputBE &serialize_io,
                                    Pool *stringPool,
-                                   TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
+                                   TypedSerializeOutput<ReferenceSerializeOutputBuffer> *uniqueViolationOutput,
+                                   bool shouldDRStreamRow);
+template void Table::loadTuplesFromNoHeader <TypedSerializeOutput<FallbackSerializeOutputBuffer>> (SerializeInputBE &serialize_io,
+                                   Pool *stringPool,
+                                   TypedSerializeOutput<FallbackSerializeOutputBuffer> *uniqueViolationOutput,
                                    bool shouldDRStreamRow);
 
 template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
@@ -551,9 +557,13 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
-template void Table::loadTuplesFrom <TypedSerializeOutput<SerializeOutputBuffer>> (SerializeInputBE &serialize_io,
-                           Pool *stringPool,
-                           TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
-                           bool shouldDRStreamRow);
 
+template void Table::loadTuplesFrom <TypedSerializeOutput<ReferenceSerializeOutputBuffer>> (SerializeInputBE &serialize_io,
+                           Pool *stringPool,
+                           TypedSerializeOutput<ReferenceSerializeOutputBuffer> *uniqueViolationOutput,
+                           bool shouldDRStreamRow);
+template void Table::loadTuplesFrom <TypedSerializeOutput<FallbackSerializeOutputBuffer>> (SerializeInputBE &serialize_io,
+                           Pool *stringPool,
+                           TypedSerializeOutput<FallbackSerializeOutputBuffer> *uniqueViolationOutput,
+                           bool shouldDRStreamRow);
 }

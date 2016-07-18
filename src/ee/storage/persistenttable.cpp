@@ -1218,7 +1218,14 @@ std::string PersistentTable::debug() {
  * memory tracking
  */
 void PersistentTable::processLoadedTuple(TableTuple &tuple,
-                                         TypedSerializeOutput<SerializeOutputBuffer> *uniqueViolationOutput,
+                                         TypedSerializeOutput<ReferenceSerializeOutputBuffer> *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition,
+                                         bool shouldDRStreamRows) {
+    processLoadedTupleShared(tuple, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows);
+}
+void PersistentTable::processLoadedTuple(TableTuple &tuple,
+                                         TypedSerializeOutput<FallbackSerializeOutputBuffer> *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
@@ -1339,7 +1346,7 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
                 index->ensureCapacity(tupleCount);
             }
         }
-        loadTuplesFromNoHeader<TypedSerializeOutput<SerializeOutputBuffer>>(*message->stream(), pool);
+        loadTuplesFromNoHeader<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(*message->stream(), pool);
         break;
     }
     default:
