@@ -412,6 +412,161 @@ $(document).ready(function () {
     };
 });
 
+
+var stockData = [
+        {
+            Symbol: "AAPL",
+            Company: "Apple Inc.",
+            Price: "132.54"
+        },
+        {
+            Symbol: "INTC",
+            Company: "Intel Corporation",
+            Price: "33.45"
+        },
+        {
+            Symbol: "GOOG",
+            Company: "Google Inc",
+            Price: "554.52"
+        },
+    ];
+
+function convertArrayOfObjectsToCSV(args) {
+    var result, ctr, keys, columnDelimiter, lineDelimiter, data;
+
+    data = args.data || null;
+    if (data == null || !data.length) {
+        return null;
+    }
+
+    columnDelimiter = args.columnDelimiter || ',';
+    lineDelimiter = args.lineDelimiter || '\n';
+
+    keys = Object.keys(data[0]);
+
+    result = '';
+    result += keys.join(columnDelimiter);
+    result += lineDelimiter;
+
+    data.forEach(function(item) {
+        ctr = 0;
+        keys.forEach(function(key) {
+            if (ctr > 0) result += columnDelimiter;
+
+            result += item[key];
+            ctr++;
+        });
+        result += lineDelimiter;
+    });
+
+    return result;
+}
+
+function downloadCSV(args,whichChart) {
+    var data, filename, link;
+    var graphView = $("#graphView").val()
+    var chartData = {}
+
+    if (whichChart == "cpu"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.cpuDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.cpuDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.cpuDetailsDay)
+        }
+
+    }
+    else if (whichChart == "memory"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.memoryDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.memoryDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.memoryDetailsDay)
+        }
+    }
+    else if (whichChart == "transaction"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.transDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.transDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.transDetailsDay)
+        }
+
+    }
+    else if (whichChart == "latency"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.latency)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.latencyMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.latencyDay)
+        }
+
+    }
+    else if (whichChart == "partitionIdle"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.partitionDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.partitionDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.partitionDetailsDay)
+        }
+
+    }
+    else if (whichChart == "dataReplication"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.drDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.drDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.drDetailsDay)
+        }
+    }
+    else if (whichChart == "commandLog"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.cmdLog)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.cmdLogMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.cmdLogDay)
+        }
+    }
+
+    var csv = convertArrayOfObjectsToCSV({
+        data: chartData
+    });
+    if (csv == null) return;
+
+    filename = args.filename + "-" + graphView + ".csv";
+
+    if (!csv.match(/^data:text\/csv/i)) {
+        csv = 'data:text/csv;charset=utf-8,' + csv;
+    }
+    data = encodeURI(csv);
+
+    link = document.createElement('a');
+    link.setAttribute('href', data);
+    link.setAttribute('download', filename);
+    link.click();
+}
+
 function logout() {
     saveSessionCookie("username", null);
     saveSessionCookie("password", null);

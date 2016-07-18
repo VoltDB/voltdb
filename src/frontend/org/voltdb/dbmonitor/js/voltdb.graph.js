@@ -1215,7 +1215,7 @@
 
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
-            
+
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 
@@ -1458,11 +1458,13 @@
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
-
+            debugger;
             var monitor = MonitorGraphUI.Monitors;
+
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
                 getPartitionData();
             }
+
             var partitionData = monitor.partitionData;
             var partitionDataMin = monitor.partitionDataMin;
             var partitionDataDay = monitor.partitionDataDay;
@@ -1470,6 +1472,7 @@
             var partitionDetailsArr = [];
             var partitionDetailsArrMin = [];
             var partitionDetailsArrDay = [];
+
 
             if(localStorage.partitionDetailsMin != undefined)
                 partitionDetailsArrMin = JSON.parse(localStorage.partitionDetailsMin)
@@ -1490,7 +1493,7 @@
                  for(var j = 0; j< partitionDetailsArrMin.length; j++){
                     sliceFirstData(monitor.partitionDataMin, dataView.Minutes);
                     monitor.partitionDataMin.push({"x": new Date(partitionDetailsArrMin[j].timestamp),
-                        "y": partitionDetailsArrMin[i].percentUsed
+                        "y": partitionDetailsArrMin[j].percentUsed
                     })
                 }
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
