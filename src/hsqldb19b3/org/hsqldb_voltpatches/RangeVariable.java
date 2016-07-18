@@ -313,7 +313,7 @@ final class RangeVariable {
         }
     }
 
-    boolean hasColumnAlias() {
+    boolean hasColumnAliases() {
         return columnAliases != null;
     }
 

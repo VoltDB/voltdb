@@ -61,14 +61,8 @@ void TableStats::populateTableStatsSchema(
     types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);inBytes.push_back(false);
 }
 
-Table*
-TableStats::generateEmptyTableStatsTable()
-{
+TempTable* TableStats::generateEmptyTableStatsTable() {
     string name = "Persistent Table aggregated table stats temp table";
-    // An empty stats table isn't clearly associated with any specific
-    // database ID.  Just pick something that works for now (Yes,
-    // abstractplannode::databaseId(), I'm looking in your direction)
-    CatalogId databaseId = 1;
     vector<string> columnNames = TableStats::generateTableStatsColumnNames();
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
@@ -80,12 +74,10 @@ TableStats::generateEmptyTableStatsTable()
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
                                        columnAllowNull, columnInBytes);
 
-    return
-        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
-                                                            name,
-                                                            schema,
-                                                            columnNames,
-                                                            NULL));
+    return TableFactory::buildTempTable(name,
+                                        schema,
+                                        columnNames,
+                                        NULL);
 }
 
 /*
@@ -108,10 +100,8 @@ TableStats::TableStats(Table* table)
  * @parameter partitionId this stat source is associated with
  * @parameter databaseId Database this source is associated with
  */
-void TableStats::configure(
-        string name,
-        CatalogId databaseId) {
-    StatsSource::configure(name, databaseId);
+void TableStats::configure(string name) {
+    StatsSource::configure(name);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
 }

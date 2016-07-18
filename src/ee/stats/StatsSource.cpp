@@ -60,11 +60,8 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  * @parameter hostname name of the host this partition is on
  * @parameter siteId this stat source is associated with
  * @parameter partitionId id of the partition assigned to this site
- * @parameter databaseId database this source is associated with.
  */
-void StatsSource::configure(
-        string name,
-        CatalogId databaseId) {
+void StatsSource::configure(string name) {
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     m_siteId = executorContext->m_siteId;
     m_partitionId = executorContext->m_partitionId;
@@ -84,7 +81,7 @@ void StatsSource::configure(
         m_columnName2Index[columnNames[ii]] = ii;
     }
 
-    m_statsTable.reset(TableFactory::getTempTable(databaseId, name, schema, columnNames, NULL));
+    m_statsTable.reset(TableFactory::buildTempTable(name, schema, columnNames, NULL));
     m_statsTuple = m_statsTable->tempTuple();
 }
 

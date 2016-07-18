@@ -125,7 +125,7 @@ public class VoltPort implements Connection
              * very slow if the hostname is not specified in local /etc/hosts.
              */
             try {
-                ReverseDNSCache.m_es.submit(r);
+                ReverseDNSCache.submit(r);
             } catch (RejectedExecutionException e) {
                 networkLog.debug(
                         "Reverse DNS lookup for " + m_remoteSocketAddress + " rejected because the queue was full");
