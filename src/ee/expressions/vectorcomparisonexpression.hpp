@@ -199,11 +199,16 @@ struct TupleExtractor
 
     TupleExtractor(NValue value) :
         m_table(getOutputTable(value)),
-        m_iterator(m_table->iterator()),
+        m_iterator(m_table->makeIterator()),
         m_tuple(m_table->schema()),
         m_null_tuple(m_table->schema()),
         m_size(m_table->activeTupleCount())
     {}
+
+    ~TupleExtractor()
+    {
+        delete m_iterator;
+    }
 
     int64_t resultSize() const
     {
@@ -212,7 +217,7 @@ struct TupleExtractor
 
     bool hasNext()
     {
-        return m_iterator.next(m_tuple);
+        return m_iterator->next(m_tuple);
     }
 
     ValueType next()
@@ -274,7 +279,7 @@ private:
     }
 
     Table* m_table;
-    TableIterator& m_iterator;
+    TableIterator* m_iterator;
     ValueType m_tuple;
     const StandAloneTupleStorage m_null_tuple;
     int64_t m_size;

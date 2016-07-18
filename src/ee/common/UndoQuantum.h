@@ -26,6 +26,7 @@
 #include "common/Pool.hpp"
 #include "common/UndoAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
+#include "common/SynchronizedThreadLock.h"
 #include "boost/unordered_set.hpp"
 
 class StreamedTableTest;
@@ -91,6 +92,13 @@ protected:
              i != m_undoActions.rend(); ++i) {
             UndoAction* goner = *i;
             goner->undo();
+            if (goner->isReplicatedTable()) {
+                if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+                    SynchronizedThreadLock::signalLastSiteFinished();
+                } else {
+                    SynchronizedThreadLock::waitForLastSiteFinished();
+                }
+            }
             delete goner;
         }
         Pool * result = m_dataPool;

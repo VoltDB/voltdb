@@ -619,6 +619,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -650,6 +651,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_clusterIndex,
                 m_siteId,
                 m_partitionId,
+                sitesPerHost,
                 m_hostId,
                 m_hostname,
                 drClusterId,
@@ -688,6 +690,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -705,6 +708,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(clusterIndex);
         m_data.putLong(siteId);
         m_data.putInt(partitionId);
+        m_data.putInt(sitesPerHost);
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
         m_data.putInt(defaultDrBufferSize);

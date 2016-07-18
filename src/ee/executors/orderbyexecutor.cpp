@@ -126,7 +126,6 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
-    TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
     // If limit == 0 we have no work here.  There's no need to sort anything,
@@ -136,12 +135,14 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit != 0) {
         vector<TableTuple> xs;
         ProgressMonitorProxy pmp(m_engine, this);
-        while (iterator.next(tuple))
+        TableIterator* iterator = input_table->makeIterator();
+        while (iterator->next(tuple))
         {
             pmp.countdownProgress();
             assert(tuple.isActive());
             xs.push_back(tuple);
         }
+        delete iterator;
         VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
                    input_table->debug().c_str());
 

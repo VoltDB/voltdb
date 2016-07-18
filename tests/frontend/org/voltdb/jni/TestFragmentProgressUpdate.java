@@ -592,6 +592,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 CLUSTER_ID,
                 NODE_ID,
                 0,
+                1,
                 0,
                 "",
                 0,

@@ -334,9 +334,9 @@ bool CoveringCellIndex::checkForIndexChangeDo(const TableTuple *lhs, const Table
 bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string* reasonInvalid) const {
 
     // Make sure that each row in the table has a matching entry in the tuple map.
-    TableIterator tableIt = table->iterator();
+    TableIterator* tableIt = table->makeIterator();
     TableTuple tuple(table->schema());
-    while (tableIt.next(tuple)) {
+    while (tableIt->next(tuple)) {
         NValue nval = tuple.getNValue(m_columnIndex);
         bool isNull = nval.isNull();
 
@@ -348,6 +348,7 @@ bool CoveringCellIndex::checkValidityForTest(PersistentTable* table, std::string
             }
         }
     }
+    delete tableIt;
 
     // Make sure that each entry in the tuple map is a valid row in the table,
     //   and has entries in the cell map for each cell.

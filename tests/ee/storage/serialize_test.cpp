@@ -123,11 +123,12 @@ class TableSerializeTest : public Test {
 TEST_F(TableSerializeTest, RoundTrip) {
     // print out the first table
     /*TableTuple tuple(table_.get());
-    TableIterator iter = table_->iterator();
+    TableIterator* iter = table_->makeIterator();
     VOLT_DEBUG("TABLE 1");
-    while (iter.next(tuple)) {
+    while (iter->next(tuple)) {
         VOLT_DEBUG(" %s", tuple.debug(table_.get()).c_str());
-    }*/
+    }
+    delete iter;*/
     // Serialize the table
     CopySerializeOutput serialize_out;
     table_->serializeTo(serialize_out);
@@ -193,10 +194,10 @@ TEST_F(TableSerializeTest, NullStrings) {
     EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
     EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
 
-    TableIterator iter = deserialized->iterator();
+    TableIterator* iter = deserialized->makeIterator();
     TableTuple t(deserialized->schema());
     int count = 0;
-    while (iter.next(t)) {
+    while (iter->next(t)) {
         const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(0);
         EXPECT_EQ(VALUE_TYPE_VARCHAR, columnInfo->getVoltType());
         const TupleSchema::ColumnInfo *tcolumnInfo = t.getSchema()->getColumnInfo(0);
@@ -208,6 +209,7 @@ TEST_F(TableSerializeTest, NullStrings) {
         count += 1;
     }
     EXPECT_EQ(1, count);
+    delete iter;
     delete deserialized;
 }
 

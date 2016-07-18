@@ -56,6 +56,11 @@ private:
         m_emptyTable->truncateTableRelease(m_originalTable);
     }
 
+    /*
+     * Indicates this undo action needs to be coordinated across sites in the same host
+     */
+    virtual bool isReplicatedTable() { return m_originalTable->isReplicatedTable(); }
+
 private:
     VoltDBEngine * m_engine;
     TableCatalogDelegate * m_tcd;

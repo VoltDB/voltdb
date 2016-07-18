@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDOINSERTACTION_H_
-#define PERSISTENTTABLEUNDOINSERTACTION_H_
+#ifndef DUMMYPERSISTENTTABLEUNDOACTION_H_
+#define DUMMYPERSISTENTTABLEUNDOACTION_H_
 
 #include "common/UndoAction.h"
 #include "common/types.h"
@@ -25,20 +25,18 @@
 namespace voltdb {
 
 
-class PersistentTableUndoInsertAction: public voltdb::UndoAction {
+class DummyPersistentTableUndoAction: public voltdb::UndoAction {
 public:
-    inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *table)
-        : m_tuple(insertedTuple), m_table(table)
+    inline DummyPersistentTableUndoAction(voltdb::PersistentTableSurgeon *table)
+        : m_table(table)
     { }
 
-    virtual ~PersistentTableUndoInsertAction() { }
+    virtual ~DummyPersistentTableUndoAction() { }
 
     /*
      * Undo whatever this undo action was created to undo
      */
     virtual void undo() {
-        m_table->deleteTupleForUndo(m_tuple);
     }
 
     /*
@@ -53,10 +51,9 @@ public:
     virtual bool isReplicatedTable() { return m_table->getTable().isReplicatedTable(); }
 
 private:
-    char* m_tuple;
     PersistentTableSurgeon *m_table;
 };
 
 }
 
-#endif /* PERSISTENTTABLEUNDOINSERTACTION_H_ */
+#endif

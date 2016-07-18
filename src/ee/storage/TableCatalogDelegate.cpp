@@ -38,6 +38,7 @@
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+#include "execution/VoltDBEngine.h"
 #include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
@@ -55,7 +56,15 @@ namespace voltdb {
 TableCatalogDelegate::~TableCatalogDelegate()
 {
     if (m_table) {
-        m_table->decrementRefcount();
+        PersistentTable* persistent = getPersistentTable();
+        if (persistent && persistent->isReplicatedTable()) {
+            if (m_engine == mpEngineLocals.context->getContextEngine()) {
+                m_table->decrementRefcount();
+            }
+        }
+        else {
+            m_table->decrementRefcount();
+        }
     }
 }
 
@@ -547,10 +556,10 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator &iterator = existingTable->iterator();
+        TableIterator* iterator = existingTable->makeIterator();
         TableTuple &tupleToInsert = newTable->tempTuple();
 
-        while (iterator.next(scannedTuple)) {
+        while (iterator->next(scannedTuple)) {
 
             //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
 
@@ -585,6 +594,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
                 break;
             }
         }
+        delete iterator;
     }
 
     // release any memory held by the default values --

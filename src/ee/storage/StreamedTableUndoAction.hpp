@@ -31,12 +31,14 @@ class StreamedTableUndoAction : public voltdb::UndoAction {
     {
     }
 
-    void undo() {
+    virtual void undo() {
         m_table->undo(m_mark);
     }
 
-    void release() {
+    virtual void release() {
     }
+
+    virtual bool isReplicatedTable() { return false; }
 
   private:
     StreamedTable *m_table;

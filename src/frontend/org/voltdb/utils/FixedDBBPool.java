@@ -17,17 +17,17 @@
 
 package org.voltdb.utils;
 
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.EELibraryLoader;
-import org.voltdb.VoltDB;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.EELibraryLoader;
+import org.voltdb.VoltDB;
 
 public class FixedDBBPool {
     // Key is the size of the buffers for the corresponding permits

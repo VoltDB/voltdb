@@ -46,6 +46,11 @@ public:
      * Release any resources held by the undo action. It will not need to be undone in the future.
      */
     virtual void release() = 0;
+
+    /*
+     * For shared replicated table, undo action needs to be coordinated
+     */
+    virtual bool isReplicatedTable() = 0;
 };
 }
 #endif /* UNDOACTION_H_ */

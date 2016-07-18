@@ -249,6 +249,7 @@ CTX.INPUT['common'] = """
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp
  debuglog.cpp
+ SynchronizedThreadLock.cpp
 """
 
 CTX.INPUT['execution'] = """

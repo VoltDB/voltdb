@@ -18,10 +18,52 @@
 #ifndef THREADLOCALPOOL_H_
 #define THREADLOCALPOOL_H_
 
+#include "structures/CompactingPool.h"
+
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
+#include <boost/unordered_map.hpp>
 
 namespace voltdb {
+
+typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
+
+struct voltdb_pool_allocator_new_delete
+{
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
+
+    static char * malloc(const size_type bytes);
+    static void free(char * const block);
+};
+
+typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
+typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
+typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
+
+typedef std::pair<int, PoolsByObjectSize*> PoolPairType;
+typedef PoolPairType* PoolPairTypePtr;
+
+struct PoolLocals {
+    PoolLocals();
+
+    inline PoolLocals(const PoolLocals& src) {
+        poolData = src.poolData;
+        stringData = src.stringData;
+        allocated = src.allocated;
+    }
+
+    inline PoolLocals& operator = (PoolLocals const& rhs) {
+        poolData = rhs.poolData;
+        stringData = rhs.stringData;
+        allocated = rhs.allocated;
+        return *this;
+    }
+
+    PoolPairTypePtr poolData;
+    CompactingStringStorage* stringData;
+    std::size_t* allocated;
+};
 
 /**
  * A wrapper around a set of pools that are local to the current thread.
@@ -50,11 +92,15 @@ public:
 
     static const int POOLED_MAX_VALUE_LENGTH;
 
+    static void assignThreadLocals(PoolLocals& mapping);
+
+    static PoolPairTypePtr getDataPoolPair();
+
     /**
      * Allocate space from a page of objects of the requested size.
      * Each new size of object splinters the allocated memory into a new pool
      * which is a collection of pages of objects of that exact size.
-     * Each pool will allocate additional space that is initally unused.
+     * Each pool will allocate additional space that is initially unused.
      * This is not an issue when the allocated objects will be instances of a
      * class that has many instances to quickly fill up the unused space. So,
      * an optimal use case is a custom operator new for a commonly used class.

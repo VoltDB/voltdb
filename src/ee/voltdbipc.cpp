@@ -585,6 +585,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int clusterId;
         long siteId;
         int partitionId;
+        int sitesPerHost;
         int hostId;
         int drClusterId;
         int defaultDrBufferSize;
@@ -603,6 +604,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->clusterId = ntohl(cs->clusterId);
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
+    cs->sitesPerHost = ntohl(cs->sitesPerHost);
     cs->hostId = ntohl(cs->hostId);
     cs->drClusterId = ntohl(cs->drClusterId);
     cs->defaultDrBufferSize = ntohl(cs->defaultDrBufferSize);
@@ -628,6 +630,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
                                  cs->partitionId,
+                                 cs->sitesPerHost,
                                  cs->hostId,
                                  hostname,
                                  cs->drClusterId,

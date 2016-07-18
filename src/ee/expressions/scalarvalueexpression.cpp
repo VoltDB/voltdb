@@ -43,14 +43,16 @@ voltdb::NValue ScalarValueExpression::eval(const TableTuple *tuple1, const Table
         snprintf(message, 256, "More than one row returned by a scalar/row subquery");
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
-    TableIterator& iterator = table->iterator();
+    TableIterator* iterator = table->makeIterator();
     TableTuple tuple(table->schema());
-    if (iterator.next(tuple)) {
-        return tuple.getNValue(0);
+    voltdb::NValue rslt;
+    if (iterator->next(tuple)) {
+        rslt = tuple.getNValue(0);
     } else {
-        return NValue::getNullValue(m_left->getValueType());
+        rslt = NValue::getNullValue(m_left->getValueType());
     }
-
+    delete iterator;
+    return rslt;
 }
 
 std::string ScalarValueExpression::debugInfo(const std::string &spacer) const {
