@@ -3,24 +3,14 @@ package org.voltdb.calciteadapter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.adapter.enumerable.EnumerableFilter;
-import org.apache.calcite.adapter.enumerable.EnumerableJoin;
-import org.apache.calcite.adapter.enumerable.EnumerableRules;
-import org.apache.calcite.adapter.enumerable.EnumerableThetaJoin;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -281,9 +271,6 @@ public class CalcitePlanner {
             sb.append("\n**** Converted relational expression ****\n" +
                     RelOptUtil.toString(convert) + "\n");
 
-            System.out.println("\n**** Converted relational expression ****\n" +
-                    RelOptUtil.toString(convert) + "\n");
-
             // Transform the relational expression
             RelTraitSet traitSet = planner.getEmptyTraitSet()
                     .replace(VoltDBConvention.INSTANCE);
@@ -291,10 +278,6 @@ public class CalcitePlanner {
 
             sb.append("**** Optimized relational expression ****\n" +
                     RelOptUtil.toString(transform) + "\n");
-
-            System.out.println("\n**** Optimized relational expression ****\n" +
-                    RelOptUtil.toString(transform) + "\n");
-
 
             calciteToVoltDBPlan((VoltDBRel)transform, compiledPlan);
 

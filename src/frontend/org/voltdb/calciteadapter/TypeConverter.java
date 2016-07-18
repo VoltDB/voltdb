@@ -11,6 +11,9 @@ public class TypeConverter {
         if (typeName.getName().equals("VARCHAR")) {
             return "STRING";
         }
+        else if (typeName.getName().equals("DOUBLE")) {
+            return "FLOAT";
+        }
 
         return typeName.getName();
     }

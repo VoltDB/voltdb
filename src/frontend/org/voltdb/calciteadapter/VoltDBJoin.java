@@ -64,7 +64,7 @@ public class VoltDBJoin extends Join implements VoltDBRel {
         NestLoopPlanNode nlpn = new NestLoopPlanNode();
 
         AbstractPlanNode lch = ((VoltDBRel)getInput(0)).toPlanNode();
-        AbstractPlanNode rch = ((VoltDBRel)getInput(0)).toPlanNode();
+        AbstractPlanNode rch = ((VoltDBRel)getInput(1)).toPlanNode();
         nlpn.addAndLinkChild(lch);
         nlpn.addAndLinkChild(rch);
         int numLhsFields = getInput(0).getRowType().getFieldCount();
