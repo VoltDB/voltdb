@@ -266,9 +266,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         diskLimitExpanded              {$("#diskLimitConfiguration").find(".configLabel").first()}
         snapShotName {$("#diskLimitConfiguration").find(".configLabe2").first()}
         noFeaturestxt           { $("#diskLimitConfiguration > tr.childprop-row-60 > td.configLabel")}
-
         updateInnerErrorPopup {$("#updateInnerErrorPopup")}
-
     }
     static at = {
         adminTab.displayed
