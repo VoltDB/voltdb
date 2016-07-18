@@ -1258,7 +1258,6 @@ template void PersistentTable::processLoadedTupleShared <TypedSerializeOutput<Se
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows);
-
 /** Prepare table for streaming from serialized data. */
 bool PersistentTable::activateStream(
     TupleSerializer &tupleSerializer,

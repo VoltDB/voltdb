@@ -865,7 +865,7 @@ int VoltDBIPC::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 
     if (dependencySz > 0) {
         ReferenceSerializeInputBE serialize_in(buf, dependencySz);
-        destination->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, stringPool);
+        destination->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, stringPool);
         delete [] origBuf;
         return 1;
     }

@@ -262,7 +262,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         // so it'll get cleaned up if loadTuplesFrom throws
         jni_frame.addDependencyRef(is_copy, jbuf, bytes);
         ReferenceSerializeInputBE serialize_in(bytes, length);
-        destination->loadTuplesFrom<ReferenceSerializeOutputBuffer>(serialize_in, stringPool);
+        destination->loadTuplesFrom<TypedSerializeOutput<ReferenceSerializeOutputBuffer>>(serialize_in, stringPool);
         return 1;
     }
     else {

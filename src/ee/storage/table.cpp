@@ -341,6 +341,7 @@ template bool Table::serializeColumnHeaderTo<TypedSerializeOutput<SerializeOutpu
 
 
 template<class T> bool Table::serializeTo(T &serialize_io) {
+
     // The table is serialized as:
     // [(int) total size]
     // [(int) header size] [num columns] [column types] [column names]
@@ -557,7 +558,6 @@ template <class T> void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
-
 template void Table::loadTuplesFrom <TypedSerializeOutput<ReferenceSerializeOutputBuffer>> (SerializeInputBE &serialize_io,
                            Pool *stringPool,
                            TypedSerializeOutput<ReferenceSerializeOutputBuffer> *uniqueViolationOutput,

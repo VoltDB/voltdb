@@ -79,7 +79,6 @@ class UndoLog;
 
 #ifndef SERIALIZE_IO_DECLARATIONS
 #define SERIALIZE_IO_DECLARATIONS
-
 template <Endianess E> class SerializeInput;
 typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
 typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
