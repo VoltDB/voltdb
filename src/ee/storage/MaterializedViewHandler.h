@@ -37,18 +37,10 @@ public:
         assert(m_table->m_deltaTable);
         assert( ! m_table->m_deltaTableActive);
         m_table->m_deltaTableActive = true;
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << "Delta table for " << m_table->name() << " has been activated." << endl;
-#endif
     }
 
     ~ScopedDeltaTableContext() {
         m_table->m_deltaTableActive = false;
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << "Delta table for " << m_table->name() << " has been deactivated." << endl;
-#endif
     }
 private:
     PersistentTable *m_table;

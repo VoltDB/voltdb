@@ -374,10 +374,6 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     }
     else {
         // Joined table view.
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << "PersistentTable::truncateTableRelease joined table " << originalTable->m_name << endl;
-#endif
         BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, originalTable->m_viewsToTrigger) {
             PersistentTable *destTable = viewToTrigger->destTable();
             destTable->decrementRefcount();
@@ -456,10 +452,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         }
     }
     else {
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << "PersistentTable::truncateTable() " << m_name << ": a joined table view source.\n";
-#endif
         BOOST_FOREACH (MaterializedViewHandler *viewToTrigger, m_viewsToTrigger) {
             PersistentTable *destTable = viewToTrigger->destTable();
             TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
@@ -1915,10 +1907,6 @@ void PersistentTable::addViewToTrigger(MaterializedViewHandler *viewToTrigger) {
         TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
                                              *engine->getCatalogTable(m_name));
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << "Delta table for " << m_name << " is created.\n";
-#endif
     }
     m_viewsToTrigger.push_back(viewToTrigger);
 }
