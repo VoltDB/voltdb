@@ -1450,6 +1450,21 @@
             return slicedData;
         }
 
+        this.savePartitionDataToLocalStorage = function(data, newItem, timeUnit, keyIndex){
+            var sliderValue = $( "#slider-range-min" ).slider( "value" )
+            var values = data[keyIndex].values
+            var slicedData = []
+            var interval = (sliderValue * 60) / timeUnit
+            if (values.length >= interval){
+                slicedData = values.slice(1,  (values.length - (values.length - interval)))
+            } else {
+                slicedData = values
+            }
+            slicedData.push(newItem)
+            data[keyIndex].values = slicedData
+            return data;
+        }
+
         function getPartitionData() {
             var monitor = MonitorGraphUI.Monitors;
             monitor.partitionData = getEmptyDataForPartition();
@@ -1531,12 +1546,12 @@
                                 var keyIndex = dataMapperMin[keyValue];
                                 partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.partitionMaxTimeStamp) {
-                                    var newObject = { "color": partitionDataMin[keyIndex].color , "key": partitionDataMin[keyIndex].key, "values": [{"x": new Date(timestamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }]};
-                                    partitionDetailsArrMin = MonitorGraphUI.saveLocalStorage(partitionDataMin, newObject, MonitorGraphUI.timeUnit.min)
+//                                    var newObject = {"values": [{"x": new Date(timestamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }]};
+                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDataMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, MonitorGraphUI.timeUnit.min, keyIndex)
                                     partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
                                 } else {
-                                    var newObject = { "color": partitionDataMin[keyIndex].color , "key": partitionDataMin[keyIndex].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
-                                    partitionDetailsArrMin = MonitorGraphUI.saveLocalStorage(partitionDataMin, newObject, MonitorGraphUI.timeUnit.min)
+//                                    var newObject = { "color": partitionDataMin[keyIndex].color , "key": partitionDataMin[keyIndex].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
+                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDataMin, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.min, keyIndex)
                                     partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                                 }
                                 MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
@@ -1547,12 +1562,12 @@
                             var keyIndexDay = dataMapperDay[keyValue];
                             partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.partitionMaxTimeStamp) {
-                                var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{"x": new Date(timestamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }]};
-                                partitionDetailsArrDay = MonitorGraphUI.saveLocalStorage(partitionDataDay, newObject, MonitorGraphUI.timeUnit.day)
+//                                var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{"x": new Date(timestamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }]};
+                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDataDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                                 partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
                             } else {
-                                 var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
-                                partitionDetailsArrDay = MonitorGraphUI.saveLocalStorage(partitionDataDay, newObject, MonitorGraphUI.timeUnit.day)
+//                                 var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
+                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDataDay, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                                 partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                             }
                             MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
@@ -1562,12 +1577,13 @@
 
                         partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.partitionMaxTimeStamp) {
-                            var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{"x": new Date(timestamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }]};
-                            partitionDetailsArr = MonitorGraphUI.saveLocalStorage(partitionData, newObject, MonitorGraphUI.timeUnit.sec)
+//                            var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{"x": new Date(timestamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }]};
+
+                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionData, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, MonitorGraphUI.timeUnit.sec, keyIndexSec)
                             partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
                         } else {
-                             var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{'x': new Date(timeStamp), 'y': percentValue }]}
-                            partitionDetailsArr = MonitorGraphUI.saveLocalStorage(partitionData, newObject, MonitorGraphUI.timeUnit.sec  )
+//                             var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{'x': new Date(timeStamp), 'y': percentValue }]}
+                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionData, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.sec, keyIndexSec  )
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
                         }
                         MonitorGraphUI.Monitors.partitionData = partitionData;
