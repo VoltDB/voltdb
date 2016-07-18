@@ -79,25 +79,25 @@ class UploadConfiguration(Database):
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/images.png', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file type.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file type.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/Invalid.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file content.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file content.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/Sample.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'failure')
-            self.assertEqual(result['error'],'Invalid file content.')
+            self.assertEqual(result['status'], 401)
+            self.assertEqual(result['statusString'], 'Invalid file content.')
 
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/deployment.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'success')
+            self.assertEqual(result['status'], 201)
         else:
             print "The database list is empty"
 
@@ -114,7 +114,7 @@ class UploadConfiguration(Database):
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/deployment.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
-            self.assertEqual(result['status'],'success')
+            self.assertEqual(result['status'], 201)
             response = requests.get(__db_url__ + str(last_db_id) + '/deployment/', headers=headers )
             value = response.json()
 

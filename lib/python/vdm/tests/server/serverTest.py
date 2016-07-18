@@ -141,7 +141,7 @@ class CreateServer(Server):
         data = {'description': 'test', 'hostname': '', 'name': 'test', 'id':3}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
-        self.assertEqual(value['errors'], 'You cannot specify \'Id\' while creating server.')
+        self.assertEqual(value['statusString'], 'You cannot specify \'Id\' while creating server.')
         self.assertEqual(response.status_code, 404)
 
     def test_validate_host_name(self):
@@ -160,7 +160,7 @@ class CreateServer(Server):
         data = {'description': 'test', 'hostname': '', 'name': 'test'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
-        self.assertEqual(value['errors'][0], 'Host name is required.')
+        self.assertEqual(value['statusString'][0], 'Host name is required.')
         self.assertEqual(response.status_code, 200)
 
     def test_validate_invalid_host_name(self):
@@ -179,7 +179,7 @@ class CreateServer(Server):
         data = {'description': 'test', 'hostname': '444', 'name': 'test'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
-        self.assertEqual(value['errors'][0], 'Invalid IP address.')
+        self.assertEqual(value['statusString'][0], 'Invalid IP address.')
         self.assertEqual(response.status_code, 200)
 
     def test_validate_port(self):
@@ -202,7 +202,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'][0], 'Port must be greater than 1 and less than 65535')
+            self.assertEqual(value['statusString'][0], 'Port must be greater than 1 and less than 65535')
 
     def test_validate_ip_address(self):
         """
@@ -224,7 +224,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'][0], 'Invalid IP address.')
+            self.assertEqual(value['statusString'][0], 'Invalid IP address.')
 
     def test_validate_duplicate_port(self):
         """
@@ -246,7 +246,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['statusString'], 'Duplicate port')
 
     def test_validate_duplicate_http_port(self):
         """
@@ -268,7 +268,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+            self.assertEqual(value['statusString'], 'Port 8080 for the same host is already used by server %s for '
                                               'http-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_admin_port(self):
@@ -291,7 +291,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+            self.assertEqual(value['statusString'], 'Port 21211 for the same host is already used by server %s for '
                                               'admin-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port(self):
@@ -314,7 +314,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+            self.assertEqual(value['statusString'], 'Port 3021 for the same host is already used by server %s '
                                               'for internal-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port(self):
@@ -338,7 +338,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+            self.assertEqual(value['statusString'], 'Port 7181 for the same host is already used by server %s for '
                                               'zookeeper-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_client_port(self):
@@ -362,7 +362,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+            self.assertEqual(value['statusString'], 'Port 21212 for the same host is already used by server %s for '
                                               'client-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port(self):
@@ -386,7 +386,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+            self.assertEqual(value['statusString'], 'Port 5555 for the same host is already used by server %s for '
                                               'replication-listener.' % __host_or_ip__)
 
 
@@ -417,7 +417,7 @@ class UpdateServer(Server):
                         'name': 'test12345', 'id': 33333}
                 response = requests.put(url, json=data, headers=headers)
                 value = response.json()
-                self.assertEqual(value['errors'], 'Server Id mentioned in the payload and url doesn\'t match.')
+                self.assertEqual(value['statusString'], 'Server Id mentioned in the payload and url doesn\'t match.')
                 self.assertEqual(response.status_code, 404)
             else:
                 print "The Server list is empty"
@@ -446,7 +446,7 @@ class UpdateServer(Server):
                 data = {'description': 'test', 'hostname': '', 'name': 'test'}
                 response = requests.put(url, json=data, headers=headers)
                 value = response.json()
-                self.assertEqual(value['errors'][0], 'Host name is required.')
+                self.assertEqual(value['statusString'][0], 'Host name is required.')
                 self.assertEqual(response.status_code, 200)
             else:
                 print "The Server list is empty"
@@ -473,7 +473,7 @@ class UpdateServer(Server):
                 data = {'description': 'test', 'hostname': '3333', 'name': 'test'}
                 response = requests.put(url, json=data, headers=headers)
                 value = response.json()
-                self.assertEqual(value['errors'][0], 'Invalid IP address.')
+                self.assertEqual(value['statusString'][0], 'Invalid IP address.')
                 self.assertEqual(response.status_code, 200)
             else:
                 print "The Server list is empty"
@@ -555,7 +555,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Duplicate port')
+                    self.assertEqual(value['statusString'], 'Duplicate port')
             else:
                 print "The Server list is empty"
         else:
@@ -606,7 +606,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                    self.assertEqual(value['statusString'], 'Port 8080 for the same host is already used by server %s for '
                                                       'http-listener.' % __host_or_ip__)
             else:
                 print "The Server list is empty"
@@ -657,7 +657,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+                    self.assertEqual(value['statusString'], 'Port 21211 for the same host is already used by server %s for '
                                                       'admin-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port_update(self):
@@ -704,7 +704,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+                    self.assertEqual(value['statusString'], 'Port 3021 for the same host is already used by server %s '
                                                       'for internal-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port_update(self):
@@ -752,7 +752,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+                    self.assertEqual(value['statusString'], 'Port 7181 for the same host is already used by server %s for '
                                                       'zookeeper-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_client_port_update(self):
@@ -800,7 +800,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+                    self.assertEqual(value['statusString'], 'Port 21212 for the same host is already used by server %s for '
                                                       'client-listener.' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port_update(self):
@@ -849,7 +849,7 @@ class UpdateServer(Server):
                     self.assertEqual(response.status_code, 201)
                 else:
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+                    self.assertEqual(value['statusString'], 'Port 5555 for the same host is already used by server %s for '
                                                       'replication-listener.' % __host_or_ip__)
 
 

@@ -107,22 +107,22 @@ class TempTable : public Table {
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
 
-    void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
+    void deleteAllTempTupleDeepCopies();
+
+    void deleteAllTempTuples();
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
      * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
      * before they are dirtied
      */
-    void insertTupleNonVirtualWithDeepCopy(const TableTuple &source, Pool *pool);
+    void insertTempTupleDeepCopy(const TableTuple &source, Pool *pool);
 
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
     void insertTempTuple(TableTuple &source);
     // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
-    bool insertTupleNonVirtual(TableTuple &source) { insertTempTuple(source); return true; };
-
     bool isTempTableEmpty() { return m_tupleCount == 0; }
 
     int64_t tempTableTupleCount() const { return m_tupleCount; }
@@ -160,12 +160,14 @@ class TempTable : public Table {
         m_data.clear();
     };
 
+    std::vector<uint64_t> getBlockAddresses() const;
+
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
 };
 
-inline void TempTable::insertTupleNonVirtualWithDeepCopy(const TableTuple &source, Pool *pool) {
+inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
@@ -201,36 +203,25 @@ inline void TempTable::insertTempTuple(TableTuple &source) {
     target.setPendingDeleteOnUndoReleaseFalse();
 }
 
-inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
-
+inline void TempTable::deleteAllTempTuples() {
     if (m_tupleCount == 0) {
         return;
     }
 
-    // Mark tuples as deleted and free strings. No indexes to update.
-    const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
-    if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        TableTuple target(m_schema);
-        TableIterator iter(this, m_data.begin());
-        while (iter.hasNext()) {
-            iter.next(target);
-            target.freeObjectColumns();
-        }
-    }
-
     m_tupleCount = 0;
-    while (m_data.size() > 1) {
-        // This block of temp table may have been clean up already
-        // because of delete as we go feature.
+    int remaining = m_data.size();
+    for (; remaining > 1; --remaining) {
         TBPtr blockPtr = m_data.back();
         m_data.pop_back();
+        // These temp table blocks may have been cleaned up
+        // and set null already by the delete as we go feature.
         if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
 
     // cheap clear of the preserved first block
-    if (!m_data.empty()) {
+    if (remaining) {
         m_data[0]->reset();
     }
 }

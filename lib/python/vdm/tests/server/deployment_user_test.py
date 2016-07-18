@@ -79,7 +79,7 @@ class UpdateDeploymentUser(DeploymentUser):
             db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
             response = requests.post(user_url, json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], u'user name already exists')
+            self.assertEqual(value['statusString'], u'user name already exists')
 
             self.assertEqual(response.status_code, 404)
         else:
@@ -96,7 +96,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'name' is a required property")
+            self.assertEqual(value['statusString'][0], "'name' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -110,7 +110,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.]+$'")
+            self.assertEqual(value['statusString'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.]+$'")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -126,7 +126,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'password' is a required property")
+            self.assertEqual(value['statusString'][0], "'password' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -142,7 +142,7 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "'roles' is a required property")
+            self.assertEqual(value['statusString'][0], "'roles' is a required property")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"
@@ -156,14 +156,14 @@ class UpdateDeploymentUser(DeploymentUser):
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.,-]+$'")
+            self.assertEqual(value['statusString'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.,-]+$'")
             self.assertEqual(response.status_code, 200)
 
             db_data = {"name": "voltdb", "password": "test", "plaintext": True,"roles":",", "databaseid": 1}
             response = requests.post(user_url,
                                     json=db_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "Invalid user roles.")
+            self.assertEqual(value['statusString'], "Invalid user roles.")
             self.assertEqual(response.status_code, 200)
         else:
             print "The database list is empty"

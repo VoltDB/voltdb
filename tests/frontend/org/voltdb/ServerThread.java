@@ -26,7 +26,9 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.common.Constants;
 import org.voltcore.utils.InstanceId;
+import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -43,6 +45,12 @@ public class ServerThread extends Thread {
         }
         if (m_config.m_leader == null) {
             m_config.m_leader = "";
+        }
+        if (m_config.m_coordinators == null || m_config.m_coordinators.isEmpty()) {
+            m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
+        }
+        if (m_config.m_startAction != StartAction.PROBE) {
+            m_config.m_hostCount = VoltDB.UNDEFINED;
         }
 
         if (!m_config.validate()) {
@@ -64,6 +72,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
@@ -83,6 +92,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = MeshProber.hosts(m_config.m_internalPort);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
@@ -102,7 +112,7 @@ public class ServerThread extends Thread {
             int internalPort,
             int zkPort,
             BackendTarget target) {
-        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
+        this(pathToCatalog, pathToDeployment, Constants.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
     }
 
     private ServerThread(String pathToCatalog,
@@ -120,6 +130,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
+        m_config.m_coordinators = MeshProber.hosts(internalPort);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
