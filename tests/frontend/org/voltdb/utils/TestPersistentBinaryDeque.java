@@ -916,7 +916,7 @@ public class TestPersistentBinaryDeque {
         setupTestDir();
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
     }
-    
+
     public static void setupTestDir() throws IOException {
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
@@ -940,7 +940,7 @@ public class TestPersistentBinaryDeque {
         System.gc();
         System.runFinalization();
     }
-    
+
     public static void tearDownTestDir() {
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {

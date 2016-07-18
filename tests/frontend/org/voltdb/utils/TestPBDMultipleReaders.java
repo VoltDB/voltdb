@@ -38,16 +38,16 @@ public class TestPBDMultipleReaders {
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
     private PersistentBinaryDeque m_pbd;
-    
+
     private class PBDReader {
         private String m_readerId;
         private int m_totalRead;
-        
+
         public PBDReader(String readerId) throws IOException {
             m_readerId = readerId;
             m_pbd.openForRead(m_readerId);
         }
-        
+
         public void readToEndOfSegment() throws Exception {
             int end = (m_totalRead/47 + 1) * 47;
             boolean done = false;
@@ -70,13 +70,13 @@ public class TestPBDMultipleReaders {
             m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)) );
         }
         int numSegments = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
-        
+
         int numReaders = 3;
         PBDReader[] readers = new PBDReader[numReaders];
         for (int i=0; i<numReaders; i++) {
             readers[i] = new PBDReader("reader" + i);
         }
-        
+
         int currNumSegments = numSegments;
         for (int i=0; i<numSegments; i++) {
             // One reader finishing shouldn't discard the segment
@@ -91,7 +91,7 @@ public class TestPBDMultipleReaders {
             assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         }
     }
-    
+
     @Before
     public void setUp() throws Exception {
         TestPersistentBinaryDeque.setupTestDir();

@@ -135,7 +135,7 @@ class PBDMMapSegment extends PBDSegment {
     public boolean isOpenForReading(String cursorId) {
         return false;
     }
-    
+
     @Override
     //MJ TODO:
     public void openForRead(String cursorId) throws IOException {
@@ -238,7 +238,7 @@ class PBDMMapSegment extends PBDSegment {
         if (m_closed) throw new IOException("closed");
         return m_discardCount == getNumEntries();
     }
-    
+
     @Override
     // MJ TODO:
     public boolean isSegmentEmpty() throws IOException {

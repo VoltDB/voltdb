@@ -61,7 +61,7 @@ public abstract class PBDSegment {
     abstract int readIndex(String cursorId);
 
     abstract boolean isOpenForReading(String cursorId);
-    
+
     abstract void openForRead(String cursorId) throws IOException;
     /**
      * @param forWrite    Open the file in read/write mode
@@ -98,7 +98,7 @@ public abstract class PBDSegment {
      * although incredibly unlikely
      */
     abstract int uncompressedBytesToRead(String cursorId);
-    
+
     // TODO: javadoc
     abstract int size();
 
