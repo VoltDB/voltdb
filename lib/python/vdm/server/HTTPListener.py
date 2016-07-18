@@ -1519,7 +1519,7 @@ class DatabaseDeploymentAPI(MethodView):
             if not inputs.validate():
                 return jsonify(status=401, statusString=inputs.errors)
             result = Configuration.check_validation_deployment(request)
-            if 'status' in result and result['status'] == 'error':
+            if 'status' in result and result['status'] == 401:
                 return jsonify(result)
             if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
                 return jsonify({'status': '401', 'statusString': 'DR id is required.'})
@@ -1529,10 +1529,10 @@ class DatabaseDeploymentAPI(MethodView):
             return jsonify({'status': 200, 'statusString': 'Ok', 'deployment': deployment})
         else:
             result = Configuration.set_deployment_for_upload(database_id, request)
-            if 'status' in result and result['status'] == 'failure':
-                return jsonify(result)
+            if 'status' in result and result['status'] == 401:
+                return jsonify({'status': 401, 'statusString': result['statusString']})
             else:
-                return jsonify({'status': 201, 'statusString': "success"})
+                return jsonify({'status': 201, 'statusString': 'success'})
 
 
 class VdmAPI(MethodView):

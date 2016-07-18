@@ -30,3 +30,17 @@ CREATE TABLE T6 (
 	G FLOAT
 );
 
+-- Tables T7 And T8 have identical schema
+-- except T7 has a primary key index.
+CREATE TABLE T7 (
+       A INTEGER,
+       B INTEGER,
+       C INTEGER,
+       PRIMARY KEY (A, B)
+);
+
+CREATE TABLE T8 (
+       A INTEGER,
+       B INTEGER,
+       C INTEGER
+);

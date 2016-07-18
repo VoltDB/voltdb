@@ -39,9 +39,12 @@ import java.util.UUID;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.types.TimestampType;
@@ -116,6 +119,10 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
+        EstTimeUpdater.start();
+        VoltLogger.startAsynchronousLogging();
+        ReverseDNSCache.start();
+        ClientFactory.increaseClientCountToOne();
     }
 
     /** Encapsulates VoltDB configuration parameters */
@@ -635,6 +642,9 @@ public class VoltDB {
                 m_startAction = StartAction.PROBE;
                 m_enableAdd = true;
                 checkInitializationMarker();
+                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                    m_meshBrokers = m_leader;
+                }
             } else if (m_startAction == StartAction.INITIALIZE) {
                 if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"

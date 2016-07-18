@@ -111,7 +111,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'cluster': {'sitesperhost': ''}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_sitesperhost_negative(self):
@@ -125,7 +125,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'cluster': {'sitesperhost': -1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_sitesperhost_maximum(self):
@@ -140,7 +140,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'cluster': {'sitesperhost': maximum_value}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than the maximum of 15")
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than the maximum of 15")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_ksafety_empty(self):
@@ -154,7 +154,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'cluster': {'kfactor': '', 'sitesperhost': 1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_ksafety_negative(self):
@@ -168,7 +168,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'cluster': {'kfactor': -1, 'sitesperhost': 1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_ksafety_maximum(self):
@@ -184,7 +184,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': maximum_value,
                                                                'sitesperhost': 1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than "
                                                                       "the maximum of 2")
             self.assertEqual(response.status_code, 200)
 
@@ -200,7 +200,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'time': ''}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_time_negative(self):
@@ -215,7 +215,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'time': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_time_maximum(self):
@@ -231,7 +231,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'time': maximum_value}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than "
                                                                       "the maximum of 1000")
             self.assertEqual(response.status_code, 200)
 
@@ -247,7 +247,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'transactions': ''}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_transaction_negative(self):
@@ -262,7 +262,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'transactions': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 1")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_transaction_maximum(self):
@@ -278,7 +278,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'transactions': maximum_value}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than the "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than the "
                                                                       "maximum of 2147483647")
             self.assertEqual(response.status_code, 200)
 
@@ -295,7 +295,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'commandlog': {'logsize': ''}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_log_size_negative(self):
@@ -311,7 +311,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'commandlog': {'logsize': -1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 3")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 3")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_log_size_maximum(self):
@@ -328,7 +328,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'commandlog': {'logsize': maximum_value}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater "
                                                                       "than the maximum of 3000")
             self.assertEqual(response.status_code, 200)
 
@@ -345,7 +345,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'heartbeat': {'timeout': ''}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_heart_beat_timeout_negative(self):
@@ -361,7 +361,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'heartbeat': {'timeout': -1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 1")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_heart_beat_timeout_maximum(self):
@@ -378,7 +378,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'heartbeat': {'timeout': maximum_value}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater "
                                                                       "than the maximum of 2147483647")
             self.assertEqual(response.status_code, 200)
 
@@ -395,7 +395,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'systemsettings': {'query': {'timeout': ''}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_query_timeout_negative(self):
@@ -411,7 +411,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'query': {'timeout': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_query_timeout_maximum(self):
@@ -428,7 +428,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'query': {'timeout': maximum_value}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than the maximum "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than the maximum "
                                                                       "of 2147483647")
             self.assertEqual(response.status_code, 200)
 
@@ -445,7 +445,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'systemsettings': {'temptables': {'maxsize': ''}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_temp_table_size_negative(self):
@@ -461,7 +461,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'temptables': {'maxsize': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 1")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_snapshot_priority_empty(self):
@@ -477,7 +477,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'systemsettings': {'snapshot': {'priority': ''}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_snapshot_priority_negative(self):
@@ -493,7 +493,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'snapshot': {'priority': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_snapshot_priority_maximum(self):
@@ -510,7 +510,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'snapshot': {'priority': maximum_value}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than the "
+            self.assertEqual(value['statusString'][0], str(maximum_value) + " is greater than the "
                                                                       "maximum of 10")
             self.assertEqual(response.status_code, 200)
 
@@ -527,7 +527,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                           'systemsettings': {'resourcemonitor': {'memorylimit': {'size': ''}}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_memory_limit_negative(self):
@@ -543,7 +543,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1'}}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "memorylimit value must be between 1 and 2147483647.")
+            self.assertEqual(value['statusString'], "memorylimit value must be between 1 and 2147483647.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_memory_limit_negative_percent(self):
@@ -559,7 +559,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1%'}}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "memorylimit percent value must be between 1 and 99.")
+            self.assertEqual(value['statusString'], "memorylimit percent value must be between 1 and 99.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_invalid_export_type(self):
@@ -576,7 +576,7 @@ class UpdateDeployment(Deployment):
                                                                       'enabled':False,'stream':'test',
                                                                       'type':'test','property':[{'name':'test','value':'test'}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_stream_empty(self):
@@ -593,7 +593,7 @@ class UpdateDeployment(Deployment):
                                                                       'enabled':False,
                                                                       'type':'KAFKA','property':[{'name':'test','value':'test'}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_stream_invalid(self):
@@ -612,7 +612,7 @@ class UpdateDeployment(Deployment):
                                                                         "type": "elasticsearch"}]}},
                                     headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_property_value_empty(self):
@@ -629,7 +629,7 @@ class UpdateDeployment(Deployment):
                                                                       "exportconnectorclass":"test",
                                                                       "property":[{"name":"test"}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_extra_property(self):
@@ -647,7 +647,7 @@ class UpdateDeployment(Deployment):
                                                                         "property":[{"name": "metadata.broker.list",
                                                                                      "value": "1"}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_invalid_property(self):
@@ -665,8 +665,8 @@ class UpdateDeployment(Deployment):
                                                                         "stream": "test", "type": "elasticsearch"}]}},
                                     headers=headers)
             value = response.json()
-            self.assertEqual(value['status'], 'error')
-            self.assertEqual(value['error'], 'Export: Default property(endpoint) of elasticsearch not present.')
+            self.assertEqual(value['status'], 401)
+            self.assertEqual(value['statusString'], 'Export: Default property(endpoint) of elasticsearch not present.')
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_duplicate_property(self):
@@ -687,8 +687,8 @@ class UpdateDeployment(Deployment):
                                                                        ]}},
                                     headers=headers)
             value = response.json()
-            self.assertEqual(value['status'], 'error')
-            self.assertEqual(value['error'], 'Export: Duplicate properties are not allowed.')
+            self.assertEqual(value['status'], 401)
+            self.assertEqual(value['statusString'], 'Export: Duplicate properties are not allowed.')
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_invalid_export_type(self):
@@ -705,7 +705,7 @@ class UpdateDeployment(Deployment):
                                                                       'enabled':False,'module':'test',
                                                                       'type':'test','property':[{'name':'test','value':'test'}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'], False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_module_empty(self):
@@ -722,7 +722,7 @@ class UpdateDeployment(Deployment):
                                                                       'enabled':False,
                                                                       'type':'KAFKA','property':[{'name':'test','value':'test'}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_property_value_empty(self):
@@ -739,7 +739,7 @@ class UpdateDeployment(Deployment):
                                                                       "format":"test",
                                                                       "property":[{"name":"test"}]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_extra_property(self):
@@ -758,7 +758,7 @@ class UpdateDeployment(Deployment):
                                                                                    "value": "2"}
                                                                                   ]}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['success'],False)
+            self.assertEqual(value['status'], 401)
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_property(self):
@@ -779,8 +779,8 @@ class UpdateDeployment(Deployment):
                                                               [{"name": "metadata.brokerd.list","value": "2"}],
                                                           "type": "kafka"}]}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['status'], 'error')
-            self.assertEqual(value['error'], 'Import: Default property(metadata.broker.list) of kafka not present.')
+            self.assertEqual(value['status'], 401)
+            self.assertEqual(value['statusString'], 'Import: Default property(metadata.broker.list) of kafka not present.')
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_no_additional_property(self):
@@ -794,7 +794,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'dr': {'id': 2, "extraproperty":"extra"}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "Additional properties are not allowed (u'extraproperty' was unexpected)")
+            self.assertEqual(value['statusString'][0], "Additional properties are not allowed (u'extraproperty' was unexpected)")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_id_empty(self):
@@ -808,7 +808,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'dr': {'id': ''}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(value['statusString'][0], "u'' is not of type 'integer'")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_no_id(self):
@@ -822,7 +822,7 @@ class UpdateDeployment(Deployment):
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url, json={'dr': {'port': 22}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "DR id is required.")
+            self.assertEqual(value['statusString'], "DR id is required.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_id_negative(self):
@@ -837,7 +837,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url,
                                     json={'dr': {'id': -1}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['statusString'][0], "-1 is less than the minimum of 0")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_id_greater_than_limit(self):
@@ -852,7 +852,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url,
                                     json={'dr': {'id': 5555555555555555}},headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], u'5555555555555555 is greater than the maximum of 2147483647')
+            self.assertEqual(value['statusString'][0], u'5555555555555555 is greater than the maximum of 2147483647')
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_enabled_empty_and_boolean(self):
@@ -867,7 +867,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'dr': {'enabled': ''}}, headers=headers)
             value = response.json()
             # FIXME
-            #self.assertEqual(value['errors'][0], "u'' is not of type 'boolean'")
+            #self.assertEqual(value['statusString'][0], "u'' is not of type 'boolean'")
             self.assertEqual(response.status_code, 200)
 
     def test_update_deployment(self):

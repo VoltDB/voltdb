@@ -26,9 +26,9 @@ function alertNodeClicked(obj) {
 
         var data = {
             CurrentServer: clickedServer,
-            GraphView: VoltDbUI.getCookie("graph-view"),
-            DisplayPreferences: VoltDbUI.getCookie("user-preferences"),
-            AlertThreshold: VoltDbUI.getCookie("alert-threshold"),
+            GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
+            DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
+            AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
             username: VoltDbUI.getCookie("username"),
             password: VoltDbUI.getCookie("password")
         };
@@ -624,7 +624,7 @@ function alertNodeClicked(obj) {
                     var hostIp;
                     hostName = val["HOSTNAME"];
                     hostIp = val["IPADDRESS"];
-                    var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
+                    var threshold = VoltDbUI.getFromLocalStorage("alert-threshold") != undefined ? VoltDbUI.getFromLocalStorage("alert-threshold") : 70;
                     if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
                         alertHtml += '<tr><td class="active alertAlign"  width="40%"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
                             '<td width="30%">' + hostIp + '</td>' +
@@ -657,7 +657,7 @@ function alertNodeClicked(obj) {
             $.each(systemOverview, function (id, val) {
                 if (val["IPADDRESS"] == hostName) {
                     gCurrentServer = val["HOSTNAME"];
-                    saveCookie("currentServer", val["HOSTNAME"]);
+                    saveInLocalStorage("currentServer", val["HOSTNAME"]);
                     return false;
 
                 }
@@ -668,7 +668,7 @@ function alertNodeClicked(obj) {
                 $.each(systemOverview, function (id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING") {
                         gCurrentServer = val["HOSTNAME"];
-                        saveCookie("currentServer", val["HOSTNAME"]);
+                        saveInLocalStorage("currentServer", val["HOSTNAME"]);
                         return false;
                     }
                     return true;
@@ -1252,7 +1252,7 @@ function alertNodeClicked(obj) {
 
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
-            var memoryThreshold = VoltDbUI.getCookie("alert-threshold") != '' ? VoltDbUI.getCookie("alert-threshold") : -1;
+            var memoryThreshold = VoltDbUI.getFromLocalStorage("alert-threshold") != '' ? VoltDbUI.getFromLocalStorage("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
             var currentServerHtml = "";
