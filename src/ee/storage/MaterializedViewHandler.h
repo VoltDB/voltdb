@@ -101,6 +101,8 @@ private:
     void catchUpWithExistingData();
     bool findExistingTuple(const TableTuple &deltaTuple);
     void mergeTupleForInsert(const TableTuple &deltaTuple);
+    void mergeTupleForDelete(const TableTuple &deltaTuple);
+    NValue fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex);
 };
 
 } // namespace voltdb

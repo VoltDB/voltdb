@@ -992,13 +992,14 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
+    // handle any materialized views, hide the tuple from the scan temporarily.
+    SetAndRestorePendingDeleteFlag setPending(target);
+
     insertTupleIntoDeltaTable(target, fallible);
     for (auto viewToTrigger : m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
-    // handle any materialized views, hide the tuple from the scan temporarily.
-    SetAndRestorePendingDeleteFlag setPending(target);
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(target, fallible);
     }

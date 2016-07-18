@@ -179,16 +179,6 @@ namespace voltdb {
         if (! m_destTable->isPersistentTableEmpty()) {
             return;
         }
-        bool hasNonEmptySourceTable = false;
-        for (auto sourceTable : m_sourceTables) {
-            if ( ! sourceTable->isPersistentTableEmpty()) {
-                hasNonEmptySourceTable = true;
-                break;
-            }
-        }
-        if (! hasNonEmptySourceTable) {
-            return;
-        }
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         Table *viewContent = ec->executeExecutors(executorList);
@@ -226,10 +216,6 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::mergeTupleForInsert(const TableTuple &deltaTuple) {
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << m_destTable->m_name << " MaterializedViewHandler::mergeTupleForInsert()" << endl;
-#endif
         // set up the group-by columns
         for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
             // note that if the tuple is in the mv's target table,
@@ -240,14 +226,14 @@ namespace voltdb {
             m_updatedTuple.setNValue(colindex, value);
         }
         // COUNT(*)
-        NValue oldCount = m_existingTuple.getNValue(m_groupByColumnCount);
+        NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
         NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
-        m_updatedTuple.setNValue(m_groupByColumnCount, oldCount.op_add(deltaCount));
+        m_updatedTuple.setNValue(m_groupByColumnCount, existingCount.op_add(deltaCount));
         // Aggregations
         int aggOffset = m_groupByColumnCount + 1;
-        for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
-            NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
-            NValue newValue = deltaTuple.getNValue(aggOffset+aggIndex);
+        for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+            NValue existingValue = m_existingTuple.getNValue(columnIndex);
+            NValue newValue = deltaTuple.getNValue(columnIndex);
             if (newValue.isNull()) {
                 newValue = existingValue;
             }
@@ -276,7 +262,7 @@ namespace voltdb {
                         // no break
                 }
             }
-            m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+            m_updatedTuple.setNValue(columnIndex, newValue);
         }
     }
 
@@ -286,25 +272,10 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         Table *delta = ec->executeExecutors(executorList);
-#ifdef VOLT_TRACE_ENABLED
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-            cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleInsert()" << endl;
-#endif
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
         while (ti.next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);
-#ifdef VOLT_TRACE_ENABLED
-            if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                cout << "Delta tuple: \n" << deltaTuple.debug("delta result") << endl;
-                if (found) {
-                    cout << "Found in view:\n" << m_existingTuple.debug("existing tuple") << endl;
-                }
-                else {
-                    cout << "Not found in view.\n";
-                }
-            }
-#endif
             if (found) {
                 mergeTupleForInsert(deltaTuple);
                 // Shouldn't need to update group-key-only indexes such as the primary key
@@ -319,32 +290,114 @@ namespace voltdb {
         ec->cleanupExecutorsForSubquery(executorList);
     }
 
+    void MaterializedViewHandler::mergeTupleForDelete(const TableTuple &deltaTuple) {
+        // set up the group-by columns
+        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+            // note that if the tuple is in the mv's target table,
+            // tuple values should be pulled from the existing tuple in
+            // that table. This works around a memory ownership issue
+            // related to out-of-line strings.
+            NValue value = m_existingTuple.getNValue(colindex);
+            m_updatedTuple.setNValue(colindex, value);
+        }
+        // COUNT(*)
+        NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
+        NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
+        m_updatedTuple.setNValue(m_groupByColumnCount, existingCount.op_subtract(deltaCount));
+        // Aggregations
+        int aggOffset = m_groupByColumnCount + 1;
+        int minMaxColumnIndex = 0;
+        for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+            NValue existingValue = m_existingTuple.getNValue(columnIndex);
+            NValue deltaValue = deltaTuple.getNValue(columnIndex);
+            NValue newValue = existingValue;
+            if (! deltaValue.isNull()) {
+                switch(m_aggTypes[aggIndex]) {
+                    case EXPRESSION_TYPE_AGGREGATE_SUM:
+                    case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                        newValue = existingValue.op_subtract(deltaValue);
+                        break;
+                    case EXPRESSION_TYPE_AGGREGATE_MIN:
+                    case EXPRESSION_TYPE_AGGREGATE_MAX:
+                        if (existingValue.compare(deltaValue) == 0) {
+                            // re-calculate MIN / MAX
+                            newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
+                        }
+                        minMaxColumnIndex++;
+                        break;
+                    default:
+                        assert(false); // Should have been caught when the matview was loaded.
+                        // no break
+                }
+            }
+            m_updatedTuple.setNValue(columnIndex, newValue);
+        }
+    }
+
+    NValue MaterializedViewHandler::fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex) {
+        NValue newValue = NValue::getNullValue(m_destTable->schema()->columnType(columnIndex));
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        NValueArray &params = *ec->getParameterContainer();
+        // We first backup the params array and fill it with our parameters.
+        // Is it really necessary???
+        vector<NValue> backups(m_groupByColumnCount+1);
+        for (int i=0; i<m_groupByColumnCount; i++) {
+            backups[i] = params[i];
+            params[i] = m_existingTuple.getNValue(i);
+        }
+        backups[m_groupByColumnCount] = params[m_groupByColumnCount];
+        params[m_groupByColumnCount] = m_existingTuple.getNValue(columnIndex);
+        // Then we get the executor vectors we need to run:
+        vector<AbstractExecutor*> executorList = m_minMaxExecutorVectors[minMaxColumnIndex]->getExecutorList();
+        Table *resultTable = ec->executeExecutors(executorList);
+        TableIterator ti = resultTable->iterator();
+        TableTuple resultTuple(resultTable->schema());
+        if (ti.next(resultTuple)) {
+            newValue = resultTuple.getNValue(0);
+        }
+        // Now put the original parameters back.
+        for (int i=0; i<=m_groupByColumnCount; i++) {
+            params[i] = backups[i];
+        }
+        ec->cleanupExecutorsForSubquery(executorList);
+        return newValue;
+    }
+
     void MaterializedViewHandler::handleTupleDelete(PersistentTable *sourceTable, bool fallible) {
-//         // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
-//         ScopedDeltaTableContext dtContext(sourceTable);
-//         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-//         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
-//         Table *delta = ec->executeExecutors(executorList);
-// #ifdef VOLT_TRACE_ENABLED
-//         if (ExecutorContext::getExecutorContext()->m_siteId == 0)
-//             cout << m_destTable->m_name << " MaterializedViewHandler::handleTupleDelete()" << endl;
-// #endif
-//         TableIterator ti = delta->iterator();
-//         TableTuple deltaTuple(delta->schema());
-//         while (ti.next(deltaTuple)) {
-//             bool found = findExistingTuple(deltaTuple);
-// #ifdef VOLT_TRACE_ENABLED
-//             if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-//                 cout << "Delta tuple: \n" << deltaTuple.debug("delta result") << endl;
-//                 if (found) {
-//                     cout << "Found in view:\n" << m_existingTuple.debug("existing tuple") << endl;
-//                 }
-//                 else {
-//                     cout << "Not found in view.\n";
-//                 }
-//             }
-// #endif
-//         }
+        // Within the lifespan of this ScopedDeltaTableContext, the changed source table will enter delta table mode.
+        ScopedDeltaTableContext *dtContext = new ScopedDeltaTableContext(sourceTable);
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
+        Table *delta = ec->executeExecutors(executorList);
+        TableIterator ti = delta->iterator();
+        TableTuple deltaTuple(delta->schema());
+        // The min/max value may need to be re-calculated.
+        // If this is the case, we should terminate the delta table mode early.
+        delete dtContext;
+        while (ti.next(deltaTuple)) {
+            bool found = findExistingTuple(deltaTuple);
+            if (! found) {
+                std::string name = m_destTable->name();
+                throwFatalException("MaterializedViewHandler for table %s went"
+                                    " looking for a tuple in the view and"
+                                    " expected to find it but didn't", name.c_str());
+            }
+            NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
+            NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
+            if (existingCount.compare(deltaCount) == 0) {
+                m_destTable->deleteTuple(m_existingTuple, fallible);
+                if (m_groupByColumnCount == 0) {
+                    catchUpWithExistingData();
+                }
+                continue;
+            }
+            mergeTupleForDelete(deltaTuple);
+            // Shouldn't need to update group-key-only indexes such as the primary key
+            // since their keys shouldn't ever change, but do update other indexes.
+            m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                        m_updatableIndexList, fallible);
+        }
+        ec->cleanupExecutorsForSubquery(executorList);
     }
 
 } // namespace voltdb
