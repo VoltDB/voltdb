@@ -35,7 +35,7 @@
 
 #include <stdio.h>
 #include <string>
-#include <deque>
+#include <set>
 
 namespace voltdb {
 
@@ -115,13 +115,13 @@ TEST_F(TableTupleFilterTest, tableTupleFilterTest)
 
     // iterator over and mark every 5th tuple
     int counter = 0;
-    std::deque<int64_t> control_values;
+    std::multiset<int64_t> control_values;
 
     while(iterator.next(tuple)) {
         if (++counter % 5 == 0) {
             NValue nvalue = tuple.getNValue(1);
             int64_t value = ValuePeeker::peekBigInt(nvalue);
-            control_values.push_back(value);
+            control_values.insert(value);
             tableFilter.updateTuple(tuple, MARKER);
         }
     }
@@ -135,8 +135,9 @@ TEST_F(TableTupleFilterTest, tableTupleFilterTest)
             int64_t value = ValuePeeker::peekBigInt(nvalue);
 
             ASSERT_FALSE(control_values.empty());
-            ASSERT_EQ(control_values.front(), value);
-            control_values.pop_front();
+            auto it = control_values.find(value);
+            ASSERT_NE(it, control_values.end());
+            control_values.erase(it);
     }
     ASSERT_TRUE(control_values.empty());
 
