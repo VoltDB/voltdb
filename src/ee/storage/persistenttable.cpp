@@ -808,10 +808,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // handle any materialized views, hide the tuple from the scan temporarily.
+    // handle any materialized views, we first insert the tuple into delta table,
+    // then hide the tuple from the scan temporarily.
+    // (Cannot do in reversed order because the pending delete flag will also be copied)
+    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
 
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
@@ -985,9 +987,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    // handle any materialized views, hide the tuple from the scan temporarily.
-    SetAndRestorePendingDeleteFlag setPending(target);
-
+    // handle any materialized views, insert the tuple into delta table,
     insertTupleIntoDeltaTable(target, fallible);
     BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
