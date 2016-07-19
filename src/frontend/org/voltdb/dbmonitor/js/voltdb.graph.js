@@ -1450,6 +1450,21 @@
             return slicedData;
         }
 
+        this.savePartitionDataToLocalStorage = function(data, newItem, timeUnit, keyIndex){
+            var sliderValue = $( "#slider-range-min" ).slider( "value" )
+            var values = data[keyIndex].values
+            var slicedData = []
+            var interval = (sliderValue * 60) / timeUnit
+            if (values.length >= interval){
+                slicedData = values.slice(1,  (values.length - (values.length - interval)))
+            } else {
+                slicedData = values
+            }
+            slicedData.push(newItem)
+            data[keyIndex].values = slicedData
+            return data;
+        }
+
         function getPartitionData() {
             var monitor = MonitorGraphUI.Monitors;
             monitor.partitionData = getEmptyDataForPartition();
@@ -1458,12 +1473,21 @@
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
-            debugger;
+
             var monitor = MonitorGraphUI.Monitors;
 
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
                 getPartitionData();
             }
+
+            if (dataMapperSec == undefined || $.isEmptyObject(dataMapperSec))
+                return
+
+            if (dataMapperDay == undefined || $.isEmptyObject(dataMapperDay))
+                return
+
+            if (dataMapperMin == undefined || $.isEmptyObject(dataMapperMin))
+                return
 
             var partitionData = monitor.partitionData;
             var partitionDataMin = monitor.partitionDataMin;
@@ -1476,33 +1500,53 @@
 
             if(localStorage.partitionDetailsMin != undefined)
                 partitionDetailsArrMin = JSON.parse(localStorage.partitionDetailsMin)
+            else
+                partitionDetailsArrMin = JSON.stringify(monitor.partitionDataMin);
 
             if(localStorage.partitionDetailsDay != undefined)
                 partitionDetailsArrDay = JSON.parse(localStorage.partitionDetailsDay)
+            else
+                partitionDetailsArrDay = JSON.stringify(monitor.partitionDataDay);
 
             if(localStorage.partitionDetails != undefined)
                 partitionDetailsArr = JSON.parse(localStorage.partitionDetails)
+            else
+                partitionDetailsArr = JSON.stringify(monitor.partitionData);
 
             if(monitor.partitionFirstData){
+                if(typeof(partitionDetailsArr) != "object" )
+                    partitionDetailsArr = JSON.parse(partitionDetailsArr)
                 for(var i = 0; i< partitionDetailsArr.length; i++){
-                    sliceFirstData(monitor.partitionData, dataView.Seconds);
-                    monitor.partitionData.push({"x": new Date(partitionDetailsArr[i].timestamp),
-                        "y": partitionDetailsArr[i].percentUsed
-                    })
+                    var keyIndexSec = partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 1)
+                    if(partitionDetailsArr.length != 0)
+                        monitor.partitionData[keyIndexSec]["values"] = []
+                    for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
+                        monitor.partitionData[keyIndexSec]["values"].push({"x": new Date(partitionDetailsArr[i]["values"][b].x), "y": partitionDetailsArr[i]["values"][b].y})
+                    }
                 }
-                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
-                    sliceFirstData(monitor.partitionDataMin, dataView.Minutes);
-                    monitor.partitionDataMin.push({"x": new Date(partitionDetailsArrMin[j].timestamp),
-                        "y": partitionDetailsArrMin[j].percentUsed
-                    })
+
+                if(typeof(partitionDetailsArrMin) != "object" )
+                    partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
+                for(var j = 0; j< partitionDetailsArrMin.length; j++){
+                    var keyIndexMin = partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 1)
+                    if(partitionDetailsArrMin.length != 0)
+                        monitor.partitionDataMin[keyIndexMin]["values"] = []
+                    for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
+                        monitor.partitionDataMin[keyIndexMin]["values"].push({"x": new Date(partitionDetailsArrMin[j]["values"][a].x), "y": partitionDetailsArrMin[j]["values"][a].y})
+                    }
                 }
+                if(typeof(partitionDetailsArrDay) != "object" )
+                    partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
-                    sliceFirstData(monitor.partitionDataDay, dataView.Days);
-                    monitor.partitionDataDay.push({"x": new Date(partitionDetailsArrDay[k].timestamp),
-                        "y": partitionDetailsArrDay[k].percentUsed
-                    })
+                   var keyIndexDay = partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 1)
+                   if(partitionDetailsArrDay.length != 0)
+                        monitor.partitionDataDay[keyIndexMin]["values"] = []
+                   for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
+                       monitor.partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrMin[k]["values"][c].y})
+                   }
                 }
             }
+
             if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
                 return;
 
@@ -1522,11 +1566,13 @@
                                 var keyIndex = dataMapperMin[keyValue];
                                 partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.partitionMaxTimeStamp) {
-                                    partitionDataMin[keyIndex]["values"].push({ "x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
-                                    partitionDetailsArrMin = MonitorGraphUI.saveLocalStorage(partitionDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y}, MonitorGraphUI.timeUnit.min  )
+//                                    var newObject = {"values": [{"x": new Date(timestamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }]};
+                                    partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
+                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, MonitorGraphUI.timeUnit.min, keyIndex)
                                 } else {
+//                                    var newObject = { "color": partitionDataMin[keyIndex].color , "key": partitionDataMin[keyIndex].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
                                     partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                    partitionDetailsArrMin = MonitorGraphUI.saveLocalStorage(partitionDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": percentValue}, MonitorGraphUI.timeUnit.min  )
+                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.min, keyIndex)
                                 }
                                 MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
                             }
@@ -1536,22 +1582,29 @@
                             var keyIndexDay = dataMapperDay[keyValue];
                             partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.partitionMaxTimeStamp) {
+//                                var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{"x": new Date(timestamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }]};
                                 partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
-                                partitionDetailsArrDay = MonitorGraphUI.saveLocalStorage(partitionDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y}, MonitorGraphUI.timeUnit.day  )
+                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                             } else {
+//                                 var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
                                 partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                partitionDetailsArrDay = MonitorGraphUI.saveLocalStorage(partitionDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": percentValue}, MonitorGraphUI.timeUnit.day  )
+                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                             }
                             MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
                         }
+
                         var keyIndexSec = dataMapperSec[keyValue];
+
                         partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.partitionMaxTimeStamp) {
-                            partitionData[keyIndexSec]["values"].push({ "x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
-                            partitionDetailsArr = MonitorGraphUI.saveLocalStorage(partitionDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y}, MonitorGraphUI.timeUnit.sec)
+//                            var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{"x": new Date(timestamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }]};
+                            partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
+                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, MonitorGraphUI.timeUnit.sec, keyIndexSec)
                         } else {
+//                             var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{'x': new Date(timeStamp), 'y': percentValue }]}
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
-                            partitionDetailsArr = MonitorGraphUI.saveLocalStorage(partitionDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentValue}, MonitorGraphUI.timeUnit.sec)
+                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.sec, keyIndexSec  )
+
                         }
                         MonitorGraphUI.Monitors.partitionData = partitionData;
                     });
@@ -1586,7 +1639,7 @@
             }
             if (timeStamp > monitor.partitionMaxTimeStamp)
                 monitor.partitionMaxTimeStamp = timeStamp;
-            
+
             partitionSecCount++;
             partitionMinCount++;
         };
