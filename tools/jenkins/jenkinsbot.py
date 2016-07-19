@@ -31,7 +31,7 @@ RANDOM_CHANNEL = os.environ.get('random', None)
 
 # Test Leaderboard - See the tests that have been failing the most since a certain build.
 TL_QUERY = ("""
-  SELECT tf.name AS 'Test name',
+  SELECT tf.name AS 'Long test name',
          COUNT(*) AS 'Failures'
     FROM `junit-test-failures` AS tf
    WHERE NOT tf.status='FIXED' AND
@@ -43,7 +43,7 @@ ORDER BY 2 DESC
 
 # Days Leaderboard - See the tests that has been failing the most in the past amount of days.
 D_QUERY = ("""
-  SELECT tf.name AS 'Test name',
+  SELECT tf.name AS 'Long test name',
          COUNT(*) AS 'Failures'
     FROM `junit-test-failures` AS tf
    WHERE NOT tf.status='FIXED' AND
@@ -55,7 +55,7 @@ ORDER BY 2 DESC
 
 # Build Range Leaderboard - See the tests that have been failing the most in a range of builds.
 BR_QUERY = ("""
-    SELECT tf.name AS 'Test name',
+    SELECT tf.name AS 'Long test name',
            COUNT(*) AS 'Number of failures in this build range'
       FROM `junit-test-failures` AS tf
 INNER JOIN `junit-builds` AS jr
@@ -83,9 +83,9 @@ RIGHT JOIN `junit-builds` AS jr
 """)
 
 # Leaderboard - See a specific leaderboard for two jobs.
-L_QUERY = ("""
+ML_QUERY = ("""
   SELECT job AS 'Job name',
-         name AS 'Test name',
+         name AS 'Long test name',
          fails AS 'Fails',
          total AS 'Total',
          fails/total*100. AS "Fail %",
@@ -115,7 +115,7 @@ ORDER BY 5 DESC
 
 # All Failures - See all failures for a job over time and view them as most recent.
 AF_QUERY = ("""
-  SELECT tf.name AS 'Test name',
+  SELECT tf.name AS 'Long test name',
          tf.build as 'Build',
          tf.stamp AS 'Time'
     FROM `junit-test-failures` AS tf
@@ -279,13 +279,10 @@ class JenkinsBot(object):
             headers = list(cursor.column_names)
             table = cursor.fetchall()
 
-            if query == L_QUERY:
-            # Do some specific replacement for long rows in this query.
-                for i, row in enumerate(table):
-                    table[i] = list(row)
-                    table[i][0] = table[i][0].replace('branch-2-', '')
-                    table[i][1] = table[i][1].replace('org.voltdb.', '')
-                    table[i][1] = table[i][1].replace('org.voltcore.', '')
+            if query == ML_QUERY:
+                # Do some specific replacement for long rows in this query.
+                self.leaderboard_shorten(table)
+
 
             self.client.api_call(
                 'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
@@ -307,6 +304,16 @@ class JenkinsBot(object):
             cursor.close()
             database.close()
 
+    def leaderboard_shorten(self, table):
+        """
+        Shorten the master leaderboard table.
+        """
+
+        for i, row in enumerate(table):
+            table[i][0] = table[i][0].replace('branch-2-', '')
+            table[i][1] = table[i][1].replace('org.voltdb.', '')
+            table[i][1] = table[i][1].replace('org.voltcore.', '')
+
     def post_message(self, channel, text):
         """
         Post a message on the channel.
@@ -321,10 +328,10 @@ if __name__ == '__main__':
         if sys.argv[1] == 'listen':
             jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.listen()
-        elif sys.argv[1] == 'leaderboard':
+        elif sys.argv[1] == 'master-leaderboard':
             jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.query_and_response(
-                L_QUERY,
+                ML_QUERY,
                 {'jobA': PRO, 'jobB': COMMUNITY},
                 ['#junit'],
                 'leaderboard-past30days.txt'
