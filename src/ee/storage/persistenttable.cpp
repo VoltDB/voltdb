@@ -674,7 +674,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
         }
     }
 
-    for (auto viewToTrigger : m_viewsToTrigger) {
+    BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleInsert(this, fallible);
     }
 
@@ -812,7 +812,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
 
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    for (auto viewToTrigger : m_viewsToTrigger) {
+    BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
@@ -886,7 +886,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    for (auto viewToTrigger : m_viewsToTrigger) {
+    BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleInsert(this, fallible);
     }
 
@@ -989,7 +989,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     SetAndRestorePendingDeleteFlag setPending(target);
 
     insertTupleIntoDeltaTable(target, fallible);
-    for (auto viewToTrigger : m_viewsToTrigger) {
+    BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
@@ -1933,7 +1933,7 @@ void PersistentTable::dropViewToTrigger(MaterializedViewHandler *viewToTrigger) 
 }
 
 void PersistentTable::polluteViews() {
-    for (auto mvHanlder : m_viewsToTrigger) {
+    BOOST_FOREACH (auto mvHanlder, m_viewsToTrigger) {
         mvHanlder->pollute();
     }
 }
