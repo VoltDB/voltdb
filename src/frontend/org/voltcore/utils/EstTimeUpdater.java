@@ -17,6 +17,9 @@
 
 package org.voltcore.utils;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.voltcore.logging.VoltLogger;
 
 public class EstTimeUpdater {
@@ -28,14 +31,21 @@ public class EstTimeUpdater {
     public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
 
     public static volatile boolean pause = false;
+    public static final AtomicBoolean done = new AtomicBoolean(true);
 
-    private static final Thread updater = new Thread("Estimated Time Updater") {
+    private final static Runnable updaterRunnable = new Runnable() {
         @Override
         public void run() {
+            EstTimeUpdater.update(System.currentTimeMillis());
             while (true) {
                 try {
                     Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
-                } catch (InterruptedException e) {}
+                } catch (InterruptedException e) {
+                    if (done.get()) {
+                        EstTimeUpdater.update(Long.MIN_VALUE);
+                        return;
+                    }
+                }
                 if (pause) continue;
                 Long delta = EstTimeUpdater.update(System.currentTimeMillis());
                 if ( delta != null ) {
@@ -45,9 +55,29 @@ public class EstTimeUpdater {
         }
     };
 
-    static {
-        updater.setDaemon(true);
-        updater.start();
+    private static final AtomicReference<Thread> updater = new AtomicReference<>();
+
+    public static synchronized void stop() {
+        if (done.compareAndSet(false, true)) {
+            Thread updaterThread = updater.get();
+            if (updater.compareAndSet(updaterThread, null)) {
+                updaterThread.interrupt();
+                try {
+                    updaterThread.join();
+                } catch (InterruptedException e) {
+                }
+            }
+        }
+    }
+
+    public static synchronized void start() {
+        if (done.compareAndSet(true, false)) {
+            if (updater.compareAndSet(null, new Thread(updaterRunnable))) {
+                updater.get().setDaemon(true);
+                updater.get().setName("Estimated Time Updater");
+                updater.get().start();
+            }
+        }
     }
 
     /**

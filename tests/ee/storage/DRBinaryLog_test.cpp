@@ -21,12 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdio>
-#include <string>
-#include <boost/foreach.hpp>
-#include <boost/unordered_map.hpp>
-
 #include "harness.h"
+
 #include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
@@ -35,6 +31,8 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/BinaryLogSinkWrapper.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
@@ -44,7 +42,12 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
-#include "indexes/tableindex.h"
+
+#include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
+
+#include <cstdio>
+#include <string>
 
 using namespace std;
 using namespace voltdb;

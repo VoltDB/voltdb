@@ -62,6 +62,7 @@ namespace voltdb {
     class LimitPlanNode;
     class AggregateExecutorBase;
     class ProgressMonitorProxy;
+    struct CountingPostfilter;
 
     /**
      * The optimized replacement for an ORDER BY executor to be used at the coordinator node
@@ -77,8 +78,7 @@ namespace voltdb {
         static void merge_sort(const std::vector<TableTuple>& tuples,
                                std::vector<int64_t>& partitionTupleCounts,
                                AbstractExecutor::TupleComparer comp,
-                               int limit,
-                               int offset,
+                               CountingPostfilter& postfilter,
                                AggregateExecutorBase* agg_exec,
                                TempTable* output_table,
                                ProgressMonitorProxy* pmp);
