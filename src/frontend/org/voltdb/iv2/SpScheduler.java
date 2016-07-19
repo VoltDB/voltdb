@@ -146,7 +146,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // used to decide if we should shortcut reads
     private Consistency.ReadLevel m_defaultConsistencyReadLevel;
     private ShortCircuitReadLog m_shortCircuitReadLog = null;
-    public final long MAX_BUFFERED_READ_DURATION_CHECK = 100; // millisecond
+    public final long MAX_BUFFERED_READ_DURATION_CHECK = 20; // millisecond
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -1184,23 +1184,27 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         m_shortCircuitReadLog = new ShortCircuitReadLog(m_mailbox);
 
+        // TODO(xin): it's better not to create the scheduler work on replicas.
         VoltDB.instance().schedulePriorityWork(
                 new Runnable() {
                     @Override
                     public void run() {
-                        if (m_isLeader) {
-                            if (m_lastRepairLogTruncationHandle != m_repairLogTruncationHandle) {
-                                m_lastRepairLogTruncationHandle = m_repairLogTruncationHandle;
-                                TruncationHandleMessage message = new TruncationHandleMessage(
-                                        m_repairLogTruncationHandle);
-                                m_mailbox.send(m_sendToHSIds, message);
+                        synchronized (m_mailbox) {
+                            if (m_isLeader) {
+                                if (m_lastRepairLogTruncationHandle != m_repairLogTruncationHandle) {
+                                    m_lastRepairLogTruncationHandle = m_repairLogTruncationHandle;
+                                    TruncationHandleMessage message = new TruncationHandleMessage(
+                                            m_repairLogTruncationHandle);
+                                    m_mailbox.send(m_sendToHSIds, message);
+                                }
+//                                System.out.println("TruncationHandleMessage with handle " + m_repairLogTruncationHandle
+//                                        + " sent to ids: " + m_sendToHSIds.length);
                             }
-//                            System.out.println("TruncationHandleMessage with handle " + m_repairLogTruncationHandle
-//                                    + " sent to ids: " + m_sendToHSIds.length);
+
                         }
                     }
                 },
-                MAX_BUFFERED_READ_DURATION_CHECK,
+                MAX_BUFFERED_READ_DURATION_CHECK * 10,
                 MAX_BUFFERED_READ_DURATION_CHECK,
                 TimeUnit.MILLISECONDS);
     }
