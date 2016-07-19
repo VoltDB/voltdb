@@ -90,6 +90,7 @@ public class TestPersistentBinaryDeque {
     public static TreeSet<String> getSortedDirectoryListing() {
         TreeSet<String> names = new TreeSet<String>();
         for (File f : TEST_DIR.listFiles()) {
+            if (f.getName().endsWith("pbd.cursors")) continue;
             names.add(f.getName());
         }
         return names;
@@ -332,8 +333,9 @@ public class TestPersistentBinaryDeque {
         //Make sure a single file with the appropriate data is created
         m_pbd.offer(defaultContainer());
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 1, files.length);
-        assertEquals( "pbd_nonce.0.pbd", files[0].getName());
+        assertEquals( 2, files.length);
+        assertTrue( "pbd_nonce.0.pbd".equals(files[0].getName()) || "pbd_nonce.0.pbd".equals(files[1].getName()));
+        assertTrue( "pbd_nonce.pbd.cursors".equals(files[0].getName()) || "pbd_nonce.pbd.cursors".equals(files[1].getName()));
 
         //Now make sure the current write file is stolen and a new write file created
         BBContainer retval = m_pbd.poll(CURSOR_ID, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
@@ -686,7 +688,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals(3, files.length);
+        assertEquals(4, files.length);
 
         m_pbd.sync();
         m_pbd.close();
@@ -732,7 +734,7 @@ public class TestPersistentBinaryDeque {
         }
         File files[] = TEST_DIR.listFiles();
         //We have the default pbd and new one.
-        assertEquals(2, files.length);
+        assertEquals(3, files.length);
 
         small_pbd.sync();
         small_pbd.close();

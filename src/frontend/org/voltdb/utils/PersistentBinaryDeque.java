@@ -19,6 +19,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -150,9 +151,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
     private final TreeMap<Long, PBDSegment> m_segments = new TreeMap<>();
-    //private int m_numObjects = 0;
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
+    private RandomAccessFile m_cursorsWriter;
 
     /**
      * Create a persistent binary deque with the specified nonce and storage
@@ -215,7 +216,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         extension = parts[2];
                     }
 
-                    if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
+                    if (nonce.equals(parsedNonce) && "pbd".equals(seqNum) && "cursors".equals(extension)) {
+                        readCursorFile(pathname);
+                    } else if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
                         if (pathname.length() == 4) {
                             //Doesn't have any objects, just the object count
                             pathname.delete();
@@ -276,6 +279,10 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_segments.put(e.getKey(), e.getValue());
         }
 
+        if (m_cursorsWriter == null) {
+            m_cursorsWriter = new RandomAccessFile(new File(m_path, m_nonce + ".pbd.cursors"), "rwd");
+        }
+
         //Find the first and last segment for polling and writing (after)
         Long writeSegmentIndex = 0L;
         try {
@@ -289,6 +296,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_segments.put(writeSegmentIndex, writeSegment);
         writeSegment.openForWrite(true);
         assertions();
+    }
+
+    private void readCursorFile(File file) {
+        try {
+            m_cursorsWriter = new RandomAccessFile(file, "rwd");
+            String cursorId = null;
+            while ((cursorId=m_cursorsWriter.readLine()) != null) {
+                m_readCursors.put(cursorId, new ReadCursor(cursorId));
+            }
+        } catch(IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static final boolean USE_MMAP = Boolean.getBoolean("PBD_USE_MMAP");
@@ -476,7 +495,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public void openForRead(String cursorId) throws IOException {
+    public synchronized void openForRead(String cursorId) throws IOException {
         if (m_closed) {
             throw new IOException("Closed");
         }
@@ -484,7 +503,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (!m_readCursors.containsKey(cursorId)) {
             ReadCursor cursor = new ReadCursor(cursorId);
             m_readCursors.put(cursorId, cursor);
+            persistCursor(cursorId);
         }
+    }
+
+    private void persistCursor(String cursorId) throws IOException {
+        System.out.println("Writing to cursor file " + cursorId);
+        m_cursorsWriter.writeChars(cursorId);
+        m_cursorsWriter.writeBytes(System.getProperty("line.separator"));
     }
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
@@ -542,6 +568,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments.values()) {
             segment.close();
         }
+        m_cursorsWriter.close();
         m_closed = true;
     }
 
