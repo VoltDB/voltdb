@@ -39,11 +39,6 @@ public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private Map<String, SegmentReader> m_readCursors = new HashMap<>();
-    //Index of the next object to read, not an offset into the file
-    //private int m_objectReadIndex = 0;
-    //private int m_bytesRead = 0;
-    // Maintains the read byte offset
-    //private long m_readOffset = SEGMENT_HEADER_BYTES;
 
     //ID of this segment
     private final Long m_index;

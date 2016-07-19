@@ -235,8 +235,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     return false;
                                 }
                             }
-                            // MJ TODO: review
-                            //m_numObjects += qs.getNumEntries();
                             if (m_usageSpecificLog.isDebugEnabled()) {
                                 m_usageSpecificLog.debug("Segment " + qs.file() + " has been recovered");
                             }
@@ -489,40 +487,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
     }
 
-    /*
-    @Override
-    public synchronized BBContainer poll(OutputContainerFactory ocf) throws IOException {
-        assertions();
-        if (m_closed) {
-            throw new IOException("Closed");
-        }
-
-        BBContainer retcont = null;
-        PBDSegment segment = null;
-
-        for (PBDSegment s : m_segments.values()) {
-            if (s.isClosed()) {
-                s.open(false);
-            }
-
-            if (s.hasMoreEntries()) {
-                segment = s;
-                retcont = segment.poll(ocf);
-                break;
-            }
-        }
-
-        if (retcont == null) {
-            return null;
-        }
-
-        decrementNumObjects();
-        assertions();
-        assert (retcont.b() != null);
-        return wrapRetCont(segment, retcont);
-    }
-    */
-
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
         return new BBContainer(retcont.b()) {
             @Override
@@ -569,6 +533,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
+    //TODO: Should we get rid of cursors on close?
     public synchronized void close() throws IOException {
         if (m_closed) {
             return;
