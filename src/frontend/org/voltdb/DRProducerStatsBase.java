@@ -28,7 +28,7 @@ public class DRProducerStatsBase {
 
     public static interface Columns {
         // column for both tables
-        public static final String CONSUMER_CLUSTER_ID = "CONSUMER_CLUSTER_ID";
+        public static final String CONSUMER_CLUSTER_ID = "CONSUMERCLUSTERID";
 
         // columns for the node-level table
         public static final String STATE = "STATE";
