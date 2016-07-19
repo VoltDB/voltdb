@@ -218,7 +218,9 @@ public class Token {
         StringBuffer sb           = new StringBuffer();
 
         for (int i = 0; i < statement.length; i++) {
-            if (!statement[i].isDelimiter && i != 0) {
+            // when the previous statement is ')', there should be a blank before the non-delimiter statement.
+            if (!statement[i].isDelimiter &&
+                    (!wasDelimiter || (i != 0 && statement[i - 1].getSQL().equals(")")))) {
                 sb.append(' ');
             }
 

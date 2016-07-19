@@ -37,7 +37,6 @@ import com.google_voltpatches.common.base.Charsets;
 import junit.framework.TestCase;
 
 public class TestDDLSource extends TestCase{
-    private static final int MAX_OVERHEAD = 4;
 
     private static String compileAndGenerateCatalogReport(String ddl) throws IOException {
         UUID uuid = UUID.randomUUID();
@@ -131,7 +130,7 @@ public class TestDDLSource extends TestCase{
                           + "   CLM_BIGINT,\n"
                           + "   NUM\n"
                           + ") AS \n"
-                          + "   SELECT CLM_TINYINT, CLM_SMALLINT, CLM_BIGINT, COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT, CLM_SMALLINT, CLM_BIGINT;";
+                          + "   SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
         assertTrue(reportCreateTableAndView.contains(targetDDL));
     }
 
@@ -165,18 +164,18 @@ public class TestDDLSource extends TestCase{
                           + "   CLM_BIGINT,\n"
                           + "   NUM\n"
                           + ") AS \n"
-                          + "   SELECT CLM_TINYINT, CLM_SMALLINT, CLM_BIGINT, COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT, CLM_SMALLINT, CLM_BIGINT;";
+                          + "   SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
         String targetDDL2 = "CREATE VIEW FLOATFAMILY (\n"
                           + "   CLM_DECIMAL,\n"
                           + "   CLM_FLOAT,\n"
                           + "   NUM\n"
                           + ") AS \n"
-                          + "   SELECT CLM_DECIMAL, CLM_FLOAT, COUNT(*) FROM ALLTYPES GROUP BY CLM_DECIMAL, CLM_FLOAT;";
+                          + "   SELECT CLM_DECIMAL,CLM_FLOAT,COUNT(*) FROM ALLTYPES GROUP BY CLM_DECIMAL,CLM_FLOAT;";
         assertTrue(reportCreateTableAndViews.contains(targetDDL1));
         assertTrue(reportCreateTableAndViews.contains(targetDDL2));
     }
 
-    public void testCreateTablePartition() throws IOException {
+    public void testCreateTablePartitionDDL() throws IOException {
         final String ddlCreateTable =
                 "create table AllTypes ("
                         + "clm_integer integer not null, "
@@ -193,7 +192,6 @@ public class TestDDLSource extends TestCase{
                         + ");\n"
                         + "partition table alltypes on column clm_integer;";
         String reportCreateTable = compileAndGenerateCatalogReport(ddlCreateTable);
-        System.out.println(reportCreateTable);
         String targetDDL = "CREATE TABLE ALLTYPES (\n"
                           + "   CLM_INTEGER integer NOT NULL,\n"
                           + "   CLM_TINYINT tinyint DEFAULT '0',\n"
