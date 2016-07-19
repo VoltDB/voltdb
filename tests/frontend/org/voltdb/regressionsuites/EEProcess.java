@@ -65,7 +65,7 @@ public class EEProcess {
         if (verbose) {
             System.out.println("Running " + target);
         }
-        final ArrayList<String> args = new ArrayList<String>();
+        final ArrayList<String> args = new ArrayList<>();
         final String voltdbIPCPath = System.getenv("VOLTDBIPC_PATH");
 
         args.add("valgrind");
@@ -114,7 +114,7 @@ public class EEProcess {
         try {
             boolean failure = false;
 
-            // expecting "== pid = NUMBER==" to be line 1, where NUMBER is the C++ process's PID
+            // expecting "== pid = NUMBER ==" to be line 1, where NUMBER is the C++ process's PID
             String pidString = stdout.readLine();
             if (pidString == null) {
                 failure = true;
@@ -123,11 +123,11 @@ public class EEProcess {
                     System.out.println("PID string \"" + pidString + "\"");
                 }
                 pidString = pidString.substring("== pid = ".length());
-                pidString = pidString.substring(0, pidString.indexOf("="));
+                pidString = pidString.substring(0, pidString.indexOf(" =="));
                 m_eePID = pidString;
             }
 
-            // expecting "== eecount = NUMBER==" to be line 2, where NUMBER is expected EE threads
+            // expecting "== eecount = NUMBER ==" to be line 2, where NUMBER is expected EE threads
             String siteCountString = stdout.readLine();
             if (siteCountString == null) {
                 failure = true;
@@ -136,12 +136,12 @@ public class EEProcess {
                     System.out.println("Site count string \"" + siteCountString + "\"");
                 }
                 siteCountString = siteCountString.substring("== eecount = ".length());
-                siteCountString = siteCountString.substring(0, siteCountString.indexOf("="));
+                siteCountString = siteCountString.substring(0, siteCountString.indexOf(" =="));
                 int siteCount2 = Integer.valueOf(siteCountString);
                 assert(siteCount2 == siteCount);
             }
 
-            // expecting "== port = NUMBER==" to be line 3, where NUMBER is listening port
+            // expecting "== port = NUMBER ==" to be line 3, where NUMBER is listening port
             String portString = stdout.readLine();
             if (portString == null) {
                 failure = true;
@@ -151,7 +151,7 @@ public class EEProcess {
                 }
                 portString = portString.substring("== port = ".length());
                 portString = portString.substring(0,
-                                                  portString.indexOf("="));
+                                                  portString.indexOf(" =="));
                 m_port = Integer.valueOf(portString);
             }
 
