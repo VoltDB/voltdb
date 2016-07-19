@@ -359,8 +359,8 @@ namespace voltdb {
         Table *delta = ec->executeExecutors(executorList);
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
-        // The min/max value may need to be re-calculated.
-        // If this is the case, we should terminate the delta table mode early.
+        // The min/max value may need to be re-calculated, so we should terminate the delta table mode early
+        // in order to run other queries.
         delete dtContext;
         while (ti.next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);

@@ -812,14 +812,16 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
-
     BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+    // This is for single table view.
+    {
+        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -988,13 +990,18 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     deleteFromAllIndexes(&target);
 
     // handle any materialized views, insert the tuple into delta table,
+    // then hide the tuple from the scan temporarily.
     insertTupleIntoDeltaTable(target, fallible);
     BOOST_FOREACH (auto viewToTrigger, m_viewsToTrigger) {
         viewToTrigger->handleTupleDelete(this, fallible);
     }
 
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target, fallible);
+    // This is for single table view.
+    {
+        SetAndRestorePendingDeleteFlag setPending(target);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(target, fallible);
+        }
     }
 
     if (fallible) {
