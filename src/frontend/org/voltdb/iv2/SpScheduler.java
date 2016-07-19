@@ -29,10 +29,12 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.messaging.TruncationHandleMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -142,18 +144,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+    private Consistency.ReadLevel m_defaultConsistencyReadLevel;
+    private ShortCircuitReadLog m_shortCircuitReadLog = null;
+    public final long MAX_BUFFERED_READ_DURATION_CHECK = 100; // millisecond
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
     // The DurabilityListener is not thread-safe. Access it only on the Site thread.
     private final DurabilityListener m_durabilityListener;
-    //Generator of pre-IV2ish timestamp based unique IDs
+    // Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
+    // the last not-needed-any-more point of the repair log.
+    long m_lastRepairLogTruncationHandle = Long.MIN_VALUE;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -360,6 +367,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
+        if (message instanceof TruncationHandleMessage) {
+            TruncationHandleMessage msg = (TruncationHandleMessage) message;
+            m_shortCircuitReadLog.releaseShortCircuitRead(msg.getTruncationHandle(), true);
+            return;
+        }
+
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
@@ -407,7 +420,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+        boolean shortcutRead = message.isReadOnly() &&
+                Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        if (!m_isLeader && m_shortCircuitReadLog != null) {
+            m_shortCircuitReadLog.setLastSpTruncationHandle(message.getTruncationHandle());
+        }
 
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
@@ -424,7 +441,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
-                    }
+            }
 
             /*
              * If this is for CL replay or DR, update the unique ID generator
@@ -560,7 +577,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+        final boolean shortcutRead = msg.isReadOnly() && Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
@@ -685,15 +702,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
         // All short-circuit reads will have no duplicate counter.
         // Avoid all the lookup below.
         // Also, don't update the truncation handle, since it won't have meaning for anyone.
-        if (shortcutRead) {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-            return;
+        if (message.isReadOnly()) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
+                // the initiatorHSId is the ClientInterface mailbox.
+                m_mailbox.send(message.getInitiatorHSId(), message);
+                return;
+            }
+            if (m_shortCircuitReadLog != null) {
+                assert(m_defaultConsistencyReadLevel == ReadLevel.SAFE_1);
+                m_shortCircuitReadLog.offerSp(message, m_isLeader, m_repairLogTruncationHandle);
+                return;
+            }
         }
 
         final long spHandle = message.getSpHandle();
@@ -767,7 +789,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+        boolean shortcutRead = message.isReadOnly() &&
+                Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        if (m_shortCircuitReadLog != null) {
+            m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        }
 
         FragmentTaskMessage msg = message;
         long newSpHandle;
@@ -863,7 +889,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                  * confirmation or communication with other replicas. In a partition scenario, it's
                  * possible to read an unconfirmed transaction's writes that will be lost.
                  */
-                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() &&
+                        Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
                 logThis = !shortcutRead;
             }
         }
@@ -979,12 +1006,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        if (m_shortCircuitReadLog != null) {
+            m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        }
+
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
             msg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
-            if (!msg.isForReplay()) advanceTxnEgo();
+            if (!msg.isForReplay()) {
+                advanceTxnEgo();
+            }
             msg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, msg);
@@ -1140,4 +1173,37 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
     }
+
+    public void setConsistentReadLevel(ReadLevel readLevel) {
+        m_defaultConsistencyReadLevel = readLevel;
+    }
+
+    public void setShortCircuitRead(boolean isForTest) {
+        if (m_defaultConsistencyReadLevel != ReadLevel.SAFE_1) {
+            return;
+        }
+        m_shortCircuitReadLog = new ShortCircuitReadLog(m_mailbox);
+
+        VoltDB.instance().schedulePriorityWork(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (m_isLeader) {
+                            if (m_lastRepairLogTruncationHandle != m_repairLogTruncationHandle) {
+                                m_lastRepairLogTruncationHandle = m_repairLogTruncationHandle;
+                                TruncationHandleMessage message = new TruncationHandleMessage(
+                                        m_repairLogTruncationHandle);
+                                m_mailbox.send(m_sendToHSIds, message);
+                            }
+//                            System.out.println("TruncationHandleMessage with handle " + m_repairLogTruncationHandle
+//                                    + " sent to ids: " + m_sendToHSIds.length);
+                        }
+                    }
+                },
+                MAX_BUFFERED_READ_DURATION_CHECK,
+                MAX_BUFFERED_READ_DURATION_CHECK,
+                TimeUnit.MILLISECONDS);
+    }
+
+
 }

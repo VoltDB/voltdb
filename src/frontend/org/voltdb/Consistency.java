@@ -22,8 +22,13 @@ import org.voltdb.compiler.deploymentfile.ReadlevelType;
 public abstract class Consistency {
 
     public enum ReadLevel {
-        FAST (0),
-        SAFE (1);
+        FAST (0),   // send reads everywhere, no waiting or queue, return response to clients immediately.
+        SAFE (1),   // like writes, send reads to primary, replicates them to replica, and check hash response.
+        SAFE_1 (2), // send reads everywhere but don't lose them to clients
+                    // until any previous writes have benn ack-ed of the repair log.
+        SAFE_2 (3), // send reads to primary only, not replicating to replicas like writes.
+                    // have responses to clients block on any unsafe reads waiting to go to clients in front of them.
+        SAFE_3 (4); // like SAFE_3, but evenly distributed the reads between primary and replicas.
 
         private final int value;
 
@@ -41,39 +46,53 @@ public abstract class Consistency {
             if (value == FAST.value) {
                 return FAST;
             }
-            else if (value == SAFE.value) {
+            if (value == SAFE.value) {
                 return SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No Consistency.ReadLevel with value: %d", value));
+            if (value == SAFE_1.value) {
+                return SAFE_1;
             }
+
+            throw new IllegalArgumentException(
+                    String.format("No Consistency.ReadLevel with value: %d", value));
         }
 
         public static ReadLevel fromReadLevelType(ReadlevelType value) {
             if (value == ReadlevelType.FAST) {
                 return FAST;
             }
-            else if (value == ReadlevelType.SAFE) {
+            if (value == ReadlevelType.SAFE) {
                 return SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No Consistency.ReadLevel with value: %s", value.toString()));
+            if (value == ReadlevelType.SAFE_1) {
+                return SAFE_1;
             }
+
+            throw new IllegalArgumentException(
+                    String.format("No Consistency.ReadLevel with value: %s", value.toString()));
         }
 
         public ReadlevelType toReadLevelType() {
             if (this == FAST) {
                 return ReadlevelType.FAST;
             }
-            else if (this == SAFE) {
+            if (this == SAFE) {
                 return ReadlevelType.SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No ReadlevelType mapping for Consistency.ReadLevel: %s", toString()));
+            if (this == SAFE_1) {
+                return ReadlevelType.SAFE_1;
             }
+
+            throw new IllegalArgumentException(
+                    String.format("No ReadlevelType mapping for Consistency.ReadLevel: %s", toString()));
+        }
+
+        public static boolean isShortcutRead(ReadLevel value) {
+            if (value == ReadLevel.FAST || value == ReadLevel.SAFE_1) {
+                return true;
+            }
+
+            return false;
         }
     }
 }
