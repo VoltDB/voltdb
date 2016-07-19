@@ -1089,15 +1089,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_replayComplete) {
             SettableFuture<Boolean> written = m_cl.logIv2Fault(m_mailbox.getHSId(),
                 new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
+
             boolean logWritten = false;
-            try {
-                logWritten = written.get();
-            } catch (InterruptedException e) {
-            } catch (ExecutionException e) {
-            } finally {
-                if (!logWritten){
-                    tmLog.warn("Fault Log not written for SP Handle: " + spHandle);
+
+            if (written != null) {
+                try {
+                    logWritten = written.get();
+                } catch (InterruptedException e) {
+                } catch (ExecutionException e) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
+                    }
                 }
+            }
+
+            if (!logWritten) {
+                tmLog.warn("Fault log not written for partition: " + m_partitionId);
             }
         }
     }
