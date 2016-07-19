@@ -214,11 +214,10 @@ public class Token {
 */
     static String getSQL(Token[] statement) {
 
-        boolean      wasDelimiter = true;
         StringBuffer sb           = new StringBuffer();
 
         for (int i = 0; i < statement.length; i++) {
-            if (!statement[i].isDelimiter && !wasDelimiter) {
+            if (!statement[i].isDelimiter && i != 0) {
                 sb.append(' ');
             }
 
