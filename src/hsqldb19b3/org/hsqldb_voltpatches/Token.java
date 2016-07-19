@@ -214,6 +214,7 @@ public class Token {
 */
     static String getSQL(Token[] statement) {
 
+        boolean      wasDelimiter = true;
         StringBuffer sb           = new StringBuffer();
 
         for (int i = 0; i < statement.length; i++) {
