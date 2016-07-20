@@ -124,12 +124,16 @@ class TableTupleFilter {
     /**
      * Returns the tuple address
      */
-    uint64_t getTupleAddress(size_t tupleIdx) const
+    uint64_t getTupleAddress(size_t tupleIdx)
     {
         assert(tupleIdx < m_tuples.size());
         size_t blockIdx = tupleIdx / m_tuplesPerBlock;
         assert(blockIdx < m_blocks.size());
-        return m_blocks[blockIdx] + (tupleIdx - blockIdx) * m_tupleLength;
+        if (m_prevBlockIndex > tupleIdx || (tupleIdx - m_prevBlockIndex) >= m_tuplesPerBlock) {
+            assert(m_blockIndexes.find(m_blocks[blockIdx]) != m_blockIndexes.end());
+            m_prevBlockIndex = m_blockIndexes.find(m_blocks[blockIdx])->second;
+        }
+        return m_blocks[blockIdx] + (tupleIdx - m_prevBlockIndex) * m_tupleLength;
     }
 
     bool empty() const
