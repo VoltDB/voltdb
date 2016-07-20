@@ -1516,6 +1516,8 @@
                     partitionDetailsArr = JSON.parse(partitionDetailsArr)
                 for(var i = 0; i< partitionDetailsArr.length; i++){
                     var keyIndexSec = partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 1)
+                    if (keyIndexSec == ")")
+                        keyIndexSec =  partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 6, 1)
                     if(partitionDetailsArr.length != 0)
                         monitor.partitionData[keyIndexSec]["values"] = []
                     for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
@@ -1526,6 +1528,8 @@
                     partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
                     var keyIndexMin = partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 1)
+                    if (keyIndexMin == ")")
+                        keyIndexMin =  partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 6, 1)
                     if(partitionDetailsArrMin.length != 0)
                         monitor.partitionDataMin[keyIndexMin]["values"] = []
                     for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
@@ -1536,10 +1540,12 @@
                     partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
                    var keyIndexDay = partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 1)
+                   if (keyIndexDay == ")")
+                        keyIndexDay =  partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 6, 1)
                    if(partitionDetailsArrDay.length != 0)
                         monitor.partitionDataDay[keyIndexMin]["values"] = []
                    for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
-                       monitor.partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrMin[k]["values"][c].y})
+                       monitor.partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrDay[k]["values"][c].y})
                    }
                 }
             }
