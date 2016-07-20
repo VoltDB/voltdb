@@ -524,34 +524,65 @@ function downloadCSV(args,whichChart) {
         }
     }
     else if (whichChart == "commandLog"){
+        var overLayData = convertOverlayData(JSON.parse(localStorage.SnapshotOverlayData))
         if (graphView == "Seconds"){
             chartData = JSON.parse(localStorage.cmdLog)
         }
         else if (graphView == "Minutes"){
             chartData = JSON.parse(localStorage.cmdLogMin)
+            var overLayData = JSON.parse(localStorage.SnapshotOverlayData)
         }
         else if (graphView == "Days"){
-            chartData = JSON.parse(localStorage.cmdLogDay)
+            chartData =  JSON.parse(localStorage.cmdLogDay)
         }
+            var csvCmdLog = convertArrayOfObjectsToCSV({
+                data: chartData
+            });
+            var csvOverlay = convertArrayOfObjectsToCSV({
+                data: overLayData
+            });
+            var filename_cmdLog = args.filename + "-" + graphView + ".csv";
+            var filename_overlay = "Overlay-" + graphView + ".csv";
+
+            downloadAll([
+                [filename_cmdLog, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvCmdLog)],
+                [filename_overlay, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvOverlay)],
+            ]);
     }
 
-    var csv = convertArrayOfObjectsToCSV({
-        data: chartData
-    });
-    if (csv == null) return;
+    if(whichChart != "commandLog"){
+        var csv = convertArrayOfObjectsToCSV({
+            data: chartData
+        });
+        if (csv == null) return;
 
-    filename = args.filename + "-" + graphView + ".csv";
+        filename = args.filename + "-" + graphView + ".csv";
 
-    if (!csv.match(/^data:text\/csv/i)) {
-        csv = 'data:text/csv;charset=utf-8,' + csv;
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        data = encodeURI(csv);
+
+        link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        link.click();
     }
-    data = encodeURI(csv);
-
-    link = document.createElement('a');
-    link.setAttribute('href', data);
-    link.setAttribute('download', filename);
-    link.click();
 }
+
+function downloadAll(files){
+    if(files.length == 0) return;
+    file = files.pop();
+    var theAnchor = $('<a />')
+        .attr('href', file[1])
+        .attr('download',file[0]);
+    theAnchor[0].click();
+    theAnchor.remove();
+    downloadAll(files);
+}
+
 
 function convertPartitionData(data){
     var chartData = [];
@@ -566,6 +597,30 @@ function convertPartitionData(data){
         }
     }
     return chartData;
+}
+
+function convertOverlayData(data){
+     var chartData = [];
+     for (var i=0; i< data.length; i++){
+        var startTime = new Date(data[i].startTime *1000);
+        var endTime = new Date(data[i].endTime *1000);
+        var starthours = startTime.getHours();
+        var startminutes = "0" + startTime.getMinutes();
+        var startseconds = "0" + startTime.getSeconds();
+        var startformattedTime = starthours + ':' + startminutes.substr(-2) + ':' + startseconds.substr(-2);
+        var endhours = endTime.getHours();
+        var endminutes = "0" + endTime.getMinutes();
+        var endseconds = "0" + endTime.getSeconds();
+        var endformattedTime = endhours + ':' + endminutes.substr(-2) + ':' + endseconds.substr(-2);
+
+        chartData.push({
+        "startTime": startformattedTime,
+        "endTime": endformattedTime
+        })
+     }
+
+    return chartData
+
 }
 
 function logout() {
