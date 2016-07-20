@@ -95,14 +95,11 @@ void IndexStats::populateIndexStatsSchema(
     inBytes.push_back(false);
 }
 
-Table*
-IndexStats::generateEmptyIndexStatsTable()
-{
+TempTable* IndexStats::generateEmptyIndexStatsTable() {
     string name = "Persistent Table aggregated index stats temp table";
     // An empty stats table isn't clearly associated with any specific
     // database ID.  Just pick something that works for now (Yes,
     // abstractplannode::databaseId(), I'm looking in your direction)
-    CatalogId databaseId = 1;
     vector<string> columnNames = IndexStats::generateIndexStatsColumnNames();
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
@@ -113,13 +110,10 @@ IndexStats::generateEmptyIndexStatsTable()
     TupleSchema *schema =
         TupleSchema::createTupleSchema(columnTypes, columnLengths,
                                        columnAllowNull, columnInBytes);
-
-    return
-        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
-                                                            name,
-                                                            schema,
-                                                            columnNames,
-                                                            NULL));
+    return TableFactory::buildTempTable(name,
+                                        schema,
+                                        columnNames,
+                                        NULL);
 }
 
 /*
@@ -143,9 +137,8 @@ IndexStats::IndexStats(TableIndex* index)
  */
 void IndexStats::configure(
         string name,
-        string tableName,
-        CatalogId databaseId) {
-    StatsSource::configure(name, databaseId);
+        string tableName) {
+    StatsSource::configure(name);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());

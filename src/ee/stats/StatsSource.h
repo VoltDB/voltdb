@@ -20,6 +20,7 @@
 
 #include "common/tabletuple.h"
 #include "common/ids.h"
+
 #include "boost/scoped_ptr.hpp"
 
 #include <string>
@@ -67,15 +68,8 @@ public:
      * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
-     * @parameter hostId id of the host this partition is on
-     * @parameter hostname name of the host this partition is on
-     * @parameter siteId this stat source is associated with
-     * @parameter partitionId this stat source is associated with
-     * @parameter databaseId Database this source is associated with
      */
-    void configure(
-            std::string name,
-            voltdb::CatalogId databaseId);
+    void configure(std::string name);
 
     /*
      * Destructor that frees tupleSchema_, and statsTable_
@@ -111,6 +105,7 @@ public:
      * @return String representation
      */
     virtual std::string toString();
+
 protected:
     /**
      * Update the stats tuple with the latest statistics available to this StatsSource. Implemented by derived classes.
@@ -139,8 +134,8 @@ protected:
     std::map<std::string, int> m_columnName2Index;
 
     bool interval() { return m_interval; }
-private:
 
+private:
     /**
      * Table containing the stat information. Shared pointer used as a substitute for scoped_ptr due to forward
      * declaration.

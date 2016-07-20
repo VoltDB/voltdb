@@ -288,7 +288,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 catch (IOException e) {
                     String msg = "Client interface failed to bind to"
                             + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
-                    MiscUtils.printPortsInUse(hostLog);
+                    CoreUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
@@ -1110,11 +1110,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     Procedure procedure = null;
 
                     if (invocation != null) {
-                        procedure = catalogContext.procedures.get(invocation.getProcName());
-                        if (procedure == null) {
-                            procedure = SystemProcedureCatalog.listing.get(invocation.getProcName())
-                                                              .asCatalogProcedure();
-                        }
+                        procedure = getProcedureFromName(invocation.getProcName(), catalogContext);
+                        assert (procedure != null);
                     }
 
                     //Can be null on hangup

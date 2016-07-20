@@ -572,6 +572,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         m_distributer.shutdown();
+
+        ClientFactory.decreaseClientNum();
     }
 
     @Override

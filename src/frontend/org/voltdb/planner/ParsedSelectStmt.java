@@ -685,8 +685,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // limit and offset can't have both value and parameter
-        if (limitOffset.m_limit != -1) assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
-        if (limitOffset.m_offset != 0) assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        if (limitOffset.m_limit != -1) {
+            assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
+        }
+        if (limitOffset.m_offset != 0) {
+            assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        }
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
@@ -1171,14 +1175,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (selectStmt.m_joinTree.getWhereExpression() != null) {
                 whereList.add(selectStmt.m_joinTree.getWhereExpression());
             }
-            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combine(whereList));
+            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combinePredicates(whereList));
         }
         // Add new HAVING expressions
         if (!havingList.isEmpty()) {
             if (selectStmt.m_having != null) {
                 havingList.add(selectStmt.m_having);
             }
-            selectStmt.m_having = ExpressionUtil.combine(havingList);
+            selectStmt.m_having = ExpressionUtil.combinePredicates(havingList);
             // reprocess HAVING expressions
             ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
         }
@@ -1479,7 +1483,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         joinOrderSubNodes.add(subTableNodes.get(j));
                     }
                 }
-                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes, JoinType.INNER);
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
@@ -1656,6 +1660,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_limitOffset.m_limitCanPushdown;
     }
 
+    /**
+     * Returns true if this select statement can be proved to always produce its result rows in the same
+     * order every time that it is executed.
+     */
     @Override
     public boolean isOrderDeterministic()
     {
@@ -1723,23 +1731,47 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(List<AbstractExpression> nonOrdered)
     {
-        return orderByColumnsDetermineAllDisplayColumns(m_displayColumns, m_orderColumns, nonOrdered);
+        List<ParsedColInfo> unorderedDisplayColumns = new ArrayList<>();
+        for (ParsedColInfo col : m_displayColumns) {
+
+            if (! col.orderBy) {
+                unorderedDisplayColumns.add(col);
+            }
+        }
+
+        return orderByColumnsDetermineAllDisplayColumns(unorderedDisplayColumns, m_orderColumns, nonOrdered);
     }
 
-    private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
-            ArrayList<AbstractExpression> outNonOrdered) {
-        return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
+    private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> candidateColumns,
+            List<AbstractExpression> outNonOrdered) {
+
+        List<ParsedColInfo> filteredCandidateColumns = new ArrayList<>();
+        for (ParsedColInfo col : candidateColumns) {
+            if (! col.orderBy) {
+                filteredCandidateColumns.add(col);
+            }
+        }
+
+        return orderByColumnsDetermineAllColumns(m_orderColumns, filteredCandidateColumns, outNonOrdered);
     }
 
+    /**
+     * Returns true if the specified set of "display columns" passed in by caller
+     * will be determistically ordered if sorting by the specified set of columns
+     * from an "ORDER BY" clause.  Note that the ORDER BY columns could be from an
+     * set operator (UNION, INTERSECT, etc) that has this select statement as a child.
+     *
+     * @param displayColumns  The set of display columns whose order we care about
+     * @param orderColumns    The columns that we are ordering by
+     * @param nonOrdered      Columns whose values are known to appear in non-deterministic order
+     * @return  true if the given order by columns will determine the order of the given display columns
+     */
     boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
                                                      List<ParsedColInfo> orderColumns,
                                                      List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
-            if (displayCol.orderBy) {
-                continue;
-            }
             if (displayCol.groupBy) {
                 AbstractExpression displayExpr = displayCol.expression;
                 // Round up the usual suspects -- if there were uncooperative GROUP BY expressions,
@@ -1765,9 +1797,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // First try to get away with a brute force N by M search for exact equalities.
         for (ParsedColInfo candidateCol : candidateColumns)
         {
-            if (candidateCol.orderBy) {
-                continue;
-            }
             AbstractExpression candidateExpr = candidateCol.expression;
             if (orderByExprs == null) {
                 orderByExprs = new HashSet<AbstractExpression>();
@@ -1845,6 +1874,34 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             result = false;
         }
         return result;
+    }
+
+    /**
+     * This is a very simple version of the above method for when an ORDER BY
+     * clause appears on a UNION.  Does the ORDER BY clause reference every item on the
+     * display list?  If so, then the order is deterministic.
+     *
+     * Note that in this method we don't do more sophisticated analysis (like using
+     * value equivalence, or knowledge of unique indexes) because we want to prove that
+     * *every* child of a UNION is deterministic, not just this one.
+     *
+     * @param orderColumns  ORDER BY columns on the UNION
+     * @return  true if all items on display list are in the UNION's ORDER BY
+     */
+    public boolean orderByColumnsDetermineAllDisplayColumnsForUnion(List<ParsedColInfo> orderColumns) {
+        Set<AbstractExpression> orderExprs = new HashSet<>();
+        for (ParsedColInfo col : orderColumns) {
+            orderExprs.add(col.expression);
+        }
+
+
+        for (ParsedColInfo col : m_displayColumns) {
+            if (! orderExprs.contains(col.expression)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private boolean hasAOneRowResult()
@@ -2088,5 +2145,4 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         return null;
     }
-
 }

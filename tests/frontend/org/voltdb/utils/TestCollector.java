@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.voltdb.VoltDB.CONFIG_DIR;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -125,7 +126,7 @@ public class TestCollector {
     }
 
     private int getpid(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
 
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
@@ -134,7 +135,7 @@ public class TestCollector {
         return pid;
     }
     private String getWorkingDir(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
 
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
@@ -144,7 +145,7 @@ public class TestCollector {
     }
 
     private List<String> getLogPaths(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
         List<String> logPaths = new ArrayList<String>();
@@ -159,7 +160,7 @@ public class TestCollector {
     private void createLogFiles() throws Exception {
 
         try {
-           String configInfoPath = voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";;
+           String configInfoPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator + "config.json";;
            JSONObject jsonObject= Collector.parseJSONFile(configInfoPath);
            JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
 

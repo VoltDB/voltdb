@@ -49,10 +49,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <ctime>
-#include <string>
 #include "harness.h"
+
 #include "common/common.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
@@ -61,13 +59,15 @@
 #include "common/ThreadLocalPool.h"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/DRTupleStream.h"
+#include "storage/temptable.h"
+
+#include <cstdlib>
+#include <ctime>
+#include <string>
 
 using namespace std;
 using namespace voltdb;
