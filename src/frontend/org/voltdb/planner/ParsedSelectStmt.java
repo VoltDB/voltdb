@@ -699,10 +699,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
-        int index = 0;
-        for (VoltXMLElement child : columnsNode.children) {
-            parseDisplayColumn(index, child, isDistributed);
-            ++index;
+        try {
+            m_parsingInDisplayColumns = true;
+            int index = 0;
+            for (VoltXMLElement child : columnsNode.children) {
+                parseDisplayColumn(index, child, isDistributed);
+                ++index;
+            }
+        } finally {
+            m_parsingInDisplayColumns = false;
         }
     }
 

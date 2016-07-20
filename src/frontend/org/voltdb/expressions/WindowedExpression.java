@@ -65,7 +65,8 @@ public class WindowedExpression extends AbstractExpression {
             ExpressionType operationType,  // RANK, MAX, etc.
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
-            List<SortDirectionType>  orderByDirections)
+            List<SortDirectionType>  orderByDirections,
+            int                      id)
     {
         super(operationType);
         m_partitionByExpressions.addAll(partitionbyExprs);
@@ -73,6 +74,7 @@ public class WindowedExpression extends AbstractExpression {
         m_orderByDirections.addAll(orderByDirections);
         setValueType(VoltType.BIGINT);
         setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        m_xmlID = id;
     }
 
 
@@ -136,6 +138,7 @@ public class WindowedExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject jobj) throws JSONException {
+        assert(false);
         super.loadFromJSONObject(jobj);
         m_partitionByExpressions.clear();
 
@@ -154,11 +157,12 @@ public class WindowedExpression extends AbstractExpression {
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
+        assert(false);
         super.toJSONString(stringer);
         assert (m_orderByExpressions.size() == m_orderByDirections.size());
         // Be careful.  This node may have changed to be a
         // non-windowed expression.  Don't serialize the partition by and sort
-        // expressions unless we are really a windowed
+        // expressions unless we are really a windowed expression.
         if (getExpressionType().getExpressionClass() == WindowedExpression.class) {
             /*
              * Serialize the partition expressions.  The orderby
@@ -262,5 +266,15 @@ public class WindowedExpression extends AbstractExpression {
         m_displayListExpression = displayListExpression;
     }
 
+    private int m_xmlID = -1;
+
+    /**
+     * When a VoltXMLElement is translated to an expression, we remember the
+     * ID.  We may see it again in the order by expression.  This gets the ID number.
+     * @return
+     */
+    public final int getXMLID() {
+        return m_xmlID;
+    }
 }
 

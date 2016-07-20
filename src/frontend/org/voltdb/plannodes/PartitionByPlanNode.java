@@ -103,11 +103,18 @@ public class PartitionByPlanNode extends AggregatePlanNode {
                                                    null);
     }
 
+    /**
+     * Deserialize a PartitionByPlanNode from JSON.  Since we don't need the
+     * sort directions, and we don't serialize them in toJSONString, then we
+     * can't in general get them here.
+     */
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         WindowedExpression winExpr = new WindowedExpression();
-        AbstractExpression.loadSortListFromJSONArray(winExpr.getOrderByExpressions(), null, jobj);
+        AbstractExpression.loadSortListFromJSONArray(winExpr.getOrderByExpressions(),
+                                                     null,
+                                                     jobj);
         winExpr.setExpressionType(m_aggregateTypes.get(0));
         // WE don't really care about the column and table
         // names and aliases.  These are not the ones from the

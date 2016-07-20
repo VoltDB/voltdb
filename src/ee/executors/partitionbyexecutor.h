@@ -21,8 +21,10 @@
 
 namespace voltdb {
 
-/*
- *
+/**
+ * This is the executor for a PartitionByPlanNode.  This is almost exactly like
+ * an AggregateSerialExecutor, but the initialization is slightly different, and
+ * we specify that we output one row for each input row.
  */
 class PartitionByExecutor: public AggregateSerialExecutor {
 public:

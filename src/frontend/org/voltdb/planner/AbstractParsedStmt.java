@@ -120,11 +120,6 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
-    // We need to remember if we are parsing in the display column,
-    // so that we don't parse windowed expressions elsewhere.
-    protected boolean m_parsingInDisplayColumns = false;
-
-
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
     static final String DELETE_NODE_NAME = "delete";
@@ -541,32 +536,34 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
-        // Parse individual rank expressions
+        int id = Integer.parseInt(exprNode.attributes.get("id"));
+        // If this is not in the display column list, and the id is not the id of
+        // the windowed expression, then this is an error.
         if (!m_parsingInDisplayColumns) {
-            // We are parsing a windowed expression outside of the display list.  This
-            // sometimes happens because we have used a display list alias in the order by.  So, we
-            // don't really have to parse this again.  We just return the tve we created
-            // when we parsed the windowed expression initially.
-            //
-            // If however, we have a rank expression outside the display list,
-            // and there is no other rank expression around, then this is an
-            // error.
             if (m_windowedExpressions.size() > 0) {
-                return m_windowedExpressions.get(0).getDisplayListExpression();
-            } else {
-                throw new PlanningErrorException("Windowed expressions can only appear in the select list.");
+                WindowedExpression we = m_windowedExpressions.get(0);
+                if (we.getXMLID() == id) {
+                    // This is the same as a windowed expression we saw in the
+                    // display list.  This can happen if we see an alias for
+                    // a display list element in the order by expressions.  If
+                    // this happens we just want to return the TVE we squirreled
+                    // away in the windowed expression.
+                    return we.getDisplayListExpression();
+                }
             }
+            throw new PlanningErrorException("Windowed expressions can only appear in the select list.");
         }
+        // Parse individual rank expressions
         List<AbstractExpression> partitionbyExprs = new ArrayList<>();
         List<AbstractExpression> orderbyExprs = new ArrayList<>();
         List<SortDirectionType>  orderbyDirs  = new ArrayList<>();
-        boolean areAllDecending = false;
 
         for (VoltXMLElement ele : exprNode.children) {
             if (ele.name.equals("partitionbyList")) {
                 for (int i = 0; i < ele.children.size(); i++) {
                     VoltXMLElement childNode = ele.children.get(i);
                     AbstractExpression expr = parseExpressionNode(childNode);
+                    ExpressionUtil.finalizeValueTypes(expr);
                     partitionbyExprs.add(expr);
                 }
 
@@ -579,6 +576,7 @@ public abstract class AbstractParsedStmt {
                             : SortDirectionType.ASC;
 
                     AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                    ExpressionUtil.finalizeValueTypes(expr);
                     orderbyExprs.add(expr);
                     orderbyDirs.add(sortDir);
                 }
@@ -594,7 +592,9 @@ public abstract class AbstractParsedStmt {
         WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
                                                              partitionbyExprs,
                                                              orderbyExprs,
-                                                             orderbyDirs);
+                                                             orderbyDirs,
+                                                             id);
+        ExpressionUtil.finalizeValueTypes(rankExpr);
         // Only offset 0 is useful.  But we keep the index anyway.
         int offset = m_windowedExpressions.size();
         m_windowedExpressions.add(rankExpr);
@@ -1990,4 +1990,25 @@ public abstract class AbstractParsedStmt {
         }
         return false;
     }
+
+    protected boolean m_parsingInDisplayColumns = false;
+
+    /**
+     * Whwn we parse a rank expression we want to know if we are in the display column.
+     *
+     * @return the parsingInDisplayColumns
+     */
+    public final boolean isParsingInDisplayColumns() {
+        return m_parsingInDisplayColumns;
+    }
+
+    /**
+     * Whwn we parse a rank expression we want to know if we are in the display column.
+     *
+     * @param parsingInDisplayColumns the parsingInDisplayColumns to set
+     */
+    public final void setParsingInDisplayColumns(boolean parsingInDisplayColumns) {
+        m_parsingInDisplayColumns = parsingInDisplayColumns;
+    }
+
 }

@@ -713,9 +713,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * The lists are cleared before they are filled in.  This is the inverse of toJSONArrayFromSortList.
      *
      * The JSONObject should be in object state, not array state.  It should have a member
-     * named SORT_COLUMNS, which is an array with the <expression, direction> pairs.  The
-     * directions are optional.  However, if either every expression has a direction or
-     * no expression has a direction and the list sortDirections must be null.
+     * named SORT_COLUMNS, which is an array with the <expression, direction> pairs.  Sometimes the
+     * sort directions are not needed.  For example, when deserializing
      *
      * @param sortExpressions The container for the sort expressions.
      * @param sortDirections The container for the sort directions.  This may
