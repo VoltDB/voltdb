@@ -72,6 +72,7 @@ public class ShortCircuitReadLog
         if (spHandle > m_lastSpTruncationHandle) {
 //            System.out.println("update the m_lastSpTruncationHandle from " + m_lastSpTruncationHandle + " to " + spHandle);
             m_lastSpTruncationHandle = spHandle;
+            releaseShortCircuitRead(m_lastSpTruncationHandle, IS_SP);
         }
     }
 
