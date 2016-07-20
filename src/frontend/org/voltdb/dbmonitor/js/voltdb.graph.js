@@ -1771,20 +1771,20 @@
             if(localStorage.cmdLogMin != undefined)
                 cmdLogArrMin = JSON.parse(localStorage.cmdLogMin)
             else{
-                cmdLogArrMin =  JSON.stringify(cmdLogDataMin)
+                cmdLogArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataMin))
                 cmdLogArrMin = JSON.parse(cmdLogArrMin)
             }
             if(localStorage.cmdLogDay != undefined)
                 cmdLogArrDay = JSON.parse(localStorage.cmdLogDay)
             else {
-                cmdLogArrDay = JSON.stringify(cmdLogDataDay)
+                cmdLogArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataDay))
                 cmdLogArrDay = JSON.parse(cmdLogArrDay)
             }
 
             if(localStorage.cmdLog != undefined)
                 cmdLogArr = JSON.parse(localStorage.cmdLog)
             else{
-                cmdLogArr =  JSON.stringify(cmdLogData)
+                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.parse(cmdLogArr)
             }
 
@@ -1940,6 +1940,14 @@
             cmdLogSecCount++;
             cmdLogMinCount++;
         };
+
+        this.convertDataFormat = function(cmdLogData){
+            var requiredFormat = []
+            for(var i = 0; i < cmdLogData.length; i++){
+                requiredFormat.push({"timestamp": cmdLogData[i].x, "outstandingTxn": cmdLogData[i].y})
+            }
+            return requiredFormat;
+        }
 
         this.SaveSnapshotOverlay = function(snapshotData, timeUnit){
             var interval_end = new Date()
