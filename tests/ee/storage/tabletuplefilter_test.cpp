@@ -57,7 +57,7 @@ public:
 
 private:
 
-    TupleSchema* createTupleScmema(int columns) {
+    TupleSchema* createTupleSchema(int columns) {
         std::vector<ValueType> all_types;
         std::vector<bool> column_allow_null(columns, true);
         std::vector<int32_t> all_inline_lengths;
@@ -76,7 +76,7 @@ private:
 
         std::string tableName = "a_table";
         int columns = 5;
-        TupleSchema*  schema = createTupleScmema(columns);
+        TupleSchema*  schema = createTupleSchema(columns);
 
         std::vector<std::string> names;
         for (int i = 0 ; i < columns; ++i) {

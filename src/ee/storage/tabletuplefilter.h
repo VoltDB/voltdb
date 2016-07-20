@@ -72,6 +72,9 @@ class TableTupleFilter_const_iter;
  * keep track of which tuples in the inner table were matched and
  * which were not, so as to provide null-padded rows.
  *
+ * Each block in the table is assigned a block number, where the block
+ * with the lowest address is block 0.
+ *
  * The physical tuple address in the real table and the corresponding
  * tuple index in the TableTupleFilter are related by the following
  * equation:
@@ -82,6 +85,11 @@ class TableTupleFilter_const_iter;
  *
  * Block Offset = Block Number * Tuples Per Block
  *
+ * The net effect of this is that the byte array has the byte "tag"
+ * for all the rows in the 0-th block first, followed by the 1-th
+ * block, and so on.  Not all blocks will be full, so there will be
+ * unused entries, but this representation is compact and provides
+ * relatively fast lookups.
  */
 class TableTupleFilter {
 
