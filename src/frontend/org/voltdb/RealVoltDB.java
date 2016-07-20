@@ -1541,7 +1541,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
-        boolean differingRoots = false;
+        boolean writeGeneratedDF = false;
 
         if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the voltdbroot directory in " + cnfrootFH, false, null);
@@ -1555,13 +1555,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             File cnfcanoFH = cnfrootFH.getCanonicalFile();
             if (!cnfcanoFH.equals(depcanoFH)) {
-                differingRoots = true;
+                writeGeneratedDF = true;
                 dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
             }
             // root in deployment conflicts with command line voltdbroot
-            if (!VoltDB.DBROOT.equals(deprootFN) && differingRoots) {
+            if (!VoltDB.DBROOT.equals(deprootFN) && writeGeneratedDF) {
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
+            }
+            // if provided admin-mode settings in deployment are different than the default one, update
+            // admin mode settings to default and update flag to commit updated deployment
+            if(CatalogUtil.updateAdminModeToDefaultIfNotDefault(dt)) {
+               writeGeneratedDF = true;
             }
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(
@@ -1617,8 +1622,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
         }
+
+        // log message unconditionally indicating that the provided host-count and admin-mode settings in
+        // deployment, if any, will be ignored
+        consoleLog.info("Hostcount, admin-mode settings specified in the deployment file will be ignored");
+        hostLog.info("Hostcount, admin-mode settings specified in the deployment file will be ignored");
+
         // see if you just can simply copy the deployment file
-        if (differingRoots) {
+        if (writeGeneratedDF) {
             File depFH = getConfigLogDeployment(config);
             try (FileWriter fw = new FileWriter(depFH)) {
                 fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
