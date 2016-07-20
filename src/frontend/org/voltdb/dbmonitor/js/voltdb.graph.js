@@ -1901,7 +1901,7 @@
                                 isDuplicate = false;
                         });
                         if (!isDuplicate)
-                            cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                            cmdLogOverlay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
                     }
                 }
                 d3.select('#visualisationCommandLog .nv-y')
@@ -1916,8 +1916,8 @@
                 localStorage.SnapshotOverlayData = JSON.stringify(MonitorGraphUI.SaveSnapshotOverlay(cmdLogOverlay))
 
                 $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
-                    var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
-                    var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
+                    var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.startTime);
+                    var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.endTime);
                     var opacity = 1;
                     if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
                         opacity = ((x2 - x1) > 4) ? 0.2 : 1;
@@ -1956,8 +1956,8 @@
             interval_end.setMinutes(interval_end.getMinutes() - interval);
             snapshotDataArr = [];
             for(var i = 0; i < snapshotData.length; i++){
-                start_timeStamp =  snapshotData[i].x;
-                stop_timeStamp = snapshotData[i].y;
+                start_timeStamp =  snapshotData[i].startTime;
+                stop_timeStamp = snapshotData[i].endTime;
                 if(start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()
                 && start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()){
                     snapshotDataArr.push(snapshotData[i])
