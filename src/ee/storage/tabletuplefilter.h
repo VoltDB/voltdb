@@ -65,9 +65,15 @@ template<int8_t MARKER>
 class TableTupleFilter_const_iter;
 
 /**
- * A lightweight representation of a table - a contiguous array where each tuple
- * (active and non-active) is represented as a byte with a certain value. The physical tuple address
- * in the real table and the corresponding tuple index in the TableTupleFilter are related by the following
+ * A lightweight representation of a table - a contiguous array where
+ * each tuple (active and non-active) is represented as a byte with a
+ * certain value.  This lets clients of this class "tag" rows of a
+ * table with an 8-bit value.  For full outer joins, this is used to
+ * keep track of which tuples in the inner table were matched and
+ * which were not, so as to provide null-padded rows.
+ *
+ * The physical tuple address in the real table and the corresponding
+ * tuple index in the TableTupleFilter are related by the following
  * equation:
  *
  * Tuple Index = (Tuple Address - Tuple Block Address) / Tuple Size + Block Offset
@@ -194,18 +200,25 @@ class TableTupleFilter {
 
     // Tuples (active and not active)
     std::vector<char> m_tuples;
+
     // Collection of table blocks addresses
     std::vector<uint64_t> m_blocks;
+
     // (Block Address/ Block offset into the tuples array) map
     boost::unordered_map<uint64_t, uint64_t> m_blockIndexes;
 
     // Block/Tuple size
     uint32_t m_tuplesPerBlock;
+
+    // Length of tuples in this table
     uint32_t m_tupleLength;
 
-    // Previously accessed block address
+    // Previously accessed block address, cached to avoid
+    // excessive searches of m_blocks
     uint64_t m_prevBlockAddress;
-    // Previously accessed block index
+
+    // Previously accessed block index, cached to avoid excessive
+    // lookups in m_blockIndexes
     uint64_t m_prevBlockIndex;
 
     // Index of the last ACTIVE tuple in the underlying table
