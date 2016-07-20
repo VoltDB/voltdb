@@ -1515,9 +1515,7 @@
                 if(typeof(partitionDetailsArr) != "object" )
                     partitionDetailsArr = JSON.parse(partitionDetailsArr)
                 for(var i = 0; i< partitionDetailsArr.length; i++){
-                    var keyIndexSec = partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 1)
-                    if (keyIndexSec == ")")
-                        keyIndexSec =  partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 6, 1)
+                    keyIndexSec =  i;
                     if(partitionDetailsArr.length != 0)
                         monitor.partitionData[keyIndexSec]["values"] = []
                     for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
@@ -1527,9 +1525,7 @@
                 if(typeof(partitionDetailsArrMin) != "object" )
                     partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
-                    var keyIndexMin = partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 1)
-                    if (keyIndexMin == ")")
-                        keyIndexMin =  partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 6, 1)
+                      keyIndexMin =  j;
                     if(partitionDetailsArrMin.length != 0)
                         monitor.partitionDataMin[keyIndexMin]["values"] = []
                     for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
@@ -1539,9 +1535,8 @@
                 if(typeof(partitionDetailsArrDay) != "object" )
                     partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
-                   var keyIndexDay = partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 1)
-                   if (keyIndexDay == ")")
-                        keyIndexDay =  partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 6, 1)
+//                        keyIndexDay =  partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 6, 1)
+                   keyIndexDay = k;
                    if(partitionDetailsArrDay.length != 0)
                         monitor.partitionDataDay[keyIndexMin]["values"] = []
                    for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
