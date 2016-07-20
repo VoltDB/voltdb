@@ -1517,7 +1517,7 @@
                 if(typeof(partitionDetailsArr) != "object" )
                     partitionDetailsArr = JSON.parse(partitionDetailsArr)
                 for(var i = 0; i< partitionDetailsArr.length; i++){
-                    var keyIndexSec = partitionDetailsArr[i].key.substr(partitionDetailsArr[i].key.length - 1)
+                    keyIndexSec =  i;
                     if(partitionDetailsArr.length != 0)
                         monitor.partitionData[keyIndexSec]["values"] = []
                     for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
@@ -1528,7 +1528,7 @@
                 if(typeof(partitionDetailsArrMin) != "object" )
                     partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
-                    var keyIndexMin = partitionDetailsArrMin[j].key.substr(partitionDetailsArrMin[j].key.length - 1)
+                      keyIndexMin =  j;
                     if(partitionDetailsArrMin.length != 0)
                         monitor.partitionDataMin[keyIndexMin]["values"] = []
                     for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
@@ -1538,11 +1538,12 @@
                 if(typeof(partitionDetailsArrDay) != "object" )
                     partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
-                   var keyIndexDay = partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 1)
+//                        keyIndexDay =  partitionDetailsArrDay[k].key.substr(partitionDetailsArrDay[k].key.length - 6, 1)
+                   keyIndexDay = k;
                    if(partitionDetailsArrDay.length != 0)
                         monitor.partitionDataDay[keyIndexMin]["values"] = []
                    for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
-                       monitor.partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrMin[k]["values"][c].y})
+                       monitor.partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrDay[k]["values"][c].y})
                    }
                 }
             }
@@ -1765,42 +1766,66 @@
             var cmdLogArr = []
             var cmdLogArrMin = []
             var cmdLogArrDay = []
+            var overlayDataArr = []
 
             if(localStorage.cmdLogMin != undefined)
                 cmdLogArrMin = JSON.parse(localStorage.cmdLogMin)
-
+            else{
+                cmdLogArrMin =  JSON.stringify(cmdLogDataMin)
+                cmdLogArrMin = JSON.parse(cmdLogArrMin)
+            }
             if(localStorage.cmdLogDay != undefined)
                 cmdLogArrDay = JSON.parse(localStorage.cmdLogDay)
-
+            else {
+                cmdLogArrDay = JSON.stringify(cmdLogDataDay)
+                cmdLogArrDay = JSON.parse(cmdLogArrDay)
+            }
 
             if(localStorage.cmdLog != undefined)
                 cmdLogArr = JSON.parse(localStorage.cmdLog)
+            else{
+                cmdLogArr =  JSON.stringify(cmdLogData)
+                cmdLogArr =  JSON.parse(cmdLogArr)
+            }
+
+
+            if(localStorage.SnapshotOverlayData != undefined)
+                overlayDataArr =  JSON.parse(localStorage.SnapshotOverlayData)
 
             if(monitor.cmdLogFirstData){
+                if(cmdLogArr.length != 0)
+                    cmdLogData = []
                 for(var i = 0; i< cmdLogArr.length; i++){
-                    sliceFirstData(monitor.cmdLogData, dataView.Seconds);
-                    monitor.cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
+                    //sliceFirstData(monitor.cmdLogData, dataView.Seconds);
+
+                    cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
                         "y": cmdLogArr[i].outstandingTxn
                     })
                 }
+                if(cmdLogArrMin.length != 0)
+                    cmdLogDataMin = []
                 for(var j = 0; j< cmdLogArrMin.length; j++){
-                    sliceFirstData(monitor.cmdLogDataMin, dataView.Minutes);
-                    monitor.cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
+                    //sliceFirstData(monitor.cmdLogDataMin, dataView.Minutes);
+                    cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
                         "y": cmdLogArrMin[j].outstandingTxn
                     })
                 }
+                if(cmdLogArrDay.length != 0)
+                    cmdLogDataDay = []
                 for(var k = 0; k< cmdLogArrDay.length; k++){
-                    sliceFirstData(monitor.cmdLogDataDay, dataView.Days);
-                    monitor.cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
+                    //sliceFirstData(monitor.cmdLogDataDay, dataView.Days);
+                    cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
                         "y": cmdLogArrDay[k].outstandingTxn
                     })
+                }
+
+                if(overlayDataArr.length != 0){
+                    cmdLogOverlay = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
                 }
             }
 
             if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
-
-
 
             var timeStamp = cmdLogDetail[currentServer].TIMESTAMP;
             if (timeStamp >= monitor.cmdLogMaxTimeStamp) {
@@ -1858,7 +1883,6 @@
                     dataCommandLog[0]["values"] = cmdLogData;
                 }
 
-
                 if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
                     d3.select('#visualisationCommandLog')
                         .datum(dataCommandLog)
@@ -1889,6 +1913,8 @@
                     .attr('y', 0)
                     .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
 
+                localStorage.SnapshotOverlayData = JSON.stringify(MonitorGraphUI.SaveSnapshotOverlay(cmdLogOverlay))
+
                 $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
                     var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
                     var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
@@ -1904,7 +1930,9 @@
                             .attr('y', 0)
                             .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
                     }
+
                 });
+
             }
             if (timeStamp > monitor.cmdLogMaxTimeStamp) {
                 monitor.cmdLogMaxTimeStamp = timeStamp;
@@ -1912,6 +1940,23 @@
             cmdLogSecCount++;
             cmdLogMinCount++;
         };
+
+        this.SaveSnapshotOverlay = function(snapshotData, timeUnit){
+            var interval_end = new Date()
+            var interval_start = new Date()
+            var interval = $( "#slider-range-min" ).slider( "value" )
+            interval_end.setMinutes(interval_end.getMinutes() - interval);
+            snapshotDataArr = [];
+            for(var i = 0; i < snapshotData.length; i++){
+                start_timeStamp =  snapshotData[i].x;
+                stop_timeStamp = snapshotData[i].y;
+                if(start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()
+                && start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()){
+                    snapshotDataArr.push(snapshotData[i])
+                }
+            }
+            return snapshotDataArr;
+        }
 
         this.refreshGraphCmdLog = function () {
             if ($.isFunction(MonitorGraphUI.ChartCommandlog.update))
