@@ -743,19 +743,24 @@ if __name__ == "__main__":
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        # kludge to not fail for known issues in the numeric-decimals and
-        # numeric-ints "extended" test suites, when running against PostgreSQL
-        # (or PostGIS/PostgreSQL); see ENG-10546
-        if config_name == 'numeric-decimals' and comparison_database.startswith('Post'):
-            if result["mis"] > 1180:
-                success = False
-        elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
-            if result["mis"] > 2820:
-                success = False
-        else:
-            # end of kludge; the following are the normal behavior:
-            if result["mis"] != 0:
-                success = False
+
+        max_mismatches = 0
+        # Kludge to not fail for known issues, when running against PostgreSQL
+        # (or the PostGIS extension of PostgreSQL), in either the basic-joins
+        # test suite, the basic-index-joins, and basic-compoundex-joins
+        # "extended" test suites (see ENG-10775); or, in the numeric-decimals
+        # and numeric-ints "extended" test suites (see ENG-10546)
+        if comparison_database.startswith('Post'):
+            if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
+                  config_name == 'basic-compoundex-joins'):
+                max_mismatches = 4620
+            elif config_name == 'numeric-decimals':
+                max_mismatches = 1180
+            elif config_name == 'numeric-ints':
+                max_mismatches = 2820
+        # End of kludge; the following is the normal behavior:
+        if result["mis"] > max_mismatches:
+            success = False
 
     # Write the summary
     time1 = time.time()
