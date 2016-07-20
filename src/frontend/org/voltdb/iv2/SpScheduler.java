@@ -250,7 +250,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "had no responses.  This should be impossible?");
             }
         }
-        writeIv2ViableReplayEntry();
+        // Block on write to fault log.
+        SettableFuture<Boolean> written = writeIv2ViableReplayEntry();
+        boolean logWritten = false;
+
+        if (written != null) {
+            try {
+                logWritten = written.get();
+            } catch (InterruptedException e) {
+            } catch (ExecutionException e) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
+                }
+            }
+            if (!logWritten) {
+                tmLog.warn("Attempted fault log not written for partition: " + m_partitionId);
+            }
+        }
     }
 
     /**
@@ -1011,11 +1027,29 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    /**
+     * Should only receive these messages at replicas, when told by the leader
+     */
     public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
-        // Should only receive these messages at replicas, call the internal log write with
-        // the provided SP handle
-        writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        //call the internal log write with the provided SP handle and wait for the fault log IO to complete
+        SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        boolean logWritten = false;
+
+        if (written != null) {
+            try {
+                logWritten = written.get();
+            } catch (InterruptedException e) {
+            } catch (ExecutionException e) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
+                }
+            }
+            if (!logWritten) {
+                tmLog.warn("Attempted fault log not written for partition: " + m_partitionId);
+            }
+        }
+
         setMaxSeenTxnId(message.getSpHandle());
 
         // Also initialize the unique ID generator and the last durable unique ID using
@@ -1065,48 +1099,41 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * If appropriate, cause the initiator to write the viable replay set to the command log
      * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
+     *
+     * This will return a future to block on for the write on the fault log. If the attempt to write
+     * the replay entry was never followed through due to conditions, it will be null. If the attempt
+     * to write the replay entry went through but could not be done internally, the future will be false.
      */
-    void writeIv2ViableReplayEntry()
+    SettableFuture<Boolean> writeIv2ViableReplayEntry()
     {
+        SettableFuture<Boolean> written = null;
         if (m_replayComplete) {
             if (m_isLeader) {
                 // write the viable set locally
                 long faultSpHandle = advanceTxnEgo().getTxnId();
-                writeIv2ViableReplayEntryInternal(faultSpHandle);
+                written = writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
                 Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
                 m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
         }
+        return written;
     }
 
     /**
-     * Write the viable replay set to the command log with the provided SP Handle
+     * Write the viable replay set to the command log with the provided SP Handle.
+     * Pass back the future.
      */
-    void writeIv2ViableReplayEntryInternal(long spHandle)
+    SettableFuture<Boolean> writeIv2ViableReplayEntryInternal(long spHandle)
     {
+        SettableFuture<Boolean> written = null;
         if (m_replayComplete) {
-            SettableFuture<Boolean> written = m_cl.logIv2Fault(m_mailbox.getHSId(),
+            written = m_cl.logIv2Fault(m_mailbox.getHSId(),
                 new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
-
-            boolean logWritten = false;
-
-            if (written != null) {
-                try {
-                    logWritten = written.get();
-                } catch (InterruptedException e) {
-                } catch (ExecutionException e) {
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
-                    }
-                }
-            }
-
-            if (!logWritten) {
-                tmLog.warn("Fault log not written for partition: " + m_partitionId);
-            }
+            return written;
         }
+        return written;
     }
 
     @Override

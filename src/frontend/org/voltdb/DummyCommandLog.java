@@ -58,9 +58,7 @@ public class DummyCommandLog implements CommandLog {
     @Override
     public SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle) {
-        SettableFuture<Boolean> written = SettableFuture.create();
-        written.set(false);
-        return written;
+        return null;
     }
 
     @Override

@@ -73,7 +73,7 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log.
+     * IV2-only method. Write this Iv2FaultLogEntry to the fault log portion of the command log.
      * @return a settable future that is set true after the entry has been written to disk.
      */
     public abstract SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
