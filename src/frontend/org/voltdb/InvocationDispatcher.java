@@ -1534,7 +1534,7 @@ public final class InvocationDispatcher {
          * Someday could support per-transaction consistency for reads.
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly && Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel)) {
+            if (isReadOnly && m_defaultConsistencyReadLevel.hasShortcutRead()) {
                 initiatorHSId = m_localReplicas.get().get(partition);
             }
             if (initiatorHSId != null) {

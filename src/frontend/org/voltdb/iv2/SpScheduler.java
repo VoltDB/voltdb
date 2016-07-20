@@ -420,8 +420,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        boolean shortcutRead = message.isReadOnly() &&
-                Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        boolean shortcutRead = message.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
         if (!m_isLeader && m_shortCircuitReadLog != null) {
             m_shortCircuitReadLog.setLastSpTruncationHandle(message.getTruncationHandle());
         }
@@ -577,7 +576,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        final boolean shortcutRead = msg.isReadOnly() && Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        final boolean shortcutRead = msg.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
@@ -789,8 +788,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        boolean shortcutRead = message.isReadOnly() &&
-                Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        boolean shortcutRead = message.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
         if (m_shortCircuitReadLog != null) {
             m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
         }
@@ -890,7 +888,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                  * possible to read an unconfirmed transaction's writes that will be lost.
                  */
                 final boolean shortcutRead = msg.getInitiateTask().isReadOnly() &&
-                        Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+                        m_defaultConsistencyReadLevel.hasShortcutRead();
                 logThis = !shortcutRead;
             }
         }

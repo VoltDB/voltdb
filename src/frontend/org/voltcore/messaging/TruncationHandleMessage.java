@@ -19,7 +19,7 @@ package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.VoltDbMessageFactory;
 
 public class TruncationHandleMessage extends VoltMessage {
@@ -59,6 +59,6 @@ public class TruncationHandleMessage extends VoltMessage {
     public String toString() {
         return super.toString()
                    + " TruncationHandleMessage truncation handle id: "
-                   + CoreUtils.hsIdToString(m_truncationHandle);
+                   + TxnEgo.txnIdToString(m_truncationHandle);
     }
 }

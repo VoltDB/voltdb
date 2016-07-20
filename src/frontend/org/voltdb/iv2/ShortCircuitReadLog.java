@@ -92,7 +92,7 @@ public class ShortCircuitReadLog
             truncationHandle = handle;
         }
 
-        if (msg.getSpHandle() >= truncationHandle || truncationHandle == Long.MIN_VALUE) {
+        if (msg.getSpHandle() >= truncationHandle) {
             m_mailbox.send(msg.getInitiatorHSId(), msg);
         } else {
             m_shortCircuitReadSp.add(new Item(msg));

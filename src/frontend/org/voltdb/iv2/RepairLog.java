@@ -156,7 +156,7 @@ public class RepairLog
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        boolean isShortcutReadBySetting = Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
+        boolean isShortcutReadBySetting = m_defaultConsistencyReadLevel.hasShortcutRead();
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
 
