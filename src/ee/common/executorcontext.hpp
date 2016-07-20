@@ -87,8 +87,6 @@ class ExecutorContext {
         m_uniqueId = uniqueId;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
-
-        checkTransactionForDR();
     }
 
     // data available via tick()
@@ -251,9 +249,9 @@ class ExecutorContext {
 
     bool allOutputTempTablesAreEmpty() const;
 
-  private:
     void checkTransactionForDR();
 
+  private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;

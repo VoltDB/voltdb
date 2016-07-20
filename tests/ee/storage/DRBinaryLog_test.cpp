@@ -319,6 +319,7 @@ public:
         UndoQuantum* uq = isReadOnly() ? NULL : m_undoLog.generateUndoQuantum(m_undoToken);
         engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                                                             addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
+        engine->getExecutorContext()->checkTransactionForDR();
     }
 
     void endTxn(MockVoltDBEngine *engine, bool success) {

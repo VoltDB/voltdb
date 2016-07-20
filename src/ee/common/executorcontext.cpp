@@ -20,6 +20,7 @@
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
+#include "storage/DRTupleStreamUndoAction.h"
 
 #include "boost/foreach.hpp"
 
@@ -266,9 +267,18 @@ void ExecutorContext::checkTransactionForDR() {
         if (dynamic_cast<DRTupleStream *>(m_drStream)) {
             m_drStream->transactionChecks(m_lastCommittedSpHandle, m_spHandle,
                     m_uniqueId);
+            m_undoQuantum->registerUndoAction(
+                    new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
+                            m_drStream->m_committedUso,
+                            rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
             if (m_drReplicatedStream) {
                 m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
                         m_spHandle, m_uniqueId);
+                m_undoQuantum->registerUndoAction(
+                        new (*m_undoQuantum) DRTupleStreamUndoAction(
+                                m_drReplicatedStream,
+                                m_drReplicatedStream->m_committedUso,
+                                rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
             }
         }
     }

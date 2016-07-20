@@ -383,6 +383,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
+    m_executorContext->checkTransactionForDR();
+
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
