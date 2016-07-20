@@ -1943,6 +1943,7 @@ public class TestJSONInterface extends TestCase {
             UsersType.User user = new UsersType.User();
             user.setName("foo");
             user.setPassword("foo");
+            user.setRoles("administrator");
             String map = mapper.writeValueAsString(user);
             Map<String,String> params = new HashMap<>();
             params.put("user", map);
@@ -1954,10 +1955,10 @@ public class TestJSONInterface extends TestCase {
             assertEquals(jarray.length(), 1);
             JSONObject jobj = jarray.getJSONObject(0);
             assertTrue(jobj.getString("id").contains("/deployment/users/foo"));
-            assertTrue(jobj.getString("roles").equalsIgnoreCase("null"));
+            assertTrue(jobj.getString("roles").equalsIgnoreCase("administrator"));
 
             //Post users
-            user.setRoles("foo");
+            user.setRoles("foo,administrator");
             map = mapper.writeValueAsString(user);
             params.put("user", map);
             postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
@@ -1967,7 +1968,7 @@ public class TestJSONInterface extends TestCase {
             jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             jobj = jarray.getJSONObject(0);
-            assertTrue(jobj.getString("roles").equals("foo"));
+            assertTrue(jobj.getString("roles").equals("foo,administrator"));
 
             //Delete users
             deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
