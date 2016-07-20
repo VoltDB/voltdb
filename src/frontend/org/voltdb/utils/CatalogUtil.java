@@ -1889,14 +1889,9 @@ public abstract class CatalogUtil {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
-        int maskInvalidAdminNum = 0;
-        int adminNum = 0;
 
         for (UsersType.User user : users.getUser()) {
             Set<String> roles = extractUserRoles(user);
-            if (roles.contains(ADMIN)) {
-                adminNum++;
-            }
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
@@ -1907,17 +1902,10 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                if (roles.contains(ADMIN)) {
-                    maskInvalidAdminNum++;
-                }
                 // if one user has invalid password, give a warn.
-                hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file");
-                //disable user with invalid masked password
-                String disablePassword = StringUtils.repeat('F', 104);
-                user.setPassword(disablePassword);
-                int sha1len = ClientAuthScheme.getHexencodedDigestLength(ClientAuthScheme.HASH_SHA1);
-                sha1hex = disablePassword.substring(0, sha1len);
-                sha256hex = disablePassword.substring(sha1len);
+                hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file.");
+                // throw exception disable user with invalid masked password
+                throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1948,10 +1936,6 @@ public abstract class CatalogUtil {
                             "and may not have the expected database permissions.");
                 }
             }
-        }
-        // if all administrators have invalid password, throws an exception.
-        if (maskInvalidAdminNum == adminNum) {
-            throw new RuntimeException("No administrator user has valid password.");
         }
     }
 
