@@ -104,7 +104,7 @@ public class TestPBDMultipleReaders {
             m_pbd.close();
         } catch (Exception e) {}
         try {
-            //TestPersistentBinaryDeque.tearDownTestDir();
+            TestPersistentBinaryDeque.tearDownTestDir();
         } finally {
             m_pbd = null;
         }

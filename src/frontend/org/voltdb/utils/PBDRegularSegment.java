@@ -86,7 +86,9 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public int getNumEntries() throws IOException
     {
+        boolean wasClosed = false;
         if (m_closed) {
+            wasClosed = true;
             open(false, false);
         }
         if (m_fc.size() > 0) {
@@ -94,12 +96,12 @@ public class PBDRegularSegment extends PBDSegment {
             PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), COUNT_OFFSET);
             m_numOfEntries = m_tmpHeaderBuf.b().getInt();
             m_size = m_tmpHeaderBuf.b().getInt();
-            return m_numOfEntries;
         } else {
             m_numOfEntries = 0;
             m_size = 0;
-            return 0;
         }
+        if (wasClosed) close();
+        return m_numOfEntries;
     }
 
     @Override

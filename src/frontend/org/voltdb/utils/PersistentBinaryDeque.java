@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -216,9 +217,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                         extension = parts[2];
                     }
 
-                    if (nonce.equals(parsedNonce) && "pbd".equals(seqNum) && "cursors".equals(extension)) {
-                        readCursorFile(pathname);
-                    } else if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
+                    if (nonce.equals(parsedNonce) && "pbd".equals(extension)) {
                         if (pathname.length() == 4) {
                             //Doesn't have any objects, just the object count
                             pathname.delete();
@@ -279,9 +278,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_segments.put(e.getKey(), e.getValue());
         }
 
-        if (m_cursorsWriter == null) {
-            m_cursorsWriter = new RandomAccessFile(new File(m_path, m_nonce + ".pbd.cursors"), "rwd");
-        }
+        readCursorFile(new File(m_path, m_nonce + ".pbd.cursors"));
 
         //Find the first and last segment for polling and writing (after)
         Long writeSegmentIndex = 0L;
@@ -302,9 +299,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         try {
             m_cursorsWriter = new RandomAccessFile(file, "rwd");
             String cursorId = null;
-            while ((cursorId=m_cursorsWriter.readLine()) != null) {
+            while ((cursorId=m_cursorsWriter.readUTF()) != null) {
                 m_readCursors.put(cursorId, new ReadCursor(cursorId));
+                m_cursorsWriter.readUTF();
             }
+        } catch(EOFException e) {
+            // Nothing to read
         } catch(IOException e) {
             throw new RuntimeException(e);
         }
@@ -508,9 +508,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     private void persistCursor(String cursorId) throws IOException {
-        System.out.println("Writing to cursor file " + cursorId);
-        m_cursorsWriter.writeChars(cursorId);
-        m_cursorsWriter.writeBytes(System.getProperty("line.separator"));
+        m_cursorsWriter.writeUTF(cursorId);
+        m_cursorsWriter.writeUTF(System.getProperty("line.separator"));
     }
 
     private BBContainer wrapRetCont(final PBDSegment segment, final BBContainer retcont) {
