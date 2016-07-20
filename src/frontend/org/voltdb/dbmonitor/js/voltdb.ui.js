@@ -413,24 +413,6 @@ $(document).ready(function () {
 });
 
 
-var stockData = [
-        {
-            Symbol: "AAPL",
-            Company: "Apple Inc.",
-            Price: "132.54"
-        },
-        {
-            Symbol: "INTC",
-            Company: "Intel Corporation",
-            Price: "33.45"
-        },
-        {
-            Symbol: "GOOG",
-            Company: "Google Inc",
-            Price: "554.52"
-        },
-    ];
-
 function convertArrayOfObjectsToCSV(args) {
     var result, ctr, keys, columnDelimiter, lineDelimiter, data;
 
@@ -452,8 +434,12 @@ function convertArrayOfObjectsToCSV(args) {
         ctr = 0;
         keys.forEach(function(key) {
             if (ctr > 0) result += columnDelimiter;
+                if (key == "timestamp"){
+                    result += new Date(item[key]).getHours() + ":" + new Date(item[key]).getMinutes() + ":" + new Date(item[key]).getSeconds()
+                }
+                else
+                    result += item[key];
 
-            result += item[key];
             ctr++;
         });
         result += lineDelimiter;
@@ -516,13 +502,13 @@ function downloadCSV(args,whichChart) {
     }
     else if (whichChart == "partitionIdle"){
         if (graphView == "Seconds"){
-            chartData = JSON.parse(localStorage.partitionDetails)
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetails))
         }
         else if (graphView == "Minutes"){
-            chartData = JSON.parse(localStorage.partitionDetailsMin)
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetailsMin))
         }
         else if (graphView == "Days"){
-            chartData = JSON.parse(localStorage.partitionDetailsDay)
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetailsDay))
         }
 
     }
@@ -565,6 +551,21 @@ function downloadCSV(args,whichChart) {
     link.setAttribute('href', data);
     link.setAttribute('download', filename);
     link.click();
+}
+
+function convertPartitionData(data){
+    var chartData = [];
+    for (var i=0; i< data.length; i++){
+        for(var j=0 ; j< data[i].values.length; j++){
+            chartData.push({
+            "key": data[i].key,
+            "color": data[i].color,
+            "timestamp": data[i].values[j].x,
+            "value": data[i].values[j].y
+        })
+        }
+    }
+    return chartData;
 }
 
 function logout() {
