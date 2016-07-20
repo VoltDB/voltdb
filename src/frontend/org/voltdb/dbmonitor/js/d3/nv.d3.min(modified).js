@@ -617,6 +617,7 @@
                 if (d.series[0].value == null) {
                     return '';
                 }
+                var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
                     var theadEnter = table.selectAll("thead")
@@ -650,6 +651,7 @@
                     }
                     else {
                         unit = '%';
+                        isPartitionIdleGraph = true;
                     }
                 }
 
@@ -672,13 +674,22 @@
                 //    .classed("key", true)
                 //    .html(function (p, i) { return keyFormatter(p.key, i) });
 
-                trowEnter.append("td")
+                if(isPartitionIdleGraph){
+                    trowEnter.append("td")
+                        .classed("key", true)
+                        .html(function (p, i) { return p.key })
+                    trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
+                } else {
+                    trowEnter.append("td")
+                        .classed("value", true)
+                        .html(function (p, i) { return valueFormatter(p.value, i) + unit });
 
-                trowEnter.append("td")
-                    .classed("key", true)
-                    .html("at " + d.value);
+                    trowEnter.append("td")
+                        .classed("key", true)
+                        .html("at " + d.value);
+                }
 
 
                 trowEnter.selectAll("td").each(function (p) {
