@@ -558,6 +558,8 @@ elif CTX.PLATFORM == "Linux":
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
 
+print("Making in directory \"%s\" with %d threads" 
+		% (CTX.OUTPUT_PREFIX, numHardwareThreads))
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 if retval != 0:
     sys.exit(-1)
