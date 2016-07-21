@@ -703,7 +703,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             cursor.close();
         }
         m_readCursors.clear();
- 
+
         for (PBDSegment segment : m_segments.values()) {
             segment.close();
         }
