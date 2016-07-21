@@ -1877,7 +1877,7 @@ public abstract class CatalogUtil {
      * @param users A reference to the <users> element of the deployment.xml file.
      * @throws RuntimeException when there is an user with invalid masked password.
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users) throws Exception {
+    private static void setUsersInfo(Catalog catalog, UsersType users) throws RuntimeException {
         if (users == null) {
             return;
         }
