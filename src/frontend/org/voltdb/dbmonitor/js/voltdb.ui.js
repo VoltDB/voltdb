@@ -449,7 +449,6 @@ function convertArrayOfObjectsToCSV(args) {
 }
 
 function downloadCSV(args,whichChart) {
-    debugger;
     var data, filename, link;
     var graphView = $("#graphView").val()
     var chartData = {}
