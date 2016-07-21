@@ -75,6 +75,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
@@ -157,11 +158,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
     // Atomically allows the catalog reference to change between access
-    private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
+    private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<>(null);
 
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
@@ -179,7 +183,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(2048, .75f, 128);
+            new ConcurrentHashMap<>(2048, .75f, 128);
 
     private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
 
@@ -209,7 +213,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * what has been admitted.
      */
     private final CopyOnWriteArrayList<AdmissionControlGroup> m_allACGs =
-            new CopyOnWriteArrayList<AdmissionControlGroup>();
+            new CopyOnWriteArrayList<>();
 
     /*
      * A thread local is a convenient way to keep the ACG out of volt core. The lookup is paired
@@ -344,7 +348,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (m_socket != null) {
                     boolean success = false;
                     //Populated on timeout
-                    AtomicReference<String> timeoutRef = new AtomicReference<String>();
+                    AtomicReference<String> timeoutRef = new AtomicReference<>();
                     try {
                         final InputHandler handler = authenticate(m_socket, timeoutRef);
                         if (handler != null) {
@@ -1027,6 +1031,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        if (cihm == null) {
+            hostLog.warn("ClientInterface.createTransaction request rejected. "
+                    + "This is likely due to VoltDB ceasing client communication as it "
+                    + "shuts down.");
+            return false;
+        }
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
@@ -1036,7 +1046,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * if there is, send it to the replica as a short circuit read
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly) {
+            if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
                 initiatorHSId = m_localReplicas.get(partition);
             }
             if (initiatorHSId != null) {
@@ -1133,7 +1143,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
-            LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
+            LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<>();
             @Override
             public void deliver(final VoltMessage message) {
                 if (message instanceof InitiateResponseMessage) {
@@ -1176,6 +1186,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+
+        // try to get the global default setting for read consistency, but fall back to SAFE
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
@@ -1861,13 +1874,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         buf.capacity(),
                         nowNanos);
         if (!success) {
+            // COMMENT 1:
             // HACK: this return is for the DR agent so that it
             // will move along on duplicate replicated transactions
             // reported by the slave cluster.  We report "SUCCESS"
             // to keep the agent from choking.  ENG-2334
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+
+            // COMMENT 2: ENG-10389-backport
+            // when VoltDB.crash... is called, we close off the client interface
+            // and it might not be possible to create new transactions.
+            // Return an error.
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0],
-                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                            + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                            + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
         }
         return null;
@@ -2430,7 +2451,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param now Current time in milliseconds
      */
     private final void checkForDeadConnections(final long now) {
-        final ArrayList<Pair<Connection, Integer>> connectionsToRemove = new ArrayList<Pair<Connection, Integer>>();
+        final ArrayList<Pair<Connection, Integer>> connectionsToRemove = new ArrayList<>();
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
             // Internal connections don't implement calculatePendingWriteDelta(), so check for real connection first
             if (VoltPort.class == cihm.connection.getClass()) {
@@ -2561,7 +2582,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Procedure catProc = sysProc.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.procName = procedureName;
-        spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+        spi.params = new FutureTask<>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
                 ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
@@ -2726,7 +2747,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public Map<Long, Pair<String, long[]>> getLiveClientStats()
     {
         final Map<Long, Pair<String, long[]>> client_stats =
-            new HashMap<Long, Pair<String, long[]>>();
+            new HashMap<>();
 
         // m_cihm hashes connectionId to a ClientInterfaceHandleManager
         // ClientInterfaceHandleManager has the connection object.
@@ -2739,7 +2760,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
                 long outstandingTxns = e.getValue().getOutstandingTxns();
                 client_stats.put(
-                        e.getKey(), new Pair<String, long[]>(
+                        e.getKey(), new Pair<>(
                             e.getValue().connection.getHostnameOrIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
@@ -2790,7 +2811,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
         ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> statsIterators =
-                new ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
+                new ArrayList<>();
         for(AdmissionControlGroup acg : m_allACGs) {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
@@ -2798,7 +2819,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public List<AbstractHistogram> getLatencyStats() {
-        List<AbstractHistogram> latencyStats = new ArrayList<AbstractHistogram>();
+        List<AbstractHistogram> latencyStats = new ArrayList<>();
         for (AdmissionControlGroup acg : m_allACGs) {
             latencyStats.add(acg.getLatencyInfo());
         }
@@ -2829,4 +2850,43 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return clientResponse;
     }
 
+    /**
+     * This is not designed to be a safe shutdown.
+     * This is designed to stop sending messages to clients as fast as possible.
+     * It is currently called from VoltDB.crash...
+     *
+     * Note: this really needs to work. We CAN'T respond back to the client anything
+     * after we've decided to crash or it might break some of our contracts.
+     *
+     * @return false if we can't be assured this safely worked
+     */
+    public boolean ceaseAllPublicFacingTrafficImmediately() {
+        try {
+            if (m_acceptor != null) {
+                // This call seems to block until the shutdown is done
+                // which is good becasue we assume there will be no new
+                // connections afterward
+                m_acceptor.shutdown();
+            }
+            if (m_adminAcceptor != null) {
+                m_adminAcceptor.shutdown();
+            }
+        }
+        catch (InterruptedException e) {
+            // this whole method is really a best effort kind of thing...
+            log.error(e);
+            // if we didn't succeed, let the caller know and take action
+            return false;
+        }
+        finally {
+            // this feels like an unclean thing to do... but should work
+            // for the purposes of cutting all responses right before we deliberatly
+            // end the process
+            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // care if it's empty... so... this.
+            m_cihm.clear();
+        }
+
+        return true;
+    }
 }
