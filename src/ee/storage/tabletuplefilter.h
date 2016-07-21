@@ -65,9 +65,18 @@ template<int8_t MARKER>
 class TableTupleFilter_const_iter;
 
 /**
- * A lightweight representation of a table - a contiguous array where each tuple
- * (active and non-active) is represented as a byte with a certain value. The physical tuple address
- * in the real table and the corresponding tuple index in the TableTupleFilter are related by the following
+ * A lightweight representation of a table - a contiguous array where
+ * each tuple (active and non-active) is represented as a byte with a
+ * certain value.  This lets clients of this class "tag" rows of a
+ * table with an 8-bit value.  For full outer joins, this is used to
+ * keep track of which tuples in the inner table were matched and
+ * which were not, so as to provide null-padded rows.
+ *
+ * Each block in the table is assigned a block number, where the block
+ * with the lowest address is block 0.
+ *
+ * The physical tuple address in the real table and the corresponding
+ * tuple index in the TableTupleFilter are related by the following
  * equation:
  *
  * Tuple Index = (Tuple Address - Tuple Block Address) / Tuple Size + Block Offset
@@ -76,6 +85,11 @@ class TableTupleFilter_const_iter;
  *
  * Block Offset = Block Number * Tuples Per Block
  *
+ * The net effect of this is that the byte array has the byte "tag"
+ * for all the rows in the 0-th block first, followed by the 1-th
+ * block, and so on.  Not all blocks will be full, so there will be
+ * unused entries, but this representation is compact and provides
+ * relatively fast lookups.
  */
 class TableTupleFilter {
 
@@ -124,12 +138,16 @@ class TableTupleFilter {
     /**
      * Returns the tuple address
      */
-    uint64_t getTupleAddress(size_t tupleIdx) const
+    uint64_t getTupleAddress(size_t tupleIdx)
     {
         assert(tupleIdx < m_tuples.size());
         size_t blockIdx = tupleIdx / m_tuplesPerBlock;
         assert(blockIdx < m_blocks.size());
-        return m_blocks[blockIdx] + (tupleIdx - blockIdx) * m_tupleLength;
+        if (m_prevBlockIndex > tupleIdx || (tupleIdx - m_prevBlockIndex) >= m_tuplesPerBlock) {
+            assert(m_blockIndexes.find(m_blocks[blockIdx]) != m_blockIndexes.end());
+            m_prevBlockIndex = m_blockIndexes.find(m_blocks[blockIdx])->second;
+        }
+        return m_blocks[blockIdx] + (tupleIdx - m_prevBlockIndex) * m_tupleLength;
     }
 
     bool empty() const
@@ -190,18 +208,25 @@ class TableTupleFilter {
 
     // Tuples (active and not active)
     std::vector<char> m_tuples;
+
     // Collection of table blocks addresses
     std::vector<uint64_t> m_blocks;
+
     // (Block Address/ Block offset into the tuples array) map
     boost::unordered_map<uint64_t, uint64_t> m_blockIndexes;
 
     // Block/Tuple size
     uint32_t m_tuplesPerBlock;
+
+    // Length of tuples in this table
     uint32_t m_tupleLength;
 
-    // Previously accessed block address
+    // Previously accessed block address, cached to avoid
+    // excessive searches of m_blocks
     uint64_t m_prevBlockAddress;
-    // Previously accessed block index
+
+    // Previously accessed block index, cached to avoid excessive
+    // lookups in m_blockIndexes
     uint64_t m_prevBlockIndex;
 
     // Index of the last ACTIVE tuple in the underlying table
