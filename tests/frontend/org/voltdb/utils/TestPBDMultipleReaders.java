@@ -32,6 +32,7 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
 
 public class TestPBDMultipleReaders {
 
@@ -42,17 +43,18 @@ public class TestPBDMultipleReaders {
     private class PBDReader {
         private String m_readerId;
         private int m_totalRead;
+        private BinaryDequeReader m_reader;
 
         public PBDReader(String readerId) throws IOException {
             m_readerId = readerId;
-            m_pbd.openForRead(m_readerId);
+            m_reader = m_pbd.openForRead(m_readerId);
         }
 
         public void readToEndOfSegment() throws Exception {
             int end = (m_totalRead/47 + 1) * 47;
             boolean done = false;
             for (int i=m_totalRead; i<end && !done; i++) {
-                BBContainer bbC = m_pbd.poll(m_readerId, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+                BBContainer bbC = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 if (bbC==null) {
                     done = true;
                     continue;
