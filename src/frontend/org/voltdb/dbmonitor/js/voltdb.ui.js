@@ -580,7 +580,7 @@ function downloadAll(files){
     var theAnchor = $('<a />')
         .attr('href', file[1])
         .attr('download',file[0]);
-    document.body.appendChild(theAnchor);
+    document.body.appendChild(theAnchor[0]);
     theAnchor[0].click();
     theAnchor.remove();
     downloadAll(files);
