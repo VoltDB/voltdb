@@ -863,13 +863,18 @@ public class VoltDB {
 
         public static Consistency.ReadLevel getDefaultReadConsistencyLevel() {
             // try to get the global default setting for read consistency, but fall back to SAFE
+
+            // temporary use safe-1 for testing
+            Consistency.ReadLevel readLevel = Consistency.ReadLevel.SAFE_1;
+
             if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
-                return VoltDB.instance().getConfig().m_consistencyReadLevel;
+                Consistency.ReadLevel defaultLevel = VoltDB.instance().getConfig().m_consistencyReadLevel;
+                if (defaultLevel != null) {
+                    readLevel = defaultLevel;
+                }
             }
-            else {
-                // temporary change to safe-1 for testing
-                return Consistency.ReadLevel.SAFE_1;
-            }
+
+            return readLevel;
         }
     }
 
