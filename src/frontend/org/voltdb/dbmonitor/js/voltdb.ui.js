@@ -530,7 +530,6 @@ function downloadCSV(args,whichChart) {
         }
         else if (graphView == "Minutes"){
             chartData = JSON.parse(localStorage.cmdLogMin)
-            var overLayData = JSON.parse(localStorage.SnapshotOverlayData)
         }
         else if (graphView == "Days"){
             chartData =  JSON.parse(localStorage.cmdLogDay)
