@@ -14,10 +14,17 @@ import mysql.connector
 
 from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
+#Used for pretty printing tables
 from tabulate import tabulate
 
+# Get job names from environment variables
 COMMUNITY = os.environ.get('community', None)
 PRO = os.environ.get('pro', None)
+VDM = os.environ.get('vdm', None)
+MEMVALDEBUG = os.environ.get('memvaldebug', None)
+DEBUG = os.environ.get('debug', None)
+MEMVAL = os.environ.get('memval', None)
+FULLMEMCHECK = os.environ.get('fullmemcheck', None)
 
 # Channel to message in case something goes wrong
 ADMIN_CHANNEL = os.environ.get('admin', None)
@@ -82,14 +89,14 @@ RIGHT JOIN `junit-builds` AS jr
            jr.name=%(job)s
 """)
 
-# Leaderboard - See a specific leaderboard for two jobs.
+# Master Leaderboard - See a specific leaderboard for three jobs.
 ML_QUERY = ("""
   SELECT job AS 'Job name',
          name AS 'Long test name',
          fails AS 'Fails',
          total AS 'Total',
          fails/total*100. AS "Fail %",
-         latest AS 'Latest Failure'
+         latest AS 'Latest failure'
     FROM
         (
            SELECT job,
@@ -104,8 +111,39 @@ ML_QUERY = ("""
                   MAX(tf.stamp) AS latest
              FROM `junit-test-failures` AS tf
             WHERE NOT status='FIXED' AND
-                  (job=%(jobA)s OR job=%(jobB)s) AND
+                  (job=%(jobA)s OR job=%(jobB)s OR job=%(jobC)s) AND
                   NOW() - INTERVAL 30 DAY <= tf.stamp
+         GROUP BY job,
+                  name,
+                  total
+        ) AS intermediate
+ORDER BY 5 DESC
+""")
+
+# Core Extended Leaderboard - See a specific leaderboard for two jobs.
+CL_QUERY = ("""
+  SELECT job AS 'Job name',
+         name AS 'Long test name',
+         fails AS 'Fails',
+         total AS 'Total',
+         fails/total*100. AS "Fail %",
+         latest AS 'Latest failure'
+    FROM
+        (
+           SELECT job,
+                  name,
+                  (
+                   SELECT COUNT(*)
+                     FROM `junit-builds` AS jr
+                    WHERE jr.name = tf.job AND
+                          NOW() - INTERVAL 10 DAY <= jr.stamp
+                  ) AS total,
+                  COUNT(*) AS fails,
+                  MAX(tf.stamp) AS latest
+             FROM `junit-test-failures` AS tf
+            WHERE NOT status='FIXED' AND
+                  (job=%(jobA)s OR job=%(jobB)s OR job=%(jobC)s OR job=%(jobD)s) AND
+                  NOW() - INTERVAL 10 DAY <= tf.stamp
          GROUP BY job,
                   name,
                   total
@@ -171,16 +209,16 @@ class JenkinsBot(object):
         Establishes session and responds to commands
         """
 
-        help_text = ['*Help*\n',
-                     'See which tests are failing the most since this build:\n\ttest-leaderboard <job> <build #>\n',
-                     'See which tests are failing in the past x days:\n\tdays <job> <days> \n',
-                     'Failing the most in this build range:\n\tbuild-range <job> <build #>-<build #>\n',
-                     'Most recent failure on master:\n\ttest-on-master <job> <testname> (ex. testname: org.voltdb.iv2'
+        help_text = ['*help*\n',
+                     'See which tests are failing the most since this build:\n\t*test-leaderboard* <job> <build #>\n',
+                     'See which tests are failing in the past x days:\n\t*days* <job> <days> \n',
+                     'Failing the most in this build range:\n\t*build-range* <job> <build #>-<build #>\n',
+                     'Most recent failure on master:\n\t*test-on-master* <job> <testname> (ex. testname: org.voltdb.iv2'
                          '..)\n',
-                     'All failures for a job:\n\tall-failures <job>\n',
-                     'For any <job>, you can specify "pro" or "com" for the master jobs\n',
-                     'Examples: test-leaderboard pro 860, days com 14\n',
-                     'help\n']
+                     'All failures for a job:\n\t*all-failures* <job>\n',
+                     'Display this help:\n\t*help*\n'
+                     'For any <job>, you can specify *"pro"* or *"com"* for the master jobs\n',
+                     'Examples: test-leaderboard pro 860, days com 14\n']
 
         while True:
             try:
@@ -223,7 +261,7 @@ class JenkinsBot(object):
                                 'days': args[2]
                             }
                             self.query_and_response(D_QUERY, params, [channel],
-                                                    '%s-leaderboard-past-%s.txt' % (job, args[2]))
+                                                    '%s-leaderboard-past-%s-days.txt' % (job, args[2]))
                         elif 'test-leaderboard' in text:
                             args = text.split(' ')
                             params = {
@@ -279,11 +317,9 @@ class JenkinsBot(object):
             headers = list(cursor.column_names)
             table = cursor.fetchall()
 
-            if query == ML_QUERY:
-                # Do some specific replacement for long rows in this query.
-                self.leaderboard_shorten(table)
-
-
+            if query == ML_QUERY or query == CL_QUERY:
+                # Do some specific edits for this query.
+                self.edit_leaderboard(table)
             self.client.api_call(
                 'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
             )
@@ -304,15 +340,18 @@ class JenkinsBot(object):
             cursor.close()
             database.close()
 
-    def leaderboard_shorten(self, table):
+    def edit_leaderboard(self, table):
         """
-        Shorten the master leaderboard table.
+        Edit the table to fit on most screens.
         """
-
         for i, row in enumerate(table):
+            table[i] = list(row)
             table[i][0] = table[i][0].replace('branch-2-', '')
+            table[i][0] = table[i][0].replace('test-', '')
+            table[i][0] = table[i][0].replace('nextrelease-', '')
             table[i][1] = table[i][1].replace('org.voltdb.', '')
             table[i][1] = table[i][1].replace('org.voltcore.', '')
+            table[i][1] = table[i][1].replace('regressionsuites.', '')
 
     def post_message(self, channel, text):
         """
@@ -332,7 +371,15 @@ if __name__ == '__main__':
             jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.query_and_response(
                 ML_QUERY,
-                {'jobA': PRO, 'jobB': COMMUNITY},
+                {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
                 ['#junit'],
-                'leaderboard-past30days.txt'
+                'master-past30days.txt'
+            )
+        elif sys.argv[1] == 'core-leaderboard':
+            jenkinsbot.logfile = sys.argv[2]
+            jenkinsbot.query_and_response(
+                RL_QUERY,
+                {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
+                ['#junit'],
+                'coreextended-past10days.txt'
             )
