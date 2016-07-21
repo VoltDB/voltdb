@@ -61,6 +61,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
@@ -829,11 +830,21 @@ SnapshotCompletionInterest, Promotable
                                 .append(" because catalog CRC did not match digest.");
                 return null;
             }
+            // Make sure this is not a partial snapshot.
+            // Compare digestTableNames with all normal table names in catalog file.
+            // A normal table is one that's NOT a materialized view, nor an export table.
+            Set<String> catalogNormalTableNames = CatalogUtil.getNormalTableNamesfromInMemoryJar(jarfile);
+            if (!catalogNormalTableNames.equals(digestTableNames)) {
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                                .append(s.getNonce())
+                                .append(" because this is a partial snapshot.");
+                return null;
+            }
         }
         catch (IOException ioe) {
             m_snapshotErrLogStr.append("\nRejected snapshot ")
                             .append(s.getNonce())
-                            .append(" because catalog CRC could not be validated");
+                            .append(" because catalog file could not be validated");
             return null;
         }
         finally {
