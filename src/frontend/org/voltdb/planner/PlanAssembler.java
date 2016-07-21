@@ -36,6 +36,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.MaterializedViewHandler;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
@@ -284,6 +285,14 @@ public class PlanAssembler {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
                 "Illegal to read a stream.");
+            }
+            // Check if the select target is a joint table view, guard against that.
+            // Will remove this after the feature is done.
+            for (Table t : parsedStmt.m_tableList) {
+                MaterializedViewHandler mvHandler = t.getMvhandler().get("mvHandler");
+                if (mvHandler != null && mvHandler.getIsjointtableview()) {
+                    throw new PlanningErrorException("Materialized view on joint tables will be supported soon.");
+                }
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible

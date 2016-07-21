@@ -134,7 +134,7 @@ begin Table                          "A table (relation) in the database"
   int estimatedtuplecount            "A rough estimate of the number of tuples in the table; used for planning"
   MaterializedViewInfo* views        "Information about materialized views based on this table's content"
   MaterializedViewHandler* mvHandler "Only on result table of a materialized view"
-  ViewTrigger* viewTriggers          "Only on the source table of a materialized view"
+  TableRef* affectedViewTables          "Only on the source table of a materialized view"
   Table? materializer                "If this is a materialized view, this field stores the source table"
   string signature                   "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                     "A maximum number of rows in a table"
@@ -142,20 +142,10 @@ begin Table                          "A table (relation) in the database"
   Statement* tuplelimitDeleteStmt    "Delete statement to execute if tuple limit will be exceeded"
 end
 
-begin ViewTrigger
-  Table? destTable
-  int tablePos
-end
-
 begin MaterializedViewHandler       "Information used to build and update a materialized view"
-  Table? dest                       "The table which will be updated when the source table is updated"
-  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
-  string predicate                  "A filtering predicate"
-  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
-  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
-  IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
   Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
   Statement* createQuery            "The SELECT statement that defines the view"
+  bool isJointTableView             "May be removed after the feature is finished."
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
@@ -222,6 +212,10 @@ begin Index              "A index structure on a database table's columns"
   string predicatejson   "A serialized representation of the optional predicate for partial indexes"
 end
 
+begin TableRef
+  Table? table
+end
+
 begin ColumnRef    "A reference to a table column"
   int index        "The index within the set"
   Column? column   "The table column being referenced"
@@ -252,7 +246,6 @@ begin Column                    "A table column"
   string defaultvalue           "Default value of the column"
   int defaulttype               "Type of the default value of the column"
   ConstraintRef* constraints    "Constraints that use this column"
-  MaterializedViewInfo? matview "If part of a materialized view, ref of view info"
   int aggregatetype             "If part of a materialized view, represents aggregate type"
   Column? matviewsource         "If part of a materialized view, represents source column"
   bool inbytes                  "If a varchar column and size was specified in bytes"

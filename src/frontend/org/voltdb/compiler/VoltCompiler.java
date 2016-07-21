@@ -49,12 +49,10 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
@@ -63,15 +61,11 @@ import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -88,8 +82,6 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -102,6 +94,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -1179,75 +1172,6 @@ public class VoltCompiler {
 
         ddlcompiler.compileToCatalog(db);
 
-        // Actually parse and handle all the partitions
-        // this needs to happen before procedures are compiled
-        String msg = "In database, ";
-        final CatalogMap<Table> tables = db.getTables();
-        for (Table table: tables) {
-            String tableName = table.getTypeName();
-
-            if (voltDdlTracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
-                String colName = voltDdlTracker.m_partitionMap.get(tableName.toLowerCase());
-                // A null column name indicates a replicated table. Ignore it here
-                // because it defaults to replicated in the catalog.
-                if (colName != null) {
-                    assert(tables.getIgnoreCase(tableName) != null);
-                    if (table.getMaterializer() != null) {
-                        msg += "the materialized view is automatically partitioned based on its source table. "
-                                + "Invalid PARTITION statement on view table " + tableName + ".";
-                        throw new VoltCompilerException(msg);
-                    }
-
-                    final Column partitionCol = table.getColumns().getIgnoreCase(colName);
-                    // make sure the column exists
-                    if (partitionCol == null) {
-                        msg += "PARTITION has unknown COLUMN '" + colName + "'";
-                        throw new VoltCompilerException(msg);
-                    }
-                    // make sure the column is marked not-nullable
-                    if (partitionCol.getNullable() == true) {
-                        msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
-                            "Partition columns must be constrained \"NOT NULL\".";
-                        throw new VoltCompilerException(msg);
-                    }
-                    // verify that the partition column is a supported type
-                    VoltType pcolType = VoltType.get((byte) partitionCol.getType());
-                    switch (pcolType) {
-                        case TINYINT:
-                        case SMALLINT:
-                        case INTEGER:
-                        case BIGINT:
-                        case STRING:
-                        case VARBINARY:
-                            break;
-                        default:
-                            msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                            "Partition columns must be an integer, varchar or varbinary type.";
-                            throw new VoltCompilerException(msg);
-                    }
-
-                    table.setPartitioncolumn(partitionCol);
-                    table.setIsreplicated(false);
-
-                    // Check valid indexes, whether they contain the partition column or not.
-                    for (Index index: table.getIndexes()) {
-                        checkValidPartitionTableIndex(index, partitionCol, tableName);
-                    }
-                    // Set the partitioning of destination tables of associated views.
-                    // If a view's source table is replicated, then a full scan of the
-                    // associated view is single-sited. If the source is partitioned,
-                    // a full scan of the view must be distributed, unless it is filtered
-                    // by the original table's partitioning key, which, to be filtered,
-                    // must also be a GROUP BY key.
-                    final CatalogMap<MaterializedViewInfo> views = table.getViews();
-                    for (final MaterializedViewInfo mvi : views) {
-                        mvi.getDest().setIsreplicated(false);
-                        setGroupedTablePartitionColumn(mvi, partitionCol);
-                    }
-                }
-            }
-        }
-
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
 
@@ -1316,72 +1240,6 @@ public class VoltCompiler {
                     DeterminismMode.FASTER,
                     StatementPartitioning.partitioningForRowLimitDelete());
         }
-    }
-
-    private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
-            throws VoltCompilerException {
-        // skip checking for non-unique indexes.
-        if (!index.getUnique()) {
-            return;
-        }
-
-        boolean containsPartitionColumn = false;
-        String jsonExpr = index.getExpressionsjson();
-        // if this is a pure-column index...
-        if (jsonExpr.isEmpty()) {
-            for (ColumnRef cref : index.getColumns()) {
-                Column col = cref.getColumn();
-                // unique index contains partitioned column
-                if (col.equals(partitionCol)) {
-                    containsPartitionColumn = true;
-                    break;
-                }
-            }
-        }
-        // if this is a fancy expression-based index...
-        else {
-            try {
-                int partitionColIndex = partitionCol.getIndex();
-                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                for (AbstractExpression expr: indexExpressions) {
-                    if (expr instanceof TupleValueExpression &&
-                            ((TupleValueExpression) expr).getColumnIndex() == partitionColIndex ) {
-                        containsPartitionColumn = true;
-                        break;
-                    }
-                }
-            } catch (JSONException e) {
-                e.printStackTrace(); // danger will robinson
-                assert(false);
-            }
-        }
-
-        if (containsPartitionColumn) {
-            if (index.getAssumeunique()) {
-                String exceptionMsg = String.format("ASSUMEUNIQUE is not valid " +
-                "for an index that includes the partitioning column. Please use UNIQUE instead.");
-                throw new VoltCompilerException(exceptionMsg);
-            }
-        }
-        else if ( ! index.getAssumeunique()) {
-            // Throw compiler exception.
-            String indexName = index.getTypeName();
-            String keyword = "";
-            if (indexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
-                indexName = "PRIMARY KEY";
-                keyword = "PRIMARY KEY";
-            } else {
-                indexName = "UNIQUE INDEX " + indexName;
-                keyword = "UNIQUE";
-            }
-
-            String exceptionMsg = "Invalid use of " + keyword +
-                    ". The " + indexName + " on the partitioned table " + tableName +
-                    " does not include the partitioning column " + partitionCol.getName() +
-                    ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.";
-            throw new VoltCompilerException(exceptionMsg);
-        }
-
     }
 
     /**
@@ -1485,59 +1343,6 @@ public class VoltCompiler {
 
         // allow gc to reclaim any cache memory here
         m_previousCatalogStmts.clear();
-    }
-
-    private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
-            throws VoltCompilerException {
-        // A view of a replicated table is replicated.
-        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
-        // -- it certainly isn't replicated!
-        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
-        // Otherwise, the view table just doesn't have a partitioning column
-        // -- it is seemingly randomly distributed,
-        // and its grouped columns are only locally unique but not globally unique.
-        Table destTable = mvi.getDest();
-        // Get the grouped columns in "index" order.
-        // This order corresponds to the iteration order of the MaterializedViewInfo's group by columns.
-        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
-        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
-
-        if (mvi.getGroupbycols().size() > 0) {
-            int index = 0;
-            for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
-                Column srcCol = cref.getColumn();
-                if (srcCol.getName().equals(partitionColName)) {
-                    Column destCol = destColumnArray.get(index);
-                    destTable.setPartitioncolumn(destCol);
-                    return;
-                }
-                ++index;
-            }
-        } else {
-            String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
-            if (complexGroupbyJson.length() > 0) {
-                int partitionColIndex =  partitionColumn.getIndex();
-
-                  List<AbstractExpression> mvComplexGroupbyCols = null;
-                  try {
-                      mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-                  } catch (JSONException e) {
-                      e.printStackTrace();
-                  }
-                  int index = 0;
-                  for (AbstractExpression expr: mvComplexGroupbyCols) {
-                      if (expr instanceof TupleValueExpression) {
-                          TupleValueExpression tve = (TupleValueExpression) expr;
-                          if (tve.getColumnIndex() == partitionColIndex) {
-                              Column destCol = destColumnArray.get(index);
-                              destTable.setPartitioncolumn(destCol);
-                              return;
-                          }
-                      }
-                      ++index;
-                  }
-            }
-        }
     }
 
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
