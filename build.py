@@ -439,6 +439,12 @@ if whichtests in ("${eetestsuite}", "logging"):
     logging_test
     """
 
+if whichtests in ("${eetestsuite}", "memleaktests"):
+   CTX.TESTS['memleaktests'] = """
+     definite_losses
+     indirect_losses
+     possible_losses
+   """
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test

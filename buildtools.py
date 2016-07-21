@@ -618,6 +618,66 @@ def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
 
+class MemLeakError:
+    def __init__(self, bytes, blocks, errType, line):
+        self.bytes = bytes
+        self.blocks = blocks
+        self.errType = errType
+        self.line = line
+    def message():
+        return errType + '\n    ' + line
+
+class ValgrindError:
+    def __init__(self, errorCount, contextCount, errType, line):
+        self.errorCount = errorCount
+        self.contextCount = contextCount
+        self.line = line
+    def message():
+        return line
+
+class ErrorState:
+    def __init__(self, expectNoErrors):
+        self.expectErrors = not expectNoErrors
+        self.memLossPattern = re.compile(".*(?P<errorType>((definitely)|(possibly)|(indirectly))) lost: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
+        self.stillReachablePattern = re.compile(".*still reachable: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
+        self.errorPattern = re.compile(".*ERROR SUMMARY: (?P<errorCount>\d*) errors from (?P<errorContexts>\d*) contexts")
+        self.errorLines = []
+
+    def processErrorString(self, line):
+        m = self.memLossPattern.match(line)
+        if m:
+            bytes = int(m.group('byteCount'))
+            if bytes > 0:
+                blocks = int(m.group('blockCount'))
+                errtype = m.group("errorType")
+                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errtype + " Lost.", line)]
+            return
+        m = self.stillReachablePattern.match(line)
+        if m:
+            bytes = int(m.group('byteCount'))
+            if bytes > 0:
+                blocks = int(m.group('blockCount'))
+                errType = "Memory still reachable"
+                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errType + " Lost.", line)]
+            return
+        m = self.errorPattern.match(line)
+        if m:
+            errors = int(m.group('errorCount'))
+            if errors > 0:
+                contexts = int(m.group('errorContexts'))
+                errtype = 'other'
+                self.errorLines += [ValgrindError(errors, contexts, errtype, line)]
+                
+    def isExpectedState(self):
+        if self.expectErrors:
+            return (len(self.errorLines) > 0)
+        else:
+            return (len(self.errorLines) == 0)
+
+    def errorMessage(self):
+        return ("%d Valgrind Errors: \n" % len(self.errorLines)) \
+		+ "\n".join(map(lambda l: l.message(), self.errorLines))
+    
 def runTests(CTX):
     failedTests = []
 
@@ -631,11 +691,12 @@ def runTests(CTX):
     tests = []
     for dir in CTX.TESTS.keys():
         input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
+        tests += [(dir, TEST_PREFIX + "/" + dir + "/" + x) for x in input]
     successes = 0
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
-    for test in tests:
+    for dir, test in tests:
+	expectNoMemLeaks = not (dir == "memleaktests")
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
@@ -656,25 +717,17 @@ def runTests(CTX):
 							     "--suppressions=" + os.path.join(TEST_PREFIX,
 											      "test_utils/vdbsuppressions.supp"),
 							     targetpath], stderr=PIPE, bufsize=-1)
-                #out = process.stdout.readlines()
-                allHeapBlocksFreed = False
-                otherValgrindError = True
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                for str in out_err:
-                    if str.find("All heap blocks were freed") != -1:
-                        allHeapBlocksFreed = True
-                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
-                        otherValgrindError = False
-                if not allHeapBlocksFreed:
-                    print "Not all heap blocks were freed..."
-                    retval = -1
-                elif otherValgrindError:
-                    print "Valgrind reported errors..."
+                errorState = ErrorState(expectNoMemLeaks)
+                for line in out_err:
+                    errorState.processErrorString(line);
+                if not errorState.isExpectedState():
+                    print errorState.errorMessage()
                     retval = -1
                 if retval == -1:
                     for str in out_err:
-                        print str
+                        print str.rstrip('\n')
                 sys.stdout.flush()
             else:
                 retval = os.system(targetpath)
