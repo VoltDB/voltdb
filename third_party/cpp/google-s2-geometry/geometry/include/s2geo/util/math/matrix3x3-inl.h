@@ -539,7 +539,7 @@ class Matrix3x3 {
   bool IsNaN() const {
     for ( int i = 0; i < 3; ++i ) {
       for ( int j = 0; j < 3; ++j ) {
-        if ( isnan(m_[i][j]) ) {
+        if ( MathUtil::IsNaN(m_[i][j]) ) {
           return true;
         }
       }

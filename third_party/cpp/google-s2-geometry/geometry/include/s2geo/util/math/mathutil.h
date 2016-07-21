@@ -451,6 +451,13 @@ class MathUtil {
     return bit_cast<double>(g_rep);
   }
 
+  /// Is a number a NaN?
+  /// We just defer to MathLimits<T>.
+  template <typename T>
+  static bool IsNaN(T x) {
+    return MathLimits<T>::IsNaN(x);
+  }
+
   /// Largest of two values.
   /// Works correctly for special floating point values.
   /// Note: 0.0 and -0.0 are not differentiated by Max (Max(0.0, -0.0) is -0.0),
