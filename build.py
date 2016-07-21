@@ -501,6 +501,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
+     tabletuplefilter_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
