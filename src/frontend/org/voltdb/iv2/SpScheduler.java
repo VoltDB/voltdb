@@ -250,23 +250,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "had no responses.  This should be impossible?");
             }
         }
-        // Block on write to fault log.
         SettableFuture<Boolean> written = writeIv2ViableReplayEntry();
-        boolean logWritten = false;
 
-        if (written != null) {
-            try {
-                logWritten = written.get();
-            } catch (InterruptedException e) {
-            } catch (ExecutionException e) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
-                }
-            }
-            if (!logWritten) {
-                tmLog.warn("Attempted fault log not written for partition: " + m_partitionId);
-            }
-        }
+        // Get the fault log status here to ensure the leader has written it to disk
+        // before initiating transactions again.
+        blockFaultLogWriteStatus(written);
     }
 
     /**
@@ -1034,6 +1022,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         //call the internal log write with the provided SP handle and wait for the fault log IO to complete
         SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
+
+        // Get the Fault Log Status here to ensure the replica completes the log fault task is finished before
+        // it starts processing transactions again
+        blockFaultLogWriteStatus(written);
+
+        setMaxSeenTxnId(message.getSpHandle());
+
+        // Also initialize the unique ID generator and the last durable unique ID using
+        // the value sent by the master
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
+        m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
+    }
+
+    /**
+     * Wait to get the status of a fault log write
+     */
+    private void blockFaultLogWriteStatus(SettableFuture<Boolean> written) {
         boolean logWritten = false;
 
         if (written != null) {
@@ -1049,13 +1054,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 tmLog.warn("Attempted fault log not written for partition: " + m_partitionId);
             }
         }
-
-        setMaxSeenTxnId(message.getSpHandle());
-
-        // Also initialize the unique ID generator and the last durable unique ID using
-        // the value sent by the master
-        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
-        m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
     }
 
     public void handleDumpMessage()
@@ -1123,7 +1121,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     /**
      * Write the viable replay set to the command log with the provided SP Handle.
-     * Pass back the future.
+     * Pass back the future that is set after the fault log is written to disk.
      */
     SettableFuture<Boolean> writeIv2ViableReplayEntryInternal(long spHandle)
     {
@@ -1131,7 +1129,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_replayComplete) {
             written = m_cl.logIv2Fault(m_mailbox.getHSId(),
                 new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
-            return written;
         }
         return written;
     }
