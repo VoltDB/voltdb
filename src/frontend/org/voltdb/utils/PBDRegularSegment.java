@@ -43,7 +43,6 @@ public class PBDRegularSegment extends PBDSegment {
     //ID of this segment
     private final Long m_index;
 
-    //private int m_discardCount;
     private int m_numOfEntries = -1;
     private int m_size = -1;
 
@@ -129,7 +128,6 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public void openForRead(String cursorId) throws IOException
     {
-        //TODO: start a cursor
         if (m_readCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }

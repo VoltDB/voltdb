@@ -69,7 +69,13 @@ public interface BinaryDeque {
      */
     public void push(BBContainer objects[]) throws IOException;
 
-    //TODO: add javadoc
+    /**
+     * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
+     * the existing cursor will be returned.
+     * @return a BinaryDequeReader for this cursorId
+     * @throws IOException on any errors trying to read the PBD files
+     */
     public BinaryDequeReader openForRead(String cursorId) throws IOException;
 
 
@@ -93,19 +99,44 @@ public interface BinaryDeque {
 
     public void closeAndDelete() throws IOException;
 
-    // TODO: Javadoc
+    /**
+     * Reader class used to read entries from the deque. Multiple readers may be active at the same time,
+     * each of them maintaining their own read location within the deque.
+     */
     public interface BinaryDequeReader {
         /**
-         * Remove and return the object at the head of the queue
+         * Read and return the object at the current read position of this reader.
+         * The entry will be removed once all active readers have read the entry.
          * @param ocf
          * @return
          * @throws IOException
          */
-        //TODO: Update javadoc
         public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+
+        /**
+         * Number of bytes left to read for this reader.
+         * @return number of bytes left to read for this reader.
+         * @throws IOException
+         */
         public long sizeInBytes() throws IOException;
+
+        /**
+         *  Number of objects left to read for this reader.
+         * @return number of objects left to read for this reader
+         * @throws IOException
+         */
         public int getNumObjects() throws IOException;
+
+        /**
+         * Returns true if this reader still has entries to read. False otherwise
+         * @return true if this reader still has entries to read. False otherwise
+         * @throws IOException
+         */
         public boolean isEmpty() throws IOException;
+
+        /*
+         * TODO: Need to move this to BinaryDeque level
+         */
         public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
     }
 
