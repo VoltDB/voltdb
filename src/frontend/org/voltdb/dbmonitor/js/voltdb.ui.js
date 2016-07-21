@@ -449,6 +449,7 @@ function convertArrayOfObjectsToCSV(args) {
 }
 
 function downloadCSV(args,whichChart) {
+    debugger;
     var data, filename, link;
     var graphView = $("#graphView").val()
     var chartData = {}
@@ -568,6 +569,7 @@ function downloadCSV(args,whichChart) {
         link = document.createElement('a');
         link.setAttribute('href', data);
         link.setAttribute('download', filename);
+        document.body.appendChild(link);
         link.click();
     }
 }
@@ -578,6 +580,7 @@ function downloadAll(files){
     var theAnchor = $('<a />')
         .attr('href', file[1])
         .attr('download',file[0]);
+    document.body.appendChild(theAnchor);
     theAnchor[0].click();
     theAnchor.remove();
     downloadAll(files);
