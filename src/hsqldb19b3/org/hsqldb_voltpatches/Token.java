@@ -220,7 +220,9 @@ public class Token {
         for (int i = 0; i < statement.length; i++) {
             // when the previous statement is ')', there should be a blank before the non-delimiter statement.
             if (!statement[i].isDelimiter &&
-                    (!wasDelimiter || (i != 0 && statement[i - 1].getSQL().equals(")")))) {
+                    (!wasDelimiter
+                            || (i > 0 && ")".equals(statement[i - 1].getSQL()))))
+            {
                 sb.append(' ');
             }
 
