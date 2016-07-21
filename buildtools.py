@@ -656,25 +656,37 @@ def runTests(CTX):
 							     "--suppressions=" + os.path.join(TEST_PREFIX,
 											      "test_utils/vdbsuppressions.supp"),
 							     targetpath], stderr=PIPE, bufsize=-1)
-                #out = process.stdout.readlines()
-                allHeapBlocksFreed = False
+                #out process= process.stdout.readlines()
+		noDefiniteLeaks = False
+		noPossibleLeaks = False
+		noIndirectLeaks = False
                 otherValgrindError = True
                 out_err = process.stderr.readlines()
                 retval = process.wait()
                 for str in out_err:
-                    if str.find("All heap blocks were freed") != -1:
-                        allHeapBlocksFreed = True
-                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
+		    if "definitely lost: 0 bytes in 0 blocks" in str:
+			noDefiniteLeaks = True
+		    elif "indirectly lost: 0 bytes in 0 blocks" in str:
+			noIndirectLeaks = True
+		    elif "possibly lost: 0 bytes in 0 blocks" in str:
+			noPossibleLeaks = True
+                    elif "ERROR SUMMARY: 0 errors from 0 contexts" in str:
                         otherValgrindError = False
-                if not allHeapBlocksFreed:
-                    print "Not all heap blocks were freed..."
-                    retval = -1
-                elif otherValgrindError:
+		if not noDefiniteLeaks:
+		    print "Definite leaks found"
+		    retval = -1
+	        if not noPossibleLeaks:
+		    print "Possible leaks found."
+		    retval = -1
+                if not noIndirectLeaks:
+		    print "Indirect leaks found"
+		    retval = -1
+                if otherValgrindError:
                     print "Valgrind reported errors..."
                     retval = -1
                 if retval == -1:
                     for str in out_err:
-                        print str
+                        print str.rstrip('\n')
                 sys.stdout.flush()
             else:
                 retval = os.system(targetpath)
