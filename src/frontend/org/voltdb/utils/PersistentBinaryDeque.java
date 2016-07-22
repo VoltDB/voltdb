@@ -431,9 +431,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_segments.put(e.getKey(), e.getValue());
         }
 
-        // load saved cursors
-        readCursorFile(new File(m_path, m_nonce + ".pbd.cursors"));
-
         //Find the first and last segment for polling and writing (after)
         Long writeSegmentIndex = 0L;
         try {
@@ -446,6 +443,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_segments.put(writeSegmentIndex, writeSegment);
         writeSegment.openForWrite(true);
+
+        // load saved cursors
+        readCursorFile(new File(m_path, m_nonce + ".pbd.cursors"));
         assertions();
     }
 
