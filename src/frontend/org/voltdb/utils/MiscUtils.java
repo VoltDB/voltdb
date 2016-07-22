@@ -95,16 +95,28 @@ public class MiscUtils {
      *             If there are errors reading the file
      */
     public static byte[] fileToBytes(File path) throws IOException {
-        FileInputStream fin = new FileInputStream(path);
-        byte[] buffer = new byte[(int) fin.getChannel().size()];
+        FileInputStream fin = null;
+        byte[] buffer = new byte[(int) path.length() + 1000];
+        int readBytes = 0;
+        int totalBytes = 0;
         try {
-            if (fin.read(buffer) == -1) {
-                throw new IOException("File " + path.getAbsolutePath() + " is empty");
+            fin = new FileInputStream(path);
+            while (readBytes >= 0) {
+                totalBytes += readBytes;
+                readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
             }
+        } catch(IOException ioe) {
+            throw new IOException("File " + path.getAbsolutePath() + " is empty");
         } finally {
-            fin.close();
+            if (fin != null) {
+                try {
+                    fin.close();
+                }
+                catch (Exception e) {}
+            }
         }
-        return buffer;
+        byte[] bytes = Arrays.copyOf(buffer, totalBytes);
+        return bytes;
     }
 
     /**
