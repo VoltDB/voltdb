@@ -37,7 +37,11 @@
         this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
-
+        this.enumPartitionColor = {
+            localPartition: "#D3D3D3",
+            maxMinPartition: "#4C76B0",
+            multiPartition: "#FF8C00"
+        }
         this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
@@ -90,11 +94,11 @@
                             arr.push(emptyData[0]);
                             arr.push(emptyData[emptyData.length - 1]);
                             if (datatype == "data") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.localPartition });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.multiPartition });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.maxMinPartition});
                             }
                             dataMapperSec[partitionKey] = count;
                             count++;

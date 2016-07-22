@@ -591,14 +591,28 @@ function convertPartitionData(data){
     for (var i=0; i< data.length; i++){
         for(var j=0 ; j< data[i].values.length; j++){
             chartData.push({
-            "key": data[i].key,
-            "color": data[i].color,
+            "key": data[i].key.replace(" ", ""),
+            "type": getPartitionType(data[i].key, data[i].color),
             "timestamp": data[i].values[j].x,
             "value": data[i].values[j].y
         })
         }
     }
     return chartData;
+}
+
+function getPartitionType(key, color){
+    var type = "local-partitiion"
+    if(color == MonitorGraphUI.enumPartitionColor.maxMinPartition){
+        if(key.substr(key.length-4, 3) == "Max"){
+            type = "maximum-partition"
+        } else {
+            type = "minimum-partition"
+        }
+    } else if(color ==  MonitorGraphUI.enumPartitionColor.multiPartition){
+        type = "multi-partition"
+    }
+    return type
 }
 
 function convertOverlayData(data){
