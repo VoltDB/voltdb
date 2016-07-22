@@ -833,7 +833,7 @@ SnapshotCompletionInterest, Promotable
             // Make sure this is not a partial snapshot.
             // Compare digestTableNames with all normal table names in catalog file.
             // A normal table is one that's NOT a materialized view, nor an export table.
-            Set<String> catalogNormalTableNames = CatalogUtil.getNormalTableNamesfromInMemoryJar(jarfile);
+            Set<String> catalogNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile);
             if (!catalogNormalTableNames.equals(digestTableNames)) {
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
                                 .append(s.getNonce())

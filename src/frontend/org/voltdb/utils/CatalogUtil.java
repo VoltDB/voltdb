@@ -2256,7 +2256,7 @@ public abstract class CatalogUtil {
      * @param InMemoryJarfile a in-memory catalog jar file
      * @return A set of normal table names
      */
-    public static Set<String> getNormalTableNamesfromInMemoryJar(InMemoryJarfile jarfile) {
+    public static Set<String> getNormalTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
         Set<String> tableNames = new HashSet<>();
         Catalog catalog = new Catalog();
         catalog.execute(getSerializedCatalogStringFromJar(jarfile));
