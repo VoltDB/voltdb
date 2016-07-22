@@ -444,6 +444,8 @@ if whichtests in ("${eetestsuite}", "memleaktests"):
      definite_losses
      indirect_losses
      still_reachable_losses
+     possible_losses
+     rw_deleted
    """
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """

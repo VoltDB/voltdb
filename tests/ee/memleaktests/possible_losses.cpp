@@ -49,38 +49,27 @@
  */
 
 #include "harness.h"
+#include <string.h>
 
 /**
- * Nothing to see here.
- */
-struct mystruct {
-  int           idx;
-};
-
-/**
- * This is a memory leak.  We are testing for it.
- */
-struct rootstruct {
-  mystruct      *ptr;
-  rootstruct() : ptr(0) {}
-  void init() {
-    ptr = new mystruct();
-  }
-};
-
-/**
- * This is a test for our handling of indirect memory losses.  This
+ * This is a test for our handling of definite memory losses.  This
  * tests the test harness more than the product.
  */
-class IndirectMemoryLoss : public Test {
+class PossibleMemoryLoss : public Test {
 public:
-    IndirectMemoryLoss() {}
+    PossibleMemoryLoss() {}
 };
 
-TEST_F(IndirectMemoryLoss, memLossTest) {
-    rootstruct *p = new rootstruct();
-    p->init();
-    // Note: both p and p->ptr is leaked.  Will valgrind find it?
+namespace {
+char *garbage = 0;
+}
+
+TEST_F(PossibleMemoryLoss, memLossTest) {
+    // Allocate some memory, but
+    // point to the middle of it.
+    // Maybe this will fool valgrind.
+    garbage = new char[128];
+    garbage = garbage + 64;
 }
 
 int main() {
