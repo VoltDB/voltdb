@@ -19,12 +19,10 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -807,23 +805,9 @@ SnapshotCompletionInterest, Promotable
             return null;
         }
 
-        FileInputStream fin = null;
         try {
-            fin = new FileInputStream(s.m_catalogFile);
-            byte[] buffer = new byte[(int)s.m_catalogFile.length() + 1000];
-            int readBytes = 0;
-            int totalBytes = 0;
-            try {
-                while (readBytes >= 0) {
-                    totalBytes += readBytes;
-                    readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
-                }
-            } finally {
-                fin.close();
-                fin = null;
-            }
-            byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
-            InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+            byte[] bytes = MiscUtils.fileToBytes(s.m_catalogFile);
+            InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
             if (jarfile.getCRC() != catalog_crc) {
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
                                 .append(s.getNonce())
@@ -840,20 +824,11 @@ SnapshotCompletionInterest, Promotable
                                 .append(" because this is a partial snapshot.");
                 return null;
             }
-        }
-        catch (IOException ioe) {
+        } catch (IOException ioe) {
             m_snapshotErrLogStr.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because catalog file could not be validated");
             return null;
-        }
-        finally {
-            if (fin != null) {
-                try {
-                    fin.close();
-                }
-                catch (Exception e) {}
-            }
         }
 
         SnapshotInfo info =
