@@ -298,6 +298,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
+    private boolean m_isRunningWithOldVerb = true;
+
+    @Override
+    public boolean isRunningWithOldVerbs() { return m_isRunningWithOldVerb; };
 
     @Override
     public boolean rejoining() { return m_rejoining; }
@@ -438,6 +442,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
+            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
             // Replay command line args that we can see
@@ -1563,9 +1568,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
             }
-            // if provided admin-mode settings in deployment are different than the default one, update
-            // admin mode settings to default and update flag to commit updated deployment
-            if(CatalogUtil.updateAdminModeToDefaultIfNotDefault(dt)) {
+            // if provided admin-mode start up is different than the default one, update amin-mode
+            // startup to null for default, which is admin-mode set to false in deployment, and
+            // flag updated to reflect rewrite the deployment instead of copy
+            if(dt.getAdminMode().isAdminstartup()) {
+                dt.getAdminMode().setAdminstartup(null);
+                dt.getAdminMode().setPort(null);
                writeGeneratedDF = true;
             }
         } catch (IOException e) {

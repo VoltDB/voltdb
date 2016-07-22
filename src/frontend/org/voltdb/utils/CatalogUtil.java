@@ -1061,26 +1061,6 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Checks if the admin-mode settings in passed in deployment are default or not. If not,
-     * the admin mode settings are updated to default
-     * @param deployment Reference to root <deployment> element of deployment file to be validated.
-     * @return Returns true if the admin-mode setting was updated with defaults.
-     */
-    public static boolean updateAdminModeToDefaultIfNotDefault(DeploymentType dt) {
-        AdminModeType defaultAdminMode = new AdminModeType();
-        AdminModeType providedAdminMode = dt.getAdminMode();
-        // generated xml binding classes don't generate common functions
-        // like equals(), so compare the fields manually
-        if (providedAdminMode.getPort() == defaultAdminMode.getPort() &&
-                providedAdminMode.isAdminstartup() == defaultAdminMode.isAdminstartup()) {
-            return false;
-        }
-        // prune admin-mode from deployment by replacing admin mode with default
-        dt.setAdminMode(defaultAdminMode);
-        return true;
-    }
-
-    /**
      * Set cluster info in the catalog.
      * @param leader The leader hostname
      * @param catalog The catalog to be updated.
