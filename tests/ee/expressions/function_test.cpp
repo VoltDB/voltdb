@@ -483,7 +483,7 @@ TEST_F(FunctionTest, NaturalLogTest) {
     try {
         testUnary(FUNC_LN, -1, 0);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
     ASSERT_EQ(sawException, true);
 
@@ -491,7 +491,7 @@ TEST_F(FunctionTest, NaturalLogTest) {
     try {
         testUnary(FUNC_LN, 0, 0);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), "Invalid result value (-inf)");
+    sawException = findString(sqlExcp.message(), "Invalid result value (-inf)");
     }
     ASSERT_EQ(sawException, true);
 }
@@ -505,7 +505,7 @@ TEST_F(FunctionTest, NaturalLog10Test) {
     try {
         testUnary(FUNC_LOG10, -100, 0);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
     ASSERT_EQ(sawException, true);
 
@@ -514,7 +514,7 @@ TEST_F(FunctionTest, NaturalLog10Test) {
     try {
         testUnary(FUNC_LOG10, -1, 0);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
     ASSERT_EQ(sawException, true);
 
@@ -523,7 +523,7 @@ TEST_F(FunctionTest, NaturalLog10Test) {
     try {
         testUnary(FUNC_LOG10, "100", 0);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), "Type VARCHAR can't be cast as FLOAT");
+    sawException = findString(sqlExcp.message(), "Type VARCHAR can't be cast as FLOAT");
     }
     ASSERT_EQ(sawException, true);
 }
@@ -546,7 +546,7 @@ TEST_F(FunctionTest, NaturalModTest) {
     try {
         testBinary(FUNC_MOD, "-100", 3, 1);
     } catch(SQLException &sqlExcp) {
-	sawException = findString(sqlExcp.message(), 
+    sawException = findString(sqlExcp.message(),
                                   "unsupported non-numeric type for SQL MOD function");
     }
     ASSERT_EQ(sawException, true);
