@@ -134,8 +134,8 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     }
 
     @Override
-    protected List<TupleValueExpression> getResolvableExpressions() {
-        List<TupleValueExpression> answer = super.getResolvableExpressions();
+    protected List<TupleValueExpression> getExpressionsNeedingResolution() {
+        List<TupleValueExpression> answer = super.getExpressionsNeedingResolution();
         WindowedExpression we = getWindowedExpression();
         // The partition by expressions are in the group by list.  So
         // they have been managed by the AggregatePlanNode.  We do need

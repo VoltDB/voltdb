@@ -133,7 +133,8 @@ public:
 
 //
 // There is not much here to test.  The only difference between a
-// PartitionByPlanNode and any other Aggregate node is
+// PartitionByPlanNode and any other Aggregate node is that the
+// PartitionByPLanNode generates one output row per input row.
 TEST_F(PartitionByPlanNodeTest, TestJSON)
 {
     for (int jsonIdx = 0; jsonStrings[jsonIdx]; jsonIdx += 1) {

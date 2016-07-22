@@ -787,10 +787,6 @@ public abstract class AbstractParsedStmt {
         else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
         }
-        if (exprNode.attributes.containsKey("valuetype")) {
-            String valueType = exprNode.attributes.get("valuetype");
-            expr.setValueType(VoltType.typeFromString(valueType));
-        }
         return expr;
     }
 

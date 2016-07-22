@@ -297,6 +297,19 @@ public class PlannerTestCase extends TestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    /**
+     * Call this function to verify that an order by plan node has the
+     * sort expressions and directions we expect.
+     *
+     * @param orderByPlanNode The plan node to test.
+     * @param columnDescrs Pairs of expressions and sort directions. There
+     *                     must be an even number of these, the even
+     *                     numbered ones must be expressions and the odd
+     *                     numbered ones must be sort directions.  This is
+     *                     numbering starting at 0.  So, they must be in
+     *                     the order expr, direction, expr, direction, and
+     *                     so forth.
+     */
     protected void verifyOrderByPlanNode(OrderByPlanNode  orderByPlanNode,
                                          Object       ... columnDescrs) {
         // We should have an even number of columns

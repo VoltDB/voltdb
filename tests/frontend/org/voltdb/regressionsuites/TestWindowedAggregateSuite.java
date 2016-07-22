@@ -50,6 +50,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 
 public class TestWindowedAggregateSuite extends RegressionSuite {
 
@@ -70,6 +71,12 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  A INTEGER,"
                 + "  B INTEGER,"
                 + "  C VARCHAR"
+                + ");"
+
+                + "CREATE TABLE T_TIMESTAMP ("
+                + "  A INTEGER,"
+                + "  B INTEGER,"
+                + "  C TIMESTAMP"
                 + ");"
 
                 + "create table tu (a integer, b integer);"
@@ -176,7 +183,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
 
 
     public void testRankWithString() throws Exception {
-        // Save the guard and restore it after.
         Client client = getClient();
 
         long expected[][] = new long[][] {
@@ -217,8 +223,51 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+
+    public void testRankWithTimestamp() throws Exception {
+        Client client = getClient();
+
+        long expected[][] = new long[][] {
+                {  1L,  1L,  101L, 1L },
+                {  1L,  1L,  102L, 1L },
+                {  1L,  2L,  201L, 3L },
+                {  1L,  2L,  202L, 3L },
+                {  1L,  3L,  203L, 5L },
+                {  2L,  1L, 1101L, 1L },
+                {  2L,  1L, 1102L, 1L },
+                {  2L,  2L, 1201L, 3L },
+                {  2L,  2L, 1202L, 3L },
+                {  2L,  3L, 1203L, 5L },
+                { 20L,  1L, 2101L, 1L },
+                { 20L,  1L, 2102L, 1L },
+                { 20L,  2L, 2201L, 3L },
+                { 20L,  2L, 2202L, 3L },
+                { 20L,  3L, 2203L, 5L },
+        };
+        long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
+        long input[][] = expected.clone();
+        shuffleArrayOfLongs(input);
+        ClientResponse cr;
+        VoltTable vt;
+        for (long [] row : input) {
+            cr = client.callProcedure("T_TIMESTAMP.insert", row[0], row[1], new TimestampType(baseTime + row[1]*1000));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+        String sql = "select A, B, C, rank() over (partition by A order by C) as R from T_TIMESTAMP ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(expected.length, vt.getRowCount());
+        for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
+            String msg = String.format("Row %d:", rowIdx);
+            assertEquals(msg, expected[rowIdx][0], vt.getLong(0));
+            assertEquals(msg, expected[rowIdx][1], vt.getLong(1));
+            assertEquals(msg, baseTime + expected[rowIdx][1]*1000, vt.getTimestampAsLong(2));
+            assertEquals(msg, expected[rowIdx][3], vt.getLong(3));
+        }
+    }
+
     public void testRank() throws Exception {
-        // Save the guard and restore it after.
         Client client = getClient();
 
         long expected[][] = new long[][] {

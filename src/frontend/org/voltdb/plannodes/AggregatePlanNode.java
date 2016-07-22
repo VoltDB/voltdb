@@ -34,6 +34,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -294,7 +295,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
      *
      * @return
      */
-    protected List<TupleValueExpression> getResolvableExpressions() {
+    protected List<TupleValueExpression> getExpressionsNeedingResolution() {
         List<TupleValueExpression> answer = new ArrayList<>();
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             answer.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
@@ -305,15 +306,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
     void resolveColumnIndexesUsingSchema(NodeSchema input_schema)
     {
         // get all the TVEs in the output columns
-        List<TupleValueExpression> output_tves = getResolvableExpressions();
+        List<TupleValueExpression> output_tves = getExpressionsNeedingResolution();
         for (TupleValueExpression tve : output_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             if (index == -1) {
                 // check to see if this TVE is the aggregate output
-                // XXX SHOULD MOVE THIS STRING TO A STATIC DEF SOMEWHERE
-                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               tve.getColumnName());
+                if (!tve.getTableName().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
+                throw new RuntimeException("Unable to find index for column: " +
+                                           tve.getColumnName());
                 }
             }
             else {
