@@ -301,13 +301,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private boolean m_isRunningWithOldVerb = true;
 
     @Override
-    public boolean isRunningWithOldVerbs() { return m_isRunningWithOldVerb; };
+    public boolean isRunningWithOldVerbs() {
+        return m_isRunningWithOldVerb;
+     };
 
     @Override
-    public boolean rejoining() { return m_rejoining; }
+    public boolean rejoining() {
+        return m_rejoining;
+    }
 
     @Override
-    public boolean rejoinDataPending() { return m_rejoinDataPending; }
+    public boolean rejoinDataPending() {
+        return m_rejoinDataPending;
+    }
 
     @Override
     public boolean isMpSysprocSafeToExecute(long txnId)
@@ -1568,12 +1574,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
             }
-            // if provided admin-mode start up is different than the default one, update amin-mode
-            // startup to null for default, which is admin-mode set to false in deployment, and
-            // flag updated to reflect rewrite the deployment instead of copy
+            // if provided admin-mode start up is set, update it to false and update
+            // the rewrite-flag reflect to rewrite the deployment instead of copy
             if(dt.getAdminMode().isAdminstartup()) {
-                dt.getAdminMode().setAdminstartup(null);
-                dt.getAdminMode().setPort(null);
+                dt.getAdminMode().setAdminstartup(false);
                writeGeneratedDF = true;
             }
         } catch (IOException e) {

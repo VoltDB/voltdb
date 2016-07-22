@@ -215,9 +215,9 @@ public class AsyncCompilerAgentHelper
 
             // ignore admin mode settings if operating with new start actions/verbs
             if (!VoltDB.instance().isRunningWithOldVerbs() && dt.getAdminMode().isAdminstartup()) {
-                // set it to null, this will default to admin-mode startup to default which is false
-                dt.getAdminMode().setAdminstartup(null);
-                dt.getAdminMode().setPort(null);
+                // set the admin-startup mode to false and fetch update the deployment string from
+                // updated deployment object
+                dt.getAdminMode().setAdminstartup(false);
                 retval.deploymentString = CatalogUtil.getDeployment(dt, true);
             }
             else {
