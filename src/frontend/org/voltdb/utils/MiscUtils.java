@@ -18,12 +18,12 @@
 package org.voltdb.utils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -88,6 +88,7 @@ public class MiscUtils {
     /**
      * Serialize a file into bytes. Used to serialize catalog and deployment
      * file for UpdateApplicationCatalog on the client.
+     * Notice that if the file is larger than 2GB, readAllBytes() will throw a OutOfMemoryError.
      *
      * @param path
      * @return a byte array of the file
@@ -95,28 +96,7 @@ public class MiscUtils {
      *             If there are errors reading the file
      */
     public static byte[] fileToBytes(File path) throws IOException {
-        FileInputStream fin = null;
-        byte[] buffer = new byte[(int) path.length() + 1000];
-        int readBytes = 0;
-        int totalBytes = 0;
-        try {
-            fin = new FileInputStream(path);
-            while (readBytes >= 0) {
-                totalBytes += readBytes;
-                readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
-            }
-        } catch(IOException ioe) {
-            throw new IOException("File " + path.getAbsolutePath() + " is empty");
-        } finally {
-            if (fin != null) {
-                try {
-                    fin.close();
-                }
-                catch (Exception e) {}
-            }
-        }
-        byte[] bytes = Arrays.copyOf(buffer, totalBytes);
-        return bytes;
+        return Files.readAllBytes(path.toPath());
     }
 
     /**
