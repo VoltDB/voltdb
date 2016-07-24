@@ -85,6 +85,8 @@ public interface BinaryDeque {
      */
     public void sync() throws IOException;
 
+    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
+
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
      * will result in an exception
@@ -133,11 +135,6 @@ public interface BinaryDeque {
          * @throws IOException
          */
         public boolean isEmpty() throws IOException;
-
-        /*
-         * TODO: Need to move this to BinaryDeque level
-         */
-        public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
     }
 
     public static class TruncatorResponse {

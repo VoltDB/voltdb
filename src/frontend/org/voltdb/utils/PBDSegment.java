@@ -26,6 +26,7 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 
 public abstract class PBDSegment {
+    private static final String TRUNCATOR_CURSOR = "__truncator__";
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
 
@@ -113,11 +114,11 @@ public abstract class PBDSegment {
      * of available objects in the PBD. -1 means that this whole segment should be removed.
      * @throws IOException
      */
-    int parseAndTruncate(String cursorId, BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
+    int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
         if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
 
         openForWrite(false);
-        openForRead(cursorId);
+        openForRead(TRUNCATOR_CURSOR);
 
         // Do stuff
         final int initialEntryCount = getNumEntries();
@@ -126,14 +127,14 @@ public abstract class PBDSegment {
 
         DBBPool.BBContainer cont;
         while (true) {
-            final long beforePos = readOffset(cursorId);
+            final long beforePos = readOffset(TRUNCATOR_CURSOR);
 
-            cont = poll(cursorId, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            cont = poll(TRUNCATOR_CURSOR, PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             if (cont == null) {
                 break;
             }
 
-            final int compressedLength = (int) (readOffset(cursorId) - beforePos - OBJECT_HEADER_BYTES);
+            final int compressedLength = (int) (readOffset(TRUNCATOR_CURSOR) - beforePos - OBJECT_HEADER_BYTES);
             final int uncompressedLength = cont.b().limit();
 
             try {
@@ -145,30 +146,30 @@ public abstract class PBDSegment {
                 } else {
                     //If the returned bytebuffer is empty, remove the object and truncate the file
                     if (retval.status == BinaryDeque.TruncatorResponse.Status.FULL_TRUNCATE) {
-                        if (readIndex(cursorId) == 1) {
+                        if (readIndex(TRUNCATOR_CURSOR) == 1) {
                             /*
                              * If truncation is occuring at the first object
                              * Whammo! Delete the file.
                              */
                             entriesTruncated = -1;
                         } else {
-                            entriesTruncated = initialEntryCount - (readIndex(cursorId) - 1);
+                            entriesTruncated = initialEntryCount - (readIndex(TRUNCATOR_CURSOR) - 1);
                             //Don't forget to update the number of entries in the file
-                            initNumEntries(readIndex(cursorId) - 1, sizeInBytes);
-                            m_fc.truncate(readOffset(cursorId) - (compressedLength + OBJECT_HEADER_BYTES));
+                            initNumEntries(readIndex(TRUNCATOR_CURSOR) - 1, sizeInBytes);
+                            m_fc.truncate(readOffset(TRUNCATOR_CURSOR) - (compressedLength + OBJECT_HEADER_BYTES));
                         }
                     } else {
                         assert retval.status == BinaryDeque.TruncatorResponse.Status.PARTIAL_TRUNCATE;
-                        entriesTruncated = initialEntryCount - readIndex(cursorId);
+                        entriesTruncated = initialEntryCount - readIndex(TRUNCATOR_CURSOR);
                         //Partial object truncation
-                        rewindReadOffset(cursorId, compressedLength + OBJECT_HEADER_BYTES);
-                        final long partialEntryBeginOffset = readOffset(cursorId);
+                        rewindReadOffset(TRUNCATOR_CURSOR, compressedLength + OBJECT_HEADER_BYTES);
+                        final long partialEntryBeginOffset = readOffset(TRUNCATOR_CURSOR);
                         m_fc.position(partialEntryBeginOffset);
 
                         final int written = writeTruncatedEntry(retval, compressedLength);
                         sizeInBytes += written;
 
-                        initNumEntries(readIndex(cursorId), sizeInBytes);
+                        initNumEntries(readIndex(TRUNCATOR_CURSOR), sizeInBytes);
                         m_fc.truncate(partialEntryBeginOffset + written + OBJECT_HEADER_BYTES);
                     }
 

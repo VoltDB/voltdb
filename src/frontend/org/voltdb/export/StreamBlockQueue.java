@@ -273,7 +273,7 @@ public class StreamBlockQueue {
 
     public void truncateToTxnId(final long txnId, final int nullArrayLength) throws IOException {
         assert(m_memoryDeque.isEmpty());
-        m_reader.parseAndTruncate(new BinaryDequeTruncator() {
+        m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
         @Override
         public TruncatorResponse parse(BBContainer bbc) {

@@ -122,7 +122,7 @@ public class TestPersistentBinaryDeque {
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
 
-        reader.parseAndTruncate(new BinaryDequeTruncator() {
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
                 return PersistentBinaryDeque.fullTruncateResponse();
@@ -151,7 +151,7 @@ public class TestPersistentBinaryDeque {
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
 
-        reader.parseAndTruncate(new BinaryDequeTruncator() {
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
                 fail();
@@ -201,7 +201,7 @@ public class TestPersistentBinaryDeque {
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
 
-        reader.parseAndTruncate(new BinaryDequeTruncator() {
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
@@ -275,7 +275,7 @@ public class TestPersistentBinaryDeque {
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
 
-        reader.parseAndTruncate(new BinaryDequeTruncator() {
+        m_pbd.parseAndTruncate(new BinaryDequeTruncator() {
             private long m_objectsParsed = 0;
             @Override
             public TruncatorResponse parse(BBContainer bbc) {
