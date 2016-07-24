@@ -146,10 +146,7 @@ public class TestInMemoryJarfile extends TestCase {
     public void testDifferentJarContentsDontMatchCRCs()
     throws IOException, InterruptedException
     {
-        // Create a second jarfile with identical contents
-        // Sleep for 5 seconds so the timestamps will differ
-        // and cause different global CRCs
-        //Thread.sleep(5000);
+        // Create a second jarfile with different contents
         createTestJarFile("testout-dupe.jar", false);
         long crc1 = new InMemoryJarfile("testout.jar").getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
