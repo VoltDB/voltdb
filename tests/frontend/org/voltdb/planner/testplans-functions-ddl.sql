@@ -15,3 +15,7 @@ CREATE TABLE bit (
 CREATE INDEX bit_BITAND_IDX ON bit ( bitand(bigint_type, 3) );
 CREATE INDEX bit_BITOR_IDX  ON bit ( bitor(bigint_type, 3) );
 CREATE INDEX bit_BITXOR_IDX  ON bit ( bitxor(bigint_type, 3) );
+
+CREATE TABLE ENG10749 (
+    TIME TIMESTAMP
+);
