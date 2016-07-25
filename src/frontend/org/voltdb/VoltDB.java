@@ -638,10 +638,6 @@ public class VoltDB {
 
             if (m_startAction == StartAction.PROBE) {
                 checkInitializationMarker();
-            } else if (m_startAction == StartAction.JOIN && isInitialized()) {
-                m_startAction = StartAction.PROBE;
-                m_enableAdd = true;
-                checkInitializationMarker();
             } else if (m_startAction == StartAction.INITIALIZE) {
                 if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"

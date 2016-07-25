@@ -1213,8 +1213,8 @@ def read_content(content, database_id):
                 return {'status': 401, 'statusString': inputs.errors}
 
             result = check_validation_deployment(req)
-            if 'status' in result and result['status'] == 'error':
-                return {'status': 401, 'statusString': result['error']}
+            if 'status' in result and result['status'] == 401:
+                return {'status': 401, 'statusString': result['statusString']}
 
             is_duplicate_user = check_duplicate_users(req)
             if not is_duplicate_user:
@@ -1311,14 +1311,14 @@ def check_validation_deployment(req):
     if 'export' in req.json and 'configuration' in req.json['export']:
         for configuration in req.json['export']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
-            if 'status' in result and result['status'] == 'error':
-                return {'status': 401, 'statusString': 'Export: ' + result['error']}
+            if 'status' in result and result['status'] == 401:
+                return {'status': 401, 'statusString': 'Export: ' + result['statusString']}
 
     if 'import' in req.json and 'configuration' in req.json['import']:
         for configuration in req.json['import']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
-            if 'status' in result and result['status'] == 'error':
-                return {'status': 401, 'statusString': 'Import: ' + result['error']}
+            if 'status' in result and result['status'] == 401:
+                return {'status': 401, 'statusString': 'Import: ' + result['statusString']}
 
     return {'status': 200, 'statusString': 'success'}
 

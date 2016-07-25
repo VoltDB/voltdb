@@ -333,22 +333,94 @@ public class TestUnion extends PlannerTestCase {
         }
     }
 
+    private boolean stmtIsDeterministic(String stmt) {
+        CompiledPlan plan = compileAdHocPlan(stmt);
+        return plan.isOrderDeterministic();
+    }
+
+    private void assertIsDeterministic(String stmt) {
+        assertTrue("Expected stmt\n"
+                + "   " + stmt + "\n"
+                + "to be deterministic, but it was not.", stmtIsDeterministic(stmt));
+    }
+
+    private void assertIsNonDeterministic(String stmt) {
+        assertFalse("Expected stmt\n"
+                + "    " + stmt + "\n"
+                + "to be non-deterministic, but it was."
+                ,stmtIsDeterministic(stmt));
+    }
+
     public void testUnionDeterminism() {
-        {
-            CompiledPlan plan = compileAdHocPlan("select B, DESC from T2 UNION select A, DESC from T1");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(false, isDeterministic);
-        }
-        {
-            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(false, isDeterministic);
-        }
-        {
-            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
-            boolean isDeterministic = plan.isOrderDeterministic();
-            assertEquals(true, isDeterministic);
-        }
+
+        // Not deterministic because no ordering on either statement.
+        assertIsNonDeterministic("select B, DESC from T2 UNION select A, DESC from T1");
+
+        // Not deterministic because ordering by just one column is not sufficient.
+        assertIsNonDeterministic("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
+
+        // Ordering by all columns should be deterministic.
+        assertIsDeterministic("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
+
+        // Should not be deterministic:
+        //   Ordering by (a, b) makes a deterministic order on LHS, but
+        //   RHS cannot be said to be deterministic
+        assertIsNonDeterministic("(select a, b, c from t7 union  select a, b, c from t8) order by a, b");
+
+        // This is deterministic: primary key on T7 (a, b) makes both sides of union deterministic.
+        assertIsDeterministic("((select a, b, c from t7 order by a, b) union (select a, b, c from t7 order by a, b))");
+
+        // As above, but add a non-deterministic sort to the top of the plan: no longer deterministic.
+        assertIsNonDeterministic("((select a, b, c from t7 order by a, b) union (select a, b, c from t7 order by a, b)) order by a");
+
+        // This is deterministic since the primary key on T7 (a, b) defines order on both sides,
+        // And both sides are identical.  But our planner is not yet smart enough to figure this out.
+        assertIsNonDeterministic("((select a, b, c from t7) union (select a, b, c from t7)) order by a, b");
+
+        // This is query is correctly marked as non-deterministic even though there is a PK on
+        // both sides that we are ordering by, because the third item on the select list is different.
+        assertIsNonDeterministic("((select a, b, cast(c as bigint) from t7) union (select a, b, c + 1 from t7)) order by a, b");
+    }
+
+    public void testOtherSetOpDeterminism()
+    {
+        // Output of non-union set ops is considered to be non-deterministic,
+        // since they use boost unordered containers in the EE.
+        // This is true even if sub-selects are sorted.
+
+        assertIsNonDeterministic("(select a from t1 order by a) intersect select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) intersect all select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) except select b from t2");
+        assertIsNonDeterministic("(select a from t1 order by a) except all select b from t2");
+
+        // A statement-level order by clause will the above statements deterministic.
+        assertIsDeterministic("(select a from t1 intersect     select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 intersect all select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 except        select b from t2) order by a");
+        assertIsDeterministic("(select a from t1 except all    select b from t2) order by a");
+
+        // More examples composing the various set operators.
+
+        // union on LHS of intersect
+        assertIsNonDeterministic("((select a from t1 order by a) union (select b from t2 order by b)) "
+                + "intersect select b from t2");
+
+        assertIsDeterministic("(((select a from t1) union (select b from t2 order by b)) "
+                + "intersect select b from t2) order by a");
+
+        // Not deterministic, because outer ORDER BY does not make LHS of interestect
+        // (the UNION) deterministic.
+        assertIsNonDeterministic("(((select a, desc from t1) union (select b, desc from t2 order by b)) "
+                + "intersect select b, desc from t2) order by a");
+
+        // intersect on LHS of union
+        // Not deterministic because LHS of union is not determinstic.
+        assertIsNonDeterministic("((select a from t1) intersect (select b from t2)) "
+                + "union (select b from t2 order by b)");
+
+        // Deterministic because both sides of union are deterministic.
+        assertIsDeterministic("((select a from t1) intersect (select b from t2) order by a) "
+                + "union (select b from t2 order by b)");
     }
 
     public void testInvalidOrderBy() {

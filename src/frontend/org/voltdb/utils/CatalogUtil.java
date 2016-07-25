@@ -153,6 +153,8 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
 
+    public static final String ADMIN = "administrator";
+
     // DR conflicts export table name prefix
     public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
     public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
@@ -178,6 +180,7 @@ public abstract class CatalogUtil {
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
+
     static {
         try {
             // This schema shot the sheriff.
@@ -1043,7 +1046,7 @@ public abstract class CatalogUtil {
                     continue;
 
                 for (String role : extractUserRoles(user)) {
-                    if (role.equalsIgnoreCase("ADMINISTRATOR")) {
+                    if (role.equalsIgnoreCase(ADMIN)) {
                         foundAdminUser = true;
                         break;
                     }
@@ -1872,8 +1875,9 @@ public abstract class CatalogUtil {
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
      * @param users A reference to the <users> element of the deployment.xml file.
+     * @throws RuntimeException when there is an user with invalid masked password.
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users) {
+    private static void setUsersInfo(Catalog catalog, UsersType users) throws RuntimeException {
         if (users == null) {
             return;
         }
@@ -1885,8 +1889,9 @@ public abstract class CatalogUtil {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
-        for (UsersType.User user : users.getUser()) {
 
+        for (UsersType.User user : users.getUser()) {
+            Set<String> roles = extractUserRoles(user);
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
@@ -1897,8 +1902,10 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                hostLog.fatal("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
-                System.exit(-1);
+                // if one user has invalid password, give a warn.
+                hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file.");
+                // throw exception disable user with invalid masked password
+                throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1916,7 +1923,7 @@ public abstract class CatalogUtil {
             catUser.setSha256shadowpassword(hashedPW256);
 
             // process the @groups and @roles comma separated list
-            for (final String role : extractUserRoles(user)) {
+            for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
