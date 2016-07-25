@@ -684,7 +684,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -1484,7 +1484,7 @@ function loadAdminPage() {
                             msg += "Please try again later.";
                         }
 
-                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorFieldMsg").text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
@@ -2294,7 +2294,7 @@ function loadAdminPage() {
                                 msg += "Please try again later.";
                             }
 
-                            adminEditObjects.updateErrorFieldMsg.text(msg);
+                            $("#updateErrorFieldMsg").text(msg);
 
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
@@ -2639,7 +2639,7 @@ function loadAdminPage() {
                                 msg += "Please try again later.";
                             }
 
-                            adminEditObjects.updateErrorFieldMsg.text(msg);
+                            $("#updateErrorFieldMsg").text(msg);
 
                             $("#updateErrorPopupLink").trigger("click");
                         }, 3000);
@@ -2965,7 +2965,7 @@ function loadAdminPage() {
                                     '<td width="30%">Username</td>' +
                                     '<td width="10%">' +
                                         '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
-                                        '<label id="errorUser" for="txtUser" class="error" style="display:none">This field is required</label>' +
+                                        '<label id="errorUser" for="txtUser" class="error errorHeightFix" style="display:none">This field is required</label>' +
                                         '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
                                     '</td> ' +
                                     '<td>&nbsp;</td> ' +

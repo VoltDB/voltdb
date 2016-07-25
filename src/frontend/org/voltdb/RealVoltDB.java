@@ -1128,7 +1128,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void hostsFailed(Set<Integer> failedHosts)
     {
         final ScheduledExecutorService es = getSES(true);
-        if (es != null) {
+        if (es != null && !es.isShutdown()) {
             es.submit(new Runnable() {
                 @Override
                 public void run()

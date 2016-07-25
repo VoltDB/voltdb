@@ -108,14 +108,14 @@ class TableSerializeTest : public Test {
             }
 
         }
-        ~TableSerializeTest() {
-            table_->deleteAllTuples(true);
+        virtual ~TableSerializeTest() {
+            table_->deleteAllTempTupleDeepCopies();
             delete table_;
         }
     protected:
         CatalogId database_id;
         CatalogId table_id;
-        Table* table_;
+        TempTable* table_;
         std::vector<std::string> columnNames;
 };
 
@@ -137,7 +137,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
     TempTableLimits limits;
     TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
-    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
+    TempTable* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
     deserialized->loadTuplesFrom(serialize_in, NULL);
     int colnum = table_->columnCount();
     EXPECT_EQ(colnum, deserialized->columnCount());
@@ -153,7 +153,7 @@ TEST_F(TableSerializeTest, RoundTrip) {
     const void *data1 = serialize_out.data();
     const void *data2 = serialize_out2.data();
     EXPECT_EQ(0, ::memcmp(data1, data2, size));
-    deserialized->deleteAllTuples(true);
+    deserialized->deleteAllTempTupleDeepCopies();
     delete deserialized;
 }
 
@@ -164,7 +164,7 @@ TEST_F(TableSerializeTest, NullStrings) {
     std::vector<bool> columnAllowNull(1, false);
     voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
     columnNames[0] = "";
-    table_->deleteAllTuples(true);
+    table_->deleteAllTempTupleDeepCopies();
     delete table_;
     table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
 

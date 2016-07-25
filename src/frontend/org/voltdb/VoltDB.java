@@ -638,13 +638,6 @@ public class VoltDB {
 
             if (m_startAction == StartAction.PROBE) {
                 checkInitializationMarker();
-            } else if (m_startAction == StartAction.JOIN && isInitialized()) {
-                m_startAction = StartAction.PROBE;
-                m_enableAdd = true;
-                checkInitializationMarker();
-                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                    m_meshBrokers = m_leader;
-                }
             } else if (m_startAction == StartAction.INITIALIZE) {
                 if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"

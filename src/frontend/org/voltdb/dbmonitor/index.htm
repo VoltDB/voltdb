@@ -1996,7 +1996,7 @@
     <a id="btnSaveQueryConfirmation" href="#saveQueryPopup" style="display: none;"></a>
     <div id="saveQueryPopup" style="display: none; width:20px;">
         <div id="saveQueryInnerPopup">
-            <div class="overlay-title icon-alert">
+            <div id="divSaveQueryConfirmation" class="overlay-title icon-alert">
                 <div id="saveQueryHeader" class="addConfigHeader">Save Query</div>
             </div>
             <div id="saveQueryControls">
@@ -2009,14 +2009,14 @@
                                     <td>Name:</td>
                                     <td width="65%" class="txtQName">
                                         <input id="txtQueryName" name="txtQueryName" type="text" maxlength="25">
-                                        <label id="errorQueryName" for="txtQueryName" class="error" style="display: none;"></label>
+                                        <label id="errorQueryName" for="txtQueryName" class="error errorHeightFix" style="display: none;"></label>
                                     </td>
                                 </tr>
-                            <tr id = 'queryError'>
-                               <td colspan="2">
-                                   Query field is empty. Go back and fill the query field to save queries.
-                               </td>
-                            </tr>
+                                <tr id = 'queryError'>
+                                   <td colspan="2">
+                                       <span class="error">Query is empty.</span>
+                                   </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -2057,7 +2057,6 @@
         <div class="overlay-btns"><a id="btnIsSupportedOk" class="btn">Ok</a></div>
     </div>
     <!-- HTML5 support popup -->
-
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

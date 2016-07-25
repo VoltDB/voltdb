@@ -1596,12 +1596,12 @@ class SchemaPageTest extends TestBase {
         at SchemaPageSizeWorksheetTab
 
         when: 'assign values from the page'
-        tableMin = Integer.parseInt(removeLastTwoChar(page.sizeTableMin.text()))
-        tableMax = Integer.parseInt(removeLastTwoChar(page.sizeTableMax.text()))
-        viewMin  = Integer.parseInt(removeLastTwoChar(page.sizeViewMin.text()))
-        indexMin = Integer.parseInt(removeLastTwoChar(page.sizeIndexMin.text()))
-        totalMin = Integer.parseInt(removeLastTwoChar(page.sizeTotalMin.text()))
-        totalMax = Integer.parseInt(removeLastTwoChar(page.sizeTotalMax.text()))
+        tableMin = Integer.parseInt(removeLastTwoChar(page.sizeTableMin.text().replace(",", "")))
+        tableMax = Integer.parseInt(removeLastTwoChar(page.sizeTableMax.text().replace(",", "")))
+        viewMin  = Integer.parseInt(removeLastTwoChar(page.sizeViewMin.text().replace(",", "")))
+        indexMin = Integer.parseInt(removeLastTwoChar(page.sizeIndexMin.text().replace(",", "")))
+        totalMin = Integer.parseInt(removeLastTwoChar(page.sizeTotalMin.text().replace(",", "")))
+        totalMax = Integer.parseInt(removeLastTwoChar(page.sizeTotalMax.text().replace(",", "")))
         then: 'check if the values follow the rule or not'
         totalMax == tableMax + viewMin + indexMin
         totalMin == tableMin + viewMin + indexMin
