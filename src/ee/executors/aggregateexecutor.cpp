@@ -522,17 +522,18 @@ public:
 
     virtual void advance(const NValue& val)
     {
+        int64_t valint = ValuePeeker::peekAsBigInt(val);
         if (m_peerCount == 0) {
             VOLT_TRACE("Start of partition by group: val == %s",
                        val.debug().c_str());
-            m_lastOrderByValue = val;
+            m_lastOrderByValue = valint;
             m_peerCount = 1;
             m_rank = 1;
-        } else if (m_lastOrderByValue.compare(val) != 0) {
+        } else if (m_lastOrderByValue != valint) {
             VOLT_TRACE("Start of order by group: %s -> %s",
-                       m_lastOrderByValue.debug().c_str(),
-                       val.debug().c_str());
-            m_lastOrderByValue = val;
+                       m_lastOrderByValue,
+                       valint);
+            m_lastOrderByValue = valint;
             if (m_isDenseRank) {
                 m_rank += 1;
             } else {
@@ -557,7 +558,6 @@ public:
         m_haveAdvanced = false;
         m_rank = 0;
         m_peerCount = 0;
-        m_lastOrderByValue.free();
     }
 
 private:
@@ -572,7 +572,7 @@ private:
     // default order by unit is RANGE, and we don't have any way to
     // change that syntactically in HSQL, we only get one value for
     // the order by.  So, we can save this in a single NValue.
-    NValue                             m_lastOrderByValue;
+    int64_t                            m_lastOrderByValue;
     // We don't support dense rank now.  But we can easily.  So
     // add support now.
     bool                               m_isDenseRank;
