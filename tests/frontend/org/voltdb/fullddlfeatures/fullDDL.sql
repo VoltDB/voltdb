@@ -413,7 +413,8 @@ AS
           ,  C2
 ;
 
-CREATE VIEW VT3
+-- View joining 2 tables
+CREATE VIEW VT3a
 (
     C1
 ,   C2
@@ -430,6 +431,31 @@ AS
     FROM T24
     JOIN T23
     ON T24.C1 = T23.C1
+    WHERE T24.C1 < 1000
+    GROUP BY T24.C1
+          ,  T24.C2
+;
+
+-- View joining 3 tables
+CREATE VIEW VT3b
+(
+    C1
+,   C2
+,   TOTAL
+,   SUMUP
+)
+AS
+    SELECT T24.C1
+        ,  T24.C2
+        ,  COUNT(*)
+        ,  SUM(T24.C2)
+    AS
+        newTble
+    FROM T24
+    JOIN T23
+    ON T24.C1 = T23.C1
+    JOIN T22
+    ON T23.C1=T22.C3
     WHERE T24.C1 < 1000
     GROUP BY T24.C1
           ,  T24.C2
