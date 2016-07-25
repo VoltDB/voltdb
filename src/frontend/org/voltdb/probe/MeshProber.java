@@ -392,7 +392,7 @@ public class MeshProber implements JoinAcceptor {
                     .map(c->c.getStartAction())
                     .findFirst().orElse(getStartAction());
             if (operationalStartAction == StartAction.PROBE && hc.getStartAction() != StartAction.PROBE) {
-                String msg = "Only nodes that have been initialized can join this cluster";
+                String msg = "Invalid VoltDB command. Please use init and start to join this cluster";
                 return new JoinAcceptor.PleaDecision(msg, false, false);
             }
         }
@@ -419,7 +419,7 @@ public class MeshProber implements JoinAcceptor {
         // connecting to already wholly formed cluster
         if (stat.getNumChildren() >= getHostCount()) {
             return new JoinAcceptor.PleaDecision(
-                    hc.isAddAllowed()? null : "Cluster is already whole",
+                    hc.isAddAllowed()? null : "Cluster is already complete",
                     hc.isAddAllowed(), false);
         } else if (stat.getNumChildren() < getHostCount()) {
             // check for concurrent rejoins
@@ -566,7 +566,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCount = hostCount + ksafety; // kfactor + 1
                 determination = StartAction.JOIN;
             } else {
-                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
+                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already complete cluster");
                 return;
             }
         } else if (operational == 0 && bare == unmeshed) {
@@ -574,7 +574,7 @@ public class MeshProber implements JoinAcceptor {
         } else if (operational == 0 && bare < ksafety /* kfactor + 1 */) {
             determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
         } else if (operational == 0 && bare >= ksafety  /* kfactor + 1 */) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
+            org.voltdb.VoltDB.crashLocalVoltDB("Cluster has incomplete command logs: "
                     + bare + " nodes have no command logs, while "
                     + (unmeshed - bare) + " nodes have them");
             return;

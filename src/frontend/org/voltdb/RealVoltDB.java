@@ -495,8 +495,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (config.m_startAction == StartAction.INITIALIZE) {
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
-                hostLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
-                consoleLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
+                hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
+                consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             }
 
@@ -1939,7 +1939,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         if ((depl.getCluster().getKfactor()+1) > hostCount) {
             VoltDB.crashLocalVoltDB(
-                    "Number of cluster members " + hostCount + " must greater than ksafety "
+                    "Number of cluster members " + hostCount + " must be greater than ksafety "
                   + depl.getCluster().getKfactor(), false, null
                   );
             return Optional.empty();
@@ -1950,14 +1950,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try {
                 remarshalled = CatalogUtil.getDeployment(depl, true /* pretty print indent */);
             } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
+                VoltDB.crashLocalVoltDB("Unable to save deployment configuration", false, e);
                 return Optional.empty();
             }
             deploymentBytes = Optional.of(remarshalled.getBytes(StandardCharsets.UTF_8));
             try (FileWriter fw = new FileWriter(getConfigLogDeployment(config))) {
                 fw.write(remarshalled);
             } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
+                VoltDB.crashLocalVoltDB("Unable to save deployment configuration", false, e);
                 return Optional.empty();
             }
         }
@@ -2018,8 +2018,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             } else if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
                 if (config.m_startAction == StartAction.PROBE) {
-                    String msg = "VoltDB root specified in the command line \"" + optrootFH
-                            + "\" diverges from the one specified at initialization \""
+                    String msg = "VoltDB root specified on the command line \"" + optrootFH
+                            + "\" is different from the one specified at initialization \""
                             + dplrootFH + "\"";
                     hostLog.fatal(msg);
                     VoltDB.crashLocalVoltDB(msg);
