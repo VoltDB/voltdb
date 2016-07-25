@@ -158,7 +158,7 @@ public class MaterializedViewFixInfo {
         }
         else {
             // joined table view
-            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get(mvTableName);
+            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get("mvHandlerInfo");
             numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
         }
 
