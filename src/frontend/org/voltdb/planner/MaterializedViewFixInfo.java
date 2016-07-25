@@ -25,9 +25,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -138,15 +137,29 @@ public class MaterializedViewFixInfo {
 
         String mvTableAlias = getMVTableAlias();
 
-        int numOfGroupByColumns = 0;
-        for (Column col : table.getColumns()) {
-            ExpressionType aggType = ExpressionType.get(col.getAggregatetype());
-            switch (aggType) {
-                case VALUE_TUPLE:
-                case VALUE_PARAMETER:
-                case INVALID:
-                    numOfGroupByColumns++;
+        // Get the number of group-by columns.
+        int numOfGroupByColumns;
+        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
+        if (mvInfo != null) {
+            // single table view
+            String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
+            if (complexGroupbyJson.length() > 0) {
+                List<AbstractExpression> mvComplexGroupbyCols = null;
+                try {
+                    mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                numOfGroupByColumns = mvComplexGroupbyCols.size();
             }
+            else {
+                numOfGroupByColumns = mvInfo.getGroupbycols().size();
+            }
+        }
+        else {
+            // joined table view
+            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get(mvTableName);
+            numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
         }
 
         for (int i = 0; i < numOfGroupByColumns; i++) {
