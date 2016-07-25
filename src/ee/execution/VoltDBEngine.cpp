@@ -929,6 +929,10 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             //////////////////////////////////////////
 
             const std::vector<TableIndex*> currentIndexes = persistentTable->allIndexes();
+            PersistentTable *deltaTable = NULL;
+            if (persistentTable->deltaTable()) {
+                deltaTable = static_cast<PersistentTable*>(persistentTable->deltaTable());
+            }
 
             // iterate over indexes for this table in the catalog
             BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
@@ -967,6 +971,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 
                     // all of the data should be added here
                     persistentTable->addIndex(index);
+                    // Add the same index structure to the delta table.
+                    if (deltaTable) {
+                        TableIndex *indexForDelta = TableIndexFactory::getInstance(scheme);
+                        deltaTable->addIndex(indexForDelta);
+                    }
 
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
@@ -998,6 +1007,16 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 // then remove the index
                 if (!found) {
                     persistentTable->removeIndex(currIndex);
+                    // Remove the same index structure from the delta table.
+                    if (deltaTable) {
+                        const std::vector<TableIndex*> currentDeltaIndexes = deltaTable->allIndexes();
+                        BOOST_FOREACH (TableIndex* currDeltaIndex, currentDeltaIndexes) {
+                            if (currDeltaIndex->getId() == currentIndexId) {
+                                deltaTable->removeIndex(currDeltaIndex);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
