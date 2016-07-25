@@ -38,7 +38,7 @@ RANDOM_CHANNEL = os.environ.get('random', None)
 
 # Test Leaderboard - See the tests that have been failing the most since a certain build.
 TL_QUERY = ("""
-  SELECT tf.name AS 'Long test name',
+  SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
     FROM `junit-test-failures` AS tf
    WHERE NOT tf.status='FIXED' AND
@@ -50,7 +50,7 @@ ORDER BY 2 DESC
 
 # Days Leaderboard - See the tests that has been failing the most in the past amount of days.
 D_QUERY = ("""
-  SELECT tf.name AS 'Long test name',
+  SELECT tf.name AS 'Test name',
          COUNT(*) AS 'Failures'
     FROM `junit-test-failures` AS tf
    WHERE NOT tf.status='FIXED' AND
@@ -62,7 +62,7 @@ ORDER BY 2 DESC
 
 # Build Range Leaderboard - See the tests that have been failing the most in a range of builds.
 BR_QUERY = ("""
-    SELECT tf.name AS 'Long test name',
+    SELECT tf.name AS 'Test name',
            COUNT(*) AS 'Number of failures in this build range'
       FROM `junit-test-failures` AS tf
 INNER JOIN `junit-builds` AS jr
@@ -92,7 +92,7 @@ RIGHT JOIN `junit-builds` AS jr
 # Master Leaderboard - See a specific leaderboard for three jobs.
 ML_QUERY = ("""
   SELECT job AS 'Job name',
-         name AS 'Long test name',
+         name AS 'Test name',
          fails AS 'Fails',
          total AS 'Total',
          fails/total*100. AS "Fail %",
@@ -123,7 +123,7 @@ ORDER BY 5 DESC
 # Core Extended Leaderboard - See a specific leaderboard for two jobs.
 CL_QUERY = ("""
   SELECT job AS 'Job name',
-         name AS 'Long test name',
+         name AS 'Test name',
          fails AS 'Fails',
          total AS 'Total',
          fails/total*100. AS "Fail %",
@@ -136,14 +136,14 @@ CL_QUERY = ("""
                    SELECT COUNT(*)
                      FROM `junit-builds` AS jr
                     WHERE jr.name = tf.job AND
-                          NOW() - INTERVAL 10 DAY <= jr.stamp
+                          NOW() - INTERVAL 2 DAY <= jr.stamp
                   ) AS total,
                   COUNT(*) AS fails,
                   MAX(tf.stamp) AS latest
              FROM `junit-test-failures` AS tf
             WHERE NOT status='FIXED' AND
                   (job=%(jobA)s OR job=%(jobB)s OR job=%(jobC)s OR job=%(jobD)s) AND
-                  NOW() - INTERVAL 10 DAY <= tf.stamp
+                  NOW() - INTERVAL 2 DAY <= tf.stamp
          GROUP BY job,
                   name,
                   total
@@ -153,7 +153,7 @@ ORDER BY 5 DESC
 
 # All Failures - See all failures for a job over time and view them as most recent.
 AF_QUERY = ("""
-  SELECT tf.name AS 'Long test name',
+  SELECT tf.name AS 'Test name',
          tf.build as 'Build',
          tf.stamp AS 'Time'
     FROM `junit-test-failures` AS tf
@@ -316,12 +316,20 @@ class JenkinsBot(object):
             cursor.execute(query, params)
             headers = list(cursor.column_names)
             table = cursor.fetchall()
+            leaderboard = list(table) # Copy table
 
-            if query == ML_QUERY or query == CL_QUERY:
-                # Do some specific edits for this query.
-                self.edit_leaderboard(table)
+            if os.environ.get('edit', False):
+                # Do some specific edits.
+                self.edit_leaderboard(leaderboard)
+
+            content = tabulate(leaderboard, headers)
+
+            if os.environ.get('vertical', False):
+                # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
+                content = content + '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(headers, table)
+
             self.client.api_call(
-                'files.upload', channels=channels, content=tabulate(table, headers), filetype='text', filename=filename
+                'files.upload', channels=channels, content=content, filetype='text', filename=filename
             )
 
         except MySQLError as error:
@@ -340,18 +348,31 @@ class JenkinsBot(object):
             cursor.close()
             database.close()
 
-    def edit_leaderboard(self, table):
+    def vertical_leaderboard(self, headers, table):
         """
-        Edit the table to fit on most screens.
+        Displays each row in the table as one over the other. Similar to mysql's '\G'
         """
+        table_str = ''
         for i, row in enumerate(table):
             table[i] = list(row)
-            table[i][0] = table[i][0].replace('branch-2-', '')
-            table[i][0] = table[i][0].replace('test-', '')
-            table[i][0] = table[i][0].replace('nextrelease-', '')
-            table[i][1] = table[i][1].replace('org.voltdb.', '')
-            table[i][1] = table[i][1].replace('org.voltcore.', '')
-            table[i][1] = table[i][1].replace('regressionsuites.', '')
+            table_str += '%d\n' % (i+1)
+            for j,entry in enumerate(row):
+                table_str += headers[j] + ': ' + str(entry) + '\n'
+            table_str += '\n\n'
+        return table_str
+
+    def edit_leaderboard(self, leaderboard):
+        """
+        Edit the leaderboard to fit on most screens.
+        """
+        for i, row in enumerate(leaderboard):
+            leaderboard[i] = list(row)
+            leaderboard[i][0] = leaderboard[i][0].replace('branch-2-', '')
+            leaderboard[i][0] = leaderboard[i][0].replace('test-', '')
+            leaderboard[i][0] = leaderboard[i][0].replace('nextrelease-', '')
+            leaderboard[i][1] = leaderboard[i][1].replace('org.voltdb.', '')
+            leaderboard[i][1] = leaderboard[i][1].replace('org.voltcore.', '')
+            leaderboard[i][1] = leaderboard[i][1].replace('regressionsuites.', '')
 
     def post_message(self, channel, text):
         """
@@ -378,8 +399,8 @@ if __name__ == '__main__':
         elif sys.argv[1] == 'core-leaderboard':
             jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.query_and_response(
-                RL_QUERY,
+                CL_QUERY,
                 {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
                 ['#junit'],
-                'coreextended-past10days.txt'
+                'coreextended-past2days.txt'
             )
