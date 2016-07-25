@@ -439,6 +439,14 @@ if whichtests in ("${eetestsuite}", "logging"):
     logging_test
     """
 
+if whichtests in ("${eetestsuite}", "memleaktests"):
+   CTX.TESTS['memleaktests'] = """
+     definite_losses
+     indirect_losses
+     still_reachable_losses
+     possible_losses
+     rw_deleted
+   """
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
@@ -559,6 +567,8 @@ elif CTX.PLATFORM == "Linux":
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
 
+print("Making in directory \"%s\" with %d threads" 
+		% (CTX.OUTPUT_PREFIX, numHardwareThreads))
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 if retval != 0:
     sys.exit(-1)
