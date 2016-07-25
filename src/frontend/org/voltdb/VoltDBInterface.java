@@ -45,6 +45,7 @@ public interface VoltDBInterface
     public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();
+    public boolean isRunningWithOldVerbs();
 
     /**
      * Initialize all the global components, then initialize all the m_sites.

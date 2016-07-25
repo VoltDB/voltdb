@@ -298,12 +298,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
+    private boolean m_isRunningWithOldVerb = true;
 
     @Override
-    public boolean rejoining() { return m_rejoining; }
+    public boolean isRunningWithOldVerbs() {
+        return m_isRunningWithOldVerb;
+     };
 
     @Override
-    public boolean rejoinDataPending() { return m_rejoinDataPending; }
+    public boolean rejoining() {
+        return m_rejoining;
+    }
+
+    @Override
+    public boolean rejoinDataPending() {
+        return m_rejoinDataPending;
+    }
 
     @Override
     public boolean isMpSysprocSafeToExecute(long txnId)
@@ -438,6 +448,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
+            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
             // Replay command line args that we can see
@@ -1541,7 +1552,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
-        boolean differingRoots = false;
+        boolean writeGeneratedDF = false;
 
         if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the voltdbroot directory in " + cnfrootFH, false, null);
@@ -1555,13 +1566,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             File cnfcanoFH = cnfrootFH.getCanonicalFile();
             if (!cnfcanoFH.equals(depcanoFH)) {
-                differingRoots = true;
+                writeGeneratedDF = true;
                 dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
             }
             // root in deployment conflicts with command line voltdbroot
-            if (!VoltDB.DBROOT.equals(deprootFN) && differingRoots) {
+            if (!VoltDB.DBROOT.equals(deprootFN) && writeGeneratedDF) {
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
+            }
+            // if provided admin-mode start up is set, update it to false and update
+            // the rewrite-flag reflect to rewrite the deployment instead of copy
+            if(dt.getAdminMode().isAdminstartup()) {
+                dt.getAdminMode().setAdminstartup(false);
+               writeGeneratedDF = true;
             }
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(
@@ -1617,8 +1634,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
         }
+
+        // log message unconditionally indicating that the provided host-count and admin-mode settings in
+        // deployment, if any, will be ignored
+        consoleLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
+                + "and admin-mode) are ignored");
+        hostLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
+                + "and admin-mode) are ignored");
+
         // see if you just can simply copy the deployment file
-        if (differingRoots) {
+        if (writeGeneratedDF) {
             File depFH = getConfigLogDeployment(config);
             try (FileWriter fw = new FileWriter(depFH)) {
                 fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
