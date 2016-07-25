@@ -54,7 +54,7 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -502,7 +502,7 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        file_path = SnapshotUtil.getRealPath(SnapthotPathType.valueOf(pathType), file_path);
+        file_path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), file_path);
 
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,

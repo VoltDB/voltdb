@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public interface SnapshotCompletionInterest {
 
@@ -42,7 +42,7 @@ public interface SnapshotCompletionInterest {
 
         public SnapshotCompletionEvent(
                 String path,
-                SnapthotPathType stype,
+                SnapshotPathType stype,
                 String nonce,
                 final long multipartTxnId,
                 final Map<Integer, Long> partitionTxnIds,
@@ -72,7 +72,7 @@ public interface SnapshotCompletionInterest {
         // to avoid repeating this long series of dummy-valued initializers.
         public static SnapshotCompletionEvent newInstanceForTest(
                 String path,
-                SnapthotPathType stype,
+                SnapshotPathType stype,
                 String nonce,
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,

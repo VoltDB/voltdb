@@ -28,7 +28,7 @@ import org.voltcore.network.Connection;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -136,7 +136,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         if (paths.length != nonces.length) {
             return "A path must be provided for every nonce";
         }
-        String stype = SnapthotPathType.SNAP_PATH.toString();
+        String stype = SnapshotPathType.SNAP_PATH.toString();
         if (params.size() > 2) {
             stype = (String )(ParameterConverter.tryToMakeCompatible(
                         String.class,
@@ -180,7 +180,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         for (int i = 0; i < length; i++) {
             nonces[i] = obj.getJSONArray("nonces").getString(i);
         }
-        final SnapthotPathType stype = SnapthotPathType.valueOf(obj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        final SnapshotPathType stype = SnapshotPathType.valueOf(obj.getString(SnapshotUtil.JSON_PATH_TYPE));
 
         new Thread("Async snapshot deletion thread") {
             @Override

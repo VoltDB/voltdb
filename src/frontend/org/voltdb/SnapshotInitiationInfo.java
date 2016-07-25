@@ -22,7 +22,7 @@ import java.net.URI;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
@@ -36,14 +36,14 @@ public class SnapshotInitiationInfo
     private SnapshotFormat m_format;
     private String m_data;
     private boolean m_truncationRequest;
-    private SnapthotPathType m_stype;
+    private SnapshotPathType m_stype;
 
     /**
      * Construct the object given the parameters directly.
      * @param data any additional JSON blob params.  Currently only provided by VoltDB internals
      */
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
-            SnapshotFormat format, SnapthotPathType stype, String data)
+            SnapshotFormat format, SnapshotPathType stype, String data)
     {
         m_path = path;
         m_nonce = nonce;
@@ -116,7 +116,7 @@ public class SnapshotInitiationInfo
         m_nonce = (String)params[1];
         m_blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
         m_format = SnapshotFormat.NATIVE;
-        m_stype = SnapthotPathType.SNAP_PATH;
+        m_stype = SnapshotPathType.SNAP_PATH;
     }
 
     /**
@@ -151,8 +151,8 @@ public class SnapshotInitiationInfo
 
         // IZZY - Make service an enum and store it in the object if
         // we every introduce another one
-        if (jsObj.has("service")) {
-            String service = jsObj.getString("service");
+        if (jsObj.has(SnapshotUtil.JSON_SERVICE)) {
+            String service = jsObj.getString(SnapshotUtil.JSON_SERVICE);
             if (service.equalsIgnoreCase("log_truncation")) {
                 m_truncationRequest = true;
                 if (!VoltDB.instance().getCommandLog().isEnabled()) {
@@ -167,9 +167,8 @@ public class SnapshotInitiationInfo
             }
         }
 
-        m_stype = SnapthotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE,
-                SnapthotPathType.SNAP_PATH.toString()));
-        m_path = jsObj.getString("uripath");
+        m_stype = SnapshotPathType.valueOf(jsObj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
         if (m_path.isEmpty()) {
             throw new Exception("uripath cannot be empty");
         }
@@ -184,14 +183,14 @@ public class SnapshotInitiationInfo
         }
         m_path = pathURI.getPath();
 
-        m_nonce = jsObj.getString("nonce");
+        m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
         if (m_nonce.isEmpty()) {
             throw new Exception("nonce cannot be empty");
         }
 
         Object blockingObj = false;
-        if (jsObj.has("block")) {
-            blockingObj = jsObj.get("block");
+        if (jsObj.has(SnapshotUtil.JSON_BLOCK)) {
+            blockingObj = jsObj.get(SnapshotUtil.JSON_BLOCK);
         }
         if (blockingObj instanceof Number) {
             m_blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
@@ -205,7 +204,7 @@ public class SnapshotInitiationInfo
         }
 
         m_format = SnapshotFormat.NATIVE;
-        String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
+        String formatString = jsObj.optString(SnapshotUtil.JSON_FORMAT,SnapshotFormat.NATIVE.toString());
         /*
          * Try and be very flexible about what we will accept
          * as the type of the block parameter.
@@ -258,9 +257,9 @@ public class SnapshotInitiationInfo
         jsObj.put(SnapshotUtil.JSON_PATH, m_path);
         jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_stype.toString());
         jsObj.put(SnapshotUtil.JSON_NONCE, m_nonce);
-        jsObj.put("block", m_blocking);
-        jsObj.put("format", m_format.toString());
-        jsObj.putOpt("data", m_data);
+        jsObj.put(SnapshotUtil.JSON_BLOCK, m_blocking);
+        jsObj.put(SnapshotUtil.JSON_FORMAT, m_format.toString());
+        jsObj.putOpt(SnapshotUtil.JSON_DATA, m_data);
         return jsObj;
     }
 }

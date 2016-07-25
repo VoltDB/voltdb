@@ -64,7 +64,7 @@ import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -239,7 +239,7 @@ SnapshotCompletionInterest, Promotable
         public final Set<String> digestTables = new HashSet<String>();
         // Track the tables for which we found files on the node reporting this SnapshotInfo
         public final Set<String> fileTables = new HashSet<String>();
-        public final SnapthotPathType pathType;
+        public final SnapshotPathType pathType;
 
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
@@ -249,7 +249,7 @@ SnapshotCompletionInterest, Promotable
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId,
-                            Set<String> digestTables, SnapthotPathType snaptype)
+                            Set<String> digestTables, SnapshotPathType snaptype)
         {
             this.txnId = txnId;
             this.path = path;
@@ -267,7 +267,7 @@ SnapshotCompletionInterest, Promotable
         {
             txnId = jo.getLong("txnId");
             path = jo.getString(SnapshotUtil.JSON_PATH);
-            pathType = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
+            pathType = SnapshotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
             newPartitionCount = jo.getInt("newPartitionCount");
@@ -1363,14 +1363,14 @@ SnapshotCompletionInterest, Promotable
          * Use the individual snapshot directories instead of voltroot, because
          * they can be set individually
          */
-        Map<String, SnapthotPathType> paths = new HashMap<String, SnapthotPathType>();
+        Map<String, SnapshotPathType> paths = new HashMap<String, SnapshotPathType>();
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             if (m_clSnapshotPath != null) {
-                paths.put(m_clSnapshotPath, SnapthotPathType.SNAP_CL);
+                paths.put(m_clSnapshotPath, SnapshotPathType.SNAP_CL);
             }
         }
         if (m_snapshotPath != null) {
-            paths.put(m_snapshotPath, SnapthotPathType.SNAP_AUTO);
+            paths.put(m_snapshotPath, SnapshotPathType.SNAP_AUTO);
         }
         HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();

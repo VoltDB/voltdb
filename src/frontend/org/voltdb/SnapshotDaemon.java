@@ -76,7 +76,7 @@ import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltdb.sysprocs.saverestore.SnapthotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -307,6 +307,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 // Do scan work on all known live hosts
                 VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
+                SnapshotPathType pathType = SnapshotPathType.valueOf(jsObj.getString(SnapshotUtil.JSON_PATH_TYPE));
                 Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                 for (int hostId : liveHosts) {
                     m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
@@ -318,8 +319,20 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final long endTime = System.currentTimeMillis() + timeoutMs;
                 SnapshotCheckResponseMessage response;
                 while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
-                    // ignore responses to previous requests we only check for nonce and not path here.
-                    if (jsObj.getString("nonce").equals(response.getNonce())) {
+                    final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+                    boolean nonceFound = false;
+                    if (pathType == SnapshotPathType.SNAP_PATH) {
+                        // If request was explicitely PATH check path too.
+                        if (nonce.equals(response.getNonce()) && response.getPath().equals(jsObj.getString(SnapshotUtil.JSON_PATH))) {
+                            nonceFound = true;
+                        }
+                    } else {
+                        // If request is with type other than path just check type.
+                        if (nonce.equals(response.getNonce()) && response.getSnapshotPathType() == pathType) {
+                            nonceFound = true;
+                        }
+                    }
+                    if (nonceFound) {
                         responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                     }
 
@@ -478,7 +491,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         int ii = 0;
         for (TruncationSnapshotAttempt attempt : toDelete) {
             paths[ii] = attempt.path;
-            paths[ii] = SnapshotUtil.getRealPath(SnapthotPathType.valueOf(attempt.pathType), paths[ii]);
+            paths[ii] = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(attempt.pathType), paths[ii]);
             nonces[ii++] = attempt.nonce;
         }
 
@@ -486,7 +499,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             new Object[] {
                 paths,
                 nonces,
-                SnapthotPathType.SNAP_CL.toString()
+                SnapshotPathType.SNAP_CL.toString()
                 };
         long handle = m_nextCallbackHandle++;
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -688,7 +701,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             sData = jsData.toString();
             jsObj.put(SnapshotUtil.JSON_PATH, snapshotPath );
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
-            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_CL);
+            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_CL);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             jsObj.put("data", sData);
         } catch (JSONException e) {
@@ -793,7 +806,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         if (snapshotAttempt == null) {
                             snapshotAttempt = new TruncationSnapshotAttempt();
                             m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
-                            snapshotAttempt.pathType = SnapthotPathType.SNAP_CL.toString();
+                            snapshotAttempt.pathType = SnapshotPathType.SNAP_CL.toString();
                         }
                         snapshotAttempt.nonce = nonce;
                         snapshotAttempt.path = snapshotPath;
@@ -894,7 +907,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             String jsonString = new String(data, "UTF-8");
             final JSONObject jsObj = new JSONObject(jsonString);
             final String requestId = jsObj.getString("requestId");
-            final boolean blocking = jsObj.getBoolean("block");
+            final boolean blocking = jsObj.getBoolean(SnapshotUtil.JSON_BLOCK);
             /*
              * Going to reuse the request object, remove the requestId
              * field now that it is consumed
@@ -1262,9 +1275,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String path;
         private final String nonce;
         private final Long txnId;
-        private final SnapthotPathType stype;
+        private final SnapshotPathType stype;
 
-        private Snapshot(String path, SnapthotPathType stype, String nonce, Long txnId) {
+        private Snapshot(String path, SnapshotPathType stype, String nonce, Long txnId) {
             this.path = path;
             this.stype = stype;
             this.nonce = nonce;
@@ -1355,10 +1368,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         JSONObject jsObj = new JSONObject();
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, m_path);
-            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_AUTO.toString());
+            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString());
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            m_snapshots.offer(new Snapshot(m_path, SnapthotPathType.SNAP_AUTO, nonce, now));
+            m_snapshots.offer(new Snapshot(m_path, SnapshotPathType.SNAP_AUTO, nonce, now));
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -1553,7 +1566,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final String nonce = snapshots.getString("NONCE");
                 if (nonce.startsWith(m_prefixAndSeparator)) {
                     final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, SnapthotPathType.SNAP_AUTO, nonce, txnId));
+                    m_snapshots.add(new Snapshot(path, SnapshotPathType.SNAP_AUTO, nonce, txnId));
                 }
             }
         }
@@ -1586,7 +1599,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 new Object[] {
                     pathsToDelete,
                     noncesToDelete,
-                    SnapthotPathType.SNAP_AUTO.toString()
+                    SnapshotPathType.SNAP_AUTO.toString()
                     };
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -1898,7 +1911,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         snapshotAttempt = new TruncationSnapshotAttempt();
                         snapshotAttempt.path = event.path;
                         snapshotAttempt.nonce = event.nonce;
-                        snapshotAttempt.pathType = SnapthotPathType.SNAP_CL.toString();
+                        snapshotAttempt.pathType = SnapshotPathType.SNAP_CL.toString();
                         m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;

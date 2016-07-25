@@ -22,8 +22,9 @@ package org.voltdb.sysprocs.saverestore;
  * by the Scan, Delete, Save methods.
  * @author akhanzode
  */
-public enum SnapthotPathType {
+public enum SnapshotPathType {
     SNAP_PATH, // For direct path based
     SNAP_CL, // For snapshots in command log snapshots
-    SNAP_AUTO // For auto snapshots.
+    SNAP_AUTO, // For auto snapshots.
+    SNAP_NO_PATH // For streaming snapshots
 }

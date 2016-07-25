@@ -99,6 +99,12 @@ public class SnapshotUtil {
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
     public static final String JSON_IS_RECOVER = "isRecover";
+    public static final String JSON_BLOCK = "block";
+    public static final String JSON_FORMAT = "format";
+    public static final String JSON_DATA = "data";
+    public static final String JSON_URIPATH = "uripath";
+    public static final String JSON_SERVICE = "service";
+
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -565,7 +571,7 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
-        public Snapshot(String nonce, SnapthotPathType stype)
+        public Snapshot(String nonce, SnapshotPathType stype)
         {
             m_nonce = nonce;
             m_txnId = Long.MIN_VALUE;
@@ -613,7 +619,7 @@ public class SnapshotUtil {
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
         public File m_catalogFile = null;
-        public final SnapthotPathType m_stype;
+        public final SnapshotPathType m_stype;
 
         private final String m_nonce;
         private InstanceId m_instanceId = null;
@@ -698,9 +704,9 @@ public class SnapshotUtil {
     private static class NamedSnapshots {
 
         private final Map<String, Snapshot> m_map;
-        private final SnapthotPathType m_stype;
+        private final SnapshotPathType m_stype;
 
-        public NamedSnapshots(Map<String, Snapshot> map, SnapthotPathType stype) {
+        public NamedSnapshots(Map<String, Snapshot> map, SnapshotPathType stype) {
             m_map = map;
             m_stype = stype;
         }
@@ -729,7 +735,7 @@ public class SnapshotUtil {
             Map<String, Snapshot> namedSnapshotMap,
             FileFilter filter,
             boolean validate,
-            SnapthotPathType stype,
+            SnapshotPathType stype,
             VoltLogger logger) {
 
         NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap, stype);
@@ -741,7 +747,7 @@ public class SnapshotUtil {
             NamedSnapshots namedSnapshots,
             FileFilter filter,
             boolean validate,
-            SnapthotPathType stype,
+            SnapshotPathType stype,
             VoltLogger logger,
             int recursion) {
 
@@ -1383,7 +1389,7 @@ public class SnapshotUtil {
                                        final String nonce,
                                        final boolean blocking,
                                        final SnapshotFormat format,
-                                       final SnapthotPathType stype,
+                                       final SnapshotPathType stype,
                                        final String data,
                                        final SnapshotResponseHandler handler,
                                        final boolean notifyChanges)
@@ -1588,7 +1594,7 @@ public class SnapshotUtil {
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
                 if (VoltDB.instance().isRunningWithOldVerbs()) {
-                    jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapthotPathType.SNAP_PATH);
+                    jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH);
                 }
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
                 jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, params[0]);
@@ -1607,10 +1613,10 @@ public class SnapshotUtil {
     }
 
     //Return path based on type if type is not CL or AUTO return provided path.
-    public static String getRealPath(SnapthotPathType stype, String path) {
-        if (stype == SnapthotPathType.SNAP_CL) {
+    public static String getRealPath(SnapshotPathType stype, String path) {
+        if (stype == SnapshotPathType.SNAP_CL) {
             return VoltDB.instance().getCommandLogSnapshotPath();
-        } else if (stype == SnapthotPathType.SNAP_AUTO) {
+        } else if (stype == SnapshotPathType.SNAP_AUTO) {
             return VoltDB.instance().getSnapshotPath();
         }
         return path;
