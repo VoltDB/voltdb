@@ -182,10 +182,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     }
 
 
-    public void testRankWithString() throws Exception {
-        Client client = getClient();
-
-        long expected[][] = new long[][] {
+    private long expected[][] = new long[][] {
                 {  1L,  1L,  101L, 1L },
                 {  1L,  1L,  102L, 1L },
                 {  1L,  2L,  201L, 3L },
@@ -201,7 +198,11 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 { 20L,  2L, 2201L, 3L },
                 { 20L,  2L, 2202L, 3L },
                 { 20L,  3L, 2203L, 5L },
-        };
+    };
+
+    public void testRankWithString() throws Exception {
+        Client client = getClient();
+
         long input[][] = expected.clone();
         shuffleArrayOfLongs(input);
         ClientResponse cr;
@@ -227,23 +228,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     public void testRankWithTimestamp() throws Exception {
         Client client = getClient();
 
-        long expected[][] = new long[][] {
-                {  1L,  1L,  101L, 1L },
-                {  1L,  1L,  102L, 1L },
-                {  1L,  2L,  201L, 3L },
-                {  1L,  2L,  202L, 3L },
-                {  1L,  3L,  203L, 5L },
-                {  2L,  1L, 1101L, 1L },
-                {  2L,  1L, 1102L, 1L },
-                {  2L,  2L, 1201L, 3L },
-                {  2L,  2L, 1202L, 3L },
-                {  2L,  3L, 1203L, 5L },
-                { 20L,  1L, 2101L, 1L },
-                { 20L,  1L, 2102L, 1L },
-                { 20L,  2L, 2201L, 3L },
-                { 20L,  2L, 2202L, 3L },
-                { 20L,  3L, 2203L, 5L },
-        };
         long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
         long input[][] = expected.clone();
         shuffleArrayOfLongs(input);
@@ -270,23 +254,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     public void testRank() throws Exception {
         Client client = getClient();
 
-        long expected[][] = new long[][] {
-                {  1L,  1L,  101L, 1L },
-                {  1L,  1L,  102L, 1L },
-                {  1L,  2L,  201L, 3L },
-                {  1L,  2L,  202L, 3L },
-                {  1L,  3L,  203L, 5L },
-                {  2L,  1L, 1101L, 1L },
-                {  2L,  1L, 1102L, 1L },
-                {  2L,  2L, 1201L, 3L },
-                {  2L,  2L, 1202L, 3L },
-                {  2L,  3L, 1203L, 5L },
-                { 20L,  1L, 2101L, 1L },
-                { 20L,  1L, 2102L, 1L },
-                { 20L,  2L, 2201L, 3L },
-                { 20L,  2L, 2202L, 3L },
-                { 20L,  3L, 2203L, 5L },
-        };
         long input[][] = expected.clone();
         shuffleArrayOfLongs(input);
         ClientResponse cr;
