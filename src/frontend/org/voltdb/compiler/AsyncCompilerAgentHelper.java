@@ -19,7 +19,6 @@ package org.voltdb.compiler;
 
 import java.io.IOException;
 import java.util.Map.Entry;
-import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -30,6 +29,7 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -39,7 +39,6 @@ public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private final LicenseApi m_licenseApi;
-    private static final Pattern PATH_DELETER = Pattern.compile("\\<paths\\>(.*)\\<\\/paths\\>", Pattern.CASE_INSENSITIVE|Pattern.DOTALL|Pattern.MULTILINE);
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;
@@ -202,19 +201,34 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            //compile deployment but dont rebuild paths.
-            result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
+            if (dt == null) {
+                retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
+                return retval;
+            }
+
+            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
             //In non legacy mode discard the path element.
-            if (VoltDB.instance().isRunningWithOldVerbs()) {
-                retval.deploymentString = deploymentString;
-            } else {
-                retval.deploymentString = PATH_DELETER.matcher(deploymentString).replaceAll("");
+            if (!VoltDB.instance().isRunningWithOldVerbs()) {
+                dt.setPaths(null);
             }
+            // ignore admin mode settings if operating with new start actions/verbs
+            if (!VoltDB.instance().isRunningWithOldVerbs() && dt.getAdminMode().isAdminstartup()) {
+                // set the admin-startup mode to false and fetch update the deployment string from
+                // updated deployment object
+                dt.getAdminMode().setAdminstartup(false);
+                retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+            }
+            else {
+                retval.deploymentString = deploymentString;
+            }
+
+
             retval.deploymentHash =
                 CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 

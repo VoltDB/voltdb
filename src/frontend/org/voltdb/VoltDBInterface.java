@@ -46,6 +46,7 @@ public interface VoltDBInterface
     public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();
+    public boolean isRunningWithOldVerbs();
 
     public String getVoltDBRootPath(PathsType.Voltdbroot path);
     public String getCommandLogPath(PathsType.Commandlog path);
@@ -60,8 +61,6 @@ public interface VoltDBInterface
     public String getSnapshotPath();
     public String getExportOverflowPath();
     public String getDROverflowPath();
-
-    public boolean isRunningWithOldVerbs();
 
     public String getPath(String name);
 

@@ -152,7 +152,6 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -304,13 +303,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private boolean m_isRunningWithOldVerb = true;
 
     @Override
-    public boolean isRunningWithOldVerbs() { return m_isRunningWithOldVerb; };
+    public boolean isRunningWithOldVerbs() {
+        return m_isRunningWithOldVerb;
+     };
 
     @Override
-    public boolean rejoining() { return m_rejoining; }
+    public boolean rejoining() {
+        return m_rejoining;
+    }
 
     @Override
-    public boolean rejoinDataPending() { return m_rejoinDataPending; }
+    public boolean rejoinDataPending() {
+        return m_rejoinDataPending;
+    }
 
     @Override
     public boolean isMpSysprocSafeToExecute(long txnId)
@@ -533,6 +538,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
+            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
 
             // Replay command line args that we can see
@@ -1647,7 +1653,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
-        boolean differingRoots = false;
 
         if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the voltdbroot directory in " + cnfrootFH, false, null);
@@ -1661,13 +1666,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             File cnfcanoFH = cnfrootFH.getCanonicalFile();
             if (!cnfcanoFH.equals(depcanoFH)) {
-                differingRoots = true;
                 dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
             }
             // root in deployment conflicts with command line voltdbroot
-            if (!VoltDB.DBROOT.equals(deprootFN) && differingRoots) {
+            if (!VoltDB.DBROOT.equals(deprootFN)) {
                 consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
                 hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
+            }
+            // if provided admin-mode start up is set, update it to false and update
+            // the rewrite-flag reflect to rewrite the deployment instead of copy
+            if(dt.getAdminMode().isAdminstartup()) {
+                dt.getAdminMode().setAdminstartup(false);
             }
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(
@@ -1735,39 +1744,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Now its safe to Save .paths
         stagePathConfiguration(config);
 
-        //Now that we are done with deployment configuration set all path null.
-        dt.getPaths().getVoltdbroot().setPath(null);
-        if (config.m_isEnterprise) {
-            dt.getPaths().getCommandlog().setPath(null);
-            dt.getPaths().getCommandlogsnapshot().setPath(null);
-            dt.getPaths().getSnapshots().setPath(null);
-            dt.getPaths().getExportoverflow().setPath(null);
-            dt.getPaths().getDroverflow().setPath(null);
+         //Now that we are done with deployment configuration set all path null.
+         dt.getPaths().getVoltdbroot().setPath(null);
+         if (config.m_isEnterprise) {
+             dt.getPaths().getCommandlog().setPath(null);
+             dt.getPaths().getCommandlogsnapshot().setPath(null);
+             dt.getPaths().getSnapshots().setPath(null);
+             dt.getPaths().getExportoverflow().setPath(null);
+             dt.getPaths().getDroverflow().setPath(null);
+         }
+
+        // log message unconditionally indicating that the provided host-count and admin-mode settings in
+        // deployment, if any, will be ignored
+        consoleLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
+                + "and admin-mode) are ignored");
+        hostLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
+                + "and admin-mode) are ignored");
+
+        File depFH = getConfigLogDeployment(config);
+        try (FileWriter fw = new FileWriter(depFH)) {
+            fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
+        } catch (IOException|RuntimeException e) {
+            VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
+            return;
         }
 
-        //After deployment is emptied out of path now write it.
-        // see if you just can simply copy the deployment file
-        if (differingRoots) {
-            File depFH = getConfigLogDeployment(config);
-            try (FileWriter fw = new FileWriter(depFH)) {
-                fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
-            } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
-                return;
-            }
-        } else {
-            File optFH = new VoltFile(config.m_pathToDeployment);
-            File depFH = getConfigLogDeployment(config);
-            try {
-                // can't copy file to itself
-                if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
-                    Files.copy(optFH, depFH);
-                }
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to set up deployment configuration in " + depFH, false, e);
-                return;
-            }
-        }
     }
 
     private void stageInitializedMarker(Configuration config) {

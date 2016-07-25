@@ -27,8 +27,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 
 import org.voltcore.utils.Pair;
@@ -2035,5 +2037,29 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(1, mapping.size());
         assertEquals(true, mapping.containsKey("B"));
         assertEquals(0, mapping.get("B").getIndex());
+    }
+
+    public void testGetNormalTableNamesFromInMemoryJar() throws Exception {
+        String schema = "CREATE TABLE NORMAL_A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL);\n" +
+                "CREATE TABLE NORMAL_B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
+                "CREATE TABLE NORMAL_C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
+                "CREATE VIEW VIEW_A (TOTAL_ROWS) AS SELECT COUNT(*) FROM NORMAL_A;\n" +
+                "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n";
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File file = VoltFile.createTempFile("testGetNormalTableNamesFromInMemoryJar", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.compile(file.getPath());
+        byte[] bytes = MiscUtils.fileToBytes(file);
+        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
+        file.delete();
+
+        Set<String> definedNormalTableNames = new HashSet<>();
+        definedNormalTableNames.add("NORMAL_A");
+        definedNormalTableNames.add("NORMAL_B");
+        definedNormalTableNames.add("NORMAL_C");
+        Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile);
+        assertEquals(definedNormalTableNames, returnedNormalTableNames);
     }
 }

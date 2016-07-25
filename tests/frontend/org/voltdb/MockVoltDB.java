@@ -356,7 +356,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isRunningWithOldVerbs() { return voltconfig.m_startAction.isLegacy(); };
+    public boolean isRunningWithOldVerbs() {
+        return voltconfig.m_startAction.isLegacy();
+    }
 
     @Override
     public void initialize(Configuration config)
