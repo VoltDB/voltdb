@@ -1353,11 +1353,6 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *c
     if (mvHandlerInfo) {
         PersistentTable *destTable = static_cast<PersistentTable*>(m_tables[catalogTable->relativeIndex()]);
         if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
-            if (destTable->materializedViewHandler() &&
-                destTable->materializedViewHandler()->isDirty() &&
-                ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                cout << "MaterializedViewHandler for table " << catalogTable->name() << " is dirty, reconstruct.\n";
-            }
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
             new MaterializedViewHandler(destTable, mvHandlerInfo, this);
