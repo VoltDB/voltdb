@@ -378,7 +378,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
                                   jni_path, output_dir, report_invalid, report_all, extraStats,
-                                  comparison_database, modified_sql_path, max_mismatches)
+                                  comparison_database, modified_sql_path)
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
