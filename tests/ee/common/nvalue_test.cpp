@@ -2976,12 +2976,12 @@ TEST_F(NValueTest, TestTimestampStringParse)
             cout << "Timestamp cast should have failed for string '" << trials[ii] << "'.\n";
             failed = true;
         } catch(SQLException& exc) {
-            const char* msg = exc.message().c_str();
+            string msg = exc.message();
             string to_find = "\'";
             to_find += trials[ii];
             to_find += "\'";
-            const char* found = strstr(msg, to_find.c_str());
-            if (found && found > msg && found[0] == '\'' && found[strlen(trials[ii])+1] == '\'') {
+            string::size_type found = msg.find(to_find);
+            if (found != string::npos && found > 0 && msg[found] == '\'' && msg[found + strlen(trials[ii]) + 1] == '\'') {
                 continue;
             }
             cout << "Timestamp cast exception message looks corrupted: '" << msg << "'.\n";
