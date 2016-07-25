@@ -477,7 +477,10 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const 
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
     Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
     deltaTable->incrementRefcount();
-    return dynamic_cast<PersistentTable*>(deltaTable);
+    // We have the restriction that view on joined table cannot have non-persistent table source.
+    // So here we could use static_cast. But if we in the future want to lift this limitation,
+    // we will have to put more thoughts on this.
+    return static_cast<PersistentTable*>(deltaTable);
 }
 
 //After catalog is updated call this to ensure your export tables are connected correctly.

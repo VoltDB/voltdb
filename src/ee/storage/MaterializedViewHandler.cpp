@@ -34,8 +34,11 @@ namespace voltdb {
 
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable *destTable,
                                                      catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                                                     VoltDBEngine *engine) {
-        install(destTable, mvHandlerInfo, engine);
+                                                     VoltDBEngine *engine) :
+            m_destTable(destTable),
+            m_index(destTable->primaryKeyIndex()),
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+        install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
         setUpMinMaxQueries(mvHandlerInfo, engine);
@@ -51,14 +54,14 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        sourceTable->addViewToTrigger(this);
+        sourceTable->addViewHandlerToTrigger(this);
         m_sourceTables.push_back(sourceTable);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
         assert( ! m_sourceTables.empty());
-        sourceTable->dropViewToTrigger(this);
+        sourceTable->dropViewHandlerToTrigger(this);
         PersistentTable* lastTable = m_sourceTables.back();
         if (sourceTable != lastTable) {
             // iterator to vector element:
@@ -74,18 +77,14 @@ namespace voltdb {
         m_dirty = true;
     }
 
-    void MaterializedViewHandler::install(PersistentTable *destTable,
-                                          catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
+    void MaterializedViewHandler::install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                           VoltDBEngine *engine) {
-        m_destTable = destTable;
-        m_index = m_destTable->primaryKeyIndex();
         const std::vector<TableIndex*>& targetIndexes = m_destTable->allIndexes();
         BOOST_FOREACH(TableIndex *index, targetIndexes) {
             if (index != m_index) {
                 m_updatableIndexList.push_back(index);
             }
         }
-        m_groupByColumnCount = mvHandlerInfo->groupByColumnCount();
         // Delete the existing handler if exists. When the existing handler is destructed,
         // it will automatically removes itself from all the viewsToTrigger lists of its source tables.
         delete m_destTable->m_mvHandler;

@@ -651,9 +651,14 @@ private:
 
     void computeSmallestUniqueIndex();
 
-    void addViewToTrigger(MaterializedViewHandler *viewToTrigger);
-    void dropViewToTrigger(MaterializedViewHandler *viewToTrigger);
+    void addViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger);
+    void dropViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger);
+    // Mark all the view handlers referencing this table as dirty so they will be
+    // recreated when being visited.
+    // We use this only when a table index is added / dropped.
     void polluteViews();
+    // Insert the source tuple into this table's delta table.
+    // If there is no delta table affiliated with this table, then take no action.
     void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
 
     // CONSTRAINTS
@@ -730,8 +735,14 @@ private:
     MaterializedViewHandler *m_mvHandler;
     // If I am a source table of a view, I will notify all the relevant view handlers
     // when an update is needed.
-    std::vector<MaterializedViewHandler*> m_viewsToTrigger;
+    std::vector<MaterializedViewHandler*> m_viewHandlersToTrigger;
 
+    // The delta table is only created when a view defined on a join query is referencing this table
+    // as one of its source tables. The delta table has an identical definition of this table, including
+    // the indices. When m_deltaTableActive = true, the TableCatalogDelegate for this table will return
+    // the delta table instead of the original table.
+    // WARNING: Do not manually flip this m_deltaTableActive flag, use ScopedDeltaTableContext
+    // (currently defined in MaterializedViewHandler.h) instead.
     PersistentTable *m_deltaTable;
     bool m_deltaTableActive;
 };
