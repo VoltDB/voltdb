@@ -752,7 +752,7 @@ class ServerAPI(MethodView):
             'public-interface': request.json.get('public-interface', "").strip(),
             'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
             'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
-            'placement-group': request.json.get('placement-group', "").strip()
+            'placement-group': str(request.json.get('placement-group', "")).strip()
         }
 
         # Add server to the current database
@@ -872,7 +872,7 @@ class ServerAPI(MethodView):
             current_server['public-interface'] = \
                 request.json.get('public-interface', current_server['public-interface'])
             current_server['placement-group'] = \
-                request.json.get('placement-group', current_server['placement-group'])
+                str(request.json.get('placement-group', current_server['placement-group']))
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
