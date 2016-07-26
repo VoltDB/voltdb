@@ -26,8 +26,8 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class DRProducerStatsBase {
 
-    //  DR_CONSUMER_CLUSTER_STATS property must equal "true"
-    private static boolean m_addConsumerStats = Boolean.getBoolean("DR_CONSUMER_CLUSTER_STATS");
+    //  DR_STATS_CONSUMER_CLUSTER_ID java property must equal "true"
+    private static boolean m_addConsumerIdStat = Boolean.getBoolean("DR_STATS_CONSUMER_CLUSTER_ID");
 
     public static interface Columns {
         // column for both tables
@@ -62,7 +62,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerStats) {
+            if (m_addConsumerIdStat) {
                 columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             }
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
@@ -87,7 +87,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerStats) {
+            if (m_addConsumerIdStat) {
                 columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             }
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
