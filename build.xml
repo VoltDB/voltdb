@@ -2723,7 +2723,7 @@ DEPLOYMENT FILE SCHEMA CODE GENERATION
         description="Use JAXB to generate source from the deployment file schema">
     <delete file="${deployment.parsergen.dir}/.flagfile" />
     <exec dir="${src.gpl.dir}" executable="xjc" failonerror="true">
-        <arg line="-Xinject-code -extension -p ${deployment.parsergen.pkg} ${deployment.parsergen.xsd}" />
+        <arg line="-p ${deployment.parsergen.pkg} ${deployment.parsergen.xsd}" />
     </exec>
     <touch file="${deployment.parsergen.dir}/.flagfile" />
 </target>

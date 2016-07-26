@@ -602,14 +602,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Case where you give primed deployment with -d look in ../../ for initialized marker.
                 //Also check if parents are config and voltdbroot
                 File cfile = (new File(config.m_pathToDeployment)).getParentFile();
-                rootFH = cfile.getParentFile();
-                if ("config".equals(cfile.getName()) && VoltDB.DBROOT.equals(rootFH.getName())) {
-                    inzFH = new VoltFile(rootFH, VoltDB.INITIALIZED_MARKER);
-                    if (inzFH.exists()) {
-                        VoltDB.crashLocalVoltDB("Can not use legacy start action "
-                                + config.m_startAction + " on voltdbroot "
-                                + rootFH + " that was initialized with the init command");
-                        return;
+                if (cfile != null) {
+                    rootFH = cfile.getParentFile();
+                    if ("config".equals(cfile.getName()) && VoltDB.DBROOT.equals(rootFH.getName())) {
+                        inzFH = new VoltFile(rootFH, VoltDB.INITIALIZED_MARKER);
+                        if (inzFH.exists()) {
+                            VoltDB.crashLocalVoltDB("Can not use legacy start action "
+                                    + config.m_startAction + " on voltdbroot "
+                                    + rootFH + " that was initialized with the init command");
+                            return;
+                        }
                     }
                 }
             }
