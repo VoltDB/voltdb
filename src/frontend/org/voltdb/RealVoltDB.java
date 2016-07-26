@@ -434,6 +434,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
+    private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
+        ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        PathsType paths = deployment.getPaths();
+        String voltDbRoot = paths.getVoltdbroot().getPath();
+        String path;
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
+            nonEmptyPaths.add(path);
+        return nonEmptyPaths.build();
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config configuration that gets passed in from commandline.
@@ -2205,7 +2219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                || managedPathsWithFiles(readDepl.deployment).isEmpty();
+                || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
 
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
