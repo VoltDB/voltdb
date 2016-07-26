@@ -22,9 +22,6 @@ $(document).ready(function () {
                   }
                 });
 
-     $(".crossIconMsg").on("click",function(){
-        $(".errorMsgLocalStorageFull").hide();
-     })
 
      $( "#timeInterval" ).val( defaultValue );
 
