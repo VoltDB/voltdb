@@ -1453,9 +1453,9 @@ public class QuerySpecification extends QueryExpression {
         // Bundle up all the user defined aliases here.
         // We can't import java.util.Set because there is a Set
         // already imported into this class from Hsql itself.
-        java.util.Set<String> userAliases = new java.util.HashSet<String>();
+        java.util.Set<String> userAliases = new java.util.HashSet<>();
         // Bundle up all the generated aliases here.
-        java.util.Map<String, Integer> genAliases = new java.util.HashMap<String, Integer>();
+        java.util.Map<String, Integer> genAliases = new java.util.HashMap<>();
         for (int i = 0; i < indexLimitVisible; i++) {
             Expression expression = exprColumns[i];
             String     alias      = expression.getAlias();
@@ -2093,7 +2093,7 @@ public class QuerySpecification extends QueryExpression {
     Expression getHavingCondition() { return havingCondition; }
 
     // Display columns expressions
-    List<Expression> displayCols = new ArrayList<Expression>();
+    List<Expression> displayCols = new ArrayList<>();
 
     /**
      * Dumps the exprColumns list for this query specification.
