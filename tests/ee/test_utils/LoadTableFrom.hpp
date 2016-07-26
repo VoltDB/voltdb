@@ -63,10 +63,10 @@ namespace voltdb {
  */
 bool debug_print = false;
 TempTable *loadTableFrom(const char *buffer,
-                     size_t size,
-                     Pool * pool= NULL,
-                     ReferenceSerializeOutput *uniqueViolationOutput = NULL,
-                     bool shouldDRStreamRows = false)
+                         size_t size,
+                         Pool * pool= NULL,
+                         ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                         bool shouldDRStreamRows = false)
 {
     ReferenceSerializeInputBE result(buffer, size);
     int32_t msg_size         = result.readInt();  // message length.
