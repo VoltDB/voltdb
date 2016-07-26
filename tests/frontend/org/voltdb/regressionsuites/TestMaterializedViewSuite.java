@@ -26,8 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.net.URL;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -47,6 +45,8 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
+
+import junit.framework.Test;
 
 
 public class TestMaterializedViewSuite extends RegressionSuite {
@@ -176,15 +176,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "3", "200.0", "9");
     }
 
-    private void insertENG6511(Client client, Integer pid, Integer d1, Integer d2, Integer v1, Integer v2) throws IOException, ProcCallException
-    {
-        VoltTable[] results = null;
-
-        results = client.callProcedure("ENG6511.insert", pid, d1, d2, v1, v2).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
-    }
-
     private void assertTableContentEquals(VoltTable[] ra, VoltTable[] rb)
     {
         assertEquals(1, ra.length);
@@ -251,27 +242,27 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         truncateBeforeTest(client);
         int pid = singlePartition ? 1 : 2;
 
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, pid, 1, 3, 9, 70);
-        insertENG6511(client, pid, 1, 3, 256, 412);
-        insertENG6511(client, pid, 1, 3, 70, -46);
+        insertRow(client, "ENG6511", 1, 1, 3, 70, 46);
+        insertRow(client, "ENG6511", 1, 1, 3, 70, 46);
+        insertRow(client, "ENG6511", 1, 1, 3, 12, 66);
+        insertRow(client, "ENG6511", pid, 1, 3, 9, 70);
+        insertRow(client, "ENG6511", pid, 1, 3, 256, 412);
+        insertRow(client, "ENG6511", pid, 1, 3, 70, -46);
 
-        insertENG6511(client, 1, 1, 4, 17, 218);
-        insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, pid, 1, 4, 48, 65);
-        insertENG6511(client, pid, 1, 4, -48, 70);
+        insertRow(client, "ENG6511", 1, 1, 4, 17, 218);
+        insertRow(client, "ENG6511", 1, 1, 4, 25, 28);
+        insertRow(client, "ENG6511", pid, 1, 4, 48, 65);
+        insertRow(client, "ENG6511", pid, 1, 4, -48, 70);
 
-        insertENG6511(client, 1, 2, 5, -71, 75);
-        insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, pid, 2, 5, 64, 16);
-        insertENG6511(client, pid, 2, 5, null, 91);
+        insertRow(client, "ENG6511", 1, 2, 5, -71, 75);
+        insertRow(client, "ENG6511", 1, 2, 5, -4, 5);
+        insertRow(client, "ENG6511", pid, 2, 5, 64, 16);
+        insertRow(client, "ENG6511", pid, 2, 5, null, 91);
 
-        insertENG6511(client, 1, 2, 6, -9, 85);
-        insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, pid, 2, 6, 21, -51);
-        insertENG6511(client, pid, 2, 6, null, 17);
+        insertRow(client, "ENG6511", 1, 2, 6, -9, 85);
+        insertRow(client, "ENG6511", 1, 2, 6, 38, 43);
+        insertRow(client, "ENG6511", pid, 2, 6, 21, -51);
+        insertRow(client, "ENG6511", pid, 2, 6, null, 17);
         verifyENG6511(client);
 
         runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
@@ -663,18 +654,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
 
-        results = client.callProcedure("DEPT_PEOPLE.insert", 1, 1L, 31L, 1000.00, 3).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 2, 1L, 31L, 900.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 3, 1L, 31L, 900.00, 1).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 4, 1L, 31L, 2500.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
+        insertRow(client, "DEPT_PEOPLE", 1, 1L, 31L, 1000.00, 3);
+        insertRow(client, "DEPT_PEOPLE", 2, 1L, 31L, 900.00, 5);
+        insertRow(client, "DEPT_PEOPLE", 3, 1L, 31L, 900.00, 1);
+        insertRow(client, "DEPT_PEOPLE", 4, 1L, 31L, 2500.00, 5);
 
         VoltTable t;
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_AGE_MATVIEW").getResults();
@@ -752,18 +735,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
 
-        results = client.callProcedure("DEPT_PEOPLE.insert", 1, 1L, 31L, 1000.00, 3).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 2, 1L, 31L, 900.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 3, 1L, 31L, 900.00, 1).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 4, 1L, 31L, 2500.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
+        insertRow(client, "DEPT_PEOPLE", 1, 1L, 31L, 1000.00, 3);
+        insertRow(client, "DEPT_PEOPLE", 2, 1L, 31L, 900.00, 5);
+        insertRow(client, "DEPT_PEOPLE", 3, 1L, 31L, 900.00, 1);
+        insertRow(client, "DEPT_PEOPLE", 4, 1L, 31L, 2500.00, 5);
 
         VoltTable t;
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_AGE_FILTER_MATVIEW").getResults();
@@ -1206,45 +1181,30 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         int delay = 0; // keeps the clock moving forward.
         // +1 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-        results = client.callProcedure("CONTEST.insert",
-            "Senior", timestampInitializer, "Boston", "Jack").getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
+        insertRow(client, "CONTEST", "Senior", timestampInitializer, "Boston", "Jack");
 
         // +1 V_TEAM_MEMBERSHIP, +4 V_TEAM_TIMES
         for (ii = 0; ii < 4; ++ii) {
             timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Cambridge", "anonymous " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Cambridge", "anonymous " + ii);
         }
 
         // +0 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
         for (ii = 0; ii < 3; ++ii) {
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Boston",  "not Jack " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Boston",  "not Jack " + ii);
         }
 
         // +1 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
         for (ii = 0; ii < 3; ++ii) {
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Concord", "Emerson " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Concord", "Emerson " + ii);
         }
 
         // +1 V_TEAM_MEMBERSHIP, +2 V_TEAM_TIMES
         for (ii = 0; ii < 2; ++ii) {
             timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Lexington", "Luis " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Lexington", "Luis " + ii);
         }
 
         if ( ! isHSQL()) {
@@ -1269,13 +1229,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         /**
          * Current data in MV table: V_TEAM_MEMBERSHIP.
          *  header size: 39
-             status code: -128 column count: 3
-             cols (RUNNER_CLASS:STRING), (TEAM:STRING), (TOTAL:INTEGER),
-             rows -
-              Senior,Boston,4
-              Senior,Cambridge,4
-              Senior,Concord,3
-              Senior,Lexington,2
+         *   status code: -128 column count: 3
+         *   cols (RUNNER_CLASS:STRING), (TEAM:STRING), (TOTAL:INTEGER),
+         *   rows -
+         *    Senior,Boston,4
+         *    Senior,Cambridge,4
+         *    Senior,Concord,3
+         *    Senior,Lexington,2
          */
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
@@ -1445,6 +1405,21 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(0, (int)(t.getDouble(3)));
         assertEquals(10, t.getLong(4));
 
+    }
+
+    private void insertRow(Client client, String tableName, Object... parameters) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+
+        results = client.callProcedure(tableName + ".insert", parameters).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    public void testViewOnJoinQuery() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        truncateBeforeTest(client);
     }
 
     /**
