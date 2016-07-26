@@ -221,12 +221,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     boolean m_jsonEnabled;
 
     // IV2 things
-    TreeMap<Integer, Initiator> m_iv2Initiators = new TreeMap<Integer, Initiator>();
+    TreeMap<Integer, Initiator> m_iv2Initiators = new TreeMap<>();
     Cartographer m_cartographer = null;
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
-    Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<Integer, Long>();
+    Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<>();
     private ScheduledFuture<?> resMonitorWork;
 
 
@@ -712,7 +712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
-            m_partitionsToSitesAtStartupForExportInit = new ArrayList<Integer>();
+            m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
@@ -748,7 +748,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
                 // Pass the local HSIds to the MPI so it can farm out buddy sites
                 // to the RO MP site pool
-                List<Long> localHSIds = new ArrayList<Long>();
+                List<Long> localHSIds = new ArrayList<>();
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
@@ -756,7 +756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join
-                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<Integer, Long>();
+                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
                 for (Initiator init : m_iv2Initiators.values()) {
                     if (init.isRejoinable()) {
                         partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
@@ -1136,7 +1136,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // First check to make sure that the cluster still is viable before
                     // before allowing the fault log to be updated by the notifications
                     // generated below.
-                    Set<Integer> hostsOnRing = new HashSet<Integer>();
+                    Set<Integer> hostsOnRing = new HashSet<>();
                     if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
                         VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
@@ -1410,7 +1410,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 StartAction startAction,
                                                 List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
-        TreeMap<Integer, Initiator> initiators = new TreeMap<Integer, Initiator>();
+        TreeMap<Integer, Initiator> initiators = new TreeMap<>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
@@ -1460,7 +1460,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return topo;
     }
 
-    private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
+    private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<>();
 
 
     /**
@@ -1890,6 +1890,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             0, //timestamp
                             catalog,
                             new byte[] {},
+                            null,
                             deploymentBytes,
                             0);
 
@@ -2077,7 +2078,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              */
 
             if (m_config.m_externalInterface.equals("")) {
-                LinkedList<NetworkInterface> interfaces = new LinkedList<NetworkInterface>();
+                LinkedList<NetworkInterface> interfaces = new LinkedList<>();
                 try {
                     Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
                     while (intfEnum.hasMoreElements()) {
@@ -2327,14 +2328,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Error creating \"/cluster_metadata\" node in ZK", true, e);
         }
 
-        Map<Integer, String> clusterMetadata = new HashMap<Integer, String>(0);
+        Map<Integer, String> clusterMetadata = new HashMap<>(0);
         /*
          * Spin and attempt to retrieve cluster metadata for all nodes in the cluster.
          */
-        Set<Integer> metadataToRetrieve = new HashSet<Integer>(m_messenger.getLiveHostIds());
+        Set<Integer> metadataToRetrieve = new HashSet<>(m_messenger.getLiveHostIds());
         metadataToRetrieve.remove(m_messenger.getHostId());
         while (!metadataToRetrieve.isEmpty()) {
-            Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<Integer, ZKUtil.ByteArrayCallback>();
+            Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<>();
             for (Integer hostId : metadataToRetrieve) {
                 ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
                 zk.getData(VoltZK.cluster_metadata + "/" + hostId, false, cb, null);
@@ -2672,7 +2673,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     /** Associate transaction ids to contexts */
     private final HashMap<Long, ContextTracker>m_txnIdToContextTracker =
-        new HashMap<Long, ContextTracker>();
+        new HashMap<>();
 
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
@@ -2728,6 +2729,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             currentTxnId,
                             currentTxnUniqueId,
                             newCatalogBytes,
+                            catalogBytesHash,
                             diffCommands,
                             true,
                             deploymentBytes);
@@ -2751,7 +2753,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
                 List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
 
-                List<Integer> partitions = new ArrayList<Integer>();
+                List<Integer> partitions = new ArrayList<>();
                 for (Long site : sites) {
                     Integer partition = siteTracker.getPartitionForSite(site);
                     partitions.add(partition);

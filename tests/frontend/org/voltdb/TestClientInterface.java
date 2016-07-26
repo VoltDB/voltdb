@@ -99,7 +99,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
-    private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<DeferredSerialization>();
+    private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<>();
     private int drStatsInvoked = 0;
     private StatsAgent m_statsAgent = new StatsAgent() {
         @Override
@@ -138,8 +138,8 @@ public class TestClientInterface {
 
     }
 
-    BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<ByteBuffer>();
-    BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+    BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<>();
+    BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<>();
     private static final ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
 
     @Before
@@ -153,8 +153,8 @@ public class TestClientInterface {
         m_cartographer = mock(Cartographer.class);
 
         m_zk = mock(ZooKeeper.class);
-        responses = new LinkedTransferQueue<ByteBuffer>();
-        responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+        responses = new LinkedTransferQueue<>();
+        responsesDS = new LinkedTransferQueue<>();
         //m_cxn = mock(SimpleClientResponseAdapter.class);
         drStatsInvoked = 0;
         m_cxn = new SimpleClientResponseAdapter(0, "foo") {
@@ -233,7 +233,7 @@ public class TestClientInterface {
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
 
-        m_context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
+        m_context = new CatalogContext(0, 0, catalog, bytes, null, new byte[] {}, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
@@ -825,7 +825,7 @@ public class TestClientInterface {
         assertEquals(3, vt.getRowCount());
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
 
-        Set<Integer> partitions = new HashSet<Integer>(Arrays.asList( 0, 1, 2));
+        Set<Integer> partitions = new HashSet<>(Arrays.asList( 0, 1, 2));
         while (vt.advanceRow()) {
             int partition = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), vt.getLong(1));
             assertTrue(partitions.remove(partition));

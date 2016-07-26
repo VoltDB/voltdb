@@ -84,7 +84,7 @@ public class MockVoltDB implements VoltDBInterface
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
-            new HashMap<MailboxType, List<MailboxNodeContent>>();
+            new HashMap<>();
     private boolean m_replicationActive = false;
 
     public MockVoltDB() {
@@ -273,7 +273,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, null, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
