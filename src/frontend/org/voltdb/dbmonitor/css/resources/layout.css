@@ -3783,6 +3783,10 @@ label.errorTimeOut {
 .sliderMain { position:relative; top:3px;}
 .downloadBtnChart { float: right;margin-right: 10px;position: relative; top: -4px;}
 #timeInterval {border:0; color:#222; font-weight:bold; width:24px;}
+.errorMsgLocalStorageFull { background:#fff; padding:10px 20px; margin-bottom:10px; position:relative;}
+.errorMsgLocalStorageFull p { color:#ff0000; font-weight:bold; position:relative; top:2px; float:left; font-size:13px;}
+.errorMsgLocalStorageFull img { float:left; padding-right:5px;}
+.crossIconMsg { }
 /*.sliderPop {margin-bottom: 10px;}
 .sliderControl { margin:0; padding:0;}
 .sliderControl .ui-slider .ui-slider-handle {outline:none; border-radius:1px; border:1px solid #ccc!important; }

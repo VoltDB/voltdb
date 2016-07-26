@@ -1408,10 +1408,15 @@
                     cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
                     cpuDetailsArr = MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
                 }
-
-                localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
-                localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
-                localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
+                try{
+                    $(".errorMsgLocalStorageFull").hide();
+                    localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
+                    localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
+                    localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
+                }
+                catch(e){
+                    $(".errorMsgLocalStorageFull").show();
+                }
                 MonitorGraphUI.Monitors.cpuData = cpuData;
                 monitor.cpuFirstData = false;
 
