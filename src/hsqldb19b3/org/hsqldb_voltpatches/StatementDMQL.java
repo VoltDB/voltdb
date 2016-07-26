@@ -32,7 +32,6 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.hsqldb_voltpatches.Expression.SimpleColumnContext;
@@ -852,7 +851,7 @@ public abstract class StatementDMQL extends Statement {
          * inference.
          */
         public static <T extends Comparable<T>, U> Pair<T, U> of(T x, U y) {
-            return new Pair<T, U>(x, y);
+            return new Pair<>(x, y);
         }
     }
     /**
@@ -1076,11 +1075,11 @@ public abstract class StatementDMQL extends Statement {
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
 
-        java.util.ArrayList<Expression> orderByCols = new java.util.ArrayList<Expression>();
-        java.util.ArrayList<Expression> groupByCols = new java.util.ArrayList<Expression>();
+        java.util.ArrayList<Expression> orderByCols = new java.util.ArrayList<>();
+        java.util.ArrayList<Expression> groupByCols = new java.util.ArrayList<>();
         select.displayCols.clear();
         java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>> aliases =
-                new java.util.ArrayList<Pair<Integer, HsqlNameManager.SimpleName>>();
+                new java.util.ArrayList<>();
 
         /*
          * select.exprColumn stores all of the columns needed by HSQL to
@@ -1255,7 +1254,7 @@ public abstract class StatementDMQL extends Statement {
      * the OUTER table - if it's a null-able column the outer join must return them.
      * In case of a FULL join, a USING column expression must be replaced with the
      * COALESCE(leftTable.C, rightTable.C) expression.
-     * 
+     *
      * @param elements list of expression columns to resolve
      * @param rv list of range variables
      */

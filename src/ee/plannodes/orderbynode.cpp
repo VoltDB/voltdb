@@ -67,29 +67,7 @@ std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
 
 void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
-
-    for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
-        PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
-        bool hasDirection = false, hasExpression = false;
-
-        if (sortColumn.hasNonNullKey("SORT_DIRECTION")) {
-            hasDirection = true;
-            std::string sortDirectionStr = sortColumn.valueForKey("SORT_DIRECTION").asStr();
-            m_sortDirections.push_back(stringToSortDirection(sortDirectionStr));
-        }
-        if (sortColumn.hasNonNullKey("SORT_EXPRESSION")) {
-            hasExpression = true;
-            PlannerDomValue exprDom = sortColumn.valueForKey("SORT_EXPRESSION");
-            m_sortExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
-        }
-
-        if (!(hasExpression && hasDirection)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "OrderByPlanNode::loadFromJSONObject:"
-                                          " Does not have expression and direction.");
-        }
-    }
+    loadSortListFromJSONObject(obj, &m_sortExpressions, &m_sortDirections);
 }
 
 } // namespace voltdb
