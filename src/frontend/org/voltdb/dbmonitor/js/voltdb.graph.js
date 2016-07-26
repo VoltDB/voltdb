@@ -1457,15 +1457,13 @@
             var values = data[keyIndex].values
             var slicedData = []
             var interval = (sliderValue * 60) / timeUnit
-            if (sliderValue != 0){
-                if (values.length >= interval){
-                    slicedData = values.slice(1,  (values.length - (values.length - interval)))
-                } else {
-                    slicedData = values
-                }
-                slicedData.push(newItem)
-                data[keyIndex].values = slicedData
+            if (values.length >= interval){
+                slicedData = values.slice(1,  (values.length - (values.length - interval)))
+            } else {
+                slicedData = values
             }
+            slicedData.push(newItem)
+            data[keyIndex].values = slicedData
             return data;
         }
 
