@@ -29,7 +29,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.Consistency;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -111,7 +110,7 @@ public class RepairLog
             if (isSP() && m_handle <= handle) {
                 return true;
             }
-            else if (isMP() && m_txnId <= handle) {
+            if (isMP() && m_txnId <= handle) {
                 return true;
             }
             return false;
@@ -157,58 +156,65 @@ public class RepairLog
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-
+        boolean isShortcutReadBySetting = m_defaultConsistencyReadLevel.hasShortcutRead();
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
 
-            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
+            boolean shortcutRead = m.isReadOnly() && isShortcutReadBySetting;
+            if (shortcutRead) {
+                return;
+            }
             // We can't repair shortcut-read SP transactions due to their short-circuited nature.
             // Just don't log them to the repair log.
-            if (!shortcutRead) {
-                m_lastSpHandle = m.getSpHandle();
-                truncate(m.getTruncationHandle(), IS_SP);
-                m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
-            }
-        } else if (msg instanceof FragmentTaskMessage) {
+
+            m_lastSpHandle = m.getSpHandle();
+            truncate(m.getTruncationHandle(), IS_SP);
+            m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+            return;
+        }
+        if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;
 
-            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
-            if (!shortcutRead) {
-                truncate(m.getTruncationHandle(), IS_MP);
-                // only log the first fragment of a procedure (and handle 1st case)
-                if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                    m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-                    m_lastMpHandle = m.getTxnId();
-                    m_lastSpHandle = m.getSpHandle();
-                }
+            boolean shortcutRead = m.isReadOnly() && isShortcutReadBySetting;
+            if (shortcutRead) {
+                return;
             }
+            truncate(m.getTruncationHandle(), IS_MP);
+            // only log the first fragment of a procedure (and handle 1st case)
+            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                m_lastMpHandle = m.getTxnId();
+                m_lastSpHandle = m.getSpHandle();
+            }
+            return;
         }
-        else if (msg instanceof CompleteTransactionMessage) {
+        if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
 
-            boolean shortcutRead = ctm.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
-            if (!shortcutRead && !ctm.isRestart()) {
-                truncate(ctm.getTruncationHandle(), IS_MP);
-                m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
-                //Restore will send a complete transaction message with a lower mp transaction id because
-                //the restore transaction precedes the loading of the right mp transaction id from the snapshot
-                //Hence Math.max
-                m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
-                m_lastSpHandle = ctm.getSpHandle();
+            boolean shortcutRead = ctm.isReadOnly() && isShortcutReadBySetting;
+            if (shortcutRead || ctm.isRestart()) {
+                return;
             }
+
+            truncate(ctm.getTruncationHandle(), IS_MP);
+            m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+            m_lastSpHandle = ctm.getSpHandle();
+            return;
         }
-        else if (msg instanceof DumpMessage) {
+        if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
             tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader);
             tmLog.warn("" + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
                tmLog.warn("" + who + ": msg: " + il);
             }
+            return;
         }
     }
 

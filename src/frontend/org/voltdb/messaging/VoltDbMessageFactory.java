@@ -17,6 +17,7 @@
 
 package org.voltdb.messaging;
 
+import org.voltcore.messaging.TruncationHandleMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.messaging.VoltMessageFactory;
 import org.voltdb.rejoin.RejoinDataAckMessage;
@@ -46,6 +47,8 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte MP_REPLAY_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 20;
     final public static byte SNAPSHOT_CHECK_REQUEST_ID = VOLTCORE_MESSAGE_ID_MAX + 21;
     final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
+
+    final public static byte TRUNCATION_HANDLE_ID = VOLTCORE_MESSAGE_ID_MAX + 23;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -124,6 +127,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case SNAPSHOT_CHECK_RESPONSE_ID:
             message = new SnapshotCheckResponseMessage();
+            break;
+        case TRUNCATION_HANDLE_ID:
+            message = new TruncationHandleMessage();
             break;
         default:
             message = null;

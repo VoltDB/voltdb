@@ -82,6 +82,9 @@
     <xs:restriction base="xs:string"> 
       <xs:enumeration value="fast"/>
       <xs:enumeration value="safe"/>
+      <xs:enumeration value="safe_1"/>
+      <xs:enumeration value="safe_2"/>
+      <xs:enumeration value="safe_3"/>
     </xs:restriction>
   </xs:simpleType>
   

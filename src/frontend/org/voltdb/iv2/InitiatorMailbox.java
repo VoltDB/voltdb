@@ -260,10 +260,11 @@ public class InitiatorMailbox implements Mailbox
                     }
                 }
             });
-        } else {
-            synchronized (this) {
-                deliverInternal(message);
-            }
+            return;
+        }
+
+        synchronized (this) {
+            deliverInternal(message);
         }
     }
 
@@ -283,11 +284,11 @@ public class InitiatorMailbox implements Mailbox
             handleLogRequest(message);
             return;
         }
-        else if (message instanceof Iv2RepairLogResponseMessage) {
+        if (message instanceof Iv2RepairLogResponseMessage) {
             m_algo.deliver(message);
             return;
         }
-        else if (message instanceof RejoinMessage) {
+        if (message instanceof RejoinMessage) {
             m_joinProducer.deliver((RejoinMessage) message);
             return;
         }
