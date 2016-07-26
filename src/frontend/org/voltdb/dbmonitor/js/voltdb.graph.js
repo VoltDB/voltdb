@@ -1408,6 +1408,7 @@
                     cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
                     cpuDetailsArr = MonitorGraphUI.saveLocalStorage(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
                 }
+
                 localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
                 localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
                 localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
@@ -1440,12 +1441,14 @@
             var sliderValue = $( "#slider-range-min" ).slider( "value" )
             var slicedData = []
             var interval = (sliderValue * 60) / timeUnit
-            if (data.length >= interval){
-                slicedData = data.slice(1,  (data.length - (data.length - interval)))
-            } else {
-                slicedData = data
-            }
+            if (sliderValue != 0){
+                if (data.length >= interval){
+                    slicedData = data.slice(1,  (data.length - (data.length - interval)))
+                } else {
+                    slicedData = data
+                }
             slicedData.push(newItem)
+            }
             return slicedData;
         }
 
@@ -1454,13 +1457,15 @@
             var values = data[keyIndex].values
             var slicedData = []
             var interval = (sliderValue * 60) / timeUnit
-            if (values.length >= interval){
-                slicedData = values.slice(1,  (values.length - (values.length - interval)))
-            } else {
-                slicedData = values
+            if (sliderValue != 0){
+                if (values.length >= interval){
+                    slicedData = values.slice(1,  (values.length - (values.length - interval)))
+                } else {
+                    slicedData = values
+                }
+                slicedData.push(newItem)
+                data[keyIndex].values = slicedData
             }
-            slicedData.push(newItem)
-            data[keyIndex].values = slicedData
             return data;
         }
 
@@ -1563,11 +1568,9 @@
                                 var keyIndex = dataMapperMin[keyValue];
                                 partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.partitionMaxTimeStamp) {
-//                                    var newObject = {"values": [{"x": new Date(timestamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }]};
                                     partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
                                     partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, MonitorGraphUI.timeUnit.min, keyIndex)
                                 } else {
-//                                    var newObject = { "color": partitionDataMin[keyIndex].color , "key": partitionDataMin[keyIndex].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
                                     partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                                     partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.min, keyIndex)
                                 }
@@ -1579,11 +1582,9 @@
                             var keyIndexDay = dataMapperDay[keyValue];
                             partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.partitionMaxTimeStamp) {
-//                                var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{"x": new Date(timestamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }]};
                                 partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
                                 partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                             } else {
-//                                 var newObject = { "color": partitionDataDay[keyIndexDay].color , "key": partitionDataDay[keyIndexDay].key, "values": [{ 'x': new Date(timeStamp), 'y': percentValue }]};
                                 partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
                                 partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.day, keyIndexDay)
                             }
@@ -1594,11 +1595,9 @@
 
                         partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.partitionMaxTimeStamp) {
-//                            var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{"x": new Date(timestamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }]};
                             partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
                             partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, MonitorGraphUI.timeUnit.sec, keyIndexSec)
                         } else {
-//                             var newObject = { "color": partitionData[keyIndexSec].color , "key": partitionData[keyIndexSec].key, "values": [{'x': new Date(timeStamp), 'y': percentValue }]}
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
                             partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, MonitorGraphUI.timeUnit.sec, keyIndexSec  )
 
@@ -1792,8 +1791,6 @@
                 if(cmdLogArr.length != 0)
                     cmdLogData = []
                 for(var i = 0; i< cmdLogArr.length; i++){
-                    //sliceFirstData(monitor.cmdLogData, dataView.Seconds);
-
                     cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
                         "y": cmdLogArr[i].outstandingTxn
                     })
@@ -1801,7 +1798,6 @@
                 if(cmdLogArrMin.length != 0)
                     cmdLogDataMin = []
                 for(var j = 0; j< cmdLogArrMin.length; j++){
-                    //sliceFirstData(monitor.cmdLogDataMin, dataView.Minutes);
                     cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
                         "y": cmdLogArrMin[j].outstandingTxn
                     })
@@ -1809,7 +1805,6 @@
                 if(cmdLogArrDay.length != 0)
                     cmdLogDataDay = []
                 for(var k = 0; k< cmdLogArrDay.length; k++){
-                    //sliceFirstData(monitor.cmdLogDataDay, dataView.Days);
                     cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
                         "y": cmdLogArrDay[k].outstandingTxn
                     })

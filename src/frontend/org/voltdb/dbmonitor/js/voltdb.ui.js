@@ -14,7 +14,7 @@ $(document).ready(function () {
      $( "#slider-range-min" ).slider({
                   range: "min",
                   value: defaultValue,
-                  min: 1,
+                  min: 0,
                   max: 100,
                   slide: function( event, ui ) {
                     $( "#timeInterval" ).val(ui.value );
