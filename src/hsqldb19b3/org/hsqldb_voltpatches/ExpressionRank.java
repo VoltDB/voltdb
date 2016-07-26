@@ -107,6 +107,7 @@ public class ExpressionRank extends Expression {
             Expression e = (Expression) m_sortAndSlice.exprList.get(i);
             e.resolveTypes(session, parent);
         }
+        dataType = Type.SQL_BIGINT;
     }
 
     @Override
