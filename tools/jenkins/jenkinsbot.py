@@ -14,7 +14,7 @@ import mysql.connector
 
 from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
-#Used for pretty printing tables
+# Used for pretty printing tables
 from tabulate import tabulate
 
 # Get job names from environment variables
@@ -32,7 +32,6 @@ ADMIN_CHANNEL = os.environ.get('admin', None)
 # Other channels
 GENERAL_CHANNEL = os.environ.get('general', None)
 RANDOM_CHANNEL = os.environ.get('random', None)
-
 
 # Queries
 
@@ -154,7 +153,7 @@ ORDER BY 5 DESC
 # All Failures - See all failures for a job over time and view them as most recent.
 AF_QUERY = ("""
   SELECT tf.name AS 'Test name',
-         tf.build as 'Build',
+         tf.build AS 'Build',
          tf.stamp AS 'Time'
     FROM `junit-test-failures` AS tf
    WHERE NOT STATUS='FIXED' AND
@@ -162,14 +161,13 @@ AF_QUERY = ("""
 ORDER BY 2 DESC
 """)
 
-class JenkinsBot(object):
 
+class JenkinsBot(object):
     def __init__(self):
         self.client = None
         self.logfile = 'jenkinslog.txt'
 
     def log(self, message):
-        size = 1 << 30
         message = str(message)
         try:
             size = os.path.getsize(self.logfile)
@@ -184,7 +182,10 @@ class JenkinsBot(object):
         else:
             self.post_message(ADMIN_CHANNEL, 'Log file too large.')
 
-    def connect(self):
+    def connect_to_slack(self):
+        """
+        :return: true if token for bot exists, client was created, and bot connected to Real Time Messaging
+        """
         token = os.environ.get('token', None)
         if token is None:
             self.log('Could not retrieve token for jenkinsbot')
@@ -200,6 +201,10 @@ class JenkinsBot(object):
         return True
 
     def can_reply(self, incoming):
+        """
+        :param incoming: A dictionary describing what data is incoming to the bot
+        :return: true if bot can act on incoming data
+        """
         return (len(incoming) > 0 and incoming[0].get('text', None) is not None
                 and incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None
                 and incoming[0]['channel'] != GENERAL_CHANNEL and incoming[0]['channel'] != RANDOM_CHANNEL)
@@ -214,17 +219,18 @@ class JenkinsBot(object):
                      'See which tests are failing in the past x days:\n\t*days* <job> <days> \n',
                      'Failing the most in this build range:\n\t*build-range* <job> <build #>-<build #>\n',
                      'Most recent failure on master:\n\t*test-on-master* <job> <testname> (ex. testname: org.voltdb.iv2'
-                         '..)\n',
+                     '..)\n',
                      'All failures for a job:\n\t*all-failures* <job>\n',
                      'Display this help:\n\t*help*\n'
                      'For any <job>, you can specify *"pro"* or *"com"* for the master jobs\n',
                      'Examples: test-leaderboard pro 860, days com 14\n']
 
         while True:
+            channel = ""
             try:
                 # Wait for and respond to incoming data that is: text, not from a bot, not a file.
                 incoming = list(self.client.rtm_read())
-                if (self.can_reply(incoming)):
+                if self.can_reply(incoming):
                     text = incoming[0]['text']
                     channel = incoming[0]['channel']
                     if 'end-session' in text:
@@ -246,30 +252,30 @@ class JenkinsBot(object):
                                 'job': job,
                                 'test': args[2],
                             }
-                            self.query_and_response(TOM_QUERY, params, [channel],
-                                                    '%s-testonmaster.txt' % (args[2]))
+                            table = self.query([channel], TOM_QUERY, params)
+                            self.response(table, [channel], '%s-testonmaster.txt' % (args[2]))
                         elif 'all-failures' in text:
                             params = {
                                 'job': job
                             }
-                            self.query_and_response(AF_QUERY, params, [channel],
-                                                    '%s-allfailures.txt' % (job))
+                            table = self.query([channel], AF_QUERY, params)
+                            self.response(table, [channel], '%s-allfailures.txt' % job)
                         elif 'days' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'days': args[2]
                             }
-                            self.query_and_response(D_QUERY, params, [channel],
-                                                    '%s-leaderboard-past-%s-days.txt' % (job, args[2]))
+                            table = self.query([channel], D_QUERY, params)
+                            self.response(table, [channel], '%s-leaderboard-past-%s-days.txt' % (job, args[2]))
                         elif 'test-leaderboard' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'beginning': args[2]
                             }
-                            self.query_and_response(TL_QUERY, params, [channel],
-                                                    '%s-testleaderboard-from-%s.txt' % (job, args[2]))
+                            table = self.query([channel], TL_QUERY, params)
+                            self.response(table, [channel], '%s-testleaderboard-from-%s.txt' % (job, args[2]))
                         elif 'build-range' in text:
                             args = text.split(' ')
                             builds = args[2].split('-')
@@ -278,21 +284,22 @@ class JenkinsBot(object):
                                 'build_low': builds[0],
                                 'build_high': builds[1]
                             }
-                            self.query_and_response(BR_QUERY, params, [channel],
-                                                    '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
+                            table = self.query([channel], BR_QUERY, params)
+                            self.response(table, [channel], '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
             except (KeyboardInterrupt, SystemExit):
                 self.log('Turning off the bot')
                 self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
                 return
             except IndexError as error:
                 self.log(error)
-                self.post_message(channel, 'Incorrect number or formatting of arguments\n\n' + ''.join(help_text))
+                if channel:
+                    self.post_message(channel, 'Incorrect number or formatting of arguments\n\n' + ''.join(help_text))
             except Exception as error:
                 self.log('Something unexpected went wrong')
                 self.log(error)
 
                 # Try to reconnect
-                if not self.connect():
+                if not self.connect_to_slack():
                     self.log('Could not connect to Slack')
                     self.log('Turning off the bot')
                     self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
@@ -301,10 +308,19 @@ class JenkinsBot(object):
             # Slow but reconfigurable
             time.sleep(1)
 
-    def query_and_response(self, query, params, channels, filename, retry=False):
+    def query(self, channels, query, params, is_retry=False):
         """
-        Make a query then upload a text file with tables to the channels.
+        Make a query and return a table
+        :param channels: Channels this query is for
+        :param query: Query to execute
+        :param params: Parameters for the query
+        :param is_retry: If this call of the query is a retry
+        :return: Tuple of (headers, rows) as results
         """
+
+        table = ""
+        cursor = None
+        database = None
 
         try:
             database = mysql.connector.connect(host=os.environ.get('dbhost', None),
@@ -312,25 +328,10 @@ class JenkinsBot(object):
                                                password=os.environ.get('dbpass', None),
                                                database=os.environ.get('dbdb', None))
             cursor = database.cursor()
-
             cursor.execute(query, params)
             headers = list(cursor.column_names)
-            table = cursor.fetchall()
-            leaderboard = list(table) # Copy table
-
-            if os.environ.get('edit', False):
-                # Do some specific edits.
-                self.edit_leaderboard(leaderboard)
-
-            content = tabulate(leaderboard, headers)
-
-            if os.environ.get('vertical', False):
-                # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
-                content = content + '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(headers, table)
-
-            self.client.api_call(
-                'files.upload', channels=channels, content=content, filetype='text', filename=filename
-            )
+            rows = cursor.fetchall()
+            table = (headers, rows)
 
         except MySQLError as error:
             self.log('Could not connect to database')
@@ -342,49 +343,98 @@ class JenkinsBot(object):
             self.log(error)
 
             # Try to reconnect only once
-            if self.connect() and retry == False:
-                self.query_and_response(query, params, channels, filename, retry=True)
+            if self.connect_to_slack() and not is_retry:
+                table = self.query(query, params, True)
         finally:
-            cursor.close()
-            database.close()
+            if cursor is not None:
+                cursor.close()
+            if database is not None:
+                database.close()
 
-    def vertical_leaderboard(self, headers, table):
+        return table
+
+    def response(self, tables, channels, filename):
+        """
+        Respond to a file to a channel
+        :param tables: List of (header, rows) tuples i.e. tables to construct leaderboards from
+        :param channels: The channels to post this file to
+        :param filename: The filename to respond with
+        """
+
+        filecontent = ""
+        for headers, rows in tables:
+            content = ""
+            if os.environ.get('vertical', False):
+                # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
+                content = '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(rows, headers)
+
+            if os.environ.get('edit', False):
+                # Do some specific edits.
+                self.edit_rows(rows)
+
+            # Prepend leaderboard which might have edited rows.
+            content = tabulate(rows, headers) + content
+            filecontent = filecontent + content
+
+        self.client.api_call(
+            'files.upload', channels=channels, content=filecontent, filetype='text', filename=filename
+        )
+
+    def vertical_leaderboard(self, rows, headers):
         """
         Displays each row in the table as one over the other. Similar to mysql's '\G'
+        :param headers: Column names for the table
+        :param rows: List of tuples representing the rows
+        :return: A string representing the table vertically
         """
-        table_str = ''
-        for i, row in enumerate(table):
-            table[i] = list(row)
-            table_str += '%d\n' % (i+1)
-            for j,entry in enumerate(row):
-                table_str += headers[j] + ': ' + str(entry) + '\n'
-            table_str += '\n\n'
-        return table_str
+        table = ''
+        for i, row in enumerate(rows):
+            rows[i] = list(row)
+            table += '%d\n' % (i + 1)
+            for j, entry in enumerate(row):
+                table += headers[j] + ': ' + str(entry) + '\n'
+            table += '\n\n'
+        return table
 
-    def edit_leaderboard(self, leaderboard):
+    def edit_rows(self, rows):
         """
-        Edit the leaderboard to fit on most screens.
+        Edit the rows to fit on most screens.
+        :param rows: Rows to edit. This method is specific to ML_QUERY and CL_QUERY
         """
-        for i, row in enumerate(leaderboard):
-            leaderboard[i] = list(row)
-            leaderboard[i][0] = leaderboard[i][0].replace('branch-2-', '')
-            leaderboard[i][0] = leaderboard[i][0].replace('test-', '')
-            leaderboard[i][0] = leaderboard[i][0].replace('nextrelease-', '')
-            leaderboard[i][1] = leaderboard[i][1].replace('org.voltdb.', '')
-            leaderboard[i][1] = leaderboard[i][1].replace('org.voltcore.', '')
-            leaderboard[i][1] = leaderboard[i][1].replace('regressionsuites.', '')
+        for i, row in enumerate(rows):
+            rows[i] = list(row)
+            rows[i][0] = rows[i][0].replace('branch-2-', '')
+            rows[i][0] = rows[i][0].replace('test-', '')
+            rows[i][0] = rows[i][0].replace('nextrelease-', '')
+            rows[i][1] = rows[i][1].replace('org.voltdb.', '')
+            rows[i][1] = rows[i][1].replace('org.voltcore.', '')
+            rows[i][1] = rows[i][1].replace('regressionsuites.', '')
 
     def post_message(self, channel, text):
         """
         Post a message on the channel.
+        :param channel: Channel to post message to
+        :param text: Text in message
         """
         self.client.api_call(
             'chat.postMessage', channel=channel, text=text, as_user=True
         )
 
+    def query_and_response(self, query, params, channels, filename):
+        """
+        Perform a single query and response
+        :param query: Query to run
+        :param params: Parameters for query
+        :param channels: Channels to respond to
+        :param filename: filename for the post
+        """
+        table = self.query(channels, query, params)
+        self.response([table], channels, filename)
+
+
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
-    if jenkinsbot.connect() and len(sys.argv) == 3:
+    if jenkinsbot.connect_to_slack() and len(sys.argv) == 3:
         if sys.argv[1] == 'listen':
             jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.listen()
@@ -393,7 +443,7 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 ML_QUERY,
                 {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
-                ['#junit'],
+                [ADMIN_CHANNEL],
                 'master-past30days.txt'
             )
         elif sys.argv[1] == 'core-leaderboard':
@@ -401,6 +451,6 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 CL_QUERY,
                 {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
-                ['#junit'],
+                [ADMIN_CHANNEL],
                 'coreextended-past2days.txt'
             )
