@@ -216,18 +216,12 @@ public class AsyncCompilerAgentHelper
             //In non legacy mode discard the path element.
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
-            }
-            // ignore admin mode settings if operating with new start actions/verbs
-            if (!VoltDB.instance().isRunningWithOldVerbs() && dt.getAdminMode().isAdminstartup()) {
                 // set the admin-startup mode to false and fetch update the deployment string from
                 // updated deployment object
                 dt.getAdminMode().setAdminstartup(false);
-                retval.deploymentString = CatalogUtil.getDeployment(dt, true);
             }
-            else {
-                retval.deploymentString = deploymentString;
-            }
-
+            //Always get deployment after its adjusted.
+            retval.deploymentString = CatalogUtil.getDeployment(dt, true);
 
             retval.deploymentHash =
                 CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));

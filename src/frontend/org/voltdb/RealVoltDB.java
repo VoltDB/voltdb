@@ -1672,13 +1672,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             // root in deployment conflicts with command line voltdbroot
             if (!VoltDB.DBROOT.equals(deprootFN)) {
-                consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
-                hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\"specified in the deployment file");
-            }
-            // if provided admin-mode start up is set, update it to false and update
-            // the rewrite-flag reflect to rewrite the deployment instead of copy
-            if(dt.getAdminMode().isAdminstartup()) {
-                dt.getAdminMode().setAdminstartup(false);
+                consoleLog.info("Ignoring voltdbroot \"" + deprootFN + "\" specified in the deployment file");
+                hostLog.info("Ignoring voltdbroot \"" + deprootFN + "\" specified in the deployment file");
             }
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(
@@ -1743,18 +1738,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
+        //In init/start mode we save adminmode to false always.
+        dt.getAdminMode().setAdminstartup(false);
         //Now its safe to Save .paths
         stagePathConfiguration(config);
 
          //Now that we are done with deployment configuration set all path null.
-         dt.getPaths().getVoltdbroot().setPath(null);
-         if (config.m_isEnterprise) {
-             dt.getPaths().getCommandlog().setPath(null);
-             dt.getPaths().getCommandlogsnapshot().setPath(null);
-             dt.getPaths().getSnapshots().setPath(null);
-             dt.getPaths().getExportoverflow().setPath(null);
-             dt.getPaths().getDroverflow().setPath(null);
-         }
+         dt.setPaths(null);
 
         // log message unconditionally indicating that the provided host-count and admin-mode settings in
         // deployment, if any, will be ignored
@@ -1768,7 +1758,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
         } catch (IOException|RuntimeException e) {
             VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
-            return;
         }
 
     }
