@@ -493,6 +493,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
 
             if (config.m_startAction == StartAction.INITIALIZE) {
+                if (config.m_forceVoltdbCreate) {
+                    for (String path: managedPathsWithFiles(readDepl.deployment)) {
+                        MiscUtils.deleteRecursively(new VoltFile(path));
+                    }
+                }
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
