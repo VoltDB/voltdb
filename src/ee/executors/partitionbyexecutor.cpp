@@ -14,22 +14,28 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_PLANNODES_PARTITIONBYNODE_H_
-#define SRC_EE_PLANNODES_PARTITIONBYNODE_H_
-#include "aggregatenode.h"
+/*
+ * partitionbyexecutor.cpp
+ */
+
+#include "executors/partitionbyexecutor.h"
+#include "plannodes/partitionbynode.h"
 
 namespace voltdb {
-class PartitionByPlanNode : public AggregatePlanNode {
-public:
-    PartitionByPlanNode()
-        : AggregatePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE) {
-    }
-    ~PartitionByPlanNode();
 
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string &spacer) const;
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
-};
+PartitionByExecutor::~PartitionByExecutor() {
 }
-#endif /* SRC_EE_PLANNODES_PARTITIONBYNODE_H_ */
+
+// The PartitionByExecutor wants one row for each input row.
+bool PartitionByExecutor::outputForEachInputRow() const {
+    return true;
+}
+
+bool PartitionByExecutor::p_init(AbstractPlanNode *node, TempTableLimits *limits) {
+    if (!AggregateSerialExecutor::p_init(node, limits)) {
+        return false;
+    }
+    return true;
+}
+
+} /* namespace voltdb */

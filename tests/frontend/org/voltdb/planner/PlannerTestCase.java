@@ -38,8 +38,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 import junit.framework.TestCase;
 
@@ -302,6 +306,71 @@ public class PlannerTestCase extends TestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    /**
+     * Call this function to verify that an order by plan node has the
+     * sort expressions and directions we expect.
+     *
+     * @param orderByPlanNode The plan node to test.
+     * @param columnDescrs Pairs of expressions and sort directions. There
+     *                     must be an even number of these, the even
+     *                     numbered ones must be expressions and the odd
+     *                     numbered ones must be sort directions.  This is
+     *                     numbering starting at 0.  So, they must be in
+     *                     the order expr, direction, expr, direction, and
+     *                     so forth.
+     */
+    protected void verifyOrderByPlanNode(OrderByPlanNode  orderByPlanNode,
+                                         Object       ... columnDescrs) {
+        // We should have an even number of columns
+        assertEquals(0, columnDescrs.length % 2);
+        List<AbstractExpression> exprs = orderByPlanNode.getSortExpressions();
+        List<SortDirectionType>  dirs  = orderByPlanNode.getSortDirections();
+        assertEquals(exprs.size(), dirs.size());
+        assertEquals(columnDescrs.length/2, exprs.size());
+        for (int idx = 0; idx < exprs.size(); idx += 1) {
+            AbstractExpression expr = exprs.get(idx);
+            SortDirectionType  dir  = dirs.get(idx);
+            assertTrue(expr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression)expr;
+            String expectedNames[] = ((String)columnDescrs[2*idx]).split("\\.");
+            String tableName = null;
+            String columnName = null;
+            if (expectedNames.length == 2) {
+                tableName = expectedNames[0].toUpperCase();
+                columnName = expectedNames[1].toUpperCase();
+            } else {
+                columnName = expectedNames[0].toUpperCase();
+            }
+            assertEquals(columnName, tve.getColumnName().toUpperCase());
+            if (tableName != null) {
+                assertEquals(tableName, tve.getTableName().toUpperCase());
+            }
+            assertEquals(columnDescrs[2*idx+1],       dir);
+        }
+    }
+
+    /** Given a list of Class objects for plan node subclasses, asserts
+     * if the given plan doesn't contain instances of those classes.
+     */
+    static protected void assertClassesMatchNodeChain(
+            List<Class<? extends AbstractPlanNode>> expectedClasses,
+            AbstractPlanNode actualPlan) {
+        AbstractPlanNode pn = actualPlan;
+        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
+            assertFalse("Actual plan shorter than expected",
+                    pn == null);
+            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
+                    + "instead found " + pn.getClass().getSimpleName(),
+                    c.isInstance(pn));
+            if (pn.getChildCount() > 0)
+                pn = pn.getChild(0);
+            else
+                pn = null;
+        }
+
+        assertTrue("Actual plan longer than expected", pn == null);
+    }
+
     /*
      * Everything below this is for generating EE Unit tests from
      * java.  We start with a newline because the licensescheck.py
@@ -380,28 +449,6 @@ public class PlannerTestCase extends TestCase {
         AbstractPlanNode node = compile(sqlStmt);
         String planString = PlanSelector.outputPlanDebugString(node);
         return planString;
-    }
-
-    /** Given a list of Class objects for plan node subclasses, asserts
-     * if the given plan doesn't contain instances of those classes.
-     */
-    static protected void assertClassesMatchNodeChain(
-            List<Class<? extends AbstractPlanNode>> expectedClasses,
-            AbstractPlanNode actualPlan) {
-        AbstractPlanNode pn = actualPlan;
-        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
-            assertFalse("Actual plan shorter than expected",
-                    pn == null);
-            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
-                    + "instead found " + pn.getClass().getSimpleName(),
-                    c.isInstance(pn));
-            if (pn.getChildCount() > 0)
-                pn = pn.getChild(0);
-            else
-                pn = null;
-        }
-
-        assertTrue("Actual plan longer than expected", pn == null);
     }
 
     private static void ensureTable(int data[][]) {

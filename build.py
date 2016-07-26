@@ -276,6 +276,7 @@ CTX.INPUT['executors'] = """
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
+ partitionbyexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
@@ -472,6 +473,7 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
+    PartitionByExecutorTest
     TestGeneratedPlans
     """
 

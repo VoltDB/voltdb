@@ -188,6 +188,7 @@ public class PlannerTestAideDeCamp {
             // TODO Auto-generated catch block
             e2.printStackTrace();
             System.exit(-1);
+            return null;
         }
 
         //

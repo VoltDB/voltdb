@@ -40,6 +40,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+
 #ifndef TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 #define TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 
@@ -170,7 +171,7 @@ public:
         return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
     }
 
-    void initTable(const voltdb::PersistentTable **table,
+    void initTable(voltdb::PersistentTable       **table,
                    int                            *table_id,
                    const TableConfig              *oneTable) {
         initializeTableOfInt(oneTable->m_tableName,
@@ -186,7 +187,7 @@ public:
     }
 
     void initializeTableOfInt(std::string                     tableName,
-                              const voltdb::PersistentTable **table,
+                              voltdb::PersistentTable       **table,
                               int                            *tableId,
                               int                             nRows,
                               int                             nCols,
