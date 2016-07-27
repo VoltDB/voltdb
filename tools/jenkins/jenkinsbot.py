@@ -5,6 +5,8 @@
 
 # Script that runs jenkinsbot for VoltDB Slack
 
+import logging
+from logging import handlers
 import os
 import sys
 import time
@@ -165,22 +167,37 @@ ORDER BY 2 DESC
 class JenkinsBot(object):
     def __init__(self):
         self.client = None
-        self.logfile = 'jenkinslog.txt'
+        self.logger = self.setup_logging()
 
-    def log(self, message):
-        message = str(message)
-        try:
-            size = os.path.getsize(self.logfile)
-        except OSError:
-            message = self.logfile + ' does not exist. Creating..\n' + message
-            size = 0
-        if size < (1 << 30):
-            # Limit log file to 1G
-            with open(self.logfile, 'a') as logfile:
-                logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                logfile.write(' ' + message + '\n')
-        else:
-            self.post_message(ADMIN_CHANNEL, 'Log file too large.')
+    def setup_logging(self):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+
+        # Limit log file to 1G
+        handler = handlers.RotatingFileHandler('jenkinsbot.log', maxBytes=1 << 30)
+        handler.setLevel(logging.INFO)
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+
+        logger.addHandler(handler)
+
+        return logger
+
+    # def log(self, message):
+    #     message = str(message)
+    #     try:
+    #         size = os.path.getsize(self.logfile)
+    #     except OSError:
+    #         message = self.logfile + ' does not exist. Creating..\n' + message
+    #         size = 0
+    #     if size < (1 << 30):
+    #
+    #         with open(self.logfile, 'a') as logfile:
+    #             logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    #             logfile.write(' ' + message + '\n')
+    #     else:
+    #         self.post_message(ADMIN_CHANNEL, 'Log file too large.')
 
     def connect_to_slack(self):
         """
@@ -188,14 +205,14 @@ class JenkinsBot(object):
         """
         token = os.environ.get('token', None)
         if token is None:
-            self.log('Could not retrieve token for jenkinsbot')
+            self.logger.info('Could not retrieve token for jenkinsbot')
             return False
 
         self.client = SlackClient(token)
 
         # Connect to real time messaging
         if not self.client.rtm_connect():
-            self.log('Could not connect to real time messaging')
+            self.logger.info('Could not connect to real time messaging')
             return False
 
         return True
@@ -252,30 +269,30 @@ class JenkinsBot(object):
                                 'job': job,
                                 'test': args[2],
                             }
-                            table = self.query([channel], TOM_QUERY, params)
-                            self.response(table, [channel], '%s-testonmaster.txt' % (args[2]))
+                            self.query_and_response(TOM_QUERY, params, [channel],
+                                                    '%s-testonmaster.txt' % (args[2]))
                         elif 'all-failures' in text:
                             params = {
                                 'job': job
                             }
-                            table = self.query([channel], AF_QUERY, params)
-                            self.response(table, [channel], '%s-allfailures.txt' % job)
+                            self.query_and_response(AF_QUERY, params, [channel],
+                                                    '%s-allfailures.txt' % job)
                         elif 'days' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'days': args[2]
                             }
-                            table = self.query([channel], D_QUERY, params)
-                            self.response(table, [channel], '%s-leaderboard-past-%s-days.txt' % (job, args[2]))
+                            self.query_and_response(D_QUERY, params, [channel],
+                                                    '%s-leaderboard-past-%s-days.txt' % (job, args[2]))
                         elif 'test-leaderboard' in text:
                             args = text.split(' ')
                             params = {
                                 'job': job,
                                 'beginning': args[2]
                             }
-                            table = self.query([channel], TL_QUERY, params)
-                            self.response(table, [channel], '%s-testleaderboard-from-%s.txt' % (job, args[2]))
+                            self.query_and_response(TL_QUERY, params, [channel],
+                                                    '%s-testleaderboard-from-%s.txt' % (job, args[2]))
                         elif 'build-range' in text:
                             args = text.split(' ')
                             builds = args[2].split('-')
@@ -284,25 +301,24 @@ class JenkinsBot(object):
                                 'build_low': builds[0],
                                 'build_high': builds[1]
                             }
-                            table = self.query([channel], BR_QUERY, params)
-                            self.response(table, [channel], '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
+                            self.query_and_response(BR_QUERY, params, [channel],
+                                                    '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1]))
             except (KeyboardInterrupt, SystemExit):
-                self.log('Turning off the bot')
-                self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
+                self.logger.exception('Turning off the bot due to "end-session command"')
+                self.post_message(ADMIN_CHANNEL, 'Turning off the bot due to "end-session command"')
                 return
-            except IndexError as error:
-                self.log(error)
+            except IndexError:
+                self.logger.exception('Incorrect number or formatting of arguments')
                 if channel:
                     self.post_message(channel, 'Incorrect number or formatting of arguments\n\n' + ''.join(help_text))
-            except Exception as error:
-                self.log('Something unexpected went wrong')
-                self.log(error)
+            except Exception:
+                self.logger.exception('Something unexpected went wrong')
 
                 # Try to reconnect
                 if not self.connect_to_slack():
-                    self.log('Could not connect to Slack')
-                    self.log('Turning off the bot')
-                    self.post_message(ADMIN_CHANNEL, 'Turning off the bot')
+                    self.logger.info('Could not connect to Slack')
+                    self.logger.info('Turning off the bot. Cannot connect to Slack')
+                    self.post_message(ADMIN_CHANNEL, 'Turning off the bot. Cannot connect to Slack')
                     return
 
             # Slow but reconfigurable
@@ -318,7 +334,7 @@ class JenkinsBot(object):
         :return: Tuple of (headers, rows) as results
         """
 
-        table = ""
+        table = ()
         cursor = None
         database = None
 
@@ -333,14 +349,12 @@ class JenkinsBot(object):
             rows = cursor.fetchall()
             table = (headers, rows)
 
-        except MySQLError as error:
-            self.log('Could not connect to database')
-            self.log(error)
+        except MySQLError:
+            self.logger.exception('Could not connect to database')
             for channel in channels:
                 self.post_message(channel, 'Something went wrong with the query.')
-        except Exception as error:
-            self.log('Something unexpected went wrong')
-            self.log(error)
+        except Exception:
+            self.logger.exception('Something unexpected went wrong')
 
             # Try to reconnect only once
             if self.connect_to_slack() and not is_retry:
@@ -362,7 +376,11 @@ class JenkinsBot(object):
         """
 
         filecontent = ""
-        for headers, rows in tables:
+        for table in tables:
+            if len(table) != 2:
+                continue
+            headers = table[0]
+            rows = table[1]
             content = ""
             if os.environ.get('vertical', False):
                 # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
@@ -434,23 +452,20 @@ class JenkinsBot(object):
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
-    if jenkinsbot.connect_to_slack() and len(sys.argv) == 3:
+    if jenkinsbot.connect_to_slack() and len(sys.argv) == 2:
         if sys.argv[1] == 'listen':
-            jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.listen()
         elif sys.argv[1] == 'master-leaderboard':
-            jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.query_and_response(
                 ML_QUERY,
                 {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
-                [ADMIN_CHANNEL],
+                ['#junit'],
                 'master-past30days.txt'
             )
         elif sys.argv[1] == 'core-leaderboard':
-            jenkinsbot.logfile = sys.argv[2]
             jenkinsbot.query_and_response(
                 CL_QUERY,
                 {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
-                [ADMIN_CHANNEL],
+                ['#junit'],
                 'coreextended-past2days.txt'
             )
