@@ -143,7 +143,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
     private Consistency.ReadLevel m_defaultConsistencyReadLevel;
-    private ShortCircuitReadLog m_shortCircuitReadLog = null;
+    private BufferedReadLog m_bufferedReadLog = null;
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -403,18 +403,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
-        /**
-         * A shortcut read is a read operation sent to any replica and completed with no
-         * confirmation or communication with other replicas. In a partition scenario, it's
-         * possible to read an unconfirmed transaction's writes that will be lost.
-         */
-        boolean shortcutRead = message.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
-
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
         Iv2InitiateTaskMessage msg = message;
-        if (m_isLeader || shortcutRead) {
+        if (m_isLeader || message.isReadOnly()) {
             /*
              * A short circuit read is a read where the client interface is local to
              * this node. The CI will let a replica perform a read in this case and
@@ -456,7 +449,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
-            } else if (m_isLeader && !shortcutRead) {
+            } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
@@ -561,7 +554,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        final boolean shortcutRead = msg.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
+        final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
@@ -686,10 +679,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * confirmation or communication with other replicas. In a partition scenario, it's
          * possible to read an unconfirmed transaction's writes that will be lost.
          */
-        // All short-circuit reads will have no duplicate counter.
+        // All reads will have no duplicate counter.
         // Avoid all the lookup below.
         // Also, don't update the truncation handle, since it won't have meaning for anyone.
-        if (message.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead()) {
+        if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST) {
             // the initiatorHSId is the ClientInterface mailbox.
             m_mailbox.send(message.getInitiatorHSId(), message);
             return;
@@ -715,9 +708,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
 
-        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && message.isReadOnly() &&
-                m_shortCircuitReadLog != null) {
-            m_shortCircuitReadLog.offerSp(message, m_repairLogTruncationHandle);
+        if (m_isLeader && message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
+            assert(m_bufferedReadLog != null);
+            m_bufferedReadLog.offerSp(message, m_repairLogTruncationHandle);
         }
     }
 
@@ -771,8 +764,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        boolean shortcutRead = message.isReadOnly() && m_defaultConsistencyReadLevel.hasShortcutRead();
-
         FragmentTaskMessage msg = message;
         long newSpHandle;
         if (m_isLeader) {
@@ -783,7 +774,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
 
-            if (!shortcutRead) {
+            if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
             } else {
@@ -803,7 +794,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * everywhere.
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
-            if (m_sendToHSIds.length > 0 && (!shortcutRead || msg.isSysProcTask())) {
+            if (m_sendToHSIds.length > 0 && (!message.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -867,8 +858,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                  * confirmation or communication with other replicas. In a partition scenario, it's
                  * possible to read an unconfirmed transaction's writes that will be lost.
                  */
-                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() &&
-                        m_defaultConsistencyReadLevel.hasShortcutRead();
+                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
                 logThis = !shortcutRead;
             }
         }
@@ -993,7 +983,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 advanceTxnEgo();
             }
             msg.setSpHandle(getCurrentTxnId());
-            if (m_sendToHSIds.length > 0) {
+            if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
@@ -1152,10 +1142,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_defaultConsistencyReadLevel = readLevel;
     }
 
-    public void setShortCircuitRead(boolean isForTest) {
+    public void setBufferedReadLog() {
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            m_shortCircuitReadLog = new ShortCircuitReadLog(m_mailbox);
+            m_bufferedReadLog = new BufferedReadLog(m_mailbox);
         }
     }
-
 }

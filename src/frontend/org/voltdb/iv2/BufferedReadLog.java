@@ -23,14 +23,14 @@ import java.util.Deque;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.messaging.InitiateResponseMessage;
 
-public class ShortCircuitReadLog
+public class BufferedReadLog
 {
-    final Deque<InitiateResponseMessage> m_shortCircuitReadSp;
+    final Deque<InitiateResponseMessage> m_bufferedReadSp;
     Mailbox m_mailbox;
 
-    ShortCircuitReadLog(Mailbox mailbox)
+    BufferedReadLog(Mailbox mailbox)
     {
-        m_shortCircuitReadSp = new ArrayDeque<InitiateResponseMessage>();
+        m_bufferedReadSp = new ArrayDeque<InitiateResponseMessage>();
 
         assert(mailbox != null);
         m_mailbox = mailbox;
@@ -39,25 +39,26 @@ public class ShortCircuitReadLog
     //  SPI offers a new message.
     public void offerSp(InitiateResponseMessage msg, long handle)
     {
-        if (msg.getSpHandle() >= handle) {
+        if (msg.getSpHandle() <= handle) {
             m_mailbox.send(msg.getInitiatorHSId(), msg);
         } else {
-            m_shortCircuitReadSp.add(msg);
+            m_bufferedReadSp.add(msg);
         }
-        releaseShortCircuitRead(handle);
+        releaseBufferedRead(handle);
     }
 
-    public void releaseShortCircuitRead(long spHandle)
+    public void releaseBufferedRead(long spHandle)
     {
-        Deque<InitiateResponseMessage> deq = m_shortCircuitReadSp;
+        Deque<InitiateResponseMessage> deq = m_bufferedReadSp;
         InitiateResponseMessage msg = null;
         while ((msg = deq.peek()) != null) {
-            if (msg.getSpHandle() <= spHandle) {
-                m_mailbox.send(msg.getInitiatorHSId(), msg);
-                deq.poll();
-            } else {
-                break;
+            if (msg.getSpHandle() > spHandle) {
+                return;
             }
+            // when the sp reads' handle is less equal than truncation handle
+            // we know any previous write has been confirmed and it's safe to release.
+            m_mailbox.send(msg.getInitiatorHSId(), msg);
+            deq.poll();
         }
     }
 }
