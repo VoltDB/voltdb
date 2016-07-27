@@ -23,9 +23,20 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -34,10 +45,22 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.TestCase;
+final public class TestVoltDB {
 
-public class TestVoltDB extends TestCase {
+    @BeforeClass
+    public static void setupClass() throws Exception {
+        System.setProperty("VOLT_JUSTATEST", "YESYESYES");
+    }
 
+    @Before
+    public void setup() {
+        VoltDB.ignoreCrash = true;
+    }
+
+    @Rule
+    public final TemporaryFolder tmp = new TemporaryFolder();
+
+    @Test
     public void testConfigurationConstructor() {
         VoltDB.Configuration blankConfig = new VoltDB.Configuration();
         assertFalse(blankConfig.m_noLoadLibVOLTDB);
@@ -138,7 +161,8 @@ public class TestVoltDB extends TestCase {
         assertEquals(ReplicationRole.REPLICA, cfg26.m_replicationRole);
     }
 
-    public void testConfigurationValidate() {
+    @Test
+    public void testConfigurationValidate() throws Exception {
         VoltDB.Configuration config;
 
         // missing leader provided deployment - not okay.
@@ -209,10 +233,56 @@ public class TestVoltDB extends TestCase {
         assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
     }
 
+    AtomicReference<Throwable> serverException = new AtomicReference<>(null);
+
+    final Thread.UncaughtExceptionHandler handleUncaught = new Thread.UncaughtExceptionHandler() {
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            serverException.compareAndSet(null, e);
+        }
+    };
+
+    @Test
+    public void testHostCountValidations() throws Exception {
+        final File path = tmp.newFolder();
+
+        String [] init = {"initialize", "voltdbroot", path.getPath()};
+        VoltDB.Configuration config = new VoltDB.Configuration(init);
+        assertTrue(config.validate()); // false in both pro and community]
+
+        ServerThread server = new ServerThread(config);
+        server.setUncaughtExceptionHandler(handleUncaught);
+        server.start();
+        server.join();
+
+        // invalid host count
+        String [] args400 = {"probe", "voltdbroot", path.getPath(), "hostcount", "2", "mesh", "uno,", "due", ",","tre", ",quattro" };
+        config = new VoltDB.Configuration(args400);
+        assertFalse(config.validate()); // false in both pro and community
+
+        String [] args401 = {"probe", "voltdbroot", path.getPath(), "hostcount", "-3" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        config = new VoltDB.Configuration(args401);
+        assertFalse(config.validate()); // false in both pro and community
+
+        String [] args402 = {"probe", "voltdbroot", path.getPath(), "hostcount", "4" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        config = new VoltDB.Configuration(args402);
+        assertTrue(config.validate()); // false in both pro and community
+
+        String [] args403 = {"probe", "voltdbroot", path.getPath(), "hostcount", "6" , "mesh", "uno,", "due", ",","tre", ",quattro"};
+        config = new VoltDB.Configuration(args403);
+        assertTrue(config.validate()); // false in both pro and community
+
+        String [] args404 = {"probe", "voltdbroot", path.getPath(), "mesh", "uno,", "due", ",","tre", ",quattro"};
+        config = new VoltDB.Configuration(args404);
+        assertTrue(config.validate()); // false in both pro and community
+        assertEquals(4, config.m_hostCount);
+    }
+
     /**
      * ENG-7088: Validate that deployment file users that want to belong to roles which
      * don't yet exist don't render the deployment file invalid.
      */
+    @Test
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();

@@ -376,6 +376,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     setUndoToken(undoToken);
 
+    // configure the execution context.
+    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
+                                             txnId,
+                                             spHandle,
+                                             lastCommittedSpHandle,
+                                             uniqueId);
+
+    m_executorContext->checkTransactionForDR();
+
     // reset these at the start of each batch
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
@@ -458,13 +467,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
      */
     m_numResultDependencies = 0;
     size_t numResultDependenciesCountOffset = m_resultOutput.reserveBytes(4);
-
-    // configure the execution context.
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             spHandle,
-                                             lastCommittedSpHandle,
-                                             uniqueId);
 
     // count the number of plan fragments executed
     ++m_pfCount;

@@ -66,6 +66,9 @@ import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractParsedStmt {
 
+    public static final String TEMP_TABLE_NAME = "VOLT_TEMP_TABLE";
+    public static final String WINDOWED_AGGREGATE_COLUMN_NAME = "WINAGG_COLUMN";
+
     protected String m_contentDeterminismMessage = null;
 
      // Internal statement counter
@@ -78,20 +81,20 @@ public abstract class AbstractParsedStmt {
     public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
-    private TreeMap<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<Integer, ParameterValueExpression>();
+    private TreeMap<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<>();
 
-    protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
+    protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<>();
 
     // The parameter expression from the correlated expressions. The key is the parameter index.
     // This map acts as intermediate storage for the parameter TVEs found while planning a subquery
     // until they can be distributed to the parent's subquery expression where they originated.
-    public Map<Integer, AbstractExpression> m_parameterTveMap = new HashMap<Integer, AbstractExpression>();
+    public Map<Integer, AbstractExpression> m_parameterTveMap = new HashMap<>();
 
-    public ArrayList<Table> m_tableList = new ArrayList<Table>();
+    public ArrayList<Table> m_tableList = new ArrayList<>();
 
     private Table m_DDLIndexedTable = null;
 
-    public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
+    public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<>();
 
     protected ArrayList<AbstractExpression> m_aggregationList = null;
 
@@ -101,11 +104,11 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
+    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
-    protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<String>();
+    protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<>();
 
     protected final String[] m_paramValues;
     public final Database m_db;
@@ -372,7 +375,7 @@ public abstract class AbstractParsedStmt {
      * Parse a Vector value for SQL-IN
      */
     private AbstractExpression parseVectorExpression(VoltXMLElement exprNode) {
-        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> args = new ArrayList<>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
@@ -516,20 +519,51 @@ public abstract class AbstractParsedStmt {
         return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
     }
 
-    private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
-        // Parse individual rank expressions
-        List<AbstractExpression> partitionbyExprs = new ArrayList<AbstractExpression>();
-        List<AbstractExpression> orderbyExprs = new ArrayList<AbstractExpression>();
-        List<SortDirectionType>  orderbyDirs  = new ArrayList<SortDirectionType>();
-        boolean areAllDecending = false;
+    // It turns out to be interesting to store this as a list.  We
+    // really only want one of them, but it helps to check for multiple
+    // windowed expressions in a different place than parsing.
+    protected List<WindowedExpression> m_windowedExpressions = new ArrayList<>();
 
-        boolean isPercentRank = Boolean.valueOf(exprNode.attributes.get("isPercentRank"));
+    public List<WindowedExpression> getWindowedExpressions() {
+        return m_windowedExpressions;
+    }
+    /**
+     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Windowed Expression is squirreled away in the m_windowedExpression
+     * object, though, because we will need it later.
+     *
+     * @param exprNode
+     * @return
+     */
+    private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
+        int id = Integer.parseInt(exprNode.attributes.get("id"));
+        // If this is not in the display column list, and the id is not the id of
+        // the windowed expression, then this is an error.
+        if (!m_parsingInDisplayColumns) {
+            if (m_windowedExpressions.size() > 0) {
+                WindowedExpression we = m_windowedExpressions.get(0);
+                if (we.getXMLID() == id) {
+                    // This is the same as a windowed expression we saw in the
+                    // display list.  This can happen if we see an alias for
+                    // a display list element in the order by expressions.  If
+                    // this happens we just want to return the TVE we squirreled
+                    // away in the windowed expression.
+                    return we.getDisplayListExpression();
+                }
+            }
+            throw new PlanningErrorException("Windowed expressions can only appear in the select list.");
+        }
+        // Parse individual rank expressions
+        List<AbstractExpression> partitionbyExprs = new ArrayList<>();
+        List<AbstractExpression> orderbyExprs = new ArrayList<>();
+        List<SortDirectionType>  orderbyDirs  = new ArrayList<>();
 
         for (VoltXMLElement ele : exprNode.children) {
             if (ele.name.equals("partitionbyList")) {
                 for (int i = 0; i < ele.children.size(); i++) {
                     VoltXMLElement childNode = ele.children.get(i);
                     AbstractExpression expr = parseExpressionNode(childNode);
+                    ExpressionUtil.finalizeValueTypes(expr);
                     partitionbyExprs.add(expr);
                 }
 
@@ -542,6 +576,7 @@ public abstract class AbstractParsedStmt {
                             : SortDirectionType.ASC;
 
                     AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                    ExpressionUtil.finalizeValueTypes(expr);
                     orderbyExprs.add(expr);
                     orderbyDirs.add(sortDir);
                 }
@@ -549,15 +584,27 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
-
+        String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
+        String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
+        if (exprNode.attributes.containsKey("alias")) {
+            alias = exprNode.attributes.get("alias");
+        }
         WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
                                                              partitionbyExprs,
                                                              orderbyExprs,
                                                              orderbyDirs,
-                                                             m_db,
-                                                             areAllDecending,
-                                                             isPercentRank);
-        return rankExpr;
+                                                             id);
+        ExpressionUtil.finalizeValueTypes(rankExpr);
+        // Only offset 0 is useful.  But we keep the index anyway.
+        int offset = m_windowedExpressions.size();
+        m_windowedExpressions.add(rankExpr);
+        TupleValueExpression tve = new TupleValueExpression(TEMP_TABLE_NAME, TEMP_TABLE_NAME,
+                                                            alias,           alias);
+        tve.setColumnIndex(offset);
+        tve.setValueType(rankExpr.getValueType());
+        tve.setValueSize(rankExpr.getValueSize());
+        rankExpr.setDisplayListExpression(tve);
+        return tve;
     }
 
    /**
@@ -583,7 +630,7 @@ public abstract class AbstractParsedStmt {
     */
    private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
        // Parse individual columnref expressions from the IN output schema
-       List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+       List<AbstractExpression> exprs = new ArrayList<>();
        for (VoltXMLElement exprNode : exprNodes) {
            AbstractExpression expr = parseExpressionNode(exprNode);
            exprs.add(expr);
@@ -932,7 +979,7 @@ public abstract class AbstractParsedStmt {
             expr.setRight(replaceExpressionsWithPve(expr.getRight()));
         }
         if (expr.getArgs() != null) {
-            List<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> newArgs = new ArrayList<>();
             for (AbstractExpression argument : expr.getArgs()) {
                 newArgs.add(replaceExpressionsWithPve(argument));
             }
@@ -1010,7 +1057,7 @@ public abstract class AbstractParsedStmt {
         String result_type_parameter_index = exprNode.attributes.get("result_type_parameter_index");
         String implied_argument = exprNode.attributes.get("implied_argument");
 
-        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> args = new ArrayList<>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
@@ -1133,7 +1180,7 @@ public abstract class AbstractParsedStmt {
      * @param tablesNode
      */
     private void parseTables(VoltXMLElement tablesNode) {
-        Set<String> visited = new HashSet<String>();
+        Set<String> visited = new HashSet<>();
 
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
@@ -1413,7 +1460,7 @@ public abstract class AbstractParsedStmt {
      *  Extract FROM(SELECT...) sub-queries from this statement
      */
     public List<StmtSubqueryScan> findAllFromSubqueries() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
         if (m_joinTree != null) {
             m_joinTree.extractSubQueries(subqueries);
         }
@@ -1524,7 +1571,7 @@ public abstract class AbstractParsedStmt {
         // than tables to expressions, and not confuse ourselves with
         // different instances of the same table in self joins.
         HashMap<String, List<AbstractExpression> > baseTableAliases =
-                new HashMap<String, List<AbstractExpression> >();
+                new HashMap< >();
         for (ParsedColInfo col : orderByColumns()) {
             AbstractExpression expr = col.expression;
             //
@@ -1535,7 +1582,7 @@ public abstract class AbstractParsedStmt {
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
             List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
-            Set<String> baseTableNames = new HashSet<String>();
+            Set<String> baseTableNames = new HashSet<>();
             for (AbstractExpression ae : baseTVEExpressions) {
                 assert(ae instanceof TupleValueExpression);
                 TupleValueExpression atve = (TupleValueExpression)ae;
@@ -1558,7 +1605,7 @@ public abstract class AbstractParsedStmt {
             assert(nextTableAlias != null);
             List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
             if (perTable == null) {
-                perTable = new ArrayList<AbstractExpression>();
+                perTable = new ArrayList<>();
                 baseTableAliases.put(nextTableAlias, perTable);
             }
             perTable.add(expr);
@@ -1600,7 +1647,7 @@ public abstract class AbstractParsedStmt {
                 }
 
                 // get the list of expressions for the index
-                List<AbstractExpression> indexExpressions = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> indexExpressions = new ArrayList<>();
 
                 String jsonExpr = index.getExpressionsjson();
                 // if this is a pure-column index...
@@ -1690,7 +1737,7 @@ public abstract class AbstractParsedStmt {
         //
         // The indices we care about have columns, but the order by list has expressions.
         // Extract the columns from the order by list.
-        Set<Column> orderByColumns = new HashSet<Column>();
+        Set<Column> orderByColumns = new HashSet<>();
         for (AbstractExpression expr : orderByExprs) {
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
@@ -1703,7 +1750,7 @@ public abstract class AbstractParsedStmt {
         if (constraints == null) {
             return;
         }
-        Set<Index> indices = new HashSet<Index>();
+        Set<Index> indices = new HashSet<>();
         for (Constraint constraint : constraints) {
             Index index = constraint.getIndex();
             // Only use column indices for now.
@@ -1767,7 +1814,7 @@ public abstract class AbstractParsedStmt {
      *  Extract all subexpressions of a given expression class from this statement
      */
     protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
+        HashSet<AbstractExpression> exprs = new HashSet<>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
             if (treeExpr != null) {
@@ -1898,7 +1945,7 @@ public abstract class AbstractParsedStmt {
         // Collect all tve expressions from value equivalence set which have equivalence
         // defined to parameterized or constant value expression.
         // Eg: T.A = ? or T.A = 1
-        Set <AbstractExpression> parameterizedConstantKeys = new HashSet<AbstractExpression>();
+        Set <AbstractExpression> parameterizedConstantKeys = new HashSet<>();
         Set<AbstractExpression> valueEquivalenceKeys = valueEquivalence.keySet();   // get all the keys
         for (AbstractExpression key : valueEquivalenceKeys) {
             if (key instanceof TupleValueExpression) {
@@ -1921,7 +1968,7 @@ public abstract class AbstractParsedStmt {
                 continue;
             }
 
-            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
+            Set<AbstractExpression> indexExpressions = new HashSet<>();
             CatalogMap<ColumnRef> indexColRefs = index.getColumns();
             for (ColumnRef indexColRef:indexColRefs) {
                 Column col = indexColRef.getColumn();
@@ -1939,4 +1986,25 @@ public abstract class AbstractParsedStmt {
         }
         return false;
     }
+
+    protected boolean m_parsingInDisplayColumns = false;
+
+    /**
+     * Whwn we parse a rank expression we want to know if we are in the display column.
+     *
+     * @return the parsingInDisplayColumns
+     */
+    public final boolean isParsingInDisplayColumns() {
+        return m_parsingInDisplayColumns;
+    }
+
+    /**
+     * Whwn we parse a rank expression we want to know if we are in the display column.
+     *
+     * @param parsingInDisplayColumns the parsingInDisplayColumns to set
+     */
+    public final void setParsingInDisplayColumns(boolean parsingInDisplayColumns) {
+        m_parsingInDisplayColumns = parsingInDisplayColumns;
+    }
+
 }

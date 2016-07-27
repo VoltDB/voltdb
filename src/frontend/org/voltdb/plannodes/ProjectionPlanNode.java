@@ -97,7 +97,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves =
-            new ArrayList<TupleValueExpression>();
+            new ArrayList<>();
         int i = 0;
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
