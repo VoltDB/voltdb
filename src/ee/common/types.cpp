@@ -617,6 +617,12 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD: {
         return "AGGREGATE_HYPERLOGLOGS_TO_CARD";
     }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
+    }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
     }
@@ -722,6 +728,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG;
     } else if (str == "AGGREGATE_HYPERLOGLOGS_TO_CARD") {
         return EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD;
+    } else if (str == "AGGREGATE_WINDOWED_RANK") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK;
+    } else if (str == "AGGREGATE_WINDOWED_DENSE_RANK") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {

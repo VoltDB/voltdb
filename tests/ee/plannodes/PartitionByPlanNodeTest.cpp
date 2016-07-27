@@ -55,30 +55,72 @@ using namespace voltdb;
 
 namespace {
 const char *jsonStrings[] = {
-                "{\"ID\":1, "
-                 "\"PLAN_NODE_TYPE\":\"PARTITIONBY\", "
-                 "\"AGGREGATE_COLUMNS\":[], "
-                 "\"GROUPBY_EXPRESSIONS\":[{\"TYPE\":32, "
-                                           "\"VALUE_TYPE\":8, "
-                                           "\"VALUE_SIZE\":8, "
-                                           "\"COLUMN_IDX\":1}, "
-                                          "{\"TYPE\":32, "
-                                          "\"VALUE_TYPE\":5, "
-                                          "\"VALUE_SIZE\":4, "
-                                          "\"COLUMN_IDX\":2}], "
-                 "\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\": "
-                                       "{\"TYPE\":32, "
-                                       "\"VALUE_TYPE\":8, "
-                                       "\"VALUE_SIZE\":8, "
-                                       "\"COLUMN_IDX\":1}, "
-                                     "\"SORT_DIRECTION\":\"ASC\"}, "
-                                    "{\"SORT_EXPRESSION\": "
-                                       "{\"TYPE\":32, "
-                                       "\"VALUE_TYPE\":5, "
-                                       "\"VALUE_SIZE\":4, "
-                                       "\"COLUMN_IDX\":2}, "
-                                      "\"SORT_DIRECTION\":\"DESC\"}]}",
-                (const char *)0
+        "{\n"
+        "    \"AGGREGATE_COLUMNS\": [{\n"
+        "        \"AGGREGATE_DISTINCT\": 0,\n"
+        "        \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
+        "        \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_RANK\"\n"
+        "    }],\n"
+        "    \"CHILDREN_IDS\": [3],\n"
+        "    \"GROUPBY_EXPRESSIONS\": [{\n"
+        "        \"COLUMN_IDX\": 1,\n"
+        "        \"TYPE\": 32,\n"
+        "        \"VALUE_TYPE\": 5\n"
+        "    }],\n"
+        "    \"ID\": 2,\n"
+        "    \"OUTPUT_SCHEMA\": [\n"
+        "        {\n"
+        "            \"COLUMN_NAME\": \"C3\",\n"
+        "            \"EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 0,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 6\n"
+        "            }\n"
+        "        },\n"
+        "        {\n"
+        "            \"COLUMN_NAME\": \"A\",\n"
+        "            \"EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 0,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }\n"
+        "        },\n"
+        "        {\n"
+        "            \"COLUMN_NAME\": \"A\",\n"
+        "            \"EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 1,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }\n"
+        "        },\n"
+        "        {\n"
+        "            \"COLUMN_NAME\": \"B\",\n"
+        "            \"EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 2,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }\n"
+        "        },\n"
+        "        {\n"
+        "            \"COLUMN_NAME\": \"B\",\n"
+        "            \"EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 3,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }\n"
+        "        }\n"
+        "    ],\n"
+        "    \"PLAN_NODE_TYPE\": \"PARTITIONBY\",\n"
+        "    \"SORT_COLUMNS\": [{\n"
+        "        \"SORT_DIRECTION\": \"ASC\",\n"
+        "        \"SORT_EXPRESSION\": {\n"
+        "            \"COLUMN_IDX\": 1,\n"
+        "            \"TYPE\": 32,\n"
+        "            \"VALUE_TYPE\": 5\n"
+        "        }\n"
+        "    }]\n"
+        "}\n",
+        (const char *)0
 };
 }
 
@@ -89,39 +131,23 @@ public:
     }
 };
 
+//
+// There is not much here to test.  The only difference between a
+// PartitionByPlanNode and any other Aggregate node is that the
+// PartitionByPLanNode generates one output row per input row.
 TEST_F(PartitionByPlanNodeTest, TestJSON)
 {
     for (int jsonIdx = 0; jsonStrings[jsonIdx]; jsonIdx += 1) {
         const char *jsonString = jsonStrings[jsonIdx];
         PlannerDomRoot root(jsonString);
         PlannerDomValue obj(root.rootObject());
+        // If the json string is busted this will be true.
+        EXPECT_FALSE(root.isNull());
         boost::shared_ptr<voltdb::PartitionByPlanNode> pn(dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
         EXPECT_TRUE(pn.get() != NULL);
-        const std::vector<AbstractExpression*> &partitionByExprs = pn->getGroupByExpressions();
-        const std::vector<AbstractExpression*> &sortExprs = pn->getSortExpressions();
-        const std::vector<SortDirectionType> &sortDirs = pn->getSortDirections();
-        EXPECT_TRUE(partitionByExprs.size() == 2);
-        for (int exprIdx = 0; exprIdx < partitionByExprs.size(); exprIdx += 1) {
-            TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(partitionByExprs[exprIdx]);
-            EXPECT_TRUE(tve != NULL);
-            // These three are all true because of collusion in the
-            // construction of the JSON.
-            EXPECT_TRUE(tve->getColumnId() == exprIdx + 1);
-            EXPECT_TRUE(tve->getValueType() == ((exprIdx == 0) ? 8 : 5));
-            EXPECT_TRUE(tve->getValueSize() == ((exprIdx == 0) ? 8 : 4));
-        }
-        EXPECT_TRUE(sortExprs.size() == sortDirs.size());
-        EXPECT_TRUE(sortDirs[0] == SORT_DIRECTION_TYPE_ASC);
-        EXPECT_TRUE(sortDirs[1] == SORT_DIRECTION_TYPE_DESC);
-        for (int idx = 0; idx < partitionByExprs.size(); idx += 1) {
-            TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(sortExprs[idx]);
-            EXPECT_TRUE(tve != NULL);
-            // These are all true, again, because of collusion in the
-            // construction of the JSON.
-            EXPECT_TRUE(tve->getColumnId() == idx + 1);
-            EXPECT_TRUE(tve->getValueType() == ((idx == 0) ? 8 : 5));
-            EXPECT_TRUE(tve->getValueSize() == ((idx == 0) ? 8 : 4));
-        }
+        EXPECT_EQ(1, pn->getAggregates().size());
+        EXPECT_EQ(EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, pn->getAggregates()[0]);
+        EXPECT_EQ(1, pn->getGroupByExpressions().size());
     }
 }
 

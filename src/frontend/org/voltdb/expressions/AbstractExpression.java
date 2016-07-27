@@ -184,7 +184,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             clone.m_right = right_clone;
         }
         if (m_args != null) {
-            clone.m_args = new ArrayList<AbstractExpression>();
+            clone.m_args = new ArrayList<>();
             for (AbstractExpression argument : m_args) {
                 clone.m_args.add((AbstractExpression) argument.clone());
             }
@@ -485,7 +485,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             if (m_args.size() != expr.m_args.size()) {
                 return null;
             }
-            argBindings = new ArrayList<AbstractExpression>();
+            argBindings = new ArrayList<>();
             int ii = 0;
             // iterate the args lists in parallel, binding pairwise
             for (AbstractExpression rhs : expr.m_args) {
@@ -502,7 +502,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         // It's rare (if even possible) for the same bound parameter to get listed twice,
         // so don't worry about duplicate entries, here.
         // That should not cause any issue for the caller.
-        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> result = new ArrayList<>();
         if (leftBindings != null) { // null here can only mean no left child
             result.addAll(leftBindings);
         }
@@ -607,20 +607,24 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      *
      * @param stringer         The stringer used to serialize the sort list.
      * @param sortExpressions  The sort expressions.
-     * @param sortDirections   The sort directions.
+     * @param sortDirections   The sort directions.  These may be empty if the
+     *                         directions are not valueable to us.
      * @throws JSONException
      */
     public static void toJSONArrayFromSortList(JSONStringer             stringer,
                                                List<AbstractExpression> sortExpressions,
                                                List<SortDirectionType>  sortDirections) throws JSONException {
         stringer.key(SortMembers.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < sortExpressions.size(); ii++) {
+        int listSize = sortExpressions.size();
+        for (int ii = 0; ii < listSize; ii++) {
             stringer.object();
             stringer.key(SortMembers.SORT_EXPRESSION.name());
             stringer.object();
             sortExpressions.get(ii).toJSONString(stringer);
             stringer.endObject();
-            stringer.key(SortMembers.SORT_DIRECTION.name()).value(sortDirections.get(ii).toString());
+            if (sortDirections != null) {
+                stringer.key(SortMembers.SORT_DIRECTION.name()).value(sortDirections.get(ii).toString());
+            }
             stringer.endObject();
         }
         stringer.endArray();
@@ -695,7 +699,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         if (!obj.isNull(Members.ARGS.name())) {
             JSONArray jarray = obj.getJSONArray(Members.ARGS.name());
-            ArrayList<AbstractExpression> arguments = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> arguments = new ArrayList<>();
             loadFromJSONArray(arguments, jarray, tableScan);
             expr.setArgs(arguments);
         }
@@ -709,10 +713,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * The lists are cleared before they are filled in.  This is the inverse of toJSONArrayFromSortList.
      *
      * The JSONObject should be in object state, not array state.  It should have a member
-     * named SORT_COLUMNS, which is an array with the <expression, direction> pairs.
+     * named SORT_COLUMNS, which is an array with the <expression, direction> pairs.  Sometimes the
+     * sort directions are not needed.  For example, when deserializing
      *
-     * @param sortExpressions
-     * @param sortDirections
+     * @param sortExpressions The container for the sort expressions.
+     * @param sortDirections The container for the sort directions.  This may
+     *                       be null if we don't care about directions.  If there
+     *                       are no directions in the list this will be empty.
      * @param jarray
      * @throws JSONException
      */
@@ -726,16 +733,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             int size = jarray.length();
             for (int ii = 0; ii < size; ii += 1) {
                 JSONObject tempObj = jarray.getJSONObject(ii);
-                sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
                 sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION.name()) );
+                if (sortDirections != null && tempObj.has(SortMembers.SORT_DIRECTION.name())) {
+                    sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
+                }
             }
         }
+        assert(sortDirections == null || sortExpressions.size() == sortDirections.size());
     }
 
     public static List<AbstractExpression> fromJSONArrayString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONArray jarray = new JSONArray(jsontext);
-        List<AbstractExpression> result = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> result = new ArrayList<>();
         loadFromJSONArray(result, jarray, tableScan);
         return result;
     }
@@ -821,7 +831,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<AbstractExpression>();
+            newArgs = new ArrayList<>();
             for (AbstractExpression expr: m_args) {
                 AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
                 newArgs.add(ex);
@@ -888,7 +898,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<AbstractExpression>();
+            newArgs = new ArrayList<>();
             for (AbstractExpression expr: m_args) {
                 AbstractExpression ex = expr.replaceAVG();
                 newArgs.add(ex);
@@ -914,7 +924,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return a list of contained expressions that are instances of the desired class
      */
     public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<aeClass> collected = new ArrayList<aeClass>();
+        ArrayList<aeClass> collected = new ArrayList<>();
         findAllSubexpressionsOfClass_recurse(aeClass, collected);
         return collected;
     }

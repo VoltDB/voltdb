@@ -976,7 +976,7 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            AuthUser user
+            final AuthUser user
             )
     {
         CatalogContext catalogContext = m_catalogContext.get();
@@ -1009,7 +1009,7 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setParams(catalog,dep);
 
             final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
-            SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
+            final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                     alternateConnectionId, "Empty database snapshot restore catalog update"
                     );
             final InvocationClientHandler alternateHandler = new InvocationClientHandler() {

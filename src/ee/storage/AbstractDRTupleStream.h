@@ -41,6 +41,8 @@ struct DRCommittedInfo{
 };
 
 class AbstractDRTupleStream : public TupleStreamBase {
+    friend class ExecutorContext;
+
 public:
     AbstractDRTupleStream(int partitionId, int defaultBufferSize);
 
@@ -117,6 +119,9 @@ protected:
     int64_t m_rowTarget;
     bool m_opened;
     size_t m_txnRowCount;
+
+private:
+    virtual void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) = 0;
 };
 
 class DRTupleStreamDisableGuard {
