@@ -8,7 +8,10 @@
 # added to whenever new SQL functions or other features are added to VoltDB.
 #
 # The parser that interprets this file understands only a few simple rules:
-#   1. The ::= symbol means "is defined as".
+#   1. The ::= symbol means "is defined as". Definitions are normally given on
+#      a single line, but may be continued onto one or more additional lines
+#      using a backslash (\) as a continuation character; the backslash must
+#      be the last character on the line.
 #   2. The {foo} syntax means to use symbol "foo", which is defined somewhere
 #      in this file, using "::="; recursive definitions are allowed, though of
 #      course a non-recursive option must also be available, to avoid infinite
@@ -43,23 +46,13 @@
 ################################################################################
 
 ################################################################################
-# TODO: temp definitions, to test what happens when there's a crash:
-# based on known crash ENG-10422, which was fixed in V6.4
-#pre-crash-insert1       ::= insert into R1 (ID, TIME) values (-9998, 1470000000000000)
-#pre-crash-insert2       ::= insert into R1 (ID, TIME) values (-9999, 9223372036854775807)
-#pre-crash-insert        ::= {pre-crash-insert1} | {pre-crash-insert2}
-#pre-crash-select1       ::= select ID, TIME from R1 where ID < -9997
-#pre-crash-select2       ::= select ID, TIME, TRUNCATE(DAY, TIME) from R1 where ID = -9998
-#pre-crash-select        ::= {pre-crash-select1} | {pre-crash-select2}
-#crash-select            ::= select ID, TIME, TRUNCATE(DAY, TIME) from R1 where ID < -9997
+# Table and view names pre-defined in the DDL associated with this test
+table-name              ::= P1 | R1 | P2 | R2
+view-name               ::= VP1 | VR1 | VP2 | VR2
 
-################################################################################
-# Table and view names used in the DDL associated with this test
-table-name              ::= P1 | R1
-# TODO: actually define some views
-view-name               ::= P1 | R1
+# TODO: also pre-define some Indexes & Stored Procedures
 
-# Column names used in the DDL, of every possible data type
+# Column names used in the pre-defined DDL, of every possible data type ...
 int-column-name         ::= ID | TINY | SMALL | INT | BIG
 
 # The "5" before the "|" makes the "int-column-name" option 5 times as likely
@@ -72,14 +65,24 @@ varbinary-column-name   ::= VARBIN
 point-column-name       ::= POINT
 polygon-column-name     ::= POLYGON
 geo-column-name         ::= {point-column-name} | {polygon-column-name}
-non-int-str-column-name ::= {timestamp-column-name} | {varbinary-column-name} | {point-column-name} | {polygon-column-name}
-column-name             ::= {numeric-column-name} | {string-column-name} | {non-int-str-column-name}
+non-int-str-column-name ::= {geo-column-name} 2| {timestamp-column-name} | {varbinary-column-name}
+
+table-column-name       ::= {numeric-column-name} 2| {string-column-name} | {non-int-str-column-name}
+view-column-name        ::= {table-column-name} | {table-column-name}_COUNT | TOTAL_COUNT | \
+                            {numeric-column-name}_SUM | {numeric-column-name}_AVG
+column-name             ::= {table-column-name} 9| {view-column-name}
 column-list             ::= {column-name} [, {column-list}]
+
+# These are obviously not the complete lists of all possible table and column
+# aliases, but using a short list makes it more likely that when you refer to
+# one it is one that was actually defined
+table-alias             ::= T1 3| T2 2| T3
+column-alias            ::= C1 3| C2 2| C3
 
 ################################################################################
 # Any (non-DDL) SQL statement:
 # The "4" before the first "|" makes the "select-statement" option 4 times as
-# likely as the other options, so half of all SQL statements will be SELECT
+# likely as the other options, so half of these SQL statements will be SELECT
 # statements.
 #
 sql-statement           ::= {select-statement} 4| {insert-statement} | {upsert-statement} | \
@@ -89,8 +92,6 @@ sql-statement           ::= {select-statement} 4| {insert-statement} | {upsert-s
 # Grammar rules for an INSERT statement:
 ################################################################################
 insert-statement        ::= {insert-values-statement} | {insert-select-statement}
-# TODO: remove last part of definition, which tests what happens when there's a crash
-#crash# | {pre-crash-insert}
 
 # The "9" before the "|" makes the "simple-insert-values" or "ordered-values-list"
 # option 9 times as likely as the other option, making simple, ordered, valid
@@ -106,8 +107,8 @@ ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-val
                             {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
                             {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value}
 random-order-value-list ::= {random-type-value} [, {random-order-value-list}]
-random-type-value       ::= {integer-value} | {numeric-value} | {string-value} | {timestamp-value} | \
-                            {varbinary-value}  | {point-value}   | {polygon-value}
+random-type-value       ::= {integer-value}  4| {numeric-value} 2| {string-value} 3| {timestamp-value} | \
+                            {varbinary-value} | {point-value}    | {polygon-value}
 simple-insert-values    ::= IN{in-or-up-sert-values}
 simple-insert-select    ::= IN{in-or-up-sert-select}
 
@@ -180,21 +181,30 @@ simple-upsert-select    ::= UP{in-or-up-sert-select}
 ################################################################################
 # Grammar rules for an UPDATE statement:
 ################################################################################
-# TODO: define this for real
-update-statement        ::= {upsert-statement}
+update-statement        ::= UPDATE {table-name} SET {column-updates} \
+                            [{where-clause}]
+
+column-update           ::= {column-name} = {value-expression}
+column-updates          ::= {column-update} [, {column-updates}]
 
 ################################################################################
 # Grammar rules for a DELETE (or TRUNCATE) statement:
 ################################################################################
-# TODO: define this for real
-delete-statement        ::= {upsert-statement}
+# The "9" before the "|" makes the "basic-delete-statement" option much more
+# likely than the "truncate-statement" option, since we don't want to truncate
+# (delete all data from) a table too often
+#
+delete-statement        ::= {basic-delete-statement} 9| {truncate-statement}
+
+basic-delete-statement  ::= DELETE FROM {table-name} \
+                            [{where-clause}] [{sort-clause}]
+
+truncate-statement      ::= TRUNCATE TABLE {table-name}
 
 ################################################################################
 # Grammar rules for a SELECT statement (lots of these!):
 ################################################################################
 select-statement        ::= {basic-select-statement} 4| {select-statement} {set-operator} {select-statement}
-# TODO: remove last parts of definition, which test what happens when there's a crash
-#crash#                            {pre-crash-select} 4| {crash-select}
 set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
 # Putting the "top-clause" and "all-or-distinct" in more than one set of
@@ -232,38 +242,33 @@ and-or                  ::= AND | OR
 # TODO: allow for multi-joins (on more than 2 tables)
 join-clause             ::= [{join-type}] JOIN {table-reference} [{join-condition}]
 join-type               ::= INNER | {left-or-right} [OUTER]
-left-or-right           ::= LEFT | RIGHT
+left-or-right           ::= LEFT | RIGHT | FULL
 join-condition          ::= ON {join-expression} | USING {column-reference}
 # TODO: probably should be more specific (e.g. equi-join)
 join-expression         ::= {boolean-expression}
 
 group-clause            ::= GROUP BY  {group-by-list}  [HAVING {boolean-expression}]
-sort-clause             ::= [ORDER BY {order-by-list}] [LIMIT {non-negative-int-value} [OFFSET {non-negative-int-value}]]
+sort-clause             ::= [ORDER BY {order-by-list}] [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
 group-by-list           ::= {column-reference}                 [, {group-by-list}]
 order-by-list           ::= {column-reference} [{asc-or-desc}] [, {order-by-list}]
 asc-or-desc             ::= ASC | DESC
 
 # TODO: add more expression types, and boolean expression types,
 # using different data types (varbinary, point, polygon)
-selection-expression    ::= COUNT(*) | {numeric-expression} | {string-expression} | {timestamp-expression}
-boolean-type-expr       ::= {column-expression} IS [NOT] NULL | {boolean-numeric-expr} | {boolean-string-expr} | \
+value-expression        ::= {numeric-expression} | {string-expression} | {timestamp-expression}
+selection-expression    ::= {value-expression} 9| COUNT(*)
+boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {boolean-numeric-expr} | {boolean-string-expr} | \
                             {boolean-timestamp-expr}
 boolean-numeric-expr    ::= {numeric-expression} {comparison-operator} {numeric-expression}
 boolean-string-expr     ::= {string-expression} {comparison-operator} {string-expression}
 boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression}
 comparison-operator     ::= = | <> | != | < | > | <= | >=
 
-# These are obviously not the complete lists of all possible table and column
-# aliases, but using a short list makes it more likely that when you refer to
-# one it is one that was actually defined
-table-alias             ::= T1 3| T2 2| T3
-column-alias            ::= C1 3| C2 2| C3
-
 ################################################################################
 # Numeric constant values, functions, operators and expressions
 #
 digit                   ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-non-negative-int-value  ::= {digit}[{digit}[{digit}][{digit}]]
+non-negative-int-value  ::= {digit}[{digit}[{digit}][{non-negative-int-value}]]
 integer-non-null-value  ::= [-]{non-negative-int-value}
 numeric-non-null-value  ::= {integer-non-null-value}[.{non-negative-int-value}[{non-negative-int-value}]]
 
@@ -285,7 +290,7 @@ int-function-expr       ::= {int-expression} {math-operator} {int-expression} | 
                             {int-function-2args}({int-expression}, {int-expression}) | \
                             {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
 numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expression} | \
-                            {math-function-0args}() | \
+                            {math-function-0args}[()] | \
                             {math-function-1arg}({numeric-expression}) | \
                             {math-function-2args}({numeric-expression}, {numeric-expression}) | \
                             {num-valued-time-expr}
@@ -301,13 +306,14 @@ int-function-2args      ::= MOD
 character               ::= A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z | \
                             a | b | c | d | e | f | g | h | i | j | k | l | m | n | o | p | q | r | s | t | u | v | w | x | y | z | \
                             {digit} 10| . | , | ! | @ | # | $ | % | ^ | & | * | ( | ) | - | _ | + | =
-string-non-null-value   ::= '[{character}][{character}][{character}[{character}[{character}[{character}[{string-non-null-value}]]]]]'
+characters              ::= [{character}][{character}][{character}[{characters}]]
+string-non-null-value   ::= '{characters}'
 
 # The "3" before the "|" makes the "string-non-null-value" option 3 times as
 # likely as the NULL option, making NULL values less likely
 string-value            ::= {string-non-null-value} 3| NULL
 
-string-expression       ::= {string-value} | {string-column-name} | {string-function-expr} | 
+string-expression       ::= {string-value} | {string-column-name} | {string-function-expr}
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} | \
                             {string-function-1arg} ({string-expression}) | \
                             {string-function-2args}({string-expression}, {string-expression}) | \
@@ -327,7 +333,7 @@ case-sensitivity        ::= 'c' | 'i' | {string-expression}
 # Some functions of a string produce an integer value
 int-valued-string-func  ::= CHAR_LENGTH | OCTET_LENGTH
 # POSITION is a special case, due to the use of the IN keyword
-int-valued-string-expr  ::= {int-valued-string-func}({string-expression}) | POSITION({string-expression} IN {string-expression})
+int-valued-string-expr  ::= {int-valued-string-func}({string-expression}) 2| POSITION({string-expression} IN {string-expression})
 
 # Some functions of an integer produce a string value
 string-valued-int-func  ::= BIN | CHAR | HEX | SPACE
@@ -370,7 +376,7 @@ timestamp-non-null-value::= '{year}-{month}-{day} {hour}:{minute-or-second}:{min
 timestamp-value         ::= {timestamp-non-null-value} 3| NULL
 
 timestamp-expression    ::= {timestamp-value} | {timestamp-column-name} | {timestamp-function-expr}
-timestamp-function-expr ::= CURRENT_TIMESTAMP | NOW | \
+timestamp-function-expr ::= CURRENT_TIMESTAMP[()] | NOW[()] | \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
                             TRUNCATE({dateadd-time-unit}, {timestamp-expression}) | \
@@ -404,7 +410,7 @@ dateadd-time-unit       ::= {long-time-unit} | {short-time-unit}
 # Varbinary (binary) constant values, functions, operators and expressions
 #
 hex-alphabetic-digit    ::= A | B | C | D | E | F | a | b | c | d | e | f
-hex-digit               ::= {digit} | {hex-alphabetic-digit}
+hex-digit               ::= {digit} 2| {hex-alphabetic-digit}
 even-num-of-hex-digits  ::= {hex-digit}{hex-digit}[{even-num-of-hex-digits}]
 varbin-non-null-value   ::= x'{even-num-of-hex-digits}'
 
@@ -450,7 +456,7 @@ polygon-value           ::= {polygon-non-null-value} 3| NULL
 # Non-geospatial (ng-) alternative values of some of the above definitions, for
 # use with SQLCoverage, to avoid issues with Geospatial types (point & polygon,
 # i.e. GEOGRAPHY_POINT & GEOGRAPHY); these definitions are largely the same,
-# but with the points and polygons [and varbinary] left out, or NULL
+# but with the points and polygons [and varbinary?] left out, or NULL
 #
 
 ng-non-int-str-column-name ::= {timestamp-column-name} | {varbinary-column-name} | {int-column-name}
@@ -495,4 +501,4 @@ ng-polygon-value           ::= NULL
 # TODO: More expression & function types TBD:
 num-only-aggregate-func ::= SUM | AVG
 non-num-aggregate-func  ::= COUNT | APPROX_COUNT_DISTINCT | MAX | MIN
-aggregate-function      ::= {num-only-aggregate-func} | {non-num-aggregate-func} | {non-num-aggregate-func}
+aggregate-function      ::= {non-num-aggregate-func} 2| {num-only-aggregate-func}
