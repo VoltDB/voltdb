@@ -249,6 +249,8 @@ class ExecutorContext {
 
     bool allOutputTempTablesAreEmpty() const;
 
+    void checkTransactionForDR();
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
