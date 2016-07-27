@@ -25,6 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -176,55 +179,39 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "3", "200.0", "9");
     }
 
-    private void assertTableContentEquals(VoltTable[] ra, VoltTable[] rb)
-    {
-        assertEquals(1, ra.length);
-        assertEquals(1, rb.length);
-        VoltTable a = ra[0];
-        VoltTable b = rb[0];
-        assertEquals(a.getRowCount(), b.getRowCount());
-        assertEquals(a.getColumnCount(), b.getColumnCount());
-        for (int i=0; i<a.getRowCount(); ++i) {
-            a.advanceRow();
-            b.advanceRow();
-            for (int j=0; j<a.getColumnCount(); ++j) {
-                assertEquals(a.getLong(j), b.getLong(j));
-            }
-        }
-    }
-
     private void verifyENG6511(Client client) throws IOException, ProcCallException
     {
-        VoltTable[] vresult = null;
-        VoltTable[] tresult = null;
+        VoltTable vresult = null;
+        VoltTable tresult = null;
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result: ";
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511C: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511TwoIndexes: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511NoGroup: ", tresult, vresult);
     }
 
     private void runAndVerifyENG6511(Client client, String query) throws IOException, ProcCallException
@@ -1416,10 +1403,132 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
+    private void deleteRow(Client client, String tableName, Object... parameters) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        if (tableName.equalsIgnoreCase("ORDERITEMS")) {
+            results = client.callProcedure("DELETEORDERITEM", parameters[0], parameters[1]).getResults();
+        }
+        else {
+            results = client.callProcedure(tableName + ".delete", parameters[0]).getResults();
+        }
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    private void verifyViewOnJoinQueryResult(Client client) throws IOException, ProcCallException
+    {
+        VoltTable vresult = null;
+        VoltTable tresult = null;
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result ";
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_NOPCOL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_NOPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_NOPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_NOPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_WITHPCOL ORDER BY 1, 2;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_DETAIL_WITHPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_WITHPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER2016 ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER2016").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER2016: ", tresult, vresult);
+    }
+
     public void testViewOnJoinQuery() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
+        List<Object[]> dataList = Arrays.asList(
+            new Object[][] {
+                {"CUSTOMERS", 1, "Tom", "VoltDB"},
+                {"CUSTOMERS", 2, "Jerry", "Bedford"},
+                {"CUSTOMERS", 3, "Rachael", "USA"},
+                {"CUSTOMERS", 4, "Ross", "Massachusetts"},
+                {"CUSTOMERS", 5, "Stephen", "Houston TX"},
+                {"CUSTOMERS", 6, "Mike", "WPI"},
+                {"CUSTOMERS", 7, "Max", "New York"},
+                {"CUSTOMERS", 8, "Ethan", "Beijing China"},
+                {"CUSTOMERS", 9, "Selina", "France"},
+                {"CUSTOMERS", 10, "Harry Potter", "Hogwarts"},
+                {"ORDERS", 1, 2, "2016-04-23 13:24:57.671000"},
+                {"ORDERS", 2, 7, "2015-04-12 10:24:10.671400"},
+                {"ORDERS", 3, 5, "2016-01-20 09:24:15.943000"},
+                {"ORDERS", 4, 1, "2015-10-30 19:24:00.644000"},
+                {"ORDERS", 5, 3, "2015-04-23 00:24:45.768000"},
+                {"ORDERS", 6, 2, "2016-07-05 16:24:31.384000"},
+                {"ORDERS", 7, 4, "2015-03-09 21:24:15.768000"},
+                {"ORDERS", 8, 2, "2015-09-01 16:24:42.279300"},
+                {"PRODUCTS", 1, "H MART", 20.97},
+                {"PRODUCTS", 2, "COSTCO WHOLESALE", 62.66},
+                {"PRODUCTS", 3, "CENTRAL ROCK GYM", 22.00},
+                {"PRODUCTS", 4, "ATT*BILL PAYMENT", 48.90},
+                {"PRODUCTS", 5, "APL* ITUNES", 16.23},
+                {"PRODUCTS", 6, "GOOGLE *YouTube", 10.81},
+                {"PRODUCTS", 7, "UNIV OF HOUSTON SYSTEM", 218.35},
+                {"PRODUCTS", 8, "THE UPS STORE 2287", 36.31},
+                {"PRODUCTS", 9, "NNU*XFINITYWIFI", 7.95},
+                {"PRODUCTS", 10, "IKEA STOUGHTON", 61.03},
+                {"PRODUCTS", 11, "WM SUPERCENTER #5752", 9.74},
+                {"PRODUCTS", 12, "STOP & SHOP 0831", 12.28},
+                {"PRODUCTS", 13, "VERANDA NOODLE HOUSE", 29.81},
+                {"PRODUCTS", 14, "AMC 34TH ST 14 #2120", 38.98},
+                {"PRODUCTS", 15, "STARBUCKS STORE 19384", 5.51},
+                {"PRODUCTS", 16, "SAN SOO KAP SAN SHUSHI", 10.69},
+                {"PRODUCTS", 17, "PLASTC INC.", 155.00},
+                {"PRODUCTS", 18, "MANDARIN MALDEN", 34.70},
+                {"PRODUCTS", 19, "MCDONALDS F16461", 7.25},
+                {"PRODUCTS", 20, "UBER US JUL20 M2E3D", 31.33},
+                {"PRODUCTS", 21, "TOUS LES JOURS", 13.25},
+                {"PRODUCTS", 22, "GINGER JAPANESE RESTAU", 69.20},
+                {"PRODUCTS", 23, "WOO JEON II", 9.58},
+                {"PRODUCTS", 24, "INFLIGHT WI-FI - LTV", 7.99},
+                {"PRODUCTS", 25, "EXPEDIA INC", 116.70},
+                {"PRODUCTS", 26, "THE ICE CREAM STORE", 5.23},
+                {"PRODUCTS", 27, "WEGMANS BURLINGTON #59", 22.13},
+                {"PRODUCTS", 28, "ACADEMY EXPRESS", 46.80},
+                {"PRODUCTS", 29, "TUCKS CANDY FACTORY INC", 7.00},
+                {"PRODUCTS", 30, "SICHUAN GOURMET", 37.12},
+                {"ORDERITEMS", 1, 2, 1},
+                {"ORDERITEMS", 1, 7, 1},
+                {"ORDERITEMS", 2, 5, 2},
+                {"ORDERITEMS", 3, 1, 3},
+                {"ORDERITEMS", 3, 15, 1},
+                {"ORDERITEMS", 3, 20, 1},
+                {"ORDERITEMS", 3, 4, 2},
+                {"ORDERITEMS", 3, 26, 5},
+                {"ORDERITEMS", 4, 30, 1},
+                {"ORDERITEMS", 5, 8, 1},
+                {"ORDERITEMS", 5, 12, 6},
+                {"ORDERITEMS", 5, 1, 0},
+                {"ORDERITEMS", 5, 27, 1},
+                {"ORDERITEMS", 6, 0, 1},
+                {"ORDERITEMS", 6, 21, 1},
+                {"ORDERITEMS", 7, 8, 1},
+                {"ORDERITEMS", 7, 19, 1},
+                {"ORDERITEMS", 7, 30, 4},
+                {"ORDERITEMS", 7, 1, 1},
+                {"ORDERITEMS", 8, 25, 2}
+            }
+        );
+        Collections.shuffle(dataList);
+        for (Object[] dataRow : dataList) {
+            insertRow(client, dataRow[0].toString(), dataRow[1], dataRow[2], dataRow[3]);
+            verifyViewOnJoinQueryResult(client);
+        }
+        Collections.shuffle(dataList);
+        for (Object[] dataRow : dataList) {
+            deleteRow(client, dataRow[0].toString(), dataRow[1], dataRow[2]);
+            verifyViewOnJoinQueryResult(client);
+        }
     }
 
     /**

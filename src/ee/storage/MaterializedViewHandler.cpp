@@ -371,12 +371,8 @@ namespace voltdb {
             }
             NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
             NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
-            if (existingCount.compare(deltaCount) == 0) {
+            if (existingCount.compare(deltaCount) == 0 && m_groupByColumnCount > 0) {
                 m_destTable->deleteTuple(m_existingTuple, fallible);
-                if (m_groupByColumnCount == 0) {
-                    catchUpWithExistingData();
-                }
-                continue;
             }
             mergeTupleForDelete(deltaTuple);
             // Shouldn't need to update group-key-only indexes such as the primary key

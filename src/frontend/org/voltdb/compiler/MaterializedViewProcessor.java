@@ -216,16 +216,12 @@ public class MaterializedViewProcessor {
                                 ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
                                 if (gbcol.tableName.equals(srcTableName) && gbcol.columnName.equals(partitionColName)) {
                                     destTable.setPartitioncolumn(destColumnArray.get(i));
-                                    System.out.println(viewName + " found partition column: " + gbcol.columnName + " from table " + srcTableName);
                                     break;
                                 }
                             }
                         }
                     } // end find partition column
                 } // end for each source table
-                if (destTable.getPartitioncolumn() == null) {
-                    System.out.println("Did not find a partition column for view " + viewName);
-                }
 
                 compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
                 compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
@@ -338,6 +334,13 @@ public class MaterializedViewProcessor {
                     } else {
                         refFound.setName("");
                     }
+                }
+
+                // This is to fix the data type mismatch of the COUNT(*) column (and potentially other columns).
+                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
+                for (int i=0; i<=stmt.m_groupByColumns.size(); i++) {
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    destColumnArray.get(i).setType(col.expression.getValueType().getValue());
                 }
 
                 // parse out the aggregation columns into the dest table

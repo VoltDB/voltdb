@@ -1935,7 +1935,6 @@ void PersistentTable::dropViewHandlerToTrigger(MaterializedViewHandler *viewHand
     if (m_viewHandlersToTrigger.size() == 0) {
         m_deltaTable->decrementRefcount();
         m_deltaTable = NULL;
-        if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "Delta table for " << m_name << " is deleted.\n"; }
     }
 }
 
