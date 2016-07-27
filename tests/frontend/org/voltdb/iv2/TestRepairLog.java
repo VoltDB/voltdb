@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -49,6 +50,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 public class TestRepairLog
 {
@@ -81,6 +83,11 @@ public class TestRepairLog
         return msg;
     }
 
+    VoltMessage truncMsg(long spHandle)
+    {
+        return new RepairLogTruncationMessage(spHandle);
+    }
+
     // a message that should never be logged.
     private static class FooMessage extends VoltMessage
     {
@@ -102,9 +109,13 @@ public class TestRepairLog
     @Test
     public void testOffer()
     {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
+
         // offer some various messages to log and check
         // that it keeps the expected ones.
         RepairLog rl = new RepairLog();
+        rl.registerTransactionCommitInterest(interest);
         VoltMessage m1 = nonTruncInitMsg();
         VoltMessage m2 = nonTruncInitMsg();
 
@@ -115,22 +126,28 @@ public class TestRepairLog
         assertEquals(3, contents.size());
         assertEquals(m1, contents.get(1).getPayload());
         assertEquals(m2, contents.get(2).getPayload());
+        assertEquals(Long.MIN_VALUE, lastCommitted.get());
     }
 
     @Test
     public void testOfferWithTruncation()
     {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
         RepairLog rl = new RepairLog();
+        rl.registerTransactionCommitInterest(interest);
 
         // add m1
         VoltMessage m1 = truncInitMsg(0L, 1L);
         rl.deliver(m1);
         assertEquals(2, rl.contents(1L, false).size());
+        assertEquals(0, lastCommitted.get());
 
         // add m2
         VoltMessage m2 = truncInitMsg(0L, 2L);
         rl.deliver(m2);
         assertEquals(3, rl.contents(1L, false).size());
+        assertEquals(0, lastCommitted.get());
 
         // trim m1. add m3
         VoltMessage m3 = truncInitMsg(1L, 3L);
@@ -140,6 +157,7 @@ public class TestRepairLog
         assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
         assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(1, lastCommitted.get());
 
     }
 
@@ -161,7 +179,10 @@ public class TestRepairLog
     @Test
     public void testOfferFragmentTaskMessage()
     {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
         RepairLog rl = new RepairLog();
+        rl.registerTransactionCommitInterest(interest);
 
         // trunc(trunc point, txnId).
         VoltMessage m1 = truncFragMsg(0L, 1L);
@@ -185,12 +206,16 @@ public class TestRepairLog
         assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
         assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
+        assertEquals(Long.MIN_VALUE, lastCommitted.get());
     }
 
     @Test
     public void testOfferCompleteMessage()
     {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
         RepairLog rl = new RepairLog();
+        rl.registerTransactionCommitInterest(interest);
 
         // trunc(trunc point, txnId).
         VoltMessage m1 = truncCompleteMsg(0L, 1L);
@@ -209,13 +234,17 @@ public class TestRepairLog
         assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
         assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
+        assertEquals(Long.MIN_VALUE, lastCommitted.get());
     }
 
 
     @Test
     public void testTruncationAfterPromotion()
     {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
         RepairLog rl = new RepairLog();
+        rl.registerTransactionCommitInterest(interest);
         VoltMessage m1 = truncInitMsg(0L, 1L);
         rl.deliver(m1);
         VoltMessage m2 = truncInitMsg(0L, 2L);
@@ -223,6 +252,7 @@ public class TestRepairLog
         assertEquals(3, rl.contents(1L, false).size());
         rl.setLeaderState(true);
         assertEquals(1, rl.contents(1L, false).size());
+        assertEquals(2, lastCommitted.get());
     }
 
     // validate the invariants on the RepairLog contents:
@@ -345,5 +375,20 @@ public class TestRepairLog
         RepairLog log = new RepairLog();
         log.deliver(msg);
         validateRepairLog(log.contents(1l, false), endSpUniqueId, endMpUniqueId);
+    }
+
+    @Test
+    public void testTruncationWithInterest()
+    {
+        final AtomicLong lastCommitted = new AtomicLong(Long.MIN_VALUE);
+        final TransactionCommitInterest interest = lastCommitted::set;
+        final RepairLog dut = new RepairLog();
+        dut.registerTransactionCommitInterest(interest);
+        assertEquals(Long.MIN_VALUE, lastCommitted.get());
+
+        for (int i = 0; i < 10; i++) {
+            dut.deliver(truncMsg(i));
+            assertEquals(i, lastCommitted.get());
+        }
     }
 }
