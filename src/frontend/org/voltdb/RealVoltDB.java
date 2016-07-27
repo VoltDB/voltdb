@@ -598,7 +598,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
-                    for (String path: managedPathsWithFiles(readDepl.deployment)) {
+                    for (String path: pathsWithRecoverableArtifacts(readDepl.deployment)) {
                         MiscUtils.deleteRecursively(new VoltFile(path));
                     }
                 }
@@ -2368,7 +2368,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
+                || managedPathsWithFiles(m_config, readDepl.deployment).isEmpty();
 
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
