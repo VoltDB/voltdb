@@ -58,6 +58,7 @@ CountingPostfilter::CountingPostfilter(const TempTable* table, const AbstractExp
     m_under_limit(true)
 {}
 
+
 CountingPostfilter::CountingPostfilter() :
     m_table(NULL),
     m_postPredicate(NULL),

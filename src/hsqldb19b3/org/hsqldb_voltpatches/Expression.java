@@ -1460,7 +1460,7 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
-    static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
+    static Map<Integer, VoltXMLElement> prototypes = new HashMap<>();
 
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
@@ -1909,7 +1909,7 @@ public class Expression {
     public Expression eliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
         // The key is the expression id and the value is the expression itself
-        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        Map<String, Expression> subExprMap = new HashMap<>();
         extractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
         if (!subExprMap.isEmpty()) {
@@ -1965,7 +1965,7 @@ public class Expression {
             //
             // Horribly inefficient, but it works for now...
             //
-            final List<String> id_list = new Vector<String>();
+            final List<String> id_list = new Vector<>();
             new Object() {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {
