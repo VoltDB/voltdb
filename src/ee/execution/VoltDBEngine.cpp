@@ -1425,9 +1425,7 @@ bool VoltDBEngine::isLocalSite(const int32_t pkHash) const
 }
 
 std::string VoltDBEngine::dumpCurrentHashinator() const {
-    std::ostringstream buffer;
-    buffer << m_hashinator.get()->debug() << std::endl;
-    return buffer.str();
+    return m_hashinator.get()->debug();
 }
 
 typedef std::pair<std::string, StreamedTable*> LabeledStream;
