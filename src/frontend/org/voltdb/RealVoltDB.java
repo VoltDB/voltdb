@@ -1695,6 +1695,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             0L,
                             new byte[] {},  // spin loop in Inits.LoadCatalog.run() needs
                                             // this to be of zero length until we have a real catalog.
+                            null,
                             deploymentBytes);
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {

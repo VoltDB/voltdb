@@ -318,6 +318,7 @@ public class Inits {
                             0, catalogTxnId,
                             catalogUniqueId,
                             catalogBytes,
+                            null,
                             deploymentBytes);
                 }
                 catch (IOException e) {
