@@ -32,41 +32,32 @@ PlanNodeType PartitionByPlanNode::getPlanNodeType() const
     return PLAN_NODE_TYPE_PARTITIONBY;
 }
 
-void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    // Start with the base class.
-    AggregatePlanNode::loadFromJSONObject(obj);
-    // Read the sort expressions and directions.
-    PlannerDomValue sortByColumnArray = obj.valueForKey("SORT_COLUMNS");
-    for (int idx = 0; idx < sortByColumnArray.arrayLen(); idx += 1) {
-        PlannerDomValue sortColumnValue = sortByColumnArray.valueAtIndex(idx);
-        if (sortColumnValue.hasNonNullKey("SORT_EXPRESSION")) {
-            PlannerDomValue exprDom = sortColumnValue.valueForKey("SORT_EXPRESSION");
-            m_sortExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
-        } else {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                       "PartitionByPlanNode::loadFromJSONObject:"
-                                                       " Missing sort expression.");
-        }
-        if (sortColumnValue.hasNonNullKey("SORT_DIRECTION")) {
-            std::string dirStr = sortColumnValue.valueForKey("SORT_DIRECTION").asStr();
-            m_sortDirections.push_back(stringToSortDirection(dirStr));
-        } else {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                       "PartitionByPlanNode::loadFromJSONObject:"
-                                                       " Missing sort direction.");
-        }
-    }
-}
-
 std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
     buffer << "PartitionByPlanNode: ";
-    buffer << AggregatePlanNode::debug(spacer);
-    for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-        buffer << m_sortExpressions[idx]->debug(spacer);
-    }
-        return buffer.str();
+    buffer << AggregatePlanNode::debugInfo(spacer);
+    return buffer.str();
+}
+
+void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    AggregatePlanNode::loadFromJSONObject(obj);
+    std::vector<AbstractExpression*>  orderByExpressions;
+    // AggregatePlanNode knows there is an aggregate but
+    // it doesn't know the input expression.  Since we are
+    // coding the order by expression as the input expression
+    // we will need special handling below.
+    assert(m_aggregateInputExpressions.size() == 1);
+    // The Java PartitionByPlanNode puts the order by
+    // expressions in a sensible place.  However, we want
+    // to subvert this sensible behavior by putting the
+    // first and only one in the input expression list for
+    // the only windowed aggregate in this node.  This is
+    // temporizing around our unfortunate inability to
+    // add order by expressions to Agg subobjects in the
+    // executors.
+    AbstractPlanNode::loadSortListFromJSONObject(obj, &orderByExpressions, NULL);
+    assert(orderByExpressions.size() == 1);
+    m_aggregateInputExpressions[0] = orderByExpressions[0];
 }
 }

@@ -211,14 +211,20 @@ protected:
 
     void initGroupByKeyTuple(const TableTuple& nextTuple);
 
-    /*
+    /**
      * Swap the current group by key tuple with the in-progress group by key tuple.
      * Return the new group by key tuple associated with in-progress tuple address.
      * This function is only used in serial or partial aggregation.
      */
     TableTuple& swapWithInprogressGroupByKeyTuple();
 
-    /*
+    /**
+     * If this returns true, this class expects to output a row for
+     * each input row.  The aggregates are windowed aggregates.
+     */
+    virtual bool outputForEachInputRow() const;
+
+    /**
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
      * aggregation.

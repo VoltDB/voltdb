@@ -55,6 +55,12 @@ public class SiteTaskerQueue
         return m_tasks.poll();
     }
 
+    // Non-blocking peek on the site tasker queue.
+    public SiteTasker peek()
+    {
+        return m_tasks.peek();
+    }
+
     public boolean isEmpty() {
         return m_tasks.isEmpty();
     }
