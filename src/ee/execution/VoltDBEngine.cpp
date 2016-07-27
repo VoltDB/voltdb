@@ -1426,6 +1426,10 @@ bool VoltDBEngine::isLocalSite(const int32_t pkHash) const
     return getPartitionForPkHash(pkHash) == m_partitionId;
 }
 
+std::string VoltDBEngine::dumpCurrentHashinator() const {
+    return m_hashinator.get()->debug();
+}
+
 typedef std::pair<std::string, StreamedTable*> LabeledStream;
 
 /** Perform once per second, non-transactional work. */
