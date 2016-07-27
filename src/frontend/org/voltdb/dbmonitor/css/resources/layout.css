@@ -3777,15 +3777,18 @@ label.errorTimeOut {
 .clsQueryBtns { float:right;}
 .sliderGraph { float:left; margin:8px 30px 0 0;}
 .labelSlider { float:left; position:relative;right:208px;}
+@-moz-document url-prefix() {.labelSlider {right:214px; top:-2px;}}
 .labelSlider label {font-size: 14px;}
 .sliderGraph .ui-slider .ui-widget-header { background:#ccc}
 .sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
 .sliderMain { position:relative; top:3px;}
 .downloadBtnChart { float: right;margin-right: 10px;position: relative; top: -4px;}
 #timeInterval {border:0; color:#222; font-weight:bold; width:24px;}
+@-moz-document url-prefix() {#timeInterval {width:28px;}}
 .errorMsgLocalStorageFull { background:#fff; padding:10px 20px; margin-bottom:10px; position:relative;}
-.errorMsgLocalStorageFull p { color:#ff0000; font-weight:bold; position:relative; top:2px; float:left; font-size:13px;}
-.errorMsgLocalStorageFull img { float:left; padding-right:5px;}
+.errorMsgLocalWrapper{ float:left; padding-right:5px; width:20px;}
+.textMsgLocalWrapper { float:left; width:95%;}
+.textMsgLocalWrapper p {color:#ff0000; font-weight:bold; position:relative; top:2px; font-size:13px;}
 .crossIconMsg { }
 /*.sliderPop {margin-bottom: 10px;}
 .sliderControl { margin:0; padding:0;}
@@ -3833,6 +3836,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 
 @media (min-width: 320px) and (max-width:360px) {
 
+
       .server-info-heading .server {
   float: left;
   display: block;
@@ -3856,6 +3860,8 @@ fieldset { border:1px solid #ccc; padding:20px;}
     ul.servers-list li span.servIpNum {margin-left: 10%;}
     /*.serverNameAlign { width: 22%;}*/
 	.headLeft .logo{ margin-right:0;}
+
+
 
 }
 @media (max-width: 360px) {
@@ -4497,6 +4503,9 @@ fieldset { border:1px solid #ccc; padding:20px;}
     overflow: auto;
     width: auto;
 }
+}
+@media (max-width: 629px) {
+.textMsgLocalWrapper { width:91%;}
 }
 
 @media (max-width: 980px) {

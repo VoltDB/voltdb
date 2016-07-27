@@ -207,8 +207,13 @@
                     </div>
 
                     <div id="mainGraphBlock">
-                    <div class="errorMsgLocalStorageFull" style="display:none">
-                        <img src="css/resources/images/alert.png" alt="Alert"/><p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                    <div class="errorMsgLocalStorageFull" style="display:block">
+                        <div class="errorMsgLocalWrapper">
+                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
                         <div class="clear"></div>
                     </div>
                         <div class="graphChart" id="graphChart">
