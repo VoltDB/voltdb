@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -272,7 +273,11 @@ public class InitiateResponseMessage extends VoltMessage {
         else
             sb.append("\n  ROLLBACK/ABORT, ");
         sb.append("\n CLIENT RESPONSE: \n");
-        sb.append(m_response.toJSONString());
+        if (m_response == null) {
+            sb.append(" NULL\n");
+        } else {
+            sb.append(m_response.toJSONString());
+        }
 
         return sb.toString();
     }

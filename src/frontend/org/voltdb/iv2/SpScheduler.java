@@ -682,10 +682,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // All reads will have no duplicate counter.
         // Avoid all the lookup below.
         // Also, don't update the truncation handle, since it won't have meaning for anyone.
-        if (message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.FAST) {
-            // the initiatorHSId is the ClientInterface mailbox.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-            return;
+        if (message.isReadOnly()) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
+                // the initiatorHSId is the ClientInterface mailbox.
+                m_mailbox.send(message.getInitiatorHSId(), message);
+                return;
+            }
+            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader) {
+                assert(m_bufferedReadLog != null);
+                m_bufferedReadLog.offerSp(message, m_repairLogTruncationHandle);
+                return;
+            }
+            // SAFE mode Reads on replicas of its SPI will be here
+            // but it's impossible except the test cases.
         }
 
         final long spHandle = message.getSpHandle();
@@ -706,11 +715,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_repairLogTruncationHandle = spHandle;
             m_mailbox.send(message.getInitiatorHSId(), message);
-        }
-
-        if (m_isLeader && message.isReadOnly() && m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            assert(m_bufferedReadLog != null);
-            m_bufferedReadLog.offerSp(message, m_repairLogTruncationHandle);
         }
     }
 
