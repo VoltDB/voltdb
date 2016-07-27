@@ -72,13 +72,13 @@ public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt validateview14 = new SQLStmt("SELECT COUNT(*) FROM VENG6511expR;");
     public final SQLStmt validateview15 = new SQLStmt("SELECT COUNT(*) FROM VENG6511expLR;");
     public final SQLStmt validateview16 = new SQLStmt("SELECT COUNT(*) FROM VENG6511C;");
-    public final SQLStmt validateview17 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
-    // ORDER_COUNT_GLOBAL is a view without group by column.
-    // If the soruce tables are sucessfully truncated, it will have one row with value 0.
-    public final SQLStmt validateview18 = new SQLStmt("SELECT * FROM ORDER_COUNT_GLOBAL;");
-    public final SQLStmt validateview19 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
-    public final SQLStmt validateview20 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
-    public final SQLStmt validateview21 = new SQLStmt("SELECT COUNT(*) FROM ORDER2016;");
+    // public final SQLStmt validateview17 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
+    // // ORDER_COUNT_GLOBAL is a view without group by column.
+    // // If the soruce tables are sucessfully truncated, it will have one row with value 0.
+    // public final SQLStmt validateview18 = new SQLStmt("SELECT * FROM ORDER_COUNT_GLOBAL;");
+    // public final SQLStmt validateview19 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
+    // public final SQLStmt validateview20 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
+    // public final SQLStmt validateview21 = new SQLStmt("SELECT COUNT(*) FROM ORDER2016;");
     // The following four views are all views without group-by columns (ENG-7872).
     public final SQLStmt validateview22 = new SQLStmt("SELECT * FROM MATPEOPLE_COUNT;");
     public final SQLStmt validateview23 = new SQLStmt("SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT;");
@@ -133,11 +133,11 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview14); // ("SELECT COUNT(*) FROM VENG6511expR;");
         voltQueueSQL(validateview15); // ("SELECT COUNT(*) FROM VENG6511expLR;");
         voltQueueSQL(validateview16); // ("SELECT COUNT(*) FROM VENG6511C;");
-        voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
-        voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
-        voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
-        voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
-        voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
+        // voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
+        // voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
+        // voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
+        // voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
+        // voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
         voltQueueSQL(validateview22); // ("SELECT * FROM MATPEOPLE_COUNT;");
         voltQueueSQL(validateview23); // ("SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT;");
         voltQueueSQL(validateview24); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_SUM;");

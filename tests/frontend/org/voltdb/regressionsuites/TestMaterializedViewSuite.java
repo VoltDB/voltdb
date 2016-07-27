@@ -25,9 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -48,6 +48,8 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
+
+import com.google.common.collect.Lists;
 
 import junit.framework.Test;
 
@@ -87,7 +89,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
         int nStatement = 0;
         for (VoltTable countTable : results) {
-            // System.out.println(countTable);
             ++nStatement;
             long count = countTable.asScalarLong();
             assertEquals("COUNT statement " + nStatement + "/" +
@@ -183,7 +184,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     {
         VoltTable vresult = null;
         VoltTable tresult = null;
-        String prefix = "Assertion failed comparing the view content and the AdHoc query result: ";
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result ";
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
@@ -1394,24 +1395,36 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     }
 
-    private void insertRow(Client client, String tableName, Object... parameters) throws IOException, ProcCallException
+    private void insertRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
-
-        results = client.callProcedure(tableName + ".insert", parameters).getResults();
+        results = client.callProcedure(parameters[0].toString() + ".insert", Arrays.copyOfRange(parameters, 1, parameters.length)).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
     }
 
-    private void deleteRow(Client client, String tableName, Object... parameters) throws IOException, ProcCallException
+    private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
+        String tableName = parameters[0].toString();
         if (tableName.equalsIgnoreCase("ORDERITEMS")) {
-            results = client.callProcedure("DELETEORDERITEM", parameters[0], parameters[1]).getResults();
+            results = client.callProcedure("DELETEORDERITEMS", parameters[1], parameters[2]).getResults();
         }
         else {
-            results = client.callProcedure(tableName + ".delete", parameters[0]).getResults();
+            results = client.callProcedure(tableName + ".delete", parameters[1]).getResults();
         }
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    private void updateRow(Client client, Object[] oldRow, Object[] newRow) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        String tableName1 = oldRow[0].toString();
+        String tableName2 = newRow[0].toString();
+        assertEquals("Trying to update table " + tableName1 + " with " + tableName2 + " data.", tableName1, tableName2);
+        results = client.callProcedure("UPDATE" + tableName1, newRow[2], newRow[3],
+                                                              oldRow[1], oldRow[2], oldRow[3]).getResults();
         assertEquals(1, results.length);
         assertEquals(1L, results[0].asScalarLong());
     }
@@ -1447,26 +1460,17 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     {
         Client client = getClient();
         truncateBeforeTest(client);
-        List<Object[]> dataList = Arrays.asList(
+        ArrayList<Object[]> dataList1 = Lists.newArrayList(
             new Object[][] {
                 {"CUSTOMERS", 1, "Tom", "VoltDB"},
                 {"CUSTOMERS", 2, "Jerry", "Bedford"},
                 {"CUSTOMERS", 3, "Rachael", "USA"},
                 {"CUSTOMERS", 4, "Ross", "Massachusetts"},
                 {"CUSTOMERS", 5, "Stephen", "Houston TX"},
-                {"CUSTOMERS", 6, "Mike", "WPI"},
-                {"CUSTOMERS", 7, "Max", "New York"},
-                {"CUSTOMERS", 8, "Ethan", "Beijing China"},
-                {"CUSTOMERS", 9, "Selina", "France"},
-                {"CUSTOMERS", 10, "Harry Potter", "Hogwarts"},
                 {"ORDERS", 1, 2, "2016-04-23 13:24:57.671000"},
                 {"ORDERS", 2, 7, "2015-04-12 10:24:10.671400"},
                 {"ORDERS", 3, 5, "2016-01-20 09:24:15.943000"},
                 {"ORDERS", 4, 1, "2015-10-30 19:24:00.644000"},
-                {"ORDERS", 5, 3, "2015-04-23 00:24:45.768000"},
-                {"ORDERS", 6, 2, "2016-07-05 16:24:31.384000"},
-                {"ORDERS", 7, 4, "2015-03-09 21:24:15.768000"},
-                {"ORDERS", 8, 2, "2015-09-01 16:24:42.279300"},
                 {"PRODUCTS", 1, "H MART", 20.97},
                 {"PRODUCTS", 2, "COSTCO WHOLESALE", 62.66},
                 {"PRODUCTS", 3, "CENTRAL ROCK GYM", 22.00},
@@ -1482,6 +1486,29 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 {"PRODUCTS", 13, "VERANDA NOODLE HOUSE", 29.81},
                 {"PRODUCTS", 14, "AMC 34TH ST 14 #2120", 38.98},
                 {"PRODUCTS", 15, "STARBUCKS STORE 19384", 5.51},
+                {"ORDERITEMS", 1, 2, 1},
+                {"ORDERITEMS", 1, 7, 1},
+                {"ORDERITEMS", 2, 5, 2},
+                {"ORDERITEMS", 3, 1, 3},
+                {"ORDERITEMS", 3, 15, 1},
+                {"ORDERITEMS", 3, 20, 1},
+                {"ORDERITEMS", 3, 4, 2},
+                {"ORDERITEMS", 3, 26, 5},
+                {"ORDERITEMS", 4, 30, 1},
+                {"ORDERITEMS", 5, 8, 1},
+            }
+        );
+        ArrayList<Object[]> dataList2 = Lists.newArrayList(
+            new Object[][] {
+                {"CUSTOMERS", 6, "Mike", "WPI"},
+                {"CUSTOMERS", 7, "Max", "New York"},
+                {"CUSTOMERS", 8, "Ethan", "Beijing China"},
+                {"CUSTOMERS", 9, "Selina", "France"},
+                {"CUSTOMERS", 10, "Harry Potter", "Hogwarts"},
+                {"ORDERS", 5, 3, "2015-04-23 00:24:45.768000"},
+                {"ORDERS", 6, 2, "2016-07-05 16:24:31.384000"},
+                {"ORDERS", 7, 4, "2015-03-09 21:24:15.768000"},
+                {"ORDERS", 8, 2, "2015-09-01 16:24:42.279300"},
                 {"PRODUCTS", 16, "SAN SOO KAP SAN SHUSHI", 10.69},
                 {"PRODUCTS", 17, "PLASTC INC.", 155.00},
                 {"PRODUCTS", 18, "MANDARIN MALDEN", 34.70},
@@ -1497,16 +1524,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 {"PRODUCTS", 28, "ACADEMY EXPRESS", 46.80},
                 {"PRODUCTS", 29, "TUCKS CANDY FACTORY INC", 7.00},
                 {"PRODUCTS", 30, "SICHUAN GOURMET", 37.12},
-                {"ORDERITEMS", 1, 2, 1},
-                {"ORDERITEMS", 1, 7, 1},
-                {"ORDERITEMS", 2, 5, 2},
-                {"ORDERITEMS", 3, 1, 3},
-                {"ORDERITEMS", 3, 15, 1},
-                {"ORDERITEMS", 3, 20, 1},
-                {"ORDERITEMS", 3, 4, 2},
-                {"ORDERITEMS", 3, 26, 5},
-                {"ORDERITEMS", 4, 30, 1},
-                {"ORDERITEMS", 5, 8, 1},
                 {"ORDERITEMS", 5, 12, 6},
                 {"ORDERITEMS", 5, 1, 0},
                 {"ORDERITEMS", 5, 27, 1},
@@ -1519,14 +1536,29 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 {"ORDERITEMS", 8, 25, 2}
             }
         );
-        Collections.shuffle(dataList);
-        for (Object[] dataRow : dataList) {
-            insertRow(client, dataRow[0].toString(), dataRow[1], dataRow[2], dataRow[3]);
+        assertEquals(dataList1.size(), dataList2.size());
+        // Test update
+        for (int i=0; i<dataList1.size(); i++) {
+            insertRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
-        Collections.shuffle(dataList);
-        for (Object[] dataRow : dataList) {
-            deleteRow(client, dataRow[0].toString(), dataRow[1], dataRow[2]);
+        for (int i=0; i<dataList2.size(); i++) {
+            updateRow(client, dataList1.get(i), dataList2.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+        truncateBeforeTest(client);
+        // Merge two sub-lists
+        dataList1.addAll(dataList2);
+        // Test insert
+        Collections.shuffle(dataList1);
+        for (int i=0; i<dataList1.size(); i++) {
+            insertRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+        // Test delete
+        Collections.shuffle(dataList1);
+        for (int i=0; i<dataList1.size(); i++) {
+            deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
     }

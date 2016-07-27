@@ -193,7 +193,6 @@ public class MaterializedViewProcessor {
                         String srcTableName = srcTable.getTypeName();
                         destTable.setIsreplicated(false);
                         if (stmt.hasComplexGroupby()) {
-                            System.out.println("hasComplexGroupby!");
                             for (int i = 0; i < groupbyExprs.size(); i++) {
                                 AbstractExpression groupbyExpr = groupbyExprs.get(i);
                                 if (groupbyExpr instanceof TupleValueExpression) {
@@ -205,7 +204,6 @@ public class MaterializedViewProcessor {
                                         // If we are going to remove this restriction in the future, then we need to do more work
                                         // in order to find a proper partition column.
                                         destTable.setPartitioncolumn(destColumnArray.get(i));
-                                        System.out.println(viewName + " found partition column: " + tve.explain(srcTableName) + " from table " + srcTableName);
                                         break;
                                     }
                                 }
@@ -235,6 +233,7 @@ public class MaterializedViewProcessor {
                     destColumn.setType(col.expression.getValueType().getValue());
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
+                    destColumn.setSize(col.expression.getValueSize());
                 }
             }
             else { // =======================================================================================
@@ -340,7 +339,9 @@ public class MaterializedViewProcessor {
                 // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
                 for (int i=0; i<=stmt.m_groupByColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
-                    destColumnArray.get(i).setType(col.expression.getValueType().getValue());
+                    Column destColumn = destColumnArray.get(i);
+                    destColumn.setType(col.expression.getValueType().getValue());
+                    destColumn.setSize(col.expression.getValueSize());
                 }
 
                 // parse out the aggregation columns into the dest table
@@ -359,6 +360,7 @@ public class MaterializedViewProcessor {
                     // Correctly set the type of the column so that it's consistent.
                     // Otherwise HSQLDB might promote types differently than Volt.
                     destColumn.setType(col.expression.getValueType().getValue());
+                    destColumn.setSize(col.expression.getValueSize());
                 }
 
                 if (srcTable.getPartitioncolumn() != null) {
