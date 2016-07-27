@@ -86,6 +86,27 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  C INTEGER"
                 + ");\n"
 
+                + "CREATE TABLE T_PA (\n"
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C INTEGER NOT NULL"
+                + ");\n"
+                + "PARTITION TABLE T_PA ON COLUMN A;"
+
+                + "CREATE TABLE T_PB (\n"
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C INTEGER NOT NULL"
+                + ");\n"
+                + "PARTITION TABLE T_PB ON COLUMN A;"
+
+                + "CREATE TABLE T_PC (\n"
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C INTEGER NOT NULL"
+                + ");\n"
+                + "PARTITION TABLE T_PC ON COLUMN A;"
+
                 + "create table tu (a integer, b integer);"
                 + "create unique index idx1 on tu (a);"
                 + "create unique index idx2 on tu (b, a);"
@@ -267,6 +288,58 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(msg, baseTime + expected[rowIdx][colB]*1000, vt.getTimestampAsLong(2));
             assertEquals(msg, expected[rowIdx][colR1], vt.getLong(3));
         }
+    }
+
+    public void testRankPartitionedTable() throws Exception {
+        Client client = getClient();
+
+        long input[][] = expected.clone();
+        shuffleArrayOfLongs(input);
+        ClientResponse cr;
+        VoltTable vt;
+        for (long [] row : input) {
+            cr = client.callProcedure("T_PA.insert", row[colA], row[colB], row[colC]);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            cr = client.callProcedure("T_PB.insert", row[colA], row[colB], row[colC]);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            cr = client.callProcedure("T_PC.insert", row[colA], row[colB], row[colC]);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        }
+        String sql;
+        sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PA ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
+            String msg = String.format("Row %d:", rowIdx);
+            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
+            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
+            assertEquals(msg, expected[rowIdx][colR1], vt.getLong(3));
+        }
+        sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PB ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
+            String msg = String.format("Row %d:", rowIdx);
+            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
+            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
+            assertEquals(msg, expected[rowIdx][colR1], vt.getLong(3));
+        }
+        sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PC ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
+            String msg = String.format("Row %d:", rowIdx);
+            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
+            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
+            assertEquals(msg, expected[rowIdx][colR1], vt.getLong(3));
+        }
+
     }
 
     public void testRank() throws Exception {
