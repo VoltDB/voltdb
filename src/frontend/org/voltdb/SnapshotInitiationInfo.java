@@ -167,7 +167,7 @@ public class SnapshotInitiationInfo
             }
         }
 
-        m_stype = SnapshotPathType.valueOf(jsObj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        m_stype = SnapshotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString()));
         m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
         if (m_path.isEmpty()) {
             throw new Exception("uripath cannot be empty");

@@ -432,7 +432,10 @@ public class HTTPAdminListener {
 
         //Get deployment from catalog context
         private DeploymentType getDeployment() {
-            return VoltDB.instance().getCatalogContext().getDeployment();
+            DeploymentType dt = VoltDB.instance().getCatalogContext().getDeployment();
+            //If running with new verbs add runtime paths.
+            CatalogUtil.updateRuntimeDeploymentPaths(dt);
+            return dt;
         }
 
         //Get deployment bytes from catalog context
