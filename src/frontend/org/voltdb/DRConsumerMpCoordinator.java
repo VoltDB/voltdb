@@ -17,21 +17,17 @@
 
 package org.voltdb;
 
-// Interface through which the outside world can interact with the consumer side
-// of DR. Currently, there's not much to do here, since the subsystem is
-// largely self-contained
-public interface ConsumerDRGateway extends Promotable {
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.Dr2MultipartResponseMessage;
+import org.voltdb.messaging.Dr2MultipartTaskMessage;
 
-    void updateCatalog(CatalogContext catalog);
+public interface DRConsumerMpCoordinator {
 
-    boolean isActive();
+    void deliver(Dr2MultipartTaskMessage message);
 
-    void initialize(boolean resumeReplication);
+    void deliver(Dr2MultipartResponseMessage message);
 
-    void shutdown(boolean blocking) throws InterruptedException;
+    void processClientResponse(int handle, ClientResponse response);
 
-    void restart() throws InterruptedException;
-
-    DRConsumerMpCoordinator getDRConsumerMpCoordinator();
-
+    void notifyOfPartitionLeaderPromotion(int partitionId);
 }

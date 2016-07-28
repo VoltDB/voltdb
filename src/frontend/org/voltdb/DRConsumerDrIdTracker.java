@@ -48,6 +48,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     private transient RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
+    private transient int m_producerPartitionId;  // TODO snapshot might not like this
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -92,19 +93,20 @@ public class DRConsumerDrIdTracker implements Serializable {
     }
 
 
-    private DRConsumerDrIdTracker(long spUniqueId, long mpUniqueId) {
+    private DRConsumerDrIdTracker(long spUniqueId, long mpUniqueId, int producerPartitionId) {
         m_map = TreeRangeSet.create();
         m_lastSpUniqueId = spUniqueId;
         m_lastMpUniqueId = mpUniqueId;
+        m_producerPartitionId = producerPartitionId;
     }
 
-    public static DRConsumerDrIdTracker createBufferTracker(long spUniqueId, long mpUniqueId) {
-        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId);
+    public static DRConsumerDrIdTracker createBufferTracker(long spUniqueId, long mpUniqueId, int producerPartitionId) {
+        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId, producerPartitionId);
         return newTracker;
     }
 
-    public static DRConsumerDrIdTracker createPartitionTracker(long initialAckPoint, long spUniqueId, long mpUniqueId) {
-        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId);
+    public static DRConsumerDrIdTracker createPartitionTracker(long initialAckPoint, long spUniqueId, long mpUniqueId, int producerPartitionId) {
+        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId, producerPartitionId);
         newTracker.addRange(initialAckPoint, initialAckPoint);
         return newTracker;
     }
@@ -113,12 +115,14 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_map = TreeRangeSet.create(other.m_map);
         m_lastSpUniqueId = other.m_lastSpUniqueId;
         m_lastMpUniqueId = other.m_lastMpUniqueId;
+        m_producerPartitionId = other.m_producerPartitionId;
     }
 
     public DRConsumerDrIdTracker(JSONObject jsObj) throws JSONException {
         m_map = TreeRangeSet.create();
         m_lastSpUniqueId = jsObj.getLong("spUniqueId");
         m_lastMpUniqueId = jsObj.getLong("mpUniqueId");
+        m_producerPartitionId = jsObj.getInt("producerPartitionId");
         final JSONArray drIdRanges = jsObj.getJSONArray("drIdRanges");
         for (int ii = 0; ii < drIdRanges.length(); ii++) {
             JSONObject obj = drIdRanges.getJSONObject(ii);
@@ -131,6 +135,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_map = TreeRangeSet.create();
         m_lastSpUniqueId = buff.getLong();
         m_lastMpUniqueId = buff.getLong();
+        m_producerPartitionId = buff.getInt();
         int mapSize = buff.getInt();
         for (int ii=0; ii<mapSize; ii++) {
             m_map.add(range(buff.getLong(), buff.getLong()));
@@ -141,9 +146,18 @@ public class DRConsumerDrIdTracker implements Serializable {
         this(ByteBuffer.wrap(flattened));
     }
 
+    public int getProducerPartitionId() {
+        return m_producerPartitionId;
+    }
+
+    public void setProducerPartitionId(int m_producerPartitionId) {
+        this.m_producerPartitionId = m_producerPartitionId;
+    }
+
     public int getSerializedSize() {
         return 8        // m_lastSpUniqueId
              + 8        // m_lastMpUniqueId
+             + 4        // m_producerPartitionId
              + 4        // map size
              + (m_map.asRanges().size() * 16);
     }
@@ -152,6 +166,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         assert(buff.remaining() >= getSerializedSize());
         buff.putLong(m_lastSpUniqueId);
         buff.putLong(m_lastMpUniqueId);
+        buff.putInt(m_producerPartitionId);
         buff.putInt(m_map.asRanges().size());
         for(Range<Long> entry : m_map.asRanges()) {
             buff.putLong(start(entry));
@@ -323,6 +338,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         JSONObject obj = new JSONObject();
         obj.put("spUniqueId", m_lastSpUniqueId);
         obj.put("mpUniqueId", m_lastMpUniqueId);
+        obj.put("producerPartitionId", m_producerPartitionId);
         JSONArray drIdRanges = new JSONArray();
         for (Range<Long> sequenceRange : m_map.asRanges()) {
             JSONObject range = new JSONObject();
@@ -340,6 +356,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         StringBuilder sb = new StringBuilder();
         sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
+        sb.append("producerPartitionId").append(m_producerPartitionId).append(" ");
         if (m_map.isEmpty()) {
             sb.append("[empty map]");
         }
@@ -359,6 +376,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         StringBuilder sb = new StringBuilder();
         sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
+        sb.append("producerPartitionId").append(m_producerPartitionId).append(" ");
         for (Range<Long> entry : m_map.asRanges()) {
             sb.append("[").append(DRLogSegmentId.getDebugStringFromDRId(start(entry))).append(", ")
               .append(DRLogSegmentId.getDebugStringFromDRId(end(entry))).append("] ");
