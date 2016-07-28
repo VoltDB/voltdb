@@ -1559,7 +1559,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // We do a shuffle here and in the delete test. But I do believe we still
         // have the full coverage of all the cases because we are inserting and deleting
         // all the rows. The cases updating values of all kinds of aggregations will be
-        // tested in one row or another. 
+        // tested in one row or another.
         Collections.shuffle(dataList1);
         for (int i=0; i<dataList1.size(); i++) {
             insertRow(client, dataList1.get(i));
