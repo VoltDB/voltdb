@@ -433,6 +433,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
+        template<class TABLE> void initMaterializedViews(catalog::Table *catalogTable,
+                                                                  TABLE *table);
         bool updateCatalogDatabaseReference();
         void resetDRConflictStreamedTables();
         /**
