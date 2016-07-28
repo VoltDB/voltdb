@@ -22,7 +22,6 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1323,10 +1322,9 @@ SnapshotCompletionInterest, Promotable
             if (m_isLeader) {
                 try {
                     try {
-                        m_zk.create(VoltZK.truncation_snapshot_path,
-                                    m_clSnapshotPath.getBytes(),
-                                    Ids.OPEN_ACL_UNSAFE,
-                                    CreateMode.PERSISTENT);
+                        String truncationRequest = m_zk.create(VoltZK.request_truncation_snapshot_node, null, Ids.OPEN_ACL_UNSAFE,
+                                  CreateMode.EPHEMERAL_SEQUENTIAL);
+                        LOG.info("Initial Truncation request made: " + truncationRequest);
                     } catch (KeeperException.NodeExistsException e) {}
                     m_zk.create(VoltZK.request_truncation_snapshot_node, null,
                             Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);

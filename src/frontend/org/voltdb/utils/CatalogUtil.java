@@ -1740,6 +1740,7 @@ public abstract class CatalogUtil {
         // only use these directories in the enterprise version
         setupCommandLog(paths.getCommandlog(), voltDbRoot);
         setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
+        setupDROverflow(paths.getDroverflow(), voltDbRoot);
     }
 
     /**
@@ -1860,7 +1861,7 @@ public abstract class CatalogUtil {
         validateDirectory("export overflow", exportOverflowPath);
     }
 
-    public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
+    public static File setupDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
         File drOverflowPath;
         drOverflowPath = new File(VoltDB.instance().getDROverflowPath(paths));
         if (!drOverflowPath.isAbsolute())

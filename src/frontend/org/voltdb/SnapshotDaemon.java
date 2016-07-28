@@ -653,14 +653,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void processSnapshotTruncationRequestCreated(
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
-        String snapshotPathTemp;
-        // TRAIL [TruncSnap:6] Get the snapshot path.
-        try {
-            snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
-        } catch (Exception e) {
-            loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
-            return;
-        }
         // Get the truncation request ID which is the truncation request node path.
         final String truncReqId;
         try {
@@ -675,8 +667,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
         }
-        m_truncationSnapshotPath = snapshotPathTemp;
-        final String snapshotPath = snapshotPathTemp;
         final long now = System.currentTimeMillis();
         final String nonce = Long.toString(now);
         //Allow nodes to check and see if the nonce incoming for a snapshot is
@@ -699,7 +689,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             JSONObject jsData = new JSONObject();
             jsData.put("truncReqId", truncReqId);
             sData = jsData.toString();
-            jsObj.put(SnapshotUtil.JSON_PATH, snapshotPath );
+            jsObj.put(SnapshotUtil.JSON_PATH, VoltDB.instance().getCommandLogSnapshotPath() );
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_CL);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
@@ -809,7 +799,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             snapshotAttempt.pathType = SnapshotPathType.SNAP_CL.toString();
                         }
                         snapshotAttempt.nonce = nonce;
-                        snapshotAttempt.path = snapshotPath;
+                        snapshotAttempt.path = VoltDB.instance().getCommandLogSnapshotPath();
                     } finally {
                         // TRAIL [TruncSnap:9] (callback) restart the whole request check cycle
                         try {

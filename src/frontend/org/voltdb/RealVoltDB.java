@@ -1045,7 +1045,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
                     m_producerDRGateway =
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
-                                    new VoltFile(VoltDB.instance().getVoltDBRootPath()),
+                                    new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,m_catalogContext.getDeployment().getCluster().getHostcount());
