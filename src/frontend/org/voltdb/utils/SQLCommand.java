@@ -74,6 +74,7 @@ public class SQLCommand
     private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
     private static boolean m_interactive;
+    private static boolean m_version_check = true;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
@@ -1157,8 +1158,9 @@ public class SQLCommand
             procedures.put(proc_name, argLists);
         }
         for (String proc_name : new ArrayList<String>(procedures.keySet())) {
-            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name))
+            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name)) {
                 procedures.remove(proc_name);
+            }
         }
         classlist.clear();
         while (classes.advanceRow()) {
@@ -1326,6 +1328,9 @@ public class SQLCommand
                 System.out.println("\n\n");
                 printUsage(0);
             }
+            else if (arg.equals("--no-version-check")) {
+                m_version_check = false; // Disable new version phone home check
+            }
             else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
                 printUsage(0);
             }
@@ -1451,24 +1456,27 @@ public class SQLCommand
     private static void openURL()
     {
         URL url;
+        if (m_version_check)
+        {
+            System.out.println("JWP: Phoning home...");
+            try {
+                // Read the response from VoltDB
+                String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
+                url = new URL(a);
+                URLConnection conn = url.openConnection();
 
-        try {
-            // Read the response from VoltDB
-            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
-            url = new URL(a);
-            URLConnection conn = url.openConnection();
+                // open the stream and put it into BufferedReader
+                BufferedReader br = new BufferedReader(
+                                   new InputStreamReader(conn.getInputStream()));
 
-            // open the stream and put it into BufferedReader
-            BufferedReader br = new BufferedReader(
-                               new InputStreamReader(conn.getInputStream()));
-
-            while (br.readLine() != null) {
-                // At this time do nothing, just drain the stream.
-                // In the future we'll notify the user that a new version of VoltDB is available.
+                while (br.readLine() != null) {
+                    // At this time do nothing, just drain the stream.
+                    // In the future we'll notify the user that a new version of VoltDB is available.
+                }
+                br.close();
+            } catch (Throwable e) {
+                // ignore any error
             }
-            br.close();
-        } catch (Throwable e) {
-            // ignore any error
         }
     }
 }
