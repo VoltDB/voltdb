@@ -208,7 +208,7 @@ PersistentTable::~PersistentTable() {
     // free up the materialized view handler if this is a view table.
     delete m_mvHandler;
     // remove this table from the source table list of the views.
-    BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, m_viewHandlers) {
         viewHandlerToTrigger->dropSourceTable(this);
     }
     if (m_deltaTable) {
@@ -363,7 +363,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    if (originalTable->m_viewHandlersToTrigger.size() == 0) {
+    if (originalTable->m_viewHandlers.size() == 0) {
         // Single table view.
         std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
         // reset all view table pointers
@@ -374,7 +374,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     }
     else {
         // Joined table view.
-        BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, originalTable->m_viewHandlersToTrigger) {
+        BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, originalTable->m_viewHandlers) {
             PersistentTable *destTable = viewHandlerToTrigger->destTable();
             destTable->decrementRefcount();
         }
@@ -439,7 +439,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->setPreTruncateTable(this);
     }
 
-    if (m_viewHandlersToTrigger.size() == 0) {
+    if (m_viewHandlers.size() == 0) {
         // add matView
         BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
             PersistentTable * targetTable = originalView->targetTable();
@@ -452,7 +452,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         }
     }
     else {
-        BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, m_viewHandlersToTrigger) {
+        BOOST_FOREACH (MaterializedViewHandler *viewHandlerToTrigger, m_viewHandlers) {
             PersistentTable *destTable = viewHandlerToTrigger->destTable();
             TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
             catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
@@ -674,7 +674,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
         }
     }
 
-    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlers) {
         viewHandlerToTrigger->handleTupleInsert(this, fallible);
     }
 
@@ -812,7 +812,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlers) {
         viewHandlerToTrigger->handleTupleDelete(this, fallible);
     }
 
@@ -890,7 +890,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlers) {
         viewHandlerToTrigger->handleTupleInsert(this, fallible);
     }
 
@@ -992,7 +992,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
     insertTupleIntoDeltaTable(target, fallible);
-    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (auto viewHandlerToTrigger, m_viewHandlers) {
         viewHandlerToTrigger->handleTupleDelete(this, fallible);
     }
 
@@ -1909,37 +1909,37 @@ void PersistentTable::configureIndexStats() {
 }
 
 void PersistentTable::addViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger) {
-    if (m_viewHandlersToTrigger.size() == 0) {
+    if (m_viewHandlers.size() == 0) {
         VoltDBEngine *engine = ExecutorContext::getEngine();
         TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
         m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(),
                                              *engine->getCatalogTable(m_name));
     }
-    m_viewHandlersToTrigger.push_back(viewHandlerToTrigger);
+    m_viewHandlers.push_back(viewHandlerToTrigger);
 }
 
 void PersistentTable::dropViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger) {
-    assert( ! m_viewHandlersToTrigger.empty());
-    MaterializedViewHandler* lastHandler = m_viewHandlersToTrigger.back();
+    assert( ! m_viewHandlers.empty());
+    MaterializedViewHandler* lastHandler = m_viewHandlers.back();
     if (viewHandlerToTrigger != lastHandler) {
         // iterator to vector element:
-        std::vector<MaterializedViewHandler*>::iterator it = find(m_viewHandlersToTrigger.begin(),
-                                                                  m_viewHandlersToTrigger.end(),
+        std::vector<MaterializedViewHandler*>::iterator it = find(m_viewHandlers.begin(),
+                                                                  m_viewHandlers.end(),
                                                                   viewHandlerToTrigger);
-        assert(it != m_viewHandlersToTrigger.end());
+        assert(it != m_viewHandlers.end());
         // Use the last view to patch the potential hole.
         *it = lastHandler;
     }
     // The last element is now excess.
-    m_viewHandlersToTrigger.pop_back();
-    if (m_viewHandlersToTrigger.size() == 0) {
+    m_viewHandlers.pop_back();
+    if (m_viewHandlers.size() == 0) {
         m_deltaTable->decrementRefcount();
         m_deltaTable = NULL;
     }
 }
 
 void PersistentTable::polluteViews() {
-    BOOST_FOREACH (auto mvHanlder, m_viewHandlersToTrigger) {
+    BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
         mvHanlder->pollute();
     }
 }

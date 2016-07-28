@@ -735,7 +735,7 @@ private:
     MaterializedViewHandler *m_mvHandler;
     // If I am a source table of a view, I will notify all the relevant view handlers
     // when an update is needed.
-    std::vector<MaterializedViewHandler*> m_viewHandlersToTrigger;
+    std::vector<MaterializedViewHandler*> m_viewHandlers;
 
     // The delta table is only created when a view defined on a join query is referencing this table
     // as one of its source tables. The delta table has an identical definition of this table, including
