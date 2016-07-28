@@ -651,8 +651,8 @@ private:
 
     void computeSmallestUniqueIndex();
 
-    void addViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger);
-    void dropViewHandlerToTrigger(MaterializedViewHandler *viewHandlerToTrigger);
+    void addViewHandler(MaterializedViewHandler *viewHandler);
+    void dropViewHandler(MaterializedViewHandler *viewHandler);
     // Mark all the view handlers referencing this table as dirty so they will be
     // recreated when being visited.
     // We use this only when a table index is added / dropped.

@@ -54,14 +54,14 @@ namespace voltdb {
     }
 
     void MaterializedViewHandler::addSourceTable(PersistentTable *sourceTable) {
-        sourceTable->addViewHandlerToTrigger(this);
+        sourceTable->addViewHandler(this);
         m_sourceTables.push_back(sourceTable);
         m_dirty = true;
     }
 
     void MaterializedViewHandler::dropSourceTable(PersistentTable *sourceTable) {
         assert( ! m_sourceTables.empty());
-        sourceTable->dropViewHandlerToTrigger(this);
+        sourceTable->dropViewHandler(this);
         PersistentTable* lastTable = m_sourceTables.back();
         if (sourceTable != lastTable) {
             // iterator to vector element:
