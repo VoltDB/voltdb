@@ -81,12 +81,13 @@ column-alias            ::= C1 3| C2 2| C3
 
 ################################################################################
 # Any (non-DDL) SQL statement:
-# The "4" before the first "|" makes the "select-statement" option 4 times as
-# likely as the other options, so half of these SQL statements will be SELECT
-# statements.
+# The "50" before the first "|" makes the "select-statement" option 50 times as
+# likely as the least likely (last) option; so half of these SQL statements will
+# be SELECT statements; but only 1% will be "delete-statement", since we don't
+# want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 4| {insert-statement} | {upsert-statement} | \
-                            {update-statement}  | {delete-statement}
+sql-statement           ::= {select-statement} 50| {insert-statement} 20| {upsert-statement} 20| \
+                            {update-statement}  9| {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:

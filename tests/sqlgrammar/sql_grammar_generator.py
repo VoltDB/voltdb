@@ -1,9 +1,31 @@
+#!/usr/bin/env python
 
-import sys
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 import os.path
 import re
 import subprocess
-import time
+import sys
 from datetime import timedelta
 from optparse import OptionParser
 from random import randrange
@@ -66,7 +88,7 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
 
         if len(options) is 1:
             # When there are are no alternative options (i.e., no '|'),
-            # the entry for the current symbol name is just a String
+            # the entry for the current symbol name is just a string
             grammar[symbol_name] = definition.strip()
         elif all(w is 1 for w in weights):
             # When all weights are 1 (equally weighted), the entry is a List
@@ -103,7 +125,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         #print 'DEBUG: symbol_name :', str(symbol_name)
         #print 'DEBUG: definition:', str(definition)
         if not definition:
-            print "Could not find symbol_name '" + str(symbol_name) + "' in grammar dictionary!!!"
+            print "ERROR: Could not find symbol_name '" + str(symbol_name) + "' in grammar dictionary!!!"
             break
         # Check how deep into a recursive definition we're going
         if depth.get(symbol_name):
@@ -158,21 +180,29 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
 
 
 def print_summary():
-    """TBD
+    """Print a summary message, including the total number of SQL statements,
+    the number and percent of valid and invalid statements (if sqlcmd was
+    called), and the total amount execution of time. Print this message both
+    to STDOUT and to the sqlcmd output file (if any). And close both output
+    files - the SQL statement one and the sqlcmd one (if they exist).
     """
     global start_time, sql_output_file, sqlcmd_output_file
     global count_all_sql_statements, count_valid_sql_statements, count_invalid_sql_statements
 
-    seconds = time() - start_time
+    # Compute the percentage of valid and invalid SQL statements
     percent_valid = 0
     percent_invalid = 0
     if count_all_sql_statements:
-        percent_valid   = 100.0 *   count_valid_sql_statements / count_all_sql_statements
-        percent_invalid = 100.0 * count_invalid_sql_statements / count_all_sql_statements
+        percent_valid   = int(round(100.0 *   count_valid_sql_statements / count_all_sql_statements))
+        percent_invalid = int(round(100.0 * count_invalid_sql_statements / count_all_sql_statements))
 
-    summary_message = '\n\nSUMMARY: ' + str(count_all_sql_statements) + ' SQL statements (' + \
-            str(count_valid_sql_statements) +' valid, '+ str(count_invalid_sql_statements) +' invalid), in ' + \
-            re.sub("^0:", "", str(timedelta(0, round(seconds))), 1) + " ({0:.3f} seconds)".format(seconds)
+    # Generate the summary message (to be printed below)
+    seconds = time() - start_time
+    summary_message = '\n\nSUMMARY: ' + str(count_all_sql_statements) + ' SQL statements'
+    if count_valid_sql_statements or count_invalid_sql_statements:
+        summary_message += ' (' + str(count_valid_sql_statements) + ' valid, ' + str(percent_valid) + '%; ' \
+                            + str(count_invalid_sql_statements) +' invalid, ' + str(percent_invalid) + '%)'
+    summary_message += ', in ' + re.sub("^0:", "", str(timedelta(0, round(seconds))), 1) + " ({0:.3f} seconds)".format(seconds)
 
     # Print the summary message, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
@@ -183,18 +213,22 @@ def print_summary():
     print summary_message
 
 
-def print_sql_statement(sql, sql_output_file1=sys.stdout, sqlcmd_proc=None,
-                        sqlcmd_output_file1=sys.stdout, max_save_statements=1000, debug=0):
-    """TBD
+def print_sql_statement(sql, max_save_statements=1000):
+    """Print the specified SQL statement (sql), to the SQL output file (which may
+    be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
+    to sqlcmd, and print its output in the sqlcmd output file (which may be
+    STDOUT). Both output files should contain a maximum of the specified number
+    of SQL statements (max_save_statements), meaning that each time we reach
+    that number, the output file(s) are deleted and begun again.
     """
     global count_all_sql_statements, count_valid_sql_statements, count_invalid_sql_statements
-    global sql_output_file, sqlcmd_output_file
+    global sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug
 
     count_all_sql_statements += 1
 
     # After every 'max_save_statements' statements, delete the output file(s),
     # and start over, to avoid the file(s) becoming too large
-    if not count_all_sql_statements % max_save_statements:
+    if max_save_statements and not count_all_sql_statements % max_save_statements:
         if sql_output_file and sql_output_file != sys.stdout:
             filename = sql_output_file.name
             sql_output_file.close()
@@ -206,7 +240,8 @@ def print_sql_statement(sql, sql_output_file1=sys.stdout, sqlcmd_proc=None,
 
     print >> sql_output_file, sql
 
-    if sqlcmd_proc:   # Pipe the SQL statement to sqlcmd
+    # Pass the SQL statement to sqlcmd, if a sqlcmd sub-process has been defined
+    if sqlcmd_proc:
         if debug > 4:
             print >> sqlcmd_output_file, 'DEBUG: SQL statement:', sql
         sqlcmd_proc.stdin.write(sql + '\n')
@@ -215,15 +250,15 @@ def print_sql_statement(sql, sql_output_file1=sys.stdout, sqlcmd_proc=None,
             print >> sqlcmd_output_file, output.rstrip('\n')
 
             # TODO: might want to use regex's here:
-            if '(Returned ' in output and ' rows in ' in output and 's)' in output:
+            if output and '(Returned ' in output and ' rows in ' in output and 's)' in output:
                 count_valid_sql_statements += 1
                 if debug > 4:
                     print >> sqlcmd_output_file, 'DEBUG: FOUND: (Returned ... rows in ...s)'
                 break
-            elif 'ERROR' in output or 'Error' in output:
+            elif output and 'ERROR' in output.upper():
                 count_invalid_sql_statements += 1
                 if debug > 4:
-                    print >> sqlcmd_output_file, 'DEBUG: FOUND: ERROR or Error'
+                    print >> sqlcmd_output_file, 'DEBUG: FOUND ERROR'
                 break
             elif (not output or 'Unable to connect' in output or 'No connections' in output
                    or 'Connection refused' in output
@@ -238,8 +273,11 @@ def print_sql_statement(sql, sql_output_file1=sys.stdout, sqlcmd_proc=None,
                 exit(99)
 
 
-def generate_sql_statements(sql_type, num_sql_statements=0, max_save_statements=1000):
-    """TBD
+def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000):
+    """Generate and print the specified number of SQL statements (num_sql_statements),
+    of the specified type (sql_statement_type); the output file(s) should contain
+    a maximum of the specified number of SQL statements (max_save_statements), meaning
+    that each time we reach that number, the output file(s) are deleted and begun again.
     """
     global max_time, grammar
     global sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug
@@ -253,12 +291,13 @@ def generate_sql_statements(sql_type, num_sql_statements=0, max_save_statements=
             if debug:
                 print 'DEBUG: exceeded max_time, at:', time()
             break
-        sql_statement = get_one_sql_statement(grammar, sql_type)
-        print_sql_statement(sql_statement, sql_output_file, sqlcmd_proc, sqlcmd_output_file, max_save_statements, debug)
+        sql_statement = get_one_sql_statement(grammar, sql_statement_type)
+        print_sql_statement(sql_statement, max_save_statements)
 
 
 if __name__ == "__main__":
 
+    # Handle command-line arguments
     parser = OptionParser()
     parser.add_option("-p", "--path", dest="path", default=".",
                       help="path to the directory in which to find the grammar file(s) to be used [default: .]")
@@ -309,6 +348,8 @@ if __name__ == "__main__":
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
 
+    # If a maximum number of minutes was specified, compute the time at which
+    # to stop execution
     start_time = time()
     max_time = 0
     if options.minutes:
@@ -317,7 +358,8 @@ if __name__ == "__main__":
         print 'DEBUG: start time:', start_time
         print 'DEBUG: max_time  :', max_time
 
-    # Define the grammar to be used to generate SQL statements
+    # Define the grammar to be used to generate SQL statements, based upon
+    # the input grammar file(s)
     grammar = {}
     for grammar_file in options.grammar_files.split(','):
         grammar = get_grammar(grammar, grammar_file, options.path)
@@ -328,10 +370,13 @@ if __name__ == "__main__":
             print '   ', key + ':', grammar[key]
         print
 
+    # Open the output file for generated SQL statements, if specified
     sql_output_file = sys.stdout
     if options.sql_output:
         sql_output_file = open(options.sql_output, 'w')
 
+    # Open the sub-process used to execute SQL statements in sqlcmd,
+    # and the output file for sqlcmd results, if specified
     sqlcmd_proc = None
     sqlcmd_output_file = None
     if options.sqlcmd_output:
@@ -358,12 +403,12 @@ if __name__ == "__main__":
         generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save))
 
     if debug > 3:
-        print_sql_statement('select * from P1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
-        print_sql_statement('select * from R1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
-        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
-        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from R1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
-        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from P1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
-        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;', sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug)
+        print_sql_statement('select * from P1;', 0)
+        print_sql_statement('select * from R1;', 0)
+        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;', 0)
+        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from R1;', 0)
+        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from P1;', 0)
+        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;', 0)
 
     if debug:
         print 'DEBUG: end time  :', time()
