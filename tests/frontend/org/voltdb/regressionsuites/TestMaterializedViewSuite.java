@@ -49,7 +49,7 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
-import com.google.common.collect.Lists;
+import com.google_voltpatches.common.collect.Lists;
 
 import junit.framework.Test;
 
