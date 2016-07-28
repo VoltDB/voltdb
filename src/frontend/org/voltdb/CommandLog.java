@@ -24,6 +24,7 @@ import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public interface CommandLog {
     /**
@@ -72,9 +73,10 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
+     * IV2-only method. Write this Iv2FaultLogEntry to the fault log portion of the command log.
+     * @return a settable future that is set true after the entry has been written to disk.
      */
-    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+    public abstract SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
     /**

@@ -276,9 +276,9 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                                  200,
                                                  1,
                                                  "YES"});
-        refcolumns.put("Column11", new Object[] {java.sql.Types.INTEGER,
-                                                 "INTEGER",
-                                                 31,
+        refcolumns.put("Column11", new Object[] {java.sql.Types.BIGINT,
+                                                 "BIGINT",
+                                                 63,
                                                  null,
                                                  2,
                                                  java.sql.DatabaseMetaData.columnNullable,
