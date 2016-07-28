@@ -1343,7 +1343,10 @@ public class SQLCommand
         String[] servers = serverList.split(",");
 
         // Phone home to see if there is a newer version of VoltDB
-        openURLAsync();
+        if (m_version_check)
+        {
+            openURLAsync();
+        }
 
         try
         {
@@ -1456,27 +1459,23 @@ public class SQLCommand
     private static void openURL()
     {
         URL url;
-        if (m_version_check)
-        {
-            System.out.println("JWP: Phoning home...");
-            try {
-                // Read the response from VoltDB
-                String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
-                url = new URL(a);
-                URLConnection conn = url.openConnection();
+        try {
+            // Read the response from VoltDB
+            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
+            url = new URL(a);
+            URLConnection conn = url.openConnection();
 
-                // open the stream and put it into BufferedReader
-                BufferedReader br = new BufferedReader(
-                                   new InputStreamReader(conn.getInputStream()));
+            // open the stream and put it into BufferedReader
+            BufferedReader br = new BufferedReader(
+                               new InputStreamReader(conn.getInputStream()));
 
-                while (br.readLine() != null) {
-                    // At this time do nothing, just drain the stream.
-                    // In the future we'll notify the user that a new version of VoltDB is available.
-                }
-                br.close();
-            } catch (Throwable e) {
-                // ignore any error
+            while (br.readLine() != null) {
+                // At this time do nothing, just drain the stream.
+                // In the future we'll notify the user that a new version of VoltDB is available.
             }
+            br.close();
+        } catch (Throwable e) {
+            // ignore any error
         }
     }
 }
