@@ -339,6 +339,9 @@ public class UniqueIdGenerator {
         return sb.toString();
     }
     public static String toShortString(long uniqueId) {
+        if (uniqueId == 0L) {
+            return "0";
+        }
         return new String(getPartitionIdFromUniqueId(uniqueId) + ":" +
                 getTimestampFromUniqueId(uniqueId) + ":" +
                 getSequenceNumberFromUniqueId(uniqueId));
