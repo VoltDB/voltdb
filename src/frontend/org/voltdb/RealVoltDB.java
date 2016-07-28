@@ -2052,31 +2052,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void loadPaths(DeploymentType deployment) throws IOException {
         String voltdbRoot = (new VoltFile(deployment.getPaths().getVoltdbroot().getPath())).getCanonicalPath();
         m_pathList.put(VoltDB.VOLTDBROOT_PATH_KEY, voltdbRoot);
-        File path = new VoltFile(deployment.getPaths().getCommandlog().getPath());
+        File path = new File(deployment.getPaths().getCommandlog().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
         m_pathList.put(VoltDB.CL_PATH_KEY, path.getCanonicalPath());
 
-        path = new VoltFile(deployment.getPaths().getCommandlogsnapshot().getPath());
+        path = new File(deployment.getPaths().getCommandlogsnapshot().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
         m_pathList.put(VoltDB.CL_SNAPSHOT_PATH_KEY, path.getCanonicalPath());
 
-        path = new VoltFile(deployment.getPaths().getSnapshots().getPath());
+        path = new File(deployment.getPaths().getSnapshots().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
         m_pathList.put(VoltDB.SNAPTHOT_PATH_KEY, path.getCanonicalPath());
 
-        path = new VoltFile(deployment.getPaths().getExportoverflow().getPath());
+        path = new File(deployment.getPaths().getExportoverflow().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
         m_pathList.put(VoltDB.EXPORT_OVERFLOW_PATH_KEY, path.getCanonicalPath());
 
-        path = new VoltFile(deployment.getPaths().getDroverflow().getPath());
+        path = new File(deployment.getPaths().getDroverflow().getPath());
         if (!path.isAbsolute()) {
             path = new VoltFile(voltdbRoot, path.getPath());
         }
