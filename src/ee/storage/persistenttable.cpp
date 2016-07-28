@@ -1637,9 +1637,30 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
     while (iter.hasNext()) {
         TableTuple tuple(schema());
         iter.next(tuple);
-        if (hashinator->hashinate(tuple.getNValue(m_partitionColumn)) != partitionId) {
+        int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
+        if (newPartitionId != partitionId) {
+            std::ostringstream buffer;
+            buffer << "@ValidPartitioning found a mispartitioned row (hash: "
+                    << m_surgeon.generateTupleHash(tuple)
+                    << " should in "<< partitionId
+                    << ", but in " << newPartitionId << "):\n"
+                    << tuple.debug(name())
+                    << std::endl;
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
+                    buffer.str().c_str());
             mispartitionedRows++;
         }
+    }
+    if (mispartitionedRows > 0) {
+        std::ostringstream buffer;
+        buffer << "Expected hashinator is "
+                << hashinator->debug()
+                << std::endl;
+        buffer << "Current hashinator is"
+                << ExecutorContext::getEngine()->dumpCurrentHashinator()
+                << std::endl;
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
+                            buffer.str().c_str());
     }
     return mispartitionedRows;
 }
