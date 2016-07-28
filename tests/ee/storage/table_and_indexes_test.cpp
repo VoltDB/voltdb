@@ -57,6 +57,10 @@ public:
         return new MockHashinator();
     }
 
+    std::string debug() const {
+       return "MockHashinator";
+    }
+
     ~MockHashinator() {}
 
 protected:
