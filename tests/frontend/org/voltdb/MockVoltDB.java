@@ -209,6 +209,7 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().setDrconsumerenabled(enabled);
     }
 
+    String m_clSnapshotPath = "command_log_snapshot";
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -219,13 +220,24 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setSynchronous(sync);
         logConfig.setFsyncinterval(fsyncInterval);
         logConfig.setMaxtxns(maxTxns);
+        m_clSnapshotPath = snapshotPath;
+    }
+    @Override
+    public String getCommandLogSnapshotPath() {
+        return m_clSnapshotPath;
     }
 
+    String m_autoSnapshotPath = "snapshots";
     public void configureSnapshotSchedulePath(String autoSnapshotPath) {
         org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
         if (scheduleConfig == null) {
             scheduleConfig = getDatabase().getSnapshotschedule().add("default");
         }
+        m_autoSnapshotPath = autoSnapshotPath;
+    }
+    @Override
+    public String getSnapshotPath() {
+        return m_autoSnapshotPath;
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -507,18 +519,8 @@ public class MockVoltDB implements VoltDBInterface
     public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
 
     @Override
-    public String getCommandLogSnapshotPath() {
-        return "command_log_snapshot";
-    }
-
-    @Override
     public String getCommandLogPath() {
         return "command_log";
-    }
-
-    @Override
-    public String getSnapshotPath() {
-        return "snapshots";
     }
 
     @Override

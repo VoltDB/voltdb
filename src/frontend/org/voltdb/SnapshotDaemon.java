@@ -426,7 +426,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 assert(results.length == 3);
 
                 final VoltTable snapshots = results[0];
-                assert(snapshots.getColumnCount() == 9);
+                assert(snapshots.getColumnCount() == 10);
 
                 TreeMap<Long, TruncationSnapshotAttempt> foundSnapshots =
                     new TreeMap<Long, TruncationSnapshotAttempt>();
@@ -1556,7 +1556,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         assert(results.length == 3);
 
         final VoltTable snapshots = results[0];
-        assert(snapshots.getColumnCount() == 9);
+        assert(snapshots.getColumnCount() == 10);
 
         final File myPath = new File(m_path);
         while (snapshots.advanceRow()) {
