@@ -49,6 +49,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
+import org.voltdb.Consistency;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -101,6 +102,9 @@ public class TestSpSchedulerDedupe extends TestCase
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);
+
+        ((SpScheduler)dut).setConsistentReadLevel(Consistency.ReadLevel.SAFE);
+        ((SpScheduler)dut).setBufferedReadLog();
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,

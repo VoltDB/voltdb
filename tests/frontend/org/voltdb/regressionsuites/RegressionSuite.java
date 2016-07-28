@@ -80,6 +80,8 @@ public class RegressionSuite extends TestCase {
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
     protected final String m_methodName;
 
+    public static int TIME_OUT_MILLIS = 10 * 60 * 1000;
+
     /**
      * Trivial constructor that passes parameter on to superclass.
      * @param name The name of the method to run as a test. (JUnit magic)
@@ -161,23 +163,23 @@ public class RegressionSuite extends TestCase {
     }
 
     public Client getAdminClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256, true); // 10 minute default
+        return getClient(TIME_OUT_MILLIS, ClientAuthScheme.HASH_SHA256, true); // 10 minute default
     }
 
     public Client getClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256); // 10 minute default
+        return getClient(TIME_OUT_MILLIS, ClientAuthScheme.HASH_SHA256); // 10 minute default
     }
 
     public Client getClient(ClientAuthScheme scheme) throws IOException {
-        return getClient(1000 * 60 * 10, scheme); // 10 minute default
+        return getClient(TIME_OUT_MILLIS, scheme); // 10 minute default
     }
 
     public Client getClientToHostId(int hostId) throws IOException {
-        return getClientToHostId(hostId, 1000 * 60 * 10); // 10 minute default
+        return getClientToHostId(hostId, TIME_OUT_MILLIS); // 10 minute default
     }
 
     public Client getFullyConnectedClient() throws IOException {
-        return getFullyConnectedClient(1000 * 60 * 10); // 10 minute default
+        return getFullyConnectedClient(TIME_OUT_MILLIS); // 10 minute default
     }
 
     /**
