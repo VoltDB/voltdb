@@ -770,7 +770,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                         }
                         msg += "adding a parameter to be passed the value " + valueDescription + " and ";
                     }
-                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN ON " +
+                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN " +
                             partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
                             "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
                     compiler.addWarn(msg);

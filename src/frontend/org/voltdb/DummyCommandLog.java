@@ -25,6 +25,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class DummyCommandLog implements CommandLog {
     @Override
@@ -55,8 +56,9 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+    public SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle) {
+        return null;
     }
 
     @Override

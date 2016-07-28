@@ -390,7 +390,7 @@ public class TestVoltCompiler extends TestCase {
 
         String expectedWarning =
                 "This procedure myTestProc would benefit from being partitioned, by adding a "
-                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN ON PKEY PARAMETER 0' clause to the "
+                + "'PARTITION ON TABLE PKEY_BIGINT COLUMN PKEY PARAMETER 0' clause to the "
                 + "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
 
         boolean findMatched = false;

@@ -19,6 +19,8 @@
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
+#include "storage/DRTupleStream.h"
+#include "storage/DRTupleStreamUndoAction.h"
 
 #include "boost/foreach.hpp"
 
@@ -250,6 +252,36 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
     int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
     m_drReplicatedStream = drReplicatedStream;
     m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
+}
+
+/**
+ * To open DR stream to start binary logging for a transaction at this level,
+ *   1. It needs to be a multipartition transaction.
+ *   2. It is NOT a read-only transaction as it generates no data change on any partition.
+ *
+ * For single partition transactions, DR stream's binary logging is handled as is
+ * at persistenttable level.
+ */
+void ExecutorContext::checkTransactionForDR() {
+    if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
+        if (dynamic_cast<DRTupleStream *>(m_drStream)) {
+            m_drStream->transactionChecks(m_lastCommittedSpHandle, m_spHandle,
+                    m_uniqueId);
+            m_undoQuantum->registerUndoAction(
+                    new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
+                            m_drStream->m_committedUso,
+                            rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
+            if (m_drReplicatedStream) {
+                m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
+                        m_spHandle, m_uniqueId);
+                m_undoQuantum->registerUndoAction(
+                        new (*m_undoQuantum) DRTupleStreamUndoAction(
+                                m_drReplicatedStream,
+                                m_drReplicatedStream->m_committedUso,
+                                rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
+            }
+        }
+    }
 }
 
 } // end namespace voltdb
