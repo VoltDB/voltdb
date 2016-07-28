@@ -186,23 +186,27 @@ def print_summary():
     to STDOUT and to the sqlcmd output file (if any). And close both output
     files - the SQL statement one and the sqlcmd one (if they exist).
     """
-    global start_time, sql_output_file, sqlcmd_output_file
-    global count_all_sql_statements, count_valid_sql_statements, count_invalid_sql_statements
-
-    # Compute the percentage of valid and invalid SQL statements
-    percent_valid = 0
-    percent_invalid = 0
-    if count_all_sql_statements:
-        percent_valid   = int(round(100.0 *   count_valid_sql_statements / count_all_sql_statements))
-        percent_invalid = int(round(100.0 * count_invalid_sql_statements / count_all_sql_statements))
+    global start_time, sql_output_file, sqlcmd_output_file, count_sql_statements
 
     # Generate the summary message (to be printed below)
     seconds = time() - start_time
-    summary_message = '\n\nSUMMARY: ' + str(count_all_sql_statements) + ' SQL statements'
-    if count_valid_sql_statements or count_invalid_sql_statements:
-        summary_message += ' (' + str(count_valid_sql_statements) + ' valid, ' + str(percent_valid) + '%; ' \
-                            + str(count_invalid_sql_statements) +' invalid, ' + str(percent_invalid) + '%)'
-    summary_message += ', in ' + re.sub("^0:", "", str(timedelta(0, round(seconds))), 1) + " ({0:.3f} seconds)".format(seconds)
+    summary_message = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
+                    + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
+    total_count = -1
+    if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
+        total_count = count_sql_statements['total']['total']
+    for sql_type in sorted(count_sql_statements):
+        sql_type_count = -1
+        if count_sql_statements[sql_type].get('total'):
+            sql_type_count = count_sql_statements[sql_type]['total']
+        summary_message += '\n    {:6s}'.format(sql_type) + ': '
+        for validity in sorted(count_sql_statements[sql_type], reverse=True):
+            if validity != 'total':  # save total for last
+                count = count_sql_statements[sql_type][validity]
+                percent = int(round(100.0 * count / sql_type_count))
+                summary_message += '{:6d} '.format(count) + validity + ' ({:2d}%), '.format(percent)
+        percent = int(round(100.0 * sql_type_count / total_count))
+        summary_message += '{:6d} '.format(sql_type_count) + 'total ({:2d}%)'.format(percent)
 
     # Print the summary message, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
@@ -212,8 +216,40 @@ def print_summary():
         sqlcmd_output_file.close()
     print summary_message
 
+def increment_sql_statement_indexes(index1, index2):
+    """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
+    a dict of dict) for the specified indexes; if there is no such value,
+    initialize it to 1.
+    """
+    global count_sql_statements
 
-def print_sql_statement(sql, max_save_statements=1000):
+    if not count_sql_statements.get(index1):
+        count_sql_statements[index1] = {}
+    if count_sql_statements[index1].get(index2):
+        count_sql_statements[index1][index2] += 1
+    else:
+        count_sql_statements[index1][index2] = 1
+
+
+def increment_sql_statement_type(type=None, validity=None):
+    """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
+    a dict of dict), both for the 'total', 'total' element and for the 'type',
+    if specified (i.e., for the type, 'total' element); also, if the 'validity'
+    is specified (normally equal to 'valid' or 'invalid'), increment those
+    values as well (i.e., the 'total', validity and type, validity elements).
+    """
+    global count_sql_statements
+
+    increment_sql_statement_indexes('total', 'total')
+    if validity:
+        increment_sql_statement_indexes('total', validity)
+    if type:
+        increment_sql_statement_indexes(type, 'total')
+        if validity:
+            increment_sql_statement_indexes(type, validity)
+
+
+def print_sql_statement(sql, max_save_statements=1000, num_chars_in_sql_type=6):
     """Print the specified SQL statement (sql), to the SQL output file (which may
     be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
     to sqlcmd, and print its output in the sqlcmd output file (which may be
@@ -221,14 +257,13 @@ def print_sql_statement(sql, max_save_statements=1000):
     of SQL statements (max_save_statements), meaning that each time we reach
     that number, the output file(s) are deleted and begun again.
     """
-    global count_all_sql_statements, count_valid_sql_statements, count_invalid_sql_statements
-    global sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug
-
-    count_all_sql_statements += 1
+    global count_sql_statements, sql_output_file, sqlcmd_output_file, sqlcmd_proc, debug
 
     # After every 'max_save_statements' statements, delete the output file(s),
     # and start over, to avoid the file(s) becoming too large
-    if max_save_statements and not count_all_sql_statements % max_save_statements:
+    if (count_sql_statements and count_sql_statements.get('total')
+            and count_sql_statements['total'].get('total') and max_save_statements
+            and not count_sql_statements['total']['total'] % max_save_statements):
         if sql_output_file and sql_output_file != sys.stdout:
             filename = sql_output_file.name
             sql_output_file.close()
@@ -251,12 +286,12 @@ def print_sql_statement(sql, max_save_statements=1000):
 
             # TODO: might want to use regex's here:
             if output and '(Returned ' in output and ' rows in ' in output and 's)' in output:
-                count_valid_sql_statements += 1
+                increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
                 if debug > 4:
                     print >> sqlcmd_output_file, 'DEBUG: FOUND: (Returned ... rows in ...s)'
                 break
             elif output and 'ERROR' in output.upper():
-                count_invalid_sql_statements += 1
+                increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
                 if debug > 4:
                     print >> sqlcmd_output_file, 'DEBUG: FOUND ERROR'
                 break
@@ -271,6 +306,8 @@ def print_sql_statement(sql, max_save_statements=1000):
                 print_summary()
                 sqlcmd_proc.communicate('exit')
                 exit(99)
+    else:
+        increment_sql_statement_type(sql[0:num_chars_in_sql_type])
 
 
 def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000):
@@ -312,9 +349,10 @@ if __name__ == "__main__":
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
                          + "(after the initial ones, if any) [default: sql-statement]")
-    parser.add_option("-n", "--number", dest="number", default=5,
+    parser.add_option("-n", "--number", dest="number", default=0,
                       help="the number of each 'type' of SQL statement to generate; a negative value "
-                         + "means keep generating until the number of minutes is reached [default: 5]")
+                         + "means keep generating until the number of minutes is reached [default: 0; "
+                         + "-1 if MINUTES is specified]")
     parser.add_option("-m", "--minutes", dest="minutes", default=0,
                       help="the number of minutes to generate all SQL statements, of all types "
                          + "(if positive, overrides the number of SQL statements) [default: 0]")
@@ -330,6 +368,10 @@ if __name__ == "__main__":
     parser.add_option("-d", "--debug", dest="debug", default=0,
                       help="print debug info: 0 for none, increasing values for more [default: 0]")
     (options, args) = parser.parse_args()
+
+    # If 'minutes' is specified, change the default for 'number'
+    if options.minutes and not options.number:
+        options.number = -1
 
     debug = int(options.debug)
     if debug > 1:
@@ -393,9 +435,7 @@ if __name__ == "__main__":
 
     # Generate the specified number of each type of SQL statement;
     # and run each in sqlcmd, if the sqlcmd option was specified
-    count_all_sql_statements = 0
-    count_valid_sql_statements = 0
-    count_invalid_sql_statements = 0
+    count_sql_statements = {}
     if options.num_initial:
         for sql_statement_type in options.initial_type.split(','):
             generate_sql_statements(sql_statement_type, int(options.num_initial), int(options.max_save))
