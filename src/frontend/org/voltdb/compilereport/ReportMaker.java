@@ -1044,11 +1044,11 @@ public class ReportMaker {
         String sizeData = generateSizeTable(sizes);
         contents = contents.replace("##SIZES##", sizeData);
 
-        String sizeSummary = generateSizeSummary(sizes);
-        contents = contents.replace("##SIZESUMMARY##", sizeSummary);
-
         String clusterConfig = generateClusterConfiguration(isPro, hostCount, sitesPerHost, kfactor);
         contents = contents.replace("##CLUSTERCONFIG##", clusterConfig);
+
+        String sizeSummary = generateSizeSummary(sizes);
+        contents = contents.replace("##SIZESUMMARY##", sizeSummary);
 
         String heapSummary = generateReccServerSettings(sizes);
         contents = contents.replace("##RECSERVERSETTINGS##", heapSummary);
