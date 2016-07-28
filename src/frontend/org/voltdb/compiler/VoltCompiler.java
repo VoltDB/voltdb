@@ -90,12 +90,8 @@ import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.utils.CatalogSchemaTools;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.*;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
-import org.voltdb.utils.LogKeys;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -672,7 +668,9 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
+            VoltDBInterface voltdb = VoltDB.instance();
+            m_report = ReportMaker.report(m_catalog, voltdb.getRequiredHeap(), MiscUtils.isPro(), voltdb.getConfig().m_hostCount,
+                    voltdb.getSitesPerHost(), voltdb.getKFactor(), m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
@@ -682,7 +680,6 @@ public class VoltCompiler {
             }
             else {
                 // try to get a catalog context
-                VoltDBInterface voltdb = VoltDB.instance();
                 CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
 
                 // it's possible that standaloneCompiler will be false and catalogContext will be null

@@ -3405,6 +3405,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public long getRequiredHeap() {
+        return computeMinimumHeapRqt(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+    }
+
+    @Override
+    public int getSitesPerHost() {
+        return m_iv2Initiators.size() - 1;
+    }
+
+    @Override
+    public int getKFactor() {
+        return m_configuredReplicationFactor;
+    }
+
+    @Override
     public ProducerDRGateway getNodeDRGateway()
     {
         return m_producerDRGateway;

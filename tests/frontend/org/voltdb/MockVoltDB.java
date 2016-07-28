@@ -577,6 +577,21 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public long getRequiredHeap() {
+        return 0l;
+    }
+
+    @Override
+    public int getSitesPerHost() {
+        return 1;
+    }
+
+    @Override
+    public int getKFactor() {
+        return 0;
+    }
+
+    @Override
     public void recoveryComplete(String requestId) {
     }
 
