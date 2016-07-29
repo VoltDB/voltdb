@@ -1,13 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
-     <cluster hostcount="1" sitesperhost="1" kfactor="0" elastic="enabled" />     
-       <systemsettings>
-           <temptables maxsize="2048"/>
-           <query timeout="30000"/>
-           <resourcemonitor frequency="1">
-               <memorylimit size="3"/>
-           </resourcemonitor>
-       </systemsettings>
+    <cluster hostcount="1" kfactor="0" />     
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
