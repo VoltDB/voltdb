@@ -25,9 +25,6 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -69,48 +66,6 @@ public class TestPBDMultipleReaders {
             }
 
             return numRead;
-        }
-    }
-
-    @Test
-    public void testDemo() throws Exception {
-        int numBuffers = 300;
-        for (int i=0; i<numBuffers; i++) {
-            m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)) );
-        }
-        System.out.println("Initial directory contents: " + TestPersistentBinaryDeque.getSortedDirectoryListing());
-
-        ExecutorService es = Executors.newFixedThreadPool(2);
-        es.submit(new ReaderWorker(new PBDReader("consumer1")));
-        es.submit(new ReaderWorker(new PBDReader("consumer2")));
-
-        es.shutdown();
-        es.awaitTermination(10, TimeUnit.MINUTES);
-    }
-
-    private static class ReaderWorker implements Runnable {
-        private final PBDReader m_reader;
-        public ReaderWorker(PBDReader reader) {
-            m_reader = reader;
-        }
-
-        public void run() {
-            try {
-                int numSegments = 0;
-                while (true) {
-                    int numRead = m_reader.readToEndOfSegment();
-                    if (numRead > 0) {
-                        System.out.println(m_reader.m_readerId + " read segment " + numSegments);
-                        System.out.println("Directory contents:");
-                        System.out.println("\t" + TestPersistentBinaryDeque.getSortedDirectoryListing());
-                        numSegments++;
-                    } else {
-                        System.out.println(m_reader.m_readerId + " has reached end of DR log");
-                    }
-                }
-            } catch(Exception e) {
-                e.printStackTrace();
-            }
         }
     }
 
