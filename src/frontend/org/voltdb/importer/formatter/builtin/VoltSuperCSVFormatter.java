@@ -57,7 +57,7 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
     private VoltCVSTokenizer m_tokenizer;
     CsvListReader m_csvReader;
 
-    VoltSuperCSVFormatter(String formatName, Properties prop) {
+    public VoltSuperCSVFormatter(String formatName, Properties prop) {
 
         if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
             throw new IllegalArgumentException(

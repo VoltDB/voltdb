@@ -740,6 +740,66 @@ public class TestHostMessenger {
     }
 
     @Test
+    public void testProbedRejoinWithMismatchedStartAction() throws Exception {
+        VoltDB.ignoreCrash = true;
+
+        NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
+        MeshProber.Builder jcb = MeshProber.builder()
+                .coordinators(coordinators(2))
+                .hostCount(3)
+                .startAction(StartAction.PROBE)
+                .nodeStateSupplier(upNodesState)
+                .kfactor(1)
+                .paused(false)
+                .bare(true);
+
+        HostMessenger hm1 = createHostMessenger(0, jcb.build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.build(), false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+        HostMessengerThread hm3Start = new HostMessengerThread(hm3, exception);
+
+        hm1Start.start();
+        hm2Start.start();
+        hm3Start.start();
+
+        hm1Start.join();
+        hm2Start.join();
+        hm3Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        Determination dtm = prober(hm1).waitForDetermination();
+        assertEquals(StartAction.CREATE, dtm.startAction);
+        assertEquals(3, dtm.hostCount);
+
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
+
+        assertTrue(upNodesState.compareAndSet(NodeState.INITIALIZING, NodeState.UP));
+
+        hm2.shutdown();
+
+        jcb.nodeState(NodeState.INITIALIZING)
+            .startAction(StartAction.REJOIN)
+            .bare(true);
+        HostMessenger hm4 = createHostMessenger(1, jcb.build(), false);
+
+        try {
+            hm4.start();
+            fail("did not crash on mismatched start actions");
+        } catch (AssertionError pass) {
+            assertTrue(VoltDB.wasCrashCalled);
+            assertTrue(VoltDB.crashMessage.contains("use init and start to join this cluster"));
+        }
+    }
+
+    @Test
     public void testProbedJoinOnWholeCluster() throws Exception {
         NodeStateRef upNodesState = new NodeStateRef(NodeState.INITIALIZING);
 
@@ -960,7 +1020,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Mismatched deployment configuration"));
+            assertTrue(VoltDB.crashMessage.contains("deployment options that do not match"));
         }
     }
 
@@ -1005,7 +1065,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Mismatched host parameters"));
+            assertTrue(VoltDB.crashMessage.contains("Mismatched list of hosts"));
         }
     }
 
@@ -1155,7 +1215,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Cannot join a community edition"));
+            assertTrue(VoltDB.crashMessage.contains("cannot contain both enterprise and community editions"));
         }
     }
 
@@ -1253,7 +1313,7 @@ public class TestHostMessenger {
             assertTrue(VoltDB.wasCrashCalled);
             assertTrue(VoltDB.crashMessage.contains("Start action CREATE does not match PROBE"));
             assertTrue(VoltDB.crashMessage.contains("Mismatched host count"));
-            assertTrue(VoltDB.crashMessage.contains("Mismatched deployment configuration"));
+            assertTrue(VoltDB.crashMessage.contains("deployment options that do not match"));
         }
     }
 

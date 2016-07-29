@@ -204,16 +204,16 @@ public class HostCriteria {
             return ilb.build();
         }
         if (m_enterprise != o.m_enterprise) {
-            ilb.add("Cannot join a community edition with an eterprise one, or viceversa");
+            ilb.add("Cluster cannot contain both enterprise and community editions");
         }
         if (m_hostCount != o.m_hostCount) {
             ilb.add(String.format("Mismatched host count: %d, and %d", m_hostCount, o.m_hostCount));
         }
         if (!m_meshHash.equals(o.m_meshHash)) {
-            ilb.add("Mismatched host parameters given at database startup");
+            ilb.add("Mismatched list of hosts given at database startup");
         }
         if (!m_configHash.equals(o.m_configHash)) {
-            ilb.add("Mismatched deployment configuration given at database startup");
+            ilb.add("Servers are initialized with deployment options that do not match");
         }
         return ilb.build();
     }

@@ -386,6 +386,15 @@ public class MeshProber implements JoinAcceptor {
                 return new JoinAcceptor.PleaDecision(error, false, false);
             }
             return new JoinAcceptor.PleaDecision(null, true, false);
+        } else {
+            StartAction operationalStartAction = hostCriteria.values().stream()
+                    .filter(c->c.getNodeState().operational())
+                    .map(c->c.getStartAction())
+                    .findFirst().orElse(getStartAction());
+            if (operationalStartAction == StartAction.PROBE && hc.getStartAction() != StartAction.PROBE) {
+                String msg = "Invalid VoltDB command. Please use init and start to join this cluster";
+                return new JoinAcceptor.PleaDecision(msg, false, false);
+            }
         }
         // how many hosts are already in the mesh?
         Stat stat = new Stat();
@@ -410,7 +419,7 @@ public class MeshProber implements JoinAcceptor {
         // connecting to already wholly formed cluster
         if (stat.getNumChildren() >= getHostCount()) {
             return new JoinAcceptor.PleaDecision(
-                    hc.isAddAllowed()? null : "Cluster is already whole",
+                    hc.isAddAllowed()? null : "Cluster is already complete",
                     hc.isAddAllowed(), false);
         } else if (stat.getNumChildren() < getHostCount()) {
             // check for concurrent rejoins
@@ -486,30 +495,12 @@ public class MeshProber implements JoinAcceptor {
         if (m_probedDetermination.isDone()) {
             return;
         }
-        // prefer host count from operational nodes
-        int hostCount = hostCriteria.values().stream()
-                .filter(h -> h.getNodeState().operational())
-                .map(h -> h.getHostCount())
-                .findAny().orElse(getHostCount());
-
         final int ksafety = getkFactor() + 1;
-
-        // not enough host criteria to make a determination
-        if (hostCriteria.size() < hostCount) {
-            m_networkLog.debug("have yet to receive all the required host criteria");
-            return;
-        }
-        // handle add (i.e. join) cases too
-        if (hostCount < getHostCount() && hostCriteria.size() <= hostCount) {
-            m_networkLog.debug("have yet to receive all the required host criteria");
-            return;
-        }
-
-        m_networkLog.debug("Received all the required host criteria");
 
         int bare = 0; // node has no recoverable artifacts (Command Logs, Snapshots)
         int unmeshed = 0;
         int operational = 0;
+        int hostCount = getHostCount();
 
         // both paused and safemode need to be specified on only one node to
         // make them a cluster attribute. These are overridden if there are
@@ -521,7 +512,11 @@ public class MeshProber implements JoinAcceptor {
             if (c.getNodeState().operational()) {
                 operational += 1;
                 // pause state from operational nodes overrides yours
-                paused = operational == 1 ? c.isPaused() : paused;
+                // prefer host count from operational nodes
+                if (operational == 1) {
+                    paused = c.isPaused();
+                    hostCount = c.getHostCount();
+                }
             }
             unmeshed += c.getNodeState().unmeshed() ? 1 : 0;
             bare += c.isBare() ? 1 : 0;
@@ -530,6 +525,18 @@ public class MeshProber implements JoinAcceptor {
             }
             safemode = safemode || c.isSafeMode();
         }
+        // not enough host criteria to make a determination
+        if (hostCriteria.size() < hostCount && operational == 0) {
+            m_networkLog.debug("have yet to receive all the required host criteria");
+            return;
+        }
+        // handle add (i.e. join) cases too
+        if (hostCount < getHostCount() && hostCriteria.size() <= hostCount) {
+            m_networkLog.debug("have yet to receive all the required host criteria");
+            return;
+        }
+
+        m_networkLog.debug("Received all the required host criteria");
 
         safemode = safemode && operational == 0 && bare < ksafety; // kfactor + 1
 
@@ -559,7 +566,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCount = hostCount + ksafety; // kfactor + 1
                 determination = StartAction.JOIN;
             } else {
-                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
+                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already complete cluster");
                 return;
             }
         } else if (operational == 0 && bare == unmeshed) {
@@ -567,7 +574,7 @@ public class MeshProber implements JoinAcceptor {
         } else if (operational == 0 && bare < ksafety /* kfactor + 1 */) {
             determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
         } else if (operational == 0 && bare >= ksafety  /* kfactor + 1 */) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
+            org.voltdb.VoltDB.crashLocalVoltDB("Cluster has incomplete command logs: "
                     + bare + " nodes have no command logs, while "
                     + (unmeshed - bare) + " nodes have them");
             return;

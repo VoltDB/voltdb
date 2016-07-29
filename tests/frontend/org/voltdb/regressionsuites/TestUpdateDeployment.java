@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
@@ -47,6 +45,8 @@ import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 
 /**
@@ -77,6 +77,11 @@ public class TestUpdateDeployment extends RegressionSuite {
         new UserInfo("fancy pants", "export", new String[]{"export"}),
         new UserInfo("default", "password", new String[]{"proc"}),
         new UserInfo("admin", "admin", new String[]{"proc", "admin"})
+    };
+
+    static final UserInfo[] USERS_BAD_PASSWORD = new UserInfo[] {
+            new UserInfo("user1", "E7FA8F38396EF1332A60B629BA69257C462CBF3B95C81F3C556DDB79BD2226BEBCF2086983707FF5CFA72BE03B8B763199BBFFD3", new String[]{"admin"}, false),
+            new UserInfo("user2", "password", new String[]{"admin", "proc"}, false)
     };
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -383,6 +388,22 @@ public class TestUpdateDeployment extends RegressionSuite {
         assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
     }
 
+    public void testBadMaskPassword() throws Exception {
+        System.out.println("\n\n-----\n testBadMaskPassword \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml");
+        // Try to change schema setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -521,6 +542,20 @@ public class TestUpdateDeployment extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-bad-username.xml"));
+
+        // A deployment change that has bad masked password
+        config = new LocalCluster("catalogupdate-bad-masked-password.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSecurityEnabled(true,true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS_BAD_PASSWORD);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml"));
 
         return builder;
     }

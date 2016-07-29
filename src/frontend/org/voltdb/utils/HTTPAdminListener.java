@@ -484,7 +484,7 @@ public class HTTPAdminListener {
                 if (baseRequest.getRequestURI().contains("/download")) {
                     //Deployment xml is text/xml
                     response.setContentType("text/xml;charset=utf-8");
-                    response.getWriter().write(new String(getDeploymentBytes()));
+                    response.getWriter().write(CatalogUtil.getDeployment(this.getDeployment(), true));
                 } else if (baseRequest.getRequestURI().contains("/users")) {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
                         handleUpdateUser(jsonp, target, baseRequest, request, response, authResult);

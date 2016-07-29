@@ -743,7 +743,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else if (m_rejoinState == kStateReplayingRejoin) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
                     // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_scheduler.poll();
+                    SiteTasker task = m_scheduler.peek();
                     boolean didWork = false;
                     if (task != null) {
                         didWork = true;
@@ -755,9 +755,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             replayFromTaskLog(mrm);
                         }
                         mrm.didRestricted();
-                        if (m_rejoinState == kStateRunning) {
-                            task.run(getSiteProcedureConnection());
-                        } else {
+                        // If m_rejoinState didn't change to kStateRunning because of replayFromTaskLog(),
+                        // remove the task from the scheduler and give it to task log.
+                        // Otherwise, keep the task in the scheduler and let the next loop take and handle it
+                        if (m_rejoinState != kStateRunning) {
+                            m_scheduler.poll();
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
                     } else {

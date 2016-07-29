@@ -14,6 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+voltdbroot_help = ('Specifies the root directory for the database. The default '
+                   'is voltdbroot under the current working directory.')
+server_list_help = ('{hostname-or-ip[,...]}, '
+             'Specifies the leader(s) for coordinating cluster startup. ')
+
 @VOLT.Command(
     bundles = VOLT.ServerBundle('probe',
                                 needs_catalog=False,
@@ -27,16 +32,17 @@
                                 supports_paused=True,
                                 is_legacy_verb=False),
     options = (
-        VOLT.StringListOption('-H', '--hosts', 'mesh',
-                              'HOST1[:PORT], HOST2:PORT, ..., HOSTn:PORT, (default HOST=localhost, PORT=3021)',
-                              default = ''),
-        VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster', default=1)
+        VOLT.StringListOption('-H', '--host', 'server_list', server_list_help, default = ''),
+        VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster', default=1),
+        VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None)
     ),
     description = 'Starts a database, which has been initialized.'
 )
 def start(runner):
-    if not runner.opts.mesh:
-        runner.abort_with_help('You must specify the --cluster option.')
-    runner.args.extend(['mesh', ','.join(runner.opts.mesh)])
+    if runner.opts.directory_spec:
+        runner.args.extend(['voltdbroot', runner.opts.directory_spec])
+    if not runner.opts.server_list:
+        runner.abort_with_help('You must specify the --host option.')
+    runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
     runner.args.extend(['hostcount', runner.opts.hostcount])
     runner.go()

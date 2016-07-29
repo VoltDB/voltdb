@@ -43,7 +43,7 @@ class Server(unittest.TestCase):
         if response.status_code == 201:
             self.assertEqual(response.status_code, 201)
         else:
-            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.status_code, 400)
         # Create a server
         response = requests.get(__db_url__)
         value = response.json()
@@ -108,6 +108,7 @@ class CreateServer(Server):
         """
         ensure GET server list
         """
+        print "Running test to check get server list API."
         response = requests.get(__db_url__)
         value = response.json()
         if value:
@@ -124,6 +125,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['statusString'], 'OK')
             self.assertEqual(value['status'], 200)
+        print "Completed test to check get server list API."
 
     def test_request_with_id(self):
         """
@@ -161,25 +163,6 @@ class CreateServer(Server):
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
         self.assertEqual(value['statusString'][0], 'Host name is required.')
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_invalid_host_name(self):
-        """
-        ensure server name is valid
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-
-        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-            (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': '444', 'name': 'test'}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['statusString'][0], 'Invalid IP address.')
         self.assertEqual(response.status_code, 200)
 
     def test_validate_port(self):
@@ -447,33 +430,6 @@ class UpdateServer(Server):
                 response = requests.put(url, json=data, headers=headers)
                 value = response.json()
                 self.assertEqual(value['statusString'][0], 'Host name is required.')
-                self.assertEqual(response.status_code, 200)
-            else:
-                print "The Server list is empty"
-
-    def test_validate_invalid_hostname(self):
-        """
-        ensure host name is not empty
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
-            response = requests.get(url)
-            value = response.json()
-            if value:
-                server_length = len(value['members'])
-                last_server_id = value['members'][server_length-1]['id']
-                url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/' % \
-                     (__host_or_ip__,last_db_id,last_server_id)
-                data = {'description': 'test', 'hostname': '3333', 'name': 'test'}
-                response = requests.put(url, json=data, headers=headers)
-                value = response.json()
-                self.assertEqual(value['statusString'][0], 'Invalid IP address.')
                 self.assertEqual(response.status_code, 200)
             else:
                 print "The Server list is empty"
