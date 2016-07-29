@@ -270,7 +270,7 @@ void ExecutorContext::checkTransactionForDR() {
             m_undoQuantum->registerUndoAction(
                     new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                             m_drStream->m_committedUso,
-                            rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
+                            0));
             if (m_drReplicatedStream) {
                 m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
                         m_spHandle, m_uniqueId);
@@ -278,7 +278,7 @@ void ExecutorContext::checkTransactionForDR() {
                         new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,
                                 m_drReplicatedStream->m_committedUso,
-                                rowCostForDRRecord(DR_RECORD_BEGIN_TXN)));
+                                0));
             }
         }
     }
