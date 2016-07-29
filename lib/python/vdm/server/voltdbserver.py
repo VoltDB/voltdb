@@ -419,7 +419,7 @@ class VoltDatabase:
 
         return server['hostname']
 
-    def stop_database(self):
+    def kill_database(self):
         """
         Stops voltdb cluster for this database
         """
@@ -539,7 +539,7 @@ class VoltDatabase:
                                    ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
         return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename, server)
 
-    def kill_database(self, database_id):
+    def stop_database(self, database_id):
         members = []
         current_database = HTTPListener.Global.DATABASES.get(self.database_id)
         if not current_database:
@@ -567,7 +567,7 @@ class VoltDatabase:
                 response = requests.put(url)
                 if (response.status_code != requests.codes.ok):
                     failed = True
-                server_status[curr['hostname']] = json.loads(json.loads(response.text)['statusString'])['statusString']
+                server_status[curr['hostname']] = json.loads(response.text)['statusString']
             except Exception, err:
                 failed = True
                 print traceback.format_exc()

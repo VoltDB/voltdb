@@ -1221,14 +1221,14 @@ class StopDatabaseAPI(MethodView):
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.kill_database(database_id)
+            response = server.stop_database(database_id)
             resp_json = json.loads(response.data)
             return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}))
 
         else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
-                response = server.stop_database()
+                response = server.kill_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
                 resp_json = json.loads(json.loads(response.data)['statusString'])
