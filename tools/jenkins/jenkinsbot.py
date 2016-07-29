@@ -6,18 +6,17 @@
 # Script that runs jenkinsbot for VoltDB Slack
 
 import logging
-from logging import handlers
 import os
 import sys
 import time
-from datetime import datetime
 
 import mysql.connector
 
+from jira import JIRA
+from logging import handlers
 from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
-# Used for pretty printing tables
-from tabulate import tabulate
+from tabulate import tabulate  # Used for pretty printing tables
 
 # Get job names from environment variables
 COMMUNITY = os.environ.get('community', None)
@@ -34,6 +33,14 @@ ADMIN_CHANNEL = os.environ.get('admin', None)
 # Other channels
 GENERAL_CHANNEL = os.environ.get('general', None)
 RANDOM_CHANNEL = os.environ.get('random', None)
+
+# Jira credentials and info
+JIRA_USER = os.environ.get('jirauser', None)
+JIRA_PASS = os.environ.get('jirapass', None)
+JIRA_PROJECT = os.environ.get('jiraproject', None)
+
+# Number of failures in a row for a test needed to trigger a new Jira issue
+TOLERANCE = 2
 
 # Queries
 
@@ -163,6 +170,17 @@ AF_QUERY = ("""
 ORDER BY 2 DESC
 """)
 
+# Consistent Failures - See which tests are failing consistently on master.
+# CF_QUERY = ("""
+#     SELECT tf.name AS 'Test name',
+#            tf.url AS 'Report url',
+#            tf.stamp as 'Time'
+#       FROM `junit-test-failures` AS tf
+#      WHERE tf.name=%(name)s AND
+#            tf.job=%(job)s AND
+#            %(build)s - tf.build < %(tolerance)s
+# """)
+
 
 class JenkinsBot(object):
     def __init__(self):
@@ -171,11 +189,11 @@ class JenkinsBot(object):
 
     def setup_logging(self):
         logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
-        # Limit log file to 1G
+        # Limit log file to 1GB
         handler = handlers.RotatingFileHandler('jenkinsbot.log', maxBytes=1 << 30)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
@@ -183,21 +201,6 @@ class JenkinsBot(object):
         logger.addHandler(handler)
 
         return logger
-
-    # def log(self, message):
-    #     message = str(message)
-    #     try:
-    #         size = os.path.getsize(self.logfile)
-    #     except OSError:
-    #         message = self.logfile + ' does not exist. Creating..\n' + message
-    #         size = 0
-    #     if size < (1 << 30):
-    #
-    #         with open(self.logfile, 'a') as logfile:
-    #             logfile.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    #             logfile.write(' ' + message + '\n')
-    #     else:
-    #         self.post_message(ADMIN_CHANNEL, 'Log file too large.')
 
     def connect_to_slack(self):
         """
@@ -311,7 +314,7 @@ class JenkinsBot(object):
                 self.logger.exception('Incorrect number or formatting of arguments')
                 if channel:
                     self.post_message(channel, 'Incorrect number or formatting of arguments\n\n' + ''.join(help_text))
-            except Exception:
+            except:
                 self.logger.exception('Something unexpected went wrong')
 
                 # Try to reconnect
@@ -353,7 +356,7 @@ class JenkinsBot(object):
             self.logger.exception('Could not connect to database')
             for channel in channels:
                 self.post_message(channel, 'Something went wrong with the query.')
-        except Exception:
+        except:
             self.logger.exception('Something unexpected went wrong')
 
             # Try to reconnect only once
@@ -448,6 +451,84 @@ class JenkinsBot(object):
         """
         table = self.query(channels, query, params)
         self.response([table], channels, filename)
+
+    def create_bug_issue(self, age, test_data, summary, description, component, version, label,
+                         user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
+        """
+        Queries the database for a test to see if it occurs frequently and creates a bug issue on Jira
+        :param age: How many times in a row the job has failed
+        :param test_data: Dictionary data of test - name, job, status, timestamp, report_url, build, host
+        :param summary: The title summary
+        :param description: Description field
+        :param component: Component bug affects
+        :param version: Version this bug affects
+        :param label: Label to attach to the issue
+        :param user: User to report bug as
+        :param passwd: Password
+        :param project: Jira project
+        """
+        # table = self.query([ADMIN_CHANNEL], CF_QUERY, {
+        #     'name': test_data['name'],
+        #     'job': test_data['job'],
+        #     'build': str(test_data['build']),
+        #     'tolerance': TOLERANCE
+        # })
+
+        # if len(table) != 2 or len(table[1]) < TOLERANCE:
+        #     # Not enough failures to trigger a bug issue
+        #     return
+
+        if age < TOLERANCE:
+            return
+
+        if user and passwd and project:
+            try:
+                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd))
+            except:
+                self.logger.exception('Could not connect to Jira')
+                return
+        else:
+            self.logger.error('Did not provide either a Jira user, a Jira password or a Jira project')
+            return
+
+        issue_dict = {
+            'project': project,
+            'summary': summary,
+            'description': description,
+            'issuetype': {
+                'name': 'Bug'
+            },
+            'labels': [label]
+        }
+
+        jira_component = None
+        components = jira.project_components(project)
+        for c in components:
+            if c.name == component:
+                jira_component = {
+                    'name': c.name,
+                    'id': c.id
+                }
+                break
+        if jira_component:
+            issue_dict['components'] = [jira_component]
+
+        jira_version = None
+        versions = jira.project_versions(project)
+        for v in versions:
+            if v.name == version:
+                jira_version = {
+                    'name': v.name,
+                    'id': v.id
+                }
+                break
+        if jira_version:
+            issue_dict['versions'] = [jira_version]
+
+        new_issue = jira.create_issue(fields=issue_dict)
+
+        if self.connect_to_slack():
+            self.post_message('#junit', 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
 
 
 if __name__ == '__main__':
