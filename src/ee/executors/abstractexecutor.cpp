@@ -178,7 +178,6 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
-
 AbstractExecutor::~AbstractExecutor() {}
 
 AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,

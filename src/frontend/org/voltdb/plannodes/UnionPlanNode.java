@@ -139,4 +139,8 @@ public class UnionPlanNode extends AbstractPlanNode {
         return false;
     }
 
+    @Override
+    public boolean isOrderDeterministic() {
+        return false;
+    }
 }

@@ -29,6 +29,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -62,6 +63,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -248,7 +250,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "had no responses.  This should be impossible?");
             }
         }
-        writeIv2ViableReplayEntry();
+        SettableFuture<Boolean> written = writeIv2ViableReplayEntry();
+
+        // Get the fault log status here to ensure the leader has written it to disk
+        // before initiating transactions again.
+        blockFaultLogWriteStatus(written);
     }
 
     /**
@@ -1009,17 +1015,45 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    /**
+     * Should only receive these messages at replicas, when told by the leader
+     */
     public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
-        // Should only receive these messages at replicas, call the internal log write with
-        // the provided SP handle
-        writeIv2ViableReplayEntryInternal(message.getSpHandle());
+        //call the internal log write with the provided SP handle and wait for the fault log IO to complete
+        SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
+
+        // Get the Fault Log Status here to ensure the replica completes the log fault task is finished before
+        // it starts processing transactions again
+        blockFaultLogWriteStatus(written);
+
         setMaxSeenTxnId(message.getSpHandle());
 
         // Also initialize the unique ID generator and the last durable unique ID using
         // the value sent by the master
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
         m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
+    }
+
+    /**
+     * Wait to get the status of a fault log write
+     */
+    private void blockFaultLogWriteStatus(SettableFuture<Boolean> written) {
+        boolean logWritten = false;
+
+        if (written != null) {
+            try {
+                logWritten = written.get();
+            } catch (InterruptedException e) {
+            } catch (ExecutionException e) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Could not determine fault log state for partition: " + m_partitionId, e);
+                }
+            }
+            if (!logWritten) {
+                tmLog.warn("Attempted fault log not written for partition: " + m_partitionId);
+            }
+        }
     }
 
     public void handleDumpMessage()
@@ -1063,31 +1097,40 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * If appropriate, cause the initiator to write the viable replay set to the command log
      * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
+     *
+     * This will return a future to block on for the write on the fault log. If the attempt to write
+     * the replay entry was never followed through due to conditions, it will be null. If the attempt
+     * to write the replay entry went through but could not be done internally, the future will be false.
      */
-    void writeIv2ViableReplayEntry()
+    SettableFuture<Boolean> writeIv2ViableReplayEntry()
     {
+        SettableFuture<Boolean> written = null;
         if (m_replayComplete) {
             if (m_isLeader) {
                 // write the viable set locally
                 long faultSpHandle = advanceTxnEgo().getTxnId();
-                writeIv2ViableReplayEntryInternal(faultSpHandle);
+                written = writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
                 Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
                 m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
         }
+        return written;
     }
 
     /**
-     * Write the viable replay set to the command log with the provided SP Handle
+     * Write the viable replay set to the command log with the provided SP Handle.
+     * Pass back the future that is set after the fault log is written to disk.
      */
-    void writeIv2ViableReplayEntryInternal(long spHandle)
+    SettableFuture<Boolean> writeIv2ViableReplayEntryInternal(long spHandle)
     {
+        SettableFuture<Boolean> written = null;
         if (m_replayComplete) {
-            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
-                    spHandle);
+            written = m_cl.logIv2Fault(m_mailbox.getHSId(),
+                new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
         }
+        return written;
     }
 
     @Override

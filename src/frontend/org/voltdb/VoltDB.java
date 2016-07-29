@@ -615,7 +615,7 @@ public class VoltDB {
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                hostLog.fatal("You must specify a startup action, either initialize, probe, create, recover, rejoin, collect, or compile.");
+                hostLog.fatal("You must specify a startup action, either init, start, create, recover, rejoin, collect, or compile.");
                 referToDocAndExit();
             }
 
@@ -638,18 +638,11 @@ public class VoltDB {
 
             if (m_startAction == StartAction.PROBE) {
                 checkInitializationMarker();
-            } else if (m_startAction == StartAction.JOIN && isInitialized()) {
-                m_startAction = StartAction.PROBE;
-                m_enableAdd = true;
-                checkInitializationMarker();
-                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                    m_meshBrokers = m_leader;
-                }
             } else if (m_startAction == StartAction.INITIALIZE) {
                 if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"
                             + "\nUse the start command to start the initialized database or use init --force"
-                            + " to initialize a new database overwriting existing files.");
+                            + " to overwrite existing files.");
                     referToDocAndExit();
                 }
             } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
@@ -697,7 +690,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 if (!configCFH.equals(optCFH)) {
-                    hostLog.fatal("In probe startup mode you may only specify " + deploymentFH + " for deployment");
+                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment");
                     referToDocAndExit();
                 }
             } else {
@@ -705,7 +698,7 @@ public class VoltDB {
             }
 
             if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                hostLog.fatal("Probe startup mode requires an already initialized VoltDB instance");
+                hostLog.fatal("Specified directory is not a VoltDB initialized root");
                 referToDocAndExit();
             }
 
@@ -782,16 +775,24 @@ public class VoltDB {
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
             if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
                 isValid = false;
-                hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+                hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
             if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
                 isValid = false;
-                hostLog.fatal("Coordinator hosts are missing");
+                hostLog.fatal("List of hosts is missing");
             }
 
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
                 isValid = false;
-                hostLog.fatal("Option \"hostcount\" may only be specified when the start action is probe");
+                hostLog.fatal("Option \"--count\" may only be specified when using start");
+            }
+            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < m_coordinators.size()) {
+                isValid = false;
+                hostLog.fatal("List of hosts is greater than option \"--count\"");
+            }
+            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < 0) {
+                isValid = false;
+                hostLog.fatal("\"--count\" may not be specified with negative values");
             }
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
                 isValid = false;

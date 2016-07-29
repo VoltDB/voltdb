@@ -22,8 +22,8 @@ VoltDB = 'org.voltdb.VoltDB'
         VOLT.StringOption('-C', '--config', 'configfile',
                          'specify the location of the deployment file',
                           default = None),
-        VOLT.StringOption('-D', '--dbroot', 'voltdbroot',
-                          'specify the location of voltdbroot',
+        VOLT.StringOption('-D', '--dir', 'directory_spec',
+                          'Specifies the root directory for the database. The default is voltdbroot under the current working directory.',
                           default = None),
         VOLT.BooleanOption('-f', '--force', 'force',
                            'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.')
@@ -34,8 +34,8 @@ def init(runner):
     runner.args.extend(['initialize'])
     if runner.opts.configfile:
         runner.args.extend(['deployment', runner.opts.configfile])
-    if runner.opts.voltdbroot:
-        runner.args.extend(['voltdbroot', runner.opts.voltdbroot])
+    if runner.opts.directory_spec:
+        runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.extend(['force'])
     args = runner.args

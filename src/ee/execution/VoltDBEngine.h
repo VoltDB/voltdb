@@ -243,6 +243,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** check if this hash is in the local partition */
         bool isLocalSite(const int32_t pkHash) const;
 
+        /** print out current hashinator */
+        std::string dumpCurrentHashinator() const;
+
         // -------------------------------------------------
         // Non-transactional work methods
         // -------------------------------------------------
@@ -430,6 +433,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
+        template<class TABLE> void initMaterializedViews(catalog::Table *catalogTable,
+                                                                  TABLE *table);
         bool updateCatalogDatabaseReference();
         void resetDRConflictStreamedTables();
         /**

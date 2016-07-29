@@ -209,6 +209,31 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
+def get_max_mismatches(comparison_database, suite_name):
+    """Returns the maximum number of acceptable mismatches, i.e., the number of
+    'known' failures for VoltDB to match the results of the comparison database
+    (HSQL or PostgreSQL), which is normally zero; however, there are sometimes
+    a few exceptions, e.g., for queries that are not supported by PostgreSQL.
+    """
+    max_mismatches = 0
+
+    # Kludge to not fail for known issues, when running against PostgreSQL
+    # (or the PostGIS extension of PostgreSQL)
+    if comparison_database.startswith('Post'):
+        # Known failures in the basic-joins test suite, and in the basic-index-joins,
+        # and basic-compoundex-joins "extended" test suites (see ENG-10775)
+        if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
+              config_name == 'basic-compoundex-joins'):
+            max_mismatches = 4620
+        # Known failures in the numeric-decimals and numeric-ints "extended"
+        # test suites (see ENG-10546)
+        elif config_name == 'numeric-decimals':
+            max_mismatches = 1180
+        elif config_name == 'numeric-ints':
+            max_mismatches = 2820
+
+    return max_mismatches
+
 def run_config(suite_name, config, basedir, output_dir, random_seed,
                report_invalid, report_all, generate_only, subversion_generation,
                submit_verbosely, ascii_only, args, testConfigKit):
@@ -346,6 +371,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
                  get_time_html_table_element(voltdb_time) +
                  get_time_html_table_element(cmpdb_time) )
     extraStats = get_numerical_html_table_element(num_crashes, error_above=0) + someStats
+    max_mismatches = get_max_mismatches(comparison_database, suite_name)
 
     global compare_results
     try:
@@ -743,19 +769,11 @@ if __name__ == "__main__":
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        # kludge to not fail for known issues in the numeric-decimals and
-        # numeric-ints "extended" test suites, when running against PostgreSQL
-        # (or PostGIS/PostgreSQL); see ENG-10546
-        if config_name == 'numeric-decimals' and comparison_database.startswith('Post'):
-            if result["mis"] > 1180:
-                success = False
-        elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
-            if result["mis"] > 2820:
-                success = False
-        else:
-            # end of kludge; the following are the normal behavior:
-            if result["mis"] != 0:
-                success = False
+
+        # The maximum number of acceptable mismatches is normally zero, except
+        # for certain rare cases involving known errors in PostgreSQL
+        if result["mis"] > get_max_mismatches(comparison_database, config_name):
+            success = False
 
     # Write the summary
     time1 = time.time()

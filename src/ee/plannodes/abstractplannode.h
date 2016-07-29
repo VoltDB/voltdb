@@ -199,6 +199,13 @@ public:
 
     void setPlanNodeIdForTest(int32_t plannode_id) { m_planNodeId = plannode_id; }
 
+    /**
+     * Load list of sort expressions and directions from a JSON object.
+     * The pointers may be null if one of the vectors is not wanted.
+     */
+    static void loadSortListFromJSONObject(PlannerDomValue obj,
+                                           std::vector<AbstractExpression*> *sortExprs,
+                                           std::vector<SortDirectionType>   *sortDirs);
 
 protected:
     AbstractPlanNode();
@@ -219,7 +226,7 @@ protected:
     struct OwningExpressionVector : public std::vector<AbstractExpression*> {
         // Nothing prevents the vector from being set up or even modified
         // via other vector methods, with this caveat:
-        // The memory managament magic provided here simply assumes ownership
+        // The memory management magic provided here simply assumes ownership
         // of any elements referenced by the _final_ state of the vector.
         ~OwningExpressionVector();
         void loadExpressionArrayFromJSONObject(const char* label,

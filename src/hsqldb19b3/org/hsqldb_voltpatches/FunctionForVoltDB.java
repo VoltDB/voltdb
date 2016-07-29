@@ -683,6 +683,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                             catch (Exception e) {
                                 throw Error.error(ErrorCode.X_42561);
                             }
+                            nodes[i].valueData = paramTypes[i].castToType(session, nodes[i].valueData, nodes[i].dataType);
                             nodes[i].dataType = paramTypes[i];
                         }
                     } else if (paramTypes[i].isNumberType() && !nodes[i].dataType.isNumberType()) {
