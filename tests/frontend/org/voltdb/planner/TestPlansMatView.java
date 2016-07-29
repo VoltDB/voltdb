@@ -78,10 +78,10 @@ public class TestPlansMatView extends PlannerTestCase {
     public void testMultipartitionedMatView()
     {
         // Add support for Where in ENG-5177
-//        List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VNP WHERE V_D2 = 1;");
-//        System.out.println(pns.get(0).toExplainPlanString());
-//        assertEquals(2, pns.size());
-//        System.out.println(pns.get(1).toExplainPlanString());
+       List<AbstractPlanNode> pns = compileToFragments("SELECT V_D1 FROM VNP WHERE V_D2 = 1;");
+       System.out.println(pns.get(0).toExplainPlanString());
+       assertEquals(2, pns.size());
+       System.out.println(pns.get(1).toExplainPlanString());
     }
 
     public void testReplicatedMatView()

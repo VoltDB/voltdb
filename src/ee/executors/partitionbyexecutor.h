@@ -14,22 +14,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_PLANNODES_PARTITIONBYNODE_H_
-#define SRC_EE_PLANNODES_PARTITIONBYNODE_H_
-#include "aggregatenode.h"
+#ifndef SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
+#define SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
+
+#include "aggregateexecutor.h"
 
 namespace voltdb {
-class PartitionByPlanNode : public AggregatePlanNode {
-public:
-    PartitionByPlanNode()
-        : AggregatePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE) {
-    }
-    ~PartitionByPlanNode();
 
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string &spacer) const;
+/**
+ * This is the executor for a PartitionByPlanNode.  This is almost exactly like
+ * an AggregateSerialExecutor, but the initialization is slightly different, and
+ * we specify that we output one row for each input row.
+ */
+class PartitionByExecutor: public AggregateSerialExecutor {
+public:
+    PartitionByExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
+      : AggregateSerialExecutor(engine, abstract_node) {
+    }
+    virtual ~PartitionByExecutor();
+    bool outputForEachInputRow() const;
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 };
-}
-#endif /* SRC_EE_PLANNODES_PARTITIONBYNODE_H_ */
+
+} /* namespace voltdb */
+
+#endif /* SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_ */
