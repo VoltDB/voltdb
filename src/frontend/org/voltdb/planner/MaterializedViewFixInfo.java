@@ -25,9 +25,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -114,49 +113,13 @@ public class MaterializedViewFixInfo {
         if (srcTable == null) {
             return false;
         }
-        Column partitionCol = srcTable.getPartitioncolumn();
-        if (partitionCol == null) {
+        if (table.getIsreplicated()) {
             return false;
         }
 
-        int partitionColIndex = partitionCol.getIndex();
-        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
-
-        int numOfGroupByColumns;
         // Justify whether partition column is in group by column list or not
-        String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
-        if (complexGroupbyJson.length() > 0) {
-            List<AbstractExpression> mvComplexGroupbyCols = null;
-            try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            numOfGroupByColumns = mvComplexGroupbyCols.size();
-
-            for (AbstractExpression expr: mvComplexGroupbyCols) {
-                if (expr instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnIndex() == partitionColIndex) {
-                        // If group by columns contain partition column from source table.
-                        // Then, query on MV table will have duplicates from each partition.
-                        // There is no need to fix this case, so just return.
-                        return false;
-                    }
-                }
-            }
-        } else {
-            CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            numOfGroupByColumns = mvSimpleGroupbyCols.size();
-
-            for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getIndex() == partitionColIndex) {
-                    // If group by columns contain partition column from source table.
-                    // Then, query on MV table will have duplicates from each partition.
-                    // There is no need to fix this case, so just return.
-                    return false;
-                }
-            }
+        if (table.getPartitioncolumn() != null) {
+            return false;
         }
         m_mvTableScan = mvTableScan;
 
@@ -173,6 +136,31 @@ public class MaterializedViewFixInfo {
         }
 
         String mvTableAlias = getMVTableAlias();
+
+        // Get the number of group-by columns.
+        int numOfGroupByColumns;
+        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
+        if (mvInfo != null) {
+            // single table view
+            String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
+            if (complexGroupbyJson.length() > 0) {
+                List<AbstractExpression> mvComplexGroupbyCols = null;
+                try {
+                    mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                numOfGroupByColumns = mvComplexGroupbyCols.size();
+            }
+            else {
+                numOfGroupByColumns = mvInfo.getGroupbycols().size();
+            }
+        }
+        else {
+            // joined table view
+            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get("mvHandlerInfo");
+            numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
+        }
 
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);

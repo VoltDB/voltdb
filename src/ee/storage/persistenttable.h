@@ -83,6 +83,7 @@ namespace voltdb {
 
 class CoveringCellIndexTest_TableCompaction;
 class MaterializedViewTriggerForWrite;
+class MaterializedViewHandler;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -206,6 +207,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
     friend class CoveringCellIndexTest_TableCompaction;
+    friend class MaterializedViewHandler;
+    friend class ScopedDeltaTableContext;
 
 private:
     // no default ctor, no copy, no assignment
@@ -522,6 +525,10 @@ public:
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
+    MaterializedViewHandler *materializedViewHandler() const { return m_mvHandler; }
+    Table* deltaTable() const { return m_deltaTable; }
+    bool isDeltaTableActive() { return m_deltaTableActive; }
+
     // STATS
     TableStats* getTableStats() {  return &m_stats; };
 
@@ -644,6 +651,16 @@ private:
 
     void computeSmallestUniqueIndex();
 
+    void addViewHandler(MaterializedViewHandler *viewHandler);
+    void dropViewHandler(MaterializedViewHandler *viewHandler);
+    // Mark all the view handlers referencing this table as dirty so they will be
+    // recreated when being visited.
+    // We use this only when a table index is added / dropped.
+    void polluteViews();
+    // Insert the source tuple into this table's delta table.
+    // If there is no delta table affiliated with this table, then take no action.
+    void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
+
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
@@ -713,6 +730,21 @@ private:
     std::vector<TableIndex*> m_indexes;
     std::vector<TableIndex*> m_uniqueIndexes;
     TableIndex *m_pkeyIndex;
+
+    // If I myself am a view table, I need to maintain a handler to handle the view update work.
+    MaterializedViewHandler *m_mvHandler;
+    // If I am a source table of a view, I will notify all the relevant view handlers
+    // when an update is needed.
+    std::vector<MaterializedViewHandler*> m_viewHandlers;
+
+    // The delta table is only created when a view defined on a join query is referencing this table
+    // as one of its source tables. The delta table has an identical definition of this table, including
+    // the indices. When m_deltaTableActive = true, the TableCatalogDelegate for this table will return
+    // the delta table instead of the original table.
+    // WARNING: Do not manually flip this m_deltaTableActive flag, use ScopedDeltaTableContext
+    // (currently defined in MaterializedViewHandler.h) instead.
+    PersistentTable *m_deltaTable;
+    bool m_deltaTableActive;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

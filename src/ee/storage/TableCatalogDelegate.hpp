@@ -66,6 +66,8 @@ class TableCatalogDelegate {
 
     void init(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
+    PersistentTable *createDeltaTable(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
     void evaluateExport(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
 
@@ -103,7 +105,7 @@ class TableCatalogDelegate {
                                     TableTuple& tbTuple,
                                     std::vector<int>& nowFields);
 
-    Table *getTable() const { return m_table; }
+    Table *getTable() const;
 
     PersistentTable *getPersistentTable() {
         return dynamic_cast<PersistentTable*>(m_table);
@@ -129,7 +131,8 @@ class TableCatalogDelegate {
     bool materialized() { return m_materialized; }
   private:
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                     catalog::Table const &catalogTable);
+                                     catalog::Table const &catalogTable,
+                                     int tableAllocationTargetSize = 0);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
