@@ -60,11 +60,15 @@ function init() {
     csvloader -f advertisers.csv advertisers
 }
 
+# Init to directory voltdbroot
+function voltinit-ifneeded() {
+    voltdb init --force
+}
+
 # run the voltdb server locally
 function server() {
-    # note: "create --force" will delete any existing data
-    # use "recover" to start from an existing voltdbroot folder with data
-    voltdb create --force -H $STARTUPLEADERHOST
+    voltinit-ifneeded
+    voltdb start -H $STARTUPLEADERHOST
 }
 
 # run this target to see what command line options the client offers
