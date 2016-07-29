@@ -5,10 +5,12 @@
 
 # A command line tool for getting junit job statistics from Jenkins CI
 
+import logging
 import os
 import sys
 
 from datetime import datetime, timedelta
+from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
@@ -28,33 +30,35 @@ class Stats(object):
         ex: junit-stats branch-2-pro-junit-master 800-802
         ex: junit-stats branch-2-community-junit-master 550-550
         """
+        logging.basicConfig(filename='junit-stats.log')
 
     def read_url(self, url):
         """
-        Download (hopefully) a json object from a url and evaluate it.
+        :param url: url to download data from
+        :return: Dictionary representation of json object
         """
 
         data = None
         try:
             data = eval(urlopen(url).read())
-        except (HTTPError, URLError) as error:
-            print(error)
-            print('Could not open data from url: %s. The url may not be formed correctly.\n' % url)
-        except IOError as error:
-            print(error)
-            print('Could not read data from url: %s. The data at the url may not be readable.\n' % url)
-        except Exception as error:
-            print('Something unexpected went wrong.\n')
-            print(error)
+        except (HTTPError, URLError):
+            logging.exception('Could not open data from url: %s. The url may not be formed correctly.' % url)
+        except IOError:
+            logging.exception('Could not read data from url: %s. The data at the url may not be readable.' % url)
+        except:
+            logging.exception('Something unexpected went wrong.')
         return data
 
     def build_history(self, job, build_range):
         """
         Displays build history for a job. Can specify an inclusive build range.
         For every build specified on the job, saves the test results
+        :param job: Full job name on Jenkins
+        :param build_range: Build range that exists for the job on Jenkins, ie "700-713", "1804-1804"
         """
 
         if job is None or build_range is None:
+            print('Either a job or build range was not specified.')
             print(self.cmdhelp)
             return
 
@@ -63,36 +67,46 @@ class Stats(object):
             build_low = int(builds[0])
             build_high = int(builds[1])
             if build_high < build_low:
-                raise Exception('Error: Left number must be lesser than or equal to right')
-        except Exception as error:
-            print(error)
+                raise Exception('Error: Left number must be lesser than or equal to right number.')
+        except:
+            logging.exception('Couldn\'t extrapolate build range.')
             print(self.cmdhelp)
             return
 
         url = self.jhost + '/job/' + job + '/lastCompletedBuild/api/python'
         build = self.read_url(url)
         if build is None:
-            print('Could not retrieve last completed build build. Job: %s' % job)
-            return
+            logging.warn('Could not retrieve last completed build. Job: %s' % job)
+            build = {
+                'number': 'unknown',
+                'builtOn': 'unknown'
+            }
 
-        latestBuild = build['number']
+        latest_build = build['number']
         host = build['builtOn']
+
+        issues = []
 
         try:
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
-        except MySQLError as error:
-            print('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
-            print(error)
+        except MySQLError:
+            logging.exception('Could not connect to qa database. User: %s. Pass: %s' % (self.dbuser, self.dbpass))
             return
 
         for build in range(build_low, build_high + 1):
+            build_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
+            build_report = self.read_url(build_url)
+            if build_report is not None:
+                host = build_report.get('builtOn', 'unknown')
+
             test_url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             test_report = self.read_url(test_url)
             if test_report is None:
-                print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                      'exist on Jenkins' % build)
-                print('Last completed build for this job is %d\n' % latestBuild)
+                logging.warn(
+                    'Could not retrieve report because url is invalid. This may be because the build %d might not '
+                    'exist on Jenkins' % build)
+                logging.warn('Last completed build for this job is %s\n' % latest_build)
                 continue
 
             try:
@@ -105,18 +119,20 @@ class Stats(object):
                 if total == 0:
                     percent = 0
                 else:
-                    percent = fails*100.0/total
+                    percent = fails * 100.0 / total
 
                 # Get timestamp job ran on.
                 job_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
                 job_report = self.read_url(job_url)
                 if job_report is None:
-                    print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                          'exist on Jenkins' % build)
-                    print('Last completed build for this job is %d\n' % latestBuild)
+                    logging.warn(
+                        'Could not retrieve report because url is invalid. This may be because the build %d might not '
+                        'exist on Jenkins' % build)
+                    logging.warn('Last completed build for this job is %s\n' % latest_build)
                     continue
-                # Already in EST
-                job_stamp = datetime.fromtimestamp(job_report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
+
+                # Job stamp is already in EST
+                job_stamp = datetime.fromtimestamp(job_report['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
                 # Compile job data to write to database
                 job_data = {
@@ -134,13 +150,13 @@ class Stats(object):
                 try:
                     cursor.execute(add_job, job_data)
                     db.commit()
-                except MySQLError as error:
-                    print(error)
+                except MySQLError:
+                    logging.exception('Could not add job data to database')
 
                 # Some of the test results are structured differently, depending on the matrix configurations.
-                childReports = test_report.get('childReports', None)
-                if childReports is None:
-                    childReports = [
+                child_reports = test_report.get('childReports', None)
+                if child_reports is None:
+                    child_reports = [
                         {
                             'result': test_report,
                             'child': {
@@ -150,51 +166,75 @@ class Stats(object):
                     ]
 
                 # Traverse through reports into test suites and get failed test case data to write to database.
-                for child in childReports:
+                for child in child_reports:
                     suites = child['result']['suites']
-                    report_url = child['child']['url'] + 'testReport'
                     for suite in suites:
                         cases = suite['cases']
-                        timestamp = suite.get('timestamp', None)
-                        if timestamp is None or timestamp == 'None':
-                            timestamp = job_stamp
+                        test_stamp = suite.get('timestamp', None)
+                        if test_stamp is None or test_stamp == 'None':
+                            test_stamp = job_stamp
                         else:
-                            timestamp = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S')
-                            # Convert from GMT to EST
-                            timestamp = (timestamp - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
+                            # Create datetime object from test_stamp string
+                            test_stamp = datetime.strptime(test_stamp, '%Y-%m-%dT%H:%M:%S')
+                            # Convert test stamp from GMT to EST and store as string
+                            test_stamp = (test_stamp - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-
+                            report_url = child['child']['url'] + 'testReport/'
+                            report_url = report_url + \
+                                         name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
                             # Record tests that don't pass.
                             if status != 'PASSED':
                                 test_data = {
                                     'name': name,
                                     'job': job,
                                     'status': status,
-                                    'timestamp': timestamp,
+                                    'timestamp': test_stamp,
                                     'url': report_url,
                                     'build': build,
                                     'host': host
                                 }
+
+                                if status == 'FAILED':
+                                    issues.append(test_data)
+
                                 add_test = ('INSERT INTO `junit-test-failures` '
                                             '(name, job, status, stamp, url, build, host) '
-                                            'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, %(url)s, %(build)s, %(host)s)')
+                                            'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, '
+                                            '%(url)s, %(build)s, %(host)s)')
+
                                 try:
                                     cursor.execute(add_test, test_data)
                                     db.commit()
-                                except MySQLError as error:
-                                    print(error)
+                                except MySQLError:
+                                    logging.exception('Could not add test data to database')
 
-            except KeyError as error:
-                print(error)
-                print('Error retrieving test data for this particular build: %d\n' % build)
-            except Exception as error:
-                # Catch all errors to avoid causing a failing build for the upstream project
-                print(error)
+            except KeyError:
+                logging.exception('Error retrieving test data for this particular build: %d\n' % build)
+            except Exception:
+                # Catch all errors to avoid causing a failing build for the upstream job in case this is being
+                # called from the junit-test-branch on Jenkins
+                logging.exception('Catching unexpected errors to avoid causing a failing build for the upstream job')
 
         cursor.close()
         db.close()
+
+        try:
+            jenkinsbot = JenkinsBot()
+            for issue in issues:
+                error_url = issue['url']
+                error_report = self.read_url(error_url)
+
+                if error_report is not None:
+                    age = error_report['age']
+                    summary = issue['name'] + ' has failed ' + str(age) + ' times in a row on ' + issue['job']
+                    description = error_url + '\n' + error_report['errorStackTrace']
+                    jenkinsbot.create_bug_issue(age, issue, summary, description, 'Core', 'V6.6',
+                                                'junit-consistent-failure')
+        except:
+            logging.exception('Error with creating issue')
+
 
 if __name__ == '__main__':
     stats = Stats()
