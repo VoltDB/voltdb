@@ -114,10 +114,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(dayOfYearQuery)
             .initialText("EXTRACT ( ").prefix("DOY FROM").suffix(")").groups("column");
 
+    // Regex pattern for a typical column or column expression (including
+    // functions, operators, etc.),
+    private static final String COLUMN_PATTERN = "(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*"
+            + "\\s*((\\+|\\-|\\*|\\/)(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*)*\\s*";
+
     // Captures the use of AVG(columnName), which PostgreSQL handles
     // differently, when the columnName is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
-            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+(AS|FROM)\\s+\\w+)?)*\\s*\\)",
+            "AVG\\s*\\("+COLUMN_PATTERN+"\\)",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an AVG(columnName) function, where
     // <i>columnName</i> is of an integer type, for which PostgreSQL returns

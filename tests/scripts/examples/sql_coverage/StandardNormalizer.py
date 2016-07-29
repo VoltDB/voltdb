@@ -96,8 +96,8 @@ def normalize_value(v, vtype, num_digits):
         # round to the desired number of decimal places -- accounting for significant digits before the decimal
         return round_to_num_digits(v, num_digits)
     elif vtype == FastSerializer.VOLTTYPE_DECIMAL:
-        # print "DEBUG normalized_to:(", decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN"), ")"
-        return decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN")
+        # round to the desired number of decimal places -- accounting for significant digits before the decimal
+        return round_to_num_digits(v, num_digits)
     elif vtype == FastSerializer.VOLTTYPE_STRING and v:
         # for strings (VARCHAR) representing a point or polygon (GEOGRAPHY_POINT
         # or GEOGRAPHY), round off the longitude and latitude values to the desired
@@ -337,7 +337,7 @@ class StandardNormalizer(NotANormalizer):
     """
 
     @staticmethod
-    def normalize(table, sql, sort_nulls=SortNulls.never, num_digits=12):
+    def normalize(table, sql, num_digits=12, sort_nulls=SortNulls.never):
         """Normalizes the result tuples of ORDER BY statements, sorting SQL
            NULL (Python None) values in the ORDER BY columns in the specified
            manner (by default, not at all).
