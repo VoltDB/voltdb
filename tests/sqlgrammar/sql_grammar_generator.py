@@ -30,6 +30,7 @@ from datetime import timedelta
 from optparse import OptionParser
 from random import randrange
 from time import time
+from traceback import print_exc
 
 __SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.+)")
 __SYMBOL_REF   = re.compile(r"{(?P<symbolname>[\w-]+)}")
@@ -189,24 +190,30 @@ def print_summary():
     global start_time, sql_output_file, sqlcmd_output_file, count_sql_statements
 
     # Generate the summary message (to be printed below)
-    seconds = time() - start_time
-    summary_message = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
-                    + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
-    total_count = -1
-    if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
-        total_count = count_sql_statements['total']['total']
-    for sql_type in sorted(count_sql_statements):
-        sql_type_count = -1
-        if count_sql_statements[sql_type].get('total'):
-            sql_type_count = count_sql_statements[sql_type]['total']
-        summary_message += '\n    {:6s}'.format(sql_type) + ': '
-        for validity in sorted(count_sql_statements[sql_type], reverse=True):
-            if validity != 'total':  # save total for last
-                count = count_sql_statements[sql_type][validity]
-                percent = int(round(100.0 * count / sql_type_count))
-                summary_message += '{:6d} '.format(count) + validity + ' ({:2d}%), '.format(percent)
-        percent = int(round(100.0 * sql_type_count / total_count))
-        summary_message += '{:6d} '.format(sql_type_count) + 'total ({:2d}%)'.format(percent)
+    try:
+        seconds = time() - start_time
+        summary_message = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
+                        + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
+        total_count = -1
+        if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
+            total_count = count_sql_statements['total']['total']
+        for sql_type in sorted(count_sql_statements):
+            sql_type_count = -1
+            if count_sql_statements[sql_type].get('total'):
+                sql_type_count = count_sql_statements[sql_type]['total']
+            summary_message += '\n    {:6s}:'.format(sql_type)
+            for validity in sorted(count_sql_statements[sql_type], reverse=True):
+                if validity != 'total':  # save total for last
+                    count = count_sql_statements[sql_type][validity]
+                    percent = int(round(100.0 * count / sql_type_count))
+                    summary_message += '{:7d} '.format(count) + validity + ' ({:2d}%),'.format(percent)
+            percent = int(round(100.0 * sql_type_count / total_count))
+            summary_message += '{:7d} '.format(sql_type_count) + 'total ({:2d}%)'.format(percent)
+        summary_message += '\n\n'
+    except Exception as e:
+        print '\n\nCaught exception attempting to print SUMMARY message:'
+        print_exc()
+        print '\n\nHere is count_sql_statements, which we were attempting to format & print:\n', count_sql_statements
 
     # Print the summary message, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
