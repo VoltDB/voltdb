@@ -33,6 +33,7 @@ ADMIN_CHANNEL = os.environ.get('admin', None)
 # Other channels
 GENERAL_CHANNEL = os.environ.get('general', None)
 RANDOM_CHANNEL = os.environ.get('random', None)
+JUNIT = os.environ.get('junit', None)
 
 # Jira credentials and info
 JIRA_USER = os.environ.get('jirauser', None)
@@ -179,7 +180,7 @@ GA_QUERY = ("""
     SELECT command
       FROM `jenkinsbot-user-aliases`
      WHERE alias=%(alias)s AND
-           slack_user=%(slack_user_id)s
+           slack_user_id=%(slack_user_id)s
 """)
 
 
@@ -188,7 +189,7 @@ class JenkinsBot(object):
         self.client = None
         self.help_text = \
             ['*help*\n',
-             'Alias a command:\n\t*my alias*=*valid command*'
+             'Alias a command:\n\tmy alias=*valid command*\n',
              'See which tests are failing the most since this build:\n\t*test-leaderboard* <job> <build #>\n',
              'See which tests are failing in the past x days:\n\t*days* <job> <days> \n',
              'Failing the most in this build range:\n\t*build-range* <job> <build #>-<build #>\n',
@@ -237,16 +238,21 @@ class JenkinsBot(object):
         """
         :param incoming: A dictionary describing what data is incoming to the bot
         :return: true if bot can act on incoming data - There is incoming data, it is text data, it's not from a bot,
-        the text isn't in a file, the channel isn't in #general or #random which jenkinsbot is part of
+        the text isn't in a file, the channel isn't in #general,  #random, #junit which jenkinsbot is part of
         """
+        # TODO rather than check if is channel, just check this is an instant message
         return (len(incoming) > 0 and incoming[0].get('text', None) is not None
                 and incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None
-                and incoming[0]['channel'] != GENERAL_CHANNEL and incoming[0]['channel'] != RANDOM_CHANNEL)
+                and incoming[0]['channel'] != GENERAL_CHANNEL and incoming[0]['channel'] != RANDOM_CHANNEL
+                and incoming[0]['channel'] != JUNIT)
 
     def listen(self):
         """
         Establishes session and responds to commands
         """
+        # Don't edit or make vertical tables in listen mode
+        os.environ['vertical'] = ''
+        os.environ['edit'] = ''
 
         while True:
             channel = ""
@@ -313,7 +319,7 @@ class JenkinsBot(object):
             rows = table[1]
             if len(rows) > 0:
                 command = rows[0]
-                text = command
+                text = command[0]
 
         query = ''
         params = {}
@@ -332,7 +338,21 @@ class JenkinsBot(object):
                 self.post_message(channel, self.help_text)
                 return query, params, filename
 
-        if 'test-on-master' in text:
+        if '=' in text:
+            args = text.split('=')
+            if len(args) != 2:
+                self.post_message(channel, 'Couldn\'t parse alias.')
+                return query, params, filename
+            alias = args[0]
+            command = args[1]
+            query = AA_QUERY
+            params = {
+                'slack_user_id': user,
+                'command': command,
+                'alias': alias
+            }
+            filename = ''
+        elif 'test-on-master' in text:
             args = text.split(' ')
             query = TOM_QUERY
             params = {
@@ -372,21 +392,6 @@ class JenkinsBot(object):
                 'build_high': builds[1]
             }
             filename = '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1])
-        elif '=' in text:
-            args = text.split('=')
-            if len(args) != 2:
-                self.post_message(channel, 'Couldn\'t parse alias.')
-                return query, params, filename
-            alias = args[0]
-            command = args[1]
-            query = AA_QUERY
-            params = {
-                'slack_user_id': user,
-                'command': command,
-                'alias': alias
-            }
-            filename = ''
-            self.query([channel], AA_QUERY, params, insert=True)
 
         return query, params, filename
 
@@ -421,7 +426,7 @@ class JenkinsBot(object):
                 database.commit()
 
         except MySQLError:
-            self.logger.exception('Could not connect to database')
+            self.logger.exception('Either could not connect to database or execution error')
             for channel in channels:
                 self.post_message(channel, 'Something went wrong with the query.')
         except:
@@ -453,6 +458,7 @@ class JenkinsBot(object):
             headers = table[0]
             rows = table[1]
             content = ""
+
             if os.environ.get('vertical', False):
                 # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
                 content = '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(rows, headers)
@@ -599,13 +605,13 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 ML_QUERY,
                 {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
-                ['#junit'],
+                [JUNIT],
                 'master-past30days.txt'
             )
         elif sys.argv[1] == 'core-leaderboard':
             jenkinsbot.query_and_response(
                 CL_QUERY,
                 {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
-                ['#junit'],
+                [JUNIT],
                 'coreextended-past2days.txt'
             )
