@@ -489,7 +489,7 @@ class ServerBundle(JavaBundle):
                 else:
                     utility.error(v[1])
         final_args = None
-        if self.subcommand in ('create', 'recover'):
+        if self.subcommand in ('create', 'recover', 'probe'):
             if runner.opts.replica:
                 final_args = [self.subcommand, 'replica']
         if self.supports_live:
