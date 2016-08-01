@@ -798,25 +798,61 @@ public class ReportMaker {
         generateSizeRollupSummary("materialized views whose row data ", "view", sb, rollups.get(1));
         generateSizeRollupSummary("indexes whose key data and overhead ", "index", sb, rollups.get(2));
 
-        sb.append("<tr><td colspan='6'>&nbsp;</td></tr>\n"); // blank row
+        sb.append("</table>\n");
+        return sb.toString();
+    }
 
-        // write the totals
+    static String generateClusterConfiguration(boolean isPro, int hostCount, int sitesPerHost, int kfactor) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table class='table cluster-config-table'>\n");
+        if (isPro) {
+            sb.append("<input type='hidden' id='isPro' value='true'>");
+        }
+
+        sb.append("<tr>");
+        sb.append("<td>Number of Hosts&nbsp;</td>");
+        sb.append("<td><div><input type='text' id='cluster-info-num-hosts' class='right-cell' value=\"" + hostCount + "\"></div></td>");
+
+        sb.append("<td>Sites per host&nbsp;</td>");
+        sb.append("<td><div><input type='text' id='cluster-info-sites-per-host' onblur='heap_update();' class='right-cell' value=\"" + sitesPerHost + "\"></div></td>");
+
+        sb.append("<td>K factor&nbsp;</td>");
+        sb.append("<td><div><input type='text' id='cluster-info-k-factor' onblur='heap_update();' class='right-cell' value=\"" + kfactor + "\"></div></td>");
+
+        sb.append("</tr>");
+        sb.append("</table>");
+        return sb.toString();
+    }
+
+    static String generateRecommendedServerSettings(DatabaseSizes dbSizes) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table class='table cluster-config-table'>\n");
+
+        CatalogItemSizeList<CatalogItemSizeRollup> rollups =
+                new CatalogItemSizeList<CatalogItemSizeRollup>();
+        rollups.add(dbSizes.tableRollup());
+        rollups.add(dbSizes.viewRollup());
+        rollups.add(dbSizes.indexRollup());
+        CatalogItemSizeRollup rollupRollup = rollups.rollup(1);
+
         sb.append("<tr>");
         if (rollupRollup.widthMin == rollupRollup.widthMax) {
-            sb.append("<td colspan='2'><b>Total user data is expected to use about</b>&nbsp;</td>");
+            sb.append("<td><b>Total user data is expected to use about</b>&nbsp;</td>");
             sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
-            sb.append("<td colspan='3'>&nbsp;of memory.</td>");
+            sb.append("<td>&nbsp;of memory.</td>");
+            sb.append("</tr>\n");
+            sb.append("<tr><td><b>Required Java Heap</b>&nbsp;</td><td id='s-size-java-heap' class='calculated-cell right-cell'></td><td>&nbsp<b>Megabytes</b></td></tr>");
         }
         else {
-            sb.append("<td colspan='2'><b>Total user data is expected to use between</b>&nbsp;</td>");
+            sb.append("<td><b>Total user data is expected to use between</b>&nbsp;</td>");
             sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
             sb.append("<td>&nbsp;<b>and</b>&nbsp;</td>");
             sb.append(String.format("<td id='s-size-summary-total-max' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMax));
             sb.append("<td>&nbsp<b>of memory.</b></td>");
+            sb.append("</tr>\n");
+            sb.append("<tr><td colspan='3'><b>Required Java Heap</b>&nbsp;</td><td id='s-size-java-heap' class='calculated-cell right-cell'></td><td>&nbsp<b>Megabytes</b></td></tr>");
         }
-        sb.append("</tr>\n");
-
-        sb.append("</table>\n");
+        sb.append("</table>");
         return sb.toString();
     }
 
@@ -852,7 +888,7 @@ public class ReportMaker {
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
      */
-    static String getStatsHTML(Database db, ArrayList<Feedback> warnings) {
+    static String getStatsHTML(Database db, long requiredHeap, ArrayList<Feedback> warnings) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table class='table table-condensed'>\n");
 
@@ -929,6 +965,18 @@ public class ReportMaker {
 
         // statements
         sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
+
+        //heap
+        sb.append("<tr><td>Required Java Heap</td><td>").append(requiredHeap).append(" Megabytes").append("</td></tr>\n");
+
+        long megabytes = 1024 * 1024;
+        long configuredHeap = Runtime.getRuntime().maxMemory() / megabytes;
+        if (configuredHeap > requiredHeap) {
+            sb.append("<tr><td>Configured Java Heap</td><td>").append(configuredHeap).append(" Megabytes").append("</td></tr>\n");
+        } else {
+            sb.append("<tr><td>Configured Java Heap</td><td><font color=\"red\">").append(configuredHeap).append("<font color=\"black\">").append(" Megabytes").append("</td></tr>\n");
+        }
+
         sb.append("</table>\n\n");
 
         // warnings, add warning section if any
@@ -962,7 +1010,7 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
+    public static String report(Catalog catalog, long minHeap, boolean isPro, int hostCount, int sitesPerHost, int kfactor, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -980,7 +1028,7 @@ public class ReportMaker {
         Database db = cluster.getDatabases().get("database");
         assert(db != null);
 
-        String statsData = getStatsHTML(db, warnings);
+        String statsData = getStatsHTML(db, minHeap, warnings);
         contents = contents.replace("##STATS##", statsData);
 
         // generateProceduresTable needs to happen before generateSchemaTable
@@ -996,8 +1044,14 @@ public class ReportMaker {
         String sizeData = generateSizeTable(sizes);
         contents = contents.replace("##SIZES##", sizeData);
 
+        String clusterConfig = generateClusterConfiguration(isPro, hostCount, sitesPerHost, kfactor);
+        contents = contents.replace("##CLUSTERCONFIG##", clusterConfig);
+
         String sizeSummary = generateSizeSummary(sizes);
         contents = contents.replace("##SIZESUMMARY##", sizeSummary);
+
+        String heapSummary = generateRecommendedServerSettings(sizes);
+        contents = contents.replace("##RECOMMENDEDSERVERSETTINGS##", heapSummary);
 
         String platformData = PlatformProperties.getPlatformProperties().toHTML();
         contents = contents.replace("##PLATFORM##", platformData);

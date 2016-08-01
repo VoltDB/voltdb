@@ -94,10 +94,17 @@ public class SnapshotUtil {
     public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
+    public static final String JSON_PATH_TYPE = "pathType";
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
     public static final String JSON_IS_RECOVER = "isRecover";
+    public static final String JSON_BLOCK = "block";
+    public static final String JSON_FORMAT = "format";
+    public static final String JSON_DATA = "data";
+    public static final String JSON_URIPATH = "uripath";
+    public static final String JSON_SERVICE = "service";
+
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -116,6 +123,7 @@ public class SnapshotUtil {
         new ColumnInfo("RESULT", VoltType.STRING),
         new ColumnInfo("ERR_MSG", VoltType.STRING)
     };
+
 
     public static final VoltTable constructNodeResultsTable()
     {
@@ -141,6 +149,7 @@ public class SnapshotUtil {
         long txnId,
         long catalogCRC,
         String path,
+        String pathType,
         String nonce,
         List<Table> tables,
         int hostId,
@@ -562,10 +571,11 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
-        public Snapshot(String nonce)
+        public Snapshot(String nonce, SnapshotPathType stype)
         {
             m_nonce = nonce;
             m_txnId = Long.MIN_VALUE;
+            m_stype = stype;
         }
 
         public void setInstanceId(InstanceId id)
@@ -609,6 +619,7 @@ public class SnapshotUtil {
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
         public File m_catalogFile = null;
+        public final SnapshotPathType m_stype;
 
         private final String m_nonce;
         private InstanceId m_instanceId = null;
@@ -693,15 +704,17 @@ public class SnapshotUtil {
     private static class NamedSnapshots {
 
         private final Map<String, Snapshot> m_map;
+        private final SnapshotPathType m_stype;
 
-        public NamedSnapshots(Map<String, Snapshot> map) {
+        public NamedSnapshots(Map<String, Snapshot> map, SnapshotPathType stype) {
             m_map = map;
+            m_stype = stype;
         }
 
         public Snapshot get(String nonce) {
             Snapshot named_s = m_map.get(nonce);
             if (named_s == null) {
-                named_s = new Snapshot(nonce);
+                named_s = new Snapshot(nonce, m_stype);
                 m_map.put(nonce, named_s);
             }
             return named_s;
@@ -722,10 +735,11 @@ public class SnapshotUtil {
             Map<String, Snapshot> namedSnapshotMap,
             FileFilter filter,
             boolean validate,
+            SnapshotPathType stype,
             VoltLogger logger) {
 
-        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap);
-        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, logger, 0);
+        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap, stype);
+        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, stype, logger, 0);
     }
 
     private static void retrieveSnapshotFilesInternal(
@@ -733,6 +747,7 @@ public class SnapshotUtil {
             NamedSnapshots namedSnapshots,
             FileFilter filter,
             boolean validate,
+            SnapshotPathType stype,
             VoltLogger logger,
             int recursion) {
 
@@ -759,7 +774,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, logger, recursion++);
+                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, stype, logger, recursion++);
                 }
                 continue;
             }
@@ -1365,6 +1380,7 @@ public class SnapshotUtil {
      * @param nonce
      * @param blocking
      * @param format
+     * @param stype type of snapshot path SNAP_AUTO, SNAP_CL or SNAP_PATH
      * @param data Any data that needs to be passed to the snapshot target
      * @param handler
      */
@@ -1373,11 +1389,12 @@ public class SnapshotUtil {
                                        final String nonce,
                                        final boolean blocking,
                                        final SnapshotFormat format,
+                                       final SnapshotPathType stype,
                                        final String data,
                                        final SnapshotResponseHandler handler,
                                        final boolean notifyChanges)
     {
-        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, stype, data);
         final SimpleClientResponseAdapter adapter =
                 new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
         final LinkedBlockingQueue<ClientResponse> responses = new LinkedBlockingQueue<ClientResponse>();
@@ -1576,6 +1593,9 @@ public class SnapshotUtil {
             JSONObject jsObj = new JSONObject();
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
+                if (VoltDB.instance().isRunningWithOldVerbs()) {
+                    jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH);
+                }
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
                 jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, params[0]);
             } catch (JSONException e) {
@@ -1590,5 +1610,15 @@ public class SnapshotUtil {
                                           params.length + " parameters provided",
                                           task.getClientHandle());
         }
+    }
+
+    //Return path based on type if type is not CL or AUTO return provided path.
+    public static String getRealPath(SnapshotPathType stype, String path) {
+        if (stype == SnapshotPathType.SNAP_CL) {
+            return VoltDB.instance().getCommandLogSnapshotPath();
+        } else if (stype == SnapshotPathType.SNAP_AUTO) {
+            return VoltDB.instance().getSnapshotPath();
+        }
+        return path;
     }
 }

@@ -91,7 +91,7 @@ def test_os_release(output):
             if releaseNum >= "6.6":
                 supported = True
         elif "ubuntu" in distInfo[0].lower():
-            if distInfo[1] in ("12.04", "14.04"):
+            if distInfo[1] in ("12.04", "14.04", "16.04"):
                 supported = True
     elif platform.system() == "Darwin":
         output["OS"] = ["PASS", "MacOS X"]

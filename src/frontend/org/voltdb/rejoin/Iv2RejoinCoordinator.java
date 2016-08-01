@@ -48,6 +48,7 @@ import org.voltdb.utils.FixedDBBPool;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -290,7 +291,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
         if (data != null && !schemaHasNoTables) {
             REJOINLOG.debug("Snapshot request: " + data);
-            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
+            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotPathType.SNAP_NO_PATH, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
         }
     }

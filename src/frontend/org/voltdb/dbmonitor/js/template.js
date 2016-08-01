@@ -419,4 +419,22 @@ function sizes_update_all() {
     
     //Update the table for sorting.
     $("#sizetable").trigger("update");
+    heap_update();
+}
+
+function heap_update() {
+    var ntables = size_summary_value("table", "count");
+    var rh = 384 + (10 * ntables);
+
+    var isPro = $("isPro")
+    if (isPro != null) {
+        var kf = Math.floor(document.getElementById('cluster-info-k-factor').value)
+        if (kf > 0) {
+            var sph = Math.floor(document.getElementById('cluster-info-sites-per-host').value)
+            rh += (128 * sph)
+        }
+    }
+
+    var heap_elem = document.getElementById('s-size-java-heap');
+    heap_elem.innerHTML = rh;
 }

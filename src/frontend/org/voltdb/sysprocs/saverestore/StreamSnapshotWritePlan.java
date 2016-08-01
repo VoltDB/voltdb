@@ -67,7 +67,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
     @Override
     public Callable<Boolean> createSetup(
-            String file_path, String file_nonce,
+            String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -105,7 +105,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
-            deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+            deferredSetup = coalesceTruncationSnapshotPlan(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                                            context, result,
                                            extraSnapshotData,
                                            tracker,
@@ -234,7 +234,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     // The truncation snapshot will always have all the tables regardless of what tables are requested
     // in the stream snapshot. Passing null to the JSON config below will cause the
     // NativeSnapshotWritePlan to include all tables.
-    private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
+    private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String pathType, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
@@ -246,7 +246,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, null, context,
+                plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, null, context,
                         result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 

@@ -47,7 +47,7 @@ import com.google_voltpatches.common.primitives.Longs;
 
 public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
-    public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
+    public Callable<Boolean> createSetup(String file_path, String pathType, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
                                          JSONObject jsData,
                                          SystemProcedureExecutionContext context,
