@@ -426,7 +426,7 @@ function heap_update() {
     var ntables = size_summary_value("table", "count");
     var rh = 384 + (10 * ntables);
 
-    var isPro = document.getElementById('isPro')
+    var isPro = $("isPro")
     if (isPro != null) {
         var kf = Math.floor(document.getElementById('cluster-info-k-factor').value)
         if (kf > 0) {

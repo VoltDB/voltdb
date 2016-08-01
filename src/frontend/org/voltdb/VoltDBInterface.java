@@ -72,9 +72,6 @@ public interface VoltDBInterface
 
     public VoltDB.Configuration getConfig();
     public CatalogContext getCatalogContext();
-    int getSitesPerHost();
-    int getKFactor();
-    long getRequiredHeap();
     public String getBuildString();
     public String getVersionString();
     /** Can this version of VoltDB run with the version string given? */

@@ -824,7 +824,7 @@ public class ReportMaker {
         return sb.toString();
     }
 
-    static String generateReccServerSettings(DatabaseSizes dbSizes) {
+    static String generateRecommendedServerSettings(DatabaseSizes dbSizes) {
         StringBuilder sb = new StringBuilder();
         sb.append("<table class='table cluster-config-table'>\n");
 
@@ -1050,8 +1050,8 @@ public class ReportMaker {
         String sizeSummary = generateSizeSummary(sizes);
         contents = contents.replace("##SIZESUMMARY##", sizeSummary);
 
-        String heapSummary = generateReccServerSettings(sizes);
-        contents = contents.replace("##RECSERVERSETTINGS##", heapSummary);
+        String heapSummary = generateRecommendedServerSettings(sizes);
+        contents = contents.replace("##RECOMMENDEDSERVERSETTINGS##", heapSummary);
 
         String platformData = PlatformProperties.getPlatformProperties().toHTML();
         contents = contents.replace("##PLATFORM##", platformData);
