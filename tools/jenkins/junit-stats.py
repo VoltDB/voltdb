@@ -18,6 +18,10 @@ from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
 from six.moves.urllib.request import urlopen
 
+# Get job names from environment variables
+COMMUNITY = os.environ.get('community', None)
+PRO = os.environ.get('pro', None)
+
 # Number of failures in a row for a test needed to trigger a new Jira issue
 TOLERANCE = 2
 
@@ -33,7 +37,7 @@ class Stats(object):
         ex: junit-stats branch-2-pro-junit-master 800-802
         ex: junit-stats branch-2-community-junit-master 550-550
         """
-        logging.basicConfig(filename='junit-stats.log')
+        logging.basicConfig(stream=sys.stdout)
 
     def read_url(self, url):
         """
@@ -226,8 +230,12 @@ class Stats(object):
         try:
             jenkinsbot = JenkinsBot()
             for issue in issues:
+                # Only report pro and community job
+                if job != PRO and job != COMMUNITY:
+                    continue
+
                 error_url = issue['url']
-                error_report = self.read_url(error_url)
+                error_report = self.read_url(error_url + '/api/python')
 
                 if error_report is None:
                     continue
@@ -241,10 +249,11 @@ class Stats(object):
                 if age < TOLERANCE and old:
                     continue
 
-                summary = issue['name'] + ' has failed ' + str(age) + ' times in a row on ' + issue['job']
+                failed_since = error_report['failedSince']
+                summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
                 description = error_url + '\n' + error_report['errorStackTrace']
-                jenkinsbot.create_bug_issue(summary, description, 'Core', 'V6.6',
-                                            'junit-consistent-failure')
+                # TODO get a current version instead of using V6.6
+                jenkinsbot.create_bug_issue(summary, description, 'Core', 'V6.6', 'junit-consistent-failure')
         except:
             logging.exception('Error with creating issue')
 

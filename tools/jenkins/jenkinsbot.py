@@ -125,7 +125,7 @@ ML_QUERY = ("""
 ORDER BY 5 DESC
 """)
 
-# Core Extended Leaderboard - See a specific leaderboard for two jobs.
+# Core Extended Leaderboard - See a specific leaderboard for three jobs.
 CL_QUERY = ("""
   SELECT job AS 'Job name',
          name AS 'Test name',
@@ -165,13 +165,6 @@ AF_QUERY = ("""
    WHERE NOT STATUS='FIXED' AND
          tf.job=%(job)s
 ORDER BY 2 DESC
-""")
-
-# Register user - Register a user to jenkinsbot.
-RU_QUERY = ("""
-    INSERT INTO `jenkinsbot-users`
-                (jenkins_username, slack_user_id, github_username)
-         VALUES (%(jenkins_username)s, %(slack_user_id)s, %(github_username)s)
 """)
 
 # Add alias - Add an alias for the user.
@@ -548,6 +541,13 @@ class JenkinsBot(object):
                 return
         else:
             self.logger.error('Did not provide either a Jira user, a Jira password or a Jira project')
+            return
+
+        # Check for existing bug with same summary
+        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        if len(existing) > 0:
+            # Already reported
+            self.logger.info('Already logged issue with summary ' + summary)
             return
 
         issue_dict = {
