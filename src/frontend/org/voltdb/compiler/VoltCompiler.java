@@ -683,7 +683,7 @@ public class VoltCompiler {
 
                 // if we have a context, write report to voltroot
                 if (catalogContext != null) {
-                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                    file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
                 }
             }
 
@@ -2215,11 +2215,11 @@ public class VoltCompiler {
             String textName = String.format("catalog-%s.out", versionFromVoltDB);
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
             final String outputJarPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), jarName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(jarName));
             // Place the compiler output in a text file in the same folder.
             final String outputTextPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), textName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(textName));
             try {
                 m_classLoader = outputJar.getLoader();

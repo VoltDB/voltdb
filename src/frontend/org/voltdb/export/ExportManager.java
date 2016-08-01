@@ -389,11 +389,11 @@ public class ExportManager
 
         updateProcessorConfig(connectors);
 
-        exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
+        exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
 
     private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
-        String overflowDir = catContext.catalog.getClusters().get("cluster").getExportoverflow();
+        String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
             exportLog.info(
                 String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
@@ -435,7 +435,7 @@ public class ExportManager
             newProcessor.setProcessorConfig(m_processorConfig);
             m_processor.set(newProcessor);
 
-            File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
 
             /*
              * If this is a catalog update providing an existing generation,
@@ -522,7 +522,12 @@ public class ExportManager
             File exportOverflowDirectory, CatalogContext catalogContext,
             CatalogMap<Connector> connectors) throws IOException {
         TreeSet<File> generationDirectories = new TreeSet<File>();
-        for (File f : exportOverflowDirectory.listFiles()) {
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files == null) {
+            //Clean export overflow no generations seen.
+            return;
+        }
+        for (File f : files) {
             if (f.isDirectory()) {
                 if (!f.canRead() || !f.canWrite() || !f.canExecute()) {
                     throw new RuntimeException("Can't one of read/write/execute directory " + f);
@@ -607,7 +612,7 @@ public class ExportManager
             return;
         }
 
-        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+        File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;

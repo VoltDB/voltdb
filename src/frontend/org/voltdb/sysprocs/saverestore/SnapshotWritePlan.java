@@ -131,9 +131,10 @@ public abstract class SnapshotWritePlan
      * artifacts.  Will dispatch to a subclass appropriate method call based on
      * the snapshot type.  Returns a callable for deferred setup, null if there
      * is nothing to do for deferred setup.
+     * @return returns a Callable
      */
     abstract public Callable<Boolean> createSetup(
-            String file_path, String file_nonce,
+            String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,

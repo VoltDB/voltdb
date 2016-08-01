@@ -31,6 +31,7 @@ import java.util.TreeSet;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 
@@ -171,7 +172,7 @@ public class SnapshotConverter {
         snapshotNames.add(snapshotName);
         SpecificSnapshotFilter filter = new SpecificSnapshotFilter(snapshotNames);
         for (File directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( directory, snapshots, filter, false, CONSOLE_LOG);
+            SnapshotUtil.retrieveSnapshotFiles(directory, snapshots, filter, false, SnapshotPathType.SNAP_PATH, CONSOLE_LOG);
         }
 
         if (snapshots.size() > 1) {

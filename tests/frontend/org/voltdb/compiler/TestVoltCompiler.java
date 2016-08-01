@@ -431,8 +431,6 @@ public class TestVoltCompiler extends TestCase {
                     get("database").getSnapshotschedule().get("default");
             assertEquals(32, schedule.getFrequencyvalue());
             assertEquals("m", schedule.getFrequencyunit());
-            //Will be empty because the deployment file initialization is what sets this value
-            assertEquals("/tmp", schedule.getPath());
             assertEquals("woobar", schedule.getPrefix());
         } finally {
             final File jar = new File("/tmp/snapshot_settings_test.jar");
