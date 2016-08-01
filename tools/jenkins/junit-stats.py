@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 
+import mysql.connector
+
 from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
@@ -16,7 +18,8 @@ from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
 from six.moves.urllib.request import urlopen
 
-import mysql.connector
+# Number of failures in a row for a test needed to trigger a new Jira issue
+TOLERANCE = 2
 
 
 class Stats(object):
@@ -226,12 +229,22 @@ class Stats(object):
                 error_url = issue['url']
                 error_report = self.read_url(error_url)
 
-                if error_report is not None:
-                    age = error_report['age']
-                    summary = issue['name'] + ' has failed ' + str(age) + ' times in a row on ' + issue['job']
-                    description = error_url + '\n' + error_report['errorStackTrace']
-                    jenkinsbot.create_bug_issue(age, issue, summary, description, 'Core', 'V6.6',
-                                                'junit-consistent-failure')
+                if error_report is None:
+                    continue
+
+                age = error_report['age']
+                yesterday = datetime.now() - timedelta(days=1)
+                timestamp = issue['timestamp']
+                old = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') < yesterday
+
+                # Don't file ticket if age within tolerance and this failure happened over one day ago
+                if age < TOLERANCE and old:
+                    continue
+
+                summary = issue['name'] + ' has failed ' + str(age) + ' times in a row on ' + issue['job']
+                description = error_url + '\n' + error_report['errorStackTrace']
+                jenkinsbot.create_bug_issue(summary, description, 'Core', 'V6.6',
+                                            'junit-consistent-failure')
         except:
             logging.exception('Error with creating issue')
 
