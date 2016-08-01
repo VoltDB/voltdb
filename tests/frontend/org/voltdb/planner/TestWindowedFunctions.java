@@ -111,9 +111,15 @@ public class TestWindowedFunctions extends PlannerTestCase {
      *        ORDER BY column, always distinguishable by its "DESC" direction.
      **/
     private void validateWindowedFunctionPlan(String windowedQuery, int nSorts, int descSortIndex, int numPartitionExprs) {
-        AbstractPlanNode node = compile(windowedQuery);
+        // Sometimes we get multi-fragment nodes when we
+        // expect single fragment nodes.  Keeping all the fragments
+        // helps to diagnose the problem.
+        List<AbstractPlanNode> nodes = compileToFragments(windowedQuery);
+        assertEquals(1, nodes.size());
+
+        AbstractPlanNode node = nodes.get(0);
         // The plan should look like:
-        // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
+        // SendNode -> ProjectionPlanNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
         // We also do some sanity checking on the PartitionPlan node.
         // First dissect the plan.
         assertTrue(node instanceof SendPlanNode);
@@ -251,17 +257,22 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validatePartitionedQuery(windowedQuery, false);
         windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY B ORDER BY A) R FROM AAA_PA ORDER BY A, B, C, R;";
         validatePartitionedQuery(windowedQuery, true);
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A, C ORDER BY B) R FROM AAA_PA";
+        validatePartitionedQuery(windowedQuery, false);
+
         // Validate plan with a rank expression with one partitioned column and one non-partitioned
         // column in the partition by list.
         windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A, C ORDER BY B) R FROM AAA_PA;";
         validatePartitionedQuery(windowedQuery, false);
-        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A, C ORDER BY B) R FROM AAA_PA ORDER BY A, B, C, R;";
-        validatePartitionedQuery(windowedQuery, true);
         // The same as the previous two tests, but swap the partition by columns.
         windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY C, A ORDER BY B) R FROM AAA_PA;";
         validatePartitionedQuery(windowedQuery, false);
         windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY C, A ORDER BY B) R FROM AAA_PA ORDER BY A, B, C, R;";
         validatePartitionedQuery(windowedQuery, true);
+        // Test that we can read from a partitioned table, but the windowed
+        // partition by is not a partition column.
+        windowedQuery = "Select A, B, C, Rank() Over (Partition By C Order By B) ARANK From AAA_STRING_PA;";
+        validatePartitionedQuery(windowedQuery, false);
     }
 
     private void validatePartitionedQuery(String query, boolean hasStatementOrderBy) {
@@ -292,6 +303,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         assertTrue(child instanceof SeqScanPlanNode);
         assertEquals(0, child.getChildCount());
     }
+
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both windowed operations and GROUP BY is not supported.");

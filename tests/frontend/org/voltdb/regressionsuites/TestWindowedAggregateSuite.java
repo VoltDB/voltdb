@@ -68,10 +68,17 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + ");\n"
 
                 +"CREATE TABLE T_STRING ("
-                + "  A INTEGER,"
-                + "  B INTEGER,"
-                + "  C VARCHAR"
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR NOT NULL"
                 + ");"
+
+                +"CREATE TABLE T_STRING_A ("
+                + "  A VARCHAR NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C INTEGER NOT NULL"
+                + ");"
+                + "PARTITION TABLE T_STRING_A ON COLUMN A;"
 
                 + "CREATE TABLE T_TIMESTAMP ("
                 + "  A INTEGER,"
@@ -106,14 +113,14 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  B INTEGER NOT NULL,"
                 + "  C INTEGER NOT NULL"
                 + ");\n"
-                + "PARTITION TABLE T_PB ON COLUMN A;"
+                + "PARTITION TABLE T_PB ON COLUMN B;"
 
                 + "CREATE TABLE T_PC (\n"
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
                 + "  C INTEGER NOT NULL"
                 + ");\n"
-                + "PARTITION TABLE T_PC ON COLUMN A;"
+                + "PARTITION TABLE T_PC ON COLUMN C;"
 
                 + "create table tu (a integer, b integer);"
                 + "create unique index idx1 on tu (a);"
@@ -262,8 +269,12 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         for (long [] row : input) {
             cr = client.callProcedure("T_STRING.insert", row[colA], row[colB], Long.toString(row[colC], 10));
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            cr = client.callProcedure("T_STRING_A.insert", Long.toString(row[colA], 10), row[colB], row[colC]);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
-        String sql = "select A, B, C, rank() over (partition by A order by B) as R from T_STRING ORDER BY A, B, C, R;";
+        String sql;
+        // Test string values
+        sql = "select A, B, C, rank() over (partition by A order by B) as R from T_STRING ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
@@ -272,6 +283,18 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(expected[rowIdx][colA], vt.getLong(0));
             assertEquals(expected[rowIdx][colB], vt.getLong(1));
             assertEquals(Long.toString(expected[rowIdx][colC], 10), vt.getString(2));
+            assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
+        }
+        // Test with partition by over a string column
+        sql = "select A, B, C, rank() over (partition by A order by B) as R from T_STRING_A ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(expected.length, vt.getRowCount());
+        for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
+            assertEquals(Long.toString(expected[rowIdx][colA], 10), vt.getString(0));
+            assertEquals(expected[rowIdx][colB], vt.getLong(1));
+            assertEquals(expected[rowIdx][colC], vt.getLong(2));
             assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
         }
     }
@@ -320,6 +343,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             cr = client.callProcedure("T_PAA.insert", row[colA], row[colAA], row[colB], row[colC]);
         }
         String sql;
+        // Test rank with partition by over a partitioned column.
         sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PA ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -331,6 +355,8 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
             assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
         }
+        // Test rank with ordered window over a partitioned column, and
+        // partition not over a partitioned column.
         sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PB ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -342,6 +368,8 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
             assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
         }
+        // Select rank with neither partition nor rank over partioned
+        // columns, but with a partitioned table.
         sql = "select A, B, C, rank() over (partition by A order by B) as R from T_PC ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -353,6 +381,8 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
             assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
         }
+        // Check rank with windowed partition on two columns, one partitioned and
+        // one not partitioned, but ordered by a non-partitioned column.
         sql = "select A, B, C, rank() over (partition by A, AA order by B) as R from T_PAA ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -364,6 +394,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
             assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
         }
+        // Check the previous case, but with the partition by order reversed.
         sql = "select A, B, C, rank() over (partition by AA, A order by B) as R from T_PAA ORDER BY A, AA, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
