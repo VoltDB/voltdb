@@ -962,8 +962,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
+                final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+                if (txn != null && txn.isDone()) {
+                    setRepairLogTruncationHandle(message.getSpHandle());
+                }
+
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
-                setRepairLogTruncationHandle(message.getSpHandle());
                 FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
@@ -1008,6 +1012,28 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // If this is a restart, then we need to leave the transaction state around
             if (!msg.isRestart()) {
                 m_outstandingTxns.remove(msg.getTxnId());
+                // Set the truncation handle here instead of when processing
+                // FragmentResponseMessage to avoid letting replicas think a
+                // fragment is done before the MP txn is fully committed.
+                //
+                // We have to use the spHandle from the fragment, not from the
+                // current CompleteTransactionMessage because it hasn't been
+                // executed yet. If we use the spHandle from the current
+                // completion message, it may be advancing the truncation handle
+                // before previous SPs are finished. This could happen when the
+                // MP we are completing is either a one-shot read MP or it
+                // didn't send any fragment to this partition.
+                //
+                // It is also possible to receive a CompleteTransactionMessage
+                // before the fragment runs, e.g. an early abort could happen if
+                // another partition failed its fragment before this partition
+                // even starts running the fragment. In this case, we don't want
+                // to update the truncation handle until after we run the
+                // fragment. Checking the doneness of the transaction state
+                // achieves this.
+                if (m_isLeader && txn.isDone()) {
+                    setRepairLogTruncationHandle(txn.m_spHandle);
+                }
             }
         }
     }
@@ -1152,6 +1178,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void setRepairLogTruncationHandle(long newHandle)
     {
+        assert newHandle >= m_repairLogTruncationHandle;
         m_repairLogTruncationHandle = newHandle;
         scheduleRepairLogTruncateMsg();
     }
