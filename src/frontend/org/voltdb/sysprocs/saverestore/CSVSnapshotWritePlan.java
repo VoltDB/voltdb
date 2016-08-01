@@ -68,7 +68,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
     @Override
     public Callable<Boolean> createSetup(
-            String file_path, String file_nonce,
+            String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -158,12 +158,13 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, config.tables, txnId, partitionTransactionIds,
+        return createDeferredSetup(file_path, pathType, file_nonce, config.tables, txnId, partitionTransactionIds,
                 context, extraSnapshotData, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
 
     private Callable<Boolean> createDeferredSetup(final String file_path,
+                                                  final String pathType,
                                                   final String file_nonce,
                                                   final Table[] tables,
                                                   final long txnId,
@@ -180,7 +181,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             @Override
             public Boolean call() throws Exception
             {
-                NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
+                NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
                         txnId, partitionTransactionIds, context, extraSnapshotData, null, timestamp,
                         context.getNumberOfPartitions(), tables);
 

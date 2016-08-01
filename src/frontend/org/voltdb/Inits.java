@@ -452,8 +452,8 @@ public class Inits {
                             m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
                                                                                        logConfig.getFsyncinterval(),
                                                                                        logConfig.getMaxtxns(),
-                                                                                       logConfig.getLogpath(),
-                                                                                       logConfig.getInternalsnapshotpath());
+                                                                                       VoltDB.instance().getCommandLogPath(),
+                                                                                       VoltDB.instance().getCommandLogSnapshotPath());
                         }
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
@@ -716,7 +716,7 @@ public class Inits {
             if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
-                    snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+                    snapshotPath = VoltDB.instance().getSnapshotPath();
                 }
 
                 int[] allPartitions = new int[m_rvdb.m_configuredNumberOfPartitions];
@@ -725,6 +725,7 @@ public class Inits {
                 }
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+                if (cl == null) return;
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
@@ -733,11 +734,11 @@ public class Inits {
                                                       m_rvdb,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
-                                                      cl.getLogpath(),
-                                                      cl.getInternalsnapshotpath(),
+                                                      VoltDB.instance().getCommandLogPath(),
+                                                      VoltDB.instance().getCommandLogSnapshotPath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
+                                                      VoltDB.instance().getVoltDBRootPath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }

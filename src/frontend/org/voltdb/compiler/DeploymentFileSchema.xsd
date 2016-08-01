@@ -59,7 +59,7 @@
           <xs:enumeration value="ddl"/>
       </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on id -->
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">
@@ -77,14 +77,14 @@
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
-  
-  <xs:simpleType name="readlevelType"> 
-    <xs:restriction base="xs:string"> 
+
+  <xs:simpleType name="readlevelType">
+    <xs:restriction base="xs:string">
       <xs:enumeration value="fast"/>
       <xs:enumeration value="safe"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
     <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
