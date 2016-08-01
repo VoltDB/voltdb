@@ -31,14 +31,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.junit.After;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 
 import org.voltcore.network.*;
 import org.voltdb.client.ClientResponse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestStatsAgent {
 

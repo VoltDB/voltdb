@@ -60,7 +60,7 @@ import com.google_voltpatches.common.collect.Maps;
 public class NativeSnapshotWritePlan extends SnapshotWritePlan
 {
     @Override
-    public Callable<Boolean> createSetup(String file_path,
+    public Callable<Boolean> createSetup(String file_path, String pathType,
                                             String file_nonce,
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
@@ -72,12 +72,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
-        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+        return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 jsData, context, result, extraSnapshotData, tracker, hashinatorData,
                 timestamp, context.getNumberOfPartitions());
     }
 
-    Callable<Boolean> createSetupInternal(String file_path,
+    Callable<Boolean> createSetupInternal(String file_path, String pathType,
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
@@ -155,13 +155,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
+        return createDeferredSetup(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 context, extraSnapshotData, tracker, hashinatorData, timestamp,
                 newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
     private Callable<Boolean> createDeferredSetup(final String file_path,
+                                                  final String pathType,
                                                   final String file_nonce,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
@@ -185,7 +186,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             {
                 final AtomicInteger numTables = new AtomicInteger(tables.length);
 
-                NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
+                NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
                         txnId, partitionTransactionIds, context, extraSnapshotData,
                         hashinatorData,
                         timestamp,
@@ -300,7 +301,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     }
 
     static void createFileBasedCompletionTasks(
-            String file_path, String file_nonce,
+            String file_path, String pathType, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             SystemProcedureExecutionContext context,
             ExtensibleSnapshotDigestData extraSnapshotData,
@@ -313,6 +314,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 txnId,
                 context.getCatalogCRC(),
                 file_path,
+                pathType,
                 file_nonce,
                 Arrays.asList(tables),
                 context.getHostId(),

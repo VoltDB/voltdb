@@ -90,7 +90,6 @@ public class VoltZK {
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
     public static final String test_scan_path = "/db/test_scan_path";   // (test only)
-    public static final String truncation_snapshot_path = "/db/truncation_snapshot_path";
     public static final String user_snapshot_request = "/db/user_snapshot_request";
     public static final String user_snapshot_response = "/db/user_snapshot_response";
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";

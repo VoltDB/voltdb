@@ -188,7 +188,7 @@ final public class TestInitStartAction {
         assertNotNull(serverException.get());
         assertTrue(serverException.get() instanceof AssertionError);
         assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("cannot use legacy start action"));
+        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         if (!c1.m_isEnterprise) return;
 
@@ -206,7 +206,7 @@ final public class TestInitStartAction {
         assertNotNull(serverException.get());
         assertTrue(serverException.get() instanceof AssertionError);
         assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("cannot use legacy start action"));
+        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         // this test which action should be considered legacy
         EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE));

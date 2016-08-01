@@ -23,13 +23,6 @@
 
 package org.voltdb;
 
-import static junit.framework.Assert.assertNull;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -60,6 +53,13 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.SetMultimap;
 import com.google_voltpatches.common.collect.SortedMapDifference;
+import static junit.framework.Assert.assertNull;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This test verifies that the Java Hashinator behaves

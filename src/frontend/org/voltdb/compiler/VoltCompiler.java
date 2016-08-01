@@ -65,6 +65,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -89,6 +90,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -665,7 +667,19 @@ public class VoltCompiler {
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
+            VoltDBInterface voltdb = VoltDB.instance();
+            // try to get a catalog context
+            CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+            int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
+            Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
+            int hostcount = deployment != null ? deployment.getHostcount() : 1;
+            int kfactor = deployment != null ? deployment.getKfactor() : 0;
+            int sitesPerHost = deployment != null ? deployment.getSitesperhost() : 8;
+            boolean isPro = MiscUtils.isPro();
+
+            long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
+            m_report = ReportMaker.report(m_catalog, minHeapRqt, isPro, hostcount,
+                    sitesPerHost, kfactor, m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
@@ -674,16 +688,12 @@ public class VoltCompiler {
                 file = new File("catalog-report.html");
             }
             else {
-                // try to get a catalog context
-                VoltDBInterface voltdb = VoltDB.instance();
-                CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
-
                 // it's possible that standaloneCompiler will be false and catalogContext will be null
                 //   in test code.
 
                 // if we have a context, write report to voltroot
                 if (catalogContext != null) {
-                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                    file = new File(VoltDB.instance().getVoltDBRootPath(), "catalog-report.html");
                 }
             }
 
@@ -2215,11 +2225,11 @@ public class VoltCompiler {
             String textName = String.format("catalog-%s.out", versionFromVoltDB);
             CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
             final String outputJarPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), jarName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(jarName));
             // Place the compiler output in a text file in the same folder.
             final String outputTextPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    ? new File(VoltDB.instance().getVoltDBRootPath(), textName).getPath()
                     : VoltDB.Configuration.getPathToCatalogForTest(textName));
             try {
                 m_classLoader = outputJar.getLoader();

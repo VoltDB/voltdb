@@ -99,7 +99,7 @@ public class TestMemoryResourceMonitor extends TestCase
                 "-20",
                 "abc"
         };
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
         for (int i=0; i<badValues.length; i++) {
             try {
                 monitor.getMemoryLimitSize(badValues[i]);
@@ -118,7 +118,7 @@ public class TestMemoryResourceMonitor extends TestCase
         configToExpectedRss.put("15%", totalSize*15/100.0);
         configToExpectedRss.put("40", 40.0*1073741824L);
         configToExpectedRss.put("1.5", 1.5*1073741824L);
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
         for (String str : configToExpectedRss.keySet()) {
             Assert.assertEquals(configToExpectedRss.get(str), monitor.getMemoryLimitSize(str));
         }
