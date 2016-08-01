@@ -29,6 +29,7 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -200,16 +201,32 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            result =
-                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            DeploymentType dt  = CatalogUtil.parseDeploymentFromString(deploymentString);
+            if (dt == null) {
+                retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
+                return retval;
+            }
+
+            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
-            retval.deploymentString = deploymentString;
+            // ignore admin mode settings if operating with new start actions/verbs
+            if (!VoltDB.instance().isRunningWithOldVerbs() && dt.getAdminMode().isAdminstartup()) {
+                // set the admin-startup mode to false and fetch update the deployment string from
+                // updated deployment object
+                dt.getAdminMode().setAdminstartup(false);
+                retval.deploymentString = CatalogUtil.getDeployment(dt, true);
+            }
+            else {
+                retval.deploymentString = deploymentString;
+            }
+
+
             retval.deploymentHash =
-                CatalogUtil.makeDeploymentHash(deploymentString.getBytes(Constants.UTF8ENCODING));
+                CatalogUtil.makeDeploymentHash(retval.deploymentString.getBytes(Constants.UTF8ENCODING));
 
             // store the version of the catalog the diffs were created against.
             // verified when / if the update procedure runs in order to verify

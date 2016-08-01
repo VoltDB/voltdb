@@ -41,6 +41,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
     }
 
+    // Keep sync with EE DRTxnPartitionHashFlag at types.h
     public enum DRTxnPartitionHashFlag {
         PLACEHOLDER,
         REPLICATED,
@@ -63,12 +64,19 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     // Keep sync with EE DRConflictType at types.h
     public static enum DRConflictType {
         NO_CONFLICT,
-        CONSTRIANT_VIOLATION,
+        CONSTRAINT_VIOLATION,
         EXPECTED_ROW_MISSING,
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
+
+    // all partial MP txns go into SP streams
+    public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
+    // all partial MP txns except those with table truncation record go to MP stream separately without coordination
+    public static final byte DR_UNCOORDINATED_MP_START_PROTOCOL_VERSION = 4;
+    // partial MP txns of the same MP txn coordinated and combined before going to MP stream
+    public static final byte DR_COORDINATED_MP_START_PROTOCOL_VERSION = 6;
 
     /**
      * Load the full subclass if it should, otherwise load the

@@ -108,6 +108,7 @@ class CreateServer(Server):
         """
         ensure GET server list
         """
+        print "Running test to check get server list API."
         response = requests.get(__db_url__)
         value = response.json()
         if value:
@@ -124,6 +125,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['statusString'], 'OK')
             self.assertEqual(value['status'], 200)
+        print "Completed test to check get server list API."
 
     def test_request_with_id(self):
         """

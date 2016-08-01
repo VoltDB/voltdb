@@ -873,8 +873,8 @@ class ServerAPI(MethodView):
             current_server['public-interface'] = \
                 request.json.get('public-interface', current_server['public-interface'])
             current_server['placement-group'] = \
-                request.json.get('placement-group', current_server['placement-group'])
-            current_server['placement-group'] = current_server['isAdded']
+                str(request.json.get('placement-group', current_server['placement-group']))
+            current_server['isAdded'] = current_server['isAdded']
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
@@ -1223,14 +1223,14 @@ class StopDatabaseAPI(MethodView):
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.kill_database(database_id)
+            response = server.stop_database(database_id)
             resp_json = json.loads(response.data)
             return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}))
 
         else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
-                response = server.stop_database()
+                response = server.kill_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
                 resp_json = json.loads(json.loads(response.data)['statusString'])

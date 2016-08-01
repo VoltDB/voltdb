@@ -74,8 +74,28 @@
     	<p>Starting.......</p>
     </div>    
     <div id="startSuccess" class="databaseRg" style="display:none;">
-    <a id="vmcLink" class="btn"><span class="glyphicon glyphicon-new-window" style="padding-right:5px;tr"></span>Go to Management Center</a>
-    <p>Database Running</p>
+      <div id="divShutdownCluster" class="clsShutdownCluster"  style="display:none;">
+        <div class="modal-dialog modal-dialog-center clsShutdownClusterContainer">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign clsShutdownWarning" aria-hidden="true"></span>Warning</h4>
+          </div>
+          <div class="modal-body">
+            <div class="divShutdownMsg">
+            <p> New changes have been made to the configuration. You need to shutdown the cluster and start it again for the changes to take effect. </p>
+            </div>
+            <div class="btnClsShutdownCluster">
+              <button id="btnShutdownCluster" type="button" class="btn clsShutdownBtn">Shutdown</button>
+            </div>
+
+       </div>
+
+          </div>
+        </div>
+      </div>
+      <a id="vmcLink" class="btn"><span class="glyphicon glyphicon-new-window" style="padding-right:5px;tr"></span>Go to Management Center</a>
+      <p>Database Running</p>
     </div>
     <div id="stallFailed" class="stalledState"  style="display:none;">
       <div class="modal-dialog modal-dialog-center stalledStateContainer">
@@ -1311,6 +1331,27 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
     </div>
   </div>
 </div>
+<!-- Shutdown Cluster Confirmation -->
+<div id="divClusterShutdown" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign clsShutdownWarning"></span>Warning</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to shutdown the cluster?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnClusterShutdownOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Delete Database -->
+
 
 <div class="loader" ></div>
 </div>

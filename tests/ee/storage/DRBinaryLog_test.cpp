@@ -60,8 +60,9 @@ const int CLUSTER_ID_REPLICA = 2;
 const int BUFFER_SIZE = 4096;
 const int LARGE_BUFFER_SIZE = 32768;
 
+static bool s_mulitPartitionFlag = false;
 static int64_t addPartitionId(int64_t value) {
-    return (value << 14) | 42;
+    return s_mulitPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 42);
 }
 
 class MockExportTupleStream : public ExportTupleStream {
@@ -88,6 +89,10 @@ class MockHashinator : public TheHashinator {
 public:
     static MockHashinator* newInstance() {
         return new MockHashinator();
+    }
+
+    std::string debug() const {
+        return "MockHashinator";
     }
 
     ~MockHashinator() {}
@@ -307,16 +312,25 @@ public:
         delete m_otherTableWithoutIndexReplica;
     }
 
+    bool isReadOnly() {
+        return (m_undoToken == INT64_MAX);
+    }
+
     void beginTxn(MockVoltDBEngine *engine, int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
         engine->prepareContext();
         m_currTxnUniqueId = addPartitionId(uniqueId);
 
-        UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken);
+        UndoQuantum* uq = isReadOnly() ? NULL : m_undoLog.generateUndoQuantum(m_undoToken);
         engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                                                             addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
+        engine->getExecutorContext()->checkTransactionForDR();
     }
 
     void endTxn(MockVoltDBEngine *engine, bool success) {
+        if (isReadOnly()) {
+            return;
+        }
+
         if (!success) {
             m_undoLog.undo(m_undoToken);
         } else {
@@ -409,12 +423,36 @@ public:
         return m_topend.receivedDRBuffer;
     }
 
-    void flushButDontApply(int64_t lastCommittedSpHandle) {
-        flush(lastCommittedSpHandle);
+    void applyNull() {
         for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
             m_topend.blocks.pop_back();
             m_topend.data.pop_back();
         }
+    }
+
+    void flushButDontApply(int64_t lastCommittedSpHandle) {
+        flush(lastCommittedSpHandle);
+        applyNull();
+    }
+
+    typedef std::pair<boost::shared_array<char>, size_t> DRStreamData;
+    DRStreamData getDRStreamData() {
+        boost::shared_ptr<StreamBlock> sb = m_topend.blocks.front();
+        m_topend.blocks.pop_front();
+        boost::shared_array<char> data = m_topend.data.front();
+        m_topend.data.pop_front();
+
+        size_t startPos = sb->headerSize() - 4;
+        *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(
+                static_cast<int32_t>(sb->offset()));
+        return std::make_pair(data, startPos);
+    }
+
+    CopySerializeInputLE* getDRTaskInfo() {
+        DRStreamData data = getDRStreamData();
+        const char* taskParams = &data.first[data.second];
+        return new CopySerializeInputLE(taskParams + 4,
+                ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
     }
 
     void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
@@ -434,16 +472,10 @@ public:
         tables[24] = m_replicatedTableReplica;
 
         while (!m_topend.blocks.empty()) {
-            boost::shared_ptr<StreamBlock> sb = m_topend.blocks.front();
-            m_topend.blocks.pop_front();
-            boost::shared_array<char> data = m_topend.data.front();
-            m_topend.data.pop_front();
-
-            size_t startPos = sb->headerSize() - 4;
-            *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sinkWrapper.apply(&data[startPos], tables, &m_pool, m_engineReplica, 1);
+            DRStreamData data = getDRStreamData();
+            m_sinkWrapper.apply(&data.first[data.second], tables, &m_pool, m_engineReplica, 1);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -1880,7 +1912,7 @@ TEST_F(DRBinaryLogTest, InsertOverBufferLimit) {
         for (int i = 1; i <= total; i++) {
             insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 
@@ -1928,7 +1960,7 @@ TEST_F(DRBinaryLogTest, UpdateOverBufferLimit) {
             newTuple.setNValue(1, ValueFactory::getBigIntValue(i));
             updateTuple(m_table, oldTuple, newTuple);
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
 
         // Make sure all changes rolled back
@@ -1966,7 +1998,7 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
             TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
             deleteTuple(m_table, tuple);
         }
-    } catch (SerializableEEException e) {
+    } catch (SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 
@@ -2031,6 +2063,61 @@ TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {
     flushAndApply(spHandle - 1);
 
     EXPECT_EQ(101, m_tableReplica->activeTupleCount());
+}
+
+TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
+    beginTxn(m_engine, 98, 98, 97, 69);
+    endTxn(m_engine, true);
+    ASSERT_FALSE(flush(98));
+    ASSERT_EQ(0, m_topend.blocks.size());
+
+    s_mulitPartitionFlag = true;
+
+    beginTxn(m_engine, 99, 99, 98, 70);
+    endTxn(m_engine, true);
+    ASSERT_TRUE(flush(99));
+
+    EXPECT_EQ(0, m_table->activeTupleCount());
+    EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+    ASSERT_EQ(2, m_topend.blocks.size());
+
+    std::unique_ptr<CopySerializeInputLE> taskInfo(getDRTaskInfo());
+    taskInfo->readByte(); // DR version
+    DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
+    ASSERT_EQ(DR_RECORD_BEGIN_TXN, type);
+    taskInfo->readLong(); // uniqueId
+    taskInfo->readLong(); // sequenceNumber
+    DRTxnPartitionHashFlag hashFlag =
+            static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte()); // hashFlag
+    ASSERT_EQ(TXN_PAR_HASH_PLACEHOLDER, hashFlag);
+    taskInfo->readInt(); // txnLength
+    int32_t partitionHash = taskInfo->readInt(); // partitionHash
+    ASSERT_TRUE(m_engine->isLocalSite(partitionHash)); // -1
+    type = static_cast<DRRecordType>(taskInfo->readByte());
+    ASSERT_EQ(DR_RECORD_END_TXN, type);
+
+    applyNull();
+    ASSERT_EQ(0, m_topend.blocks.size());
+
+    beginTxn(m_engine, 100, 100, 99, 71);
+    endTxn(m_engine, true);
+    flushAndApply(100);
+
+    EXPECT_EQ(0, m_table->activeTupleCount());
+    EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+    ASSERT_EQ(0, m_topend.blocks.size());
+
+    // read-only
+    int64_t prevUndoToken = m_undoToken;
+    m_undoToken = INT64_MAX;
+    beginTxn(m_engine, 101, 101, 100, 72);
+    endTxn(m_engine, true);
+    ASSERT_FALSE(flush(101));
+    ASSERT_EQ(0, m_topend.blocks.size());
+    ASSERT_EQ(INT64_MAX, m_undoToken);
+    m_undoToken = prevUndoToken;
+
+    s_mulitPartitionFlag = false;
 }
 
 int main() {

@@ -374,7 +374,7 @@ void Vector4<VType>::Clear() {
 
 template <typename VType>
 bool Vector4<VType>::IsNaN() const {
-  return isnan(c_[0]) || isnan(c_[1]) || isnan(c_[2]) || isnan(c_[3]);
+  return MathUtil::IsNaN(c_[0]) || MathUtil::IsNaN(c_[1]) || MathUtil::IsNaN(c_[2]) || MathUtil::IsNaN(c_[3]);
 }
 
 template <typename VType>

@@ -832,6 +832,52 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
+    public void testMatViewPartitionColumnSelection() {
+        // This test checks whether the materialzied view code can find and assign correct partition columns to
+        // views with various definitions.
+        String tableSchemas =
+            "CREATE TABLE t1 (a INT NOT NULL, b INT NOT NULL);\n" +
+            "CREATE TABLE t2 (a INT NOT NULL, b INT NOT NULL);\n";
+        String partitionDDLs =
+            "PARTITION TABLE t1 ON COLUMN b;\n" +
+            "PARTITION TABLE t2 ON COLUMN a;\n";
+        String viewDefinitions =
+            // v1: t2.a This is testing complex group-by column case.
+            "CREATE VIEW v1 (a1, a2, cnt, sumb) AS SELECT t1.a+1, t2.a, COUNT(*), SUM(t2.b) FROM t1 JOIN t2 ON t1.b=t2.a GROUP BY t1.a+1, t2.a;\n" +
+            // v2: NULL, because a parttion column must be a simple column.
+            "CREATE VIEW v2 (a1, a2, cnt, sumb) AS SELECT t1.a, t2.a+1, COUNT(*), SUM(t2.b) FROM t1 JOIN t2 ON t1.b=t2.a GROUP BY t1.a, t2.a+1;\n" +
+            // v3: t2.a This is testing simple group-by column case.
+            "CREATE VIEW v3 (a1, a2, cnt, sumb) AS SELECT t1.a, t2.a, COUNT(*), SUM(t2.b) FROM t1 JOIN t2 ON t1.b=t2.a GROUP BY t1.a, t2.a;\n" +
+            // v4: NULL
+            "CREATE VIEW v4 (a, cnt, sumb) AS SELECT t1.a, count(*), sum(t2.b) from t1 join t2 on t1.b=t2.a group by t1.a;\n";
+
+        String viewNames[] = {"v1", "v2", "v3", "v4"};
+        String pcols[] = {"A2", null, "A2", null};
+        assertEquals(viewNames.length, pcols.length);
+        VoltCompiler compiler = new VoltCompiler();
+        File jarOut = new File("viewpcolselection.jar");
+        jarOut.deleteOnExit();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableSchemas + partitionDDLs + viewDefinitions);
+        String schemaPath = schemaFile.getPath();
+        try {
+            assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+        CatalogMap<Table> tables = compiler.getCatalogDatabase().getTables();
+        for (int i=0; i<viewNames.length; i++) {
+            Table table = tables.get(viewNames[i]);
+            Column pcol = table.getPartitioncolumn();
+            if (pcol == null) {
+                assertNull(pcols[i]);
+            }
+            else {
+                assertEquals(pcols[i], pcol.getName());
+            }
+        }
+        jarOut.delete();
+    }
+
     public void testAutogenDRConflictTable() {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();
