@@ -1320,14 +1320,12 @@ SnapshotCompletionInterest, Promotable
              * will truncate the logs
              */
             if (m_isLeader) {
+                String truncationRequest = "";
                 try {
-                    try {
-                        String truncationRequest = m_zk.create(VoltZK.request_truncation_snapshot_node, null, Ids.OPEN_ACL_UNSAFE,
-                                  CreateMode.EPHEMERAL_SEQUENTIAL);
-                        LOG.info("Initial Truncation request made: " + truncationRequest);
-                    } catch (KeeperException.NodeExistsException e) {}
-                    m_zk.create(VoltZK.request_truncation_snapshot_node, null,
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+                    truncationRequest = m_zk.create(VoltZK.request_truncation_snapshot_node, null, Ids.OPEN_ACL_UNSAFE,
+                              CreateMode.EPHEMERAL_SEQUENTIAL);
+                } catch (KeeperException.NodeExistsException e) {
+                    LOG.info("Initial Truncation request failed as one is in progress: " + truncationRequest);
                 } catch (Exception e) {
                     VoltDB.crashGlobalVoltDB("Requesting a truncation snapshot " +
                                              "via ZK should always succeed",
