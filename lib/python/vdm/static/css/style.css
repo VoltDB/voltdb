@@ -1725,6 +1725,15 @@ color: grey;
     position: relative;
     top: -12px;
     right: 6px;}
+
+ .grayDot {
+    background: url(../images/gray-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
  .btnStartServer , .btnStopServer{
     cursor: pointer
  }

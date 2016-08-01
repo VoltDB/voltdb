@@ -1609,6 +1609,7 @@ class StatusDatabaseAPI(MethodView):
         database = Global.DATABASES.get(database_id)
         has_stalled = False
         has_run = False
+        is_server_unreachable = False
         if not database:
             return make_response(jsonify({"status": 404, 'statusString': 'Not found'}), 404)
         else:
@@ -1620,21 +1621,23 @@ class StatusDatabaseAPI(MethodView):
                       (server['hostname'], __PORT__, database_id, server['id'])
                 try:
                     response = requests.get(url)
+                    if response.json()['serverStatus']['status'] == "stalled":
+                        has_stalled = True
+                    elif response.json()['serverStatus']['status'] == "running":
+                        has_run = True
+                    value = response.json()
+
+                    if 'status' in response.json():
+                        del value['status']
+                        del value['statusString']
+                    serverDetails.append({server['hostname']: value['serverStatus']})
                 except Exception, err:
-                    return jsonify({"status": 404, "statusString": "error"})
-
-                if response.json()['serverStatus']['status'] == "stalled":
-                    has_stalled = True
-                elif response.json()['serverStatus']['status'] == "running":
-                    has_run = True
-                value = response.json()
-
-                if 'status' in response.json():
-                    del value['status']
-                    del value['statusString']
-                serverDetails.append({server['hostname']: value['serverStatus']})
-
-            if has_run:
+                    #return jsonify({"status": 404, "statusString": "error"})
+                    serverDetails.append({server['hostname']: {'status': 'unreachable', 'details': 'Server is unreachable', 'isInitialized': False}})
+                    is_server_unreachable = True
+            if is_server_unreachable:
+                status = 'unreachable'
+            elif has_run:
                 status = 'running'
             elif has_stalled:
                 status = 'stalled'
@@ -1729,7 +1732,6 @@ class StatusDatabaseServerAPI(MethodView):
                                                                                               'details': error,
                                                                                               'isInitialized': not isFreshStart
                                                                                               }})
-
 
 
 def main(runner, amodule, config_dir, data_dir, server):
