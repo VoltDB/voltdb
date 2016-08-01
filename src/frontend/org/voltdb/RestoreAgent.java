@@ -1323,7 +1323,7 @@ SnapshotCompletionInterest, Promotable
                 String truncationRequest = "";
                 try {
                     truncationRequest = m_zk.create(VoltZK.request_truncation_snapshot_node, null, Ids.OPEN_ACL_UNSAFE,
-                              CreateMode.EPHEMERAL_SEQUENTIAL);
+                              CreateMode.PERSISTENT_SEQUENTIAL);
                 } catch (KeeperException.NodeExistsException e) {
                     LOG.info("Initial Truncation request failed as one is in progress: " + truncationRequest);
                 } catch (Exception e) {
