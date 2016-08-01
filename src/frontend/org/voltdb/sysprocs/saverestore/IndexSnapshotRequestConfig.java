@@ -17,19 +17,20 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 /**
  * Encapsulates all the information needed to initiate the snapshot that will build the elastic

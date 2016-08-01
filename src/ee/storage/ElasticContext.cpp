@@ -127,6 +127,9 @@ ElasticContext::handleActivation(TableStreamType streamType)
                     os << "... " << (m_surgeon.indexSize() - printUpTo) << " more elements" << std::endl;
                 }
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, os.str().c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Dump EE hashinator\n");
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR,
+                        ExecutorContext::getEngine()->dumpCurrentHashinator().c_str());
 
                 return ACTIVATION_FAILED;
             }

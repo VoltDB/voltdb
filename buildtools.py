@@ -500,7 +500,7 @@ def buildMakefile(CTX):
         makefile.write("prod/voltdbipc")
     makefile.write("\n")
     makefile.write('\n')
-    makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
+    makefile.write("objects/volt.a: %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
     makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
@@ -582,8 +582,8 @@ def buildMakefile(CTX):
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("%s: objects/harness.o %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/harness.o objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
@@ -602,13 +602,11 @@ def buildMakefile(CTX):
     makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
     makefile.write("\n")
-    makefile.write("clean-3pty-install:\n")
-    makefile.write("\t${RM} -r \"${INSTALL_DIR}\"\n")
-    makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
+    makefile.write("clean-3pty-install:\n")
+    makefile.write("\t@${RM} -r \"${INSTALL_DIR}\"\n")
     makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
     makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
-    makefile.write('\t@${RM} "${INSTALL_DIR}/*"\n')
     makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
     makefile.write("\n")
     makefile.close()
@@ -618,6 +616,66 @@ def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
 
+class MemLeakError:
+    def __init__(self, bytes, blocks, errType, line):
+        self.bytes = bytes
+        self.blocks = blocks
+        self.errType = errType
+        self.line = line
+    def message(self):
+        return self.errType + '\n    ' + self.line
+
+class ValgrindError:
+    def __init__(self, errorCount, contextCount, errType, line):
+        self.errorCount = errorCount
+        self.contextCount = contextCount
+        self.line = line
+    def message(self):
+        return self.line
+
+class ErrorState:
+    def __init__(self, expectNoErrors):
+        self.expectErrors = not expectNoErrors
+        self.memLossPattern = re.compile(".*(?P<errorType>((definitely)|(possibly)|(indirectly))) lost: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
+        self.stillReachablePattern = re.compile(".*still reachable: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
+        self.errorPattern = re.compile(".*ERROR SUMMARY: (?P<errorCount>\d*) errors from (?P<errorContexts>\d*) contexts")
+        self.errorLines = []
+
+    def processErrorString(self, line):
+        m = self.memLossPattern.match(line)
+        if m:
+            bytes = int(m.group('byteCount'))
+            if bytes > 0:
+                blocks = int(m.group('blockCount'))
+                errtype = m.group("errorType")
+                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errtype + " Lost.", line)]
+            return
+        m = self.stillReachablePattern.match(line)
+        if m:
+            bytes = int(m.group('byteCount'))
+            if bytes > 0:
+                blocks = int(m.group('blockCount'))
+                errType = "Memory still reachable"
+                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errType + " Lost.", line)]
+            return
+        m = self.errorPattern.match(line)
+        if m:
+            errors = int(m.group('errorCount'))
+            if errors > 0:
+                contexts = int(m.group('errorContexts'))
+                errtype = 'other'
+                self.errorLines += [ValgrindError(errors, contexts, errtype, line)]
+                
+    def isExpectedState(self):
+        if self.expectErrors:
+            return (len(self.errorLines) > 0)
+        else:
+            return (len(self.errorLines) == 0)
+
+    def errorMessage(self):
+        return ("%d Valgrind Errors: \n" % len(self.errorLines)) \
+		+ "\n".join(map(lambda l: l.message(), self.errorLines))
+    
 def runTests(CTX):
     failedTests = []
 
@@ -631,11 +689,12 @@ def runTests(CTX):
     tests = []
     for dir in CTX.TESTS.keys():
         input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
+        tests += [(dir, TEST_PREFIX + "/" + dir + "/" + x) for x in input]
     successes = 0
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
-    for test in tests:
+    for dir, test in tests:
+	expectNoMemLeaks = not (dir == "memleaktests")
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
@@ -656,25 +715,17 @@ def runTests(CTX):
 							     "--suppressions=" + os.path.join(TEST_PREFIX,
 											      "test_utils/vdbsuppressions.supp"),
 							     targetpath], stderr=PIPE, bufsize=-1)
-                #out = process.stdout.readlines()
-                allHeapBlocksFreed = False
-                otherValgrindError = True
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                for str in out_err:
-                    if str.find("All heap blocks were freed") != -1:
-                        allHeapBlocksFreed = True
-                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
-                        otherValgrindError = False
-                if not allHeapBlocksFreed:
-                    print "Not all heap blocks were freed..."
-                    retval = -1
-                elif otherValgrindError:
-                    print "Valgrind reported errors..."
+                errorState = ErrorState(expectNoMemLeaks)
+                for line in out_err:
+                    errorState.processErrorString(line);
+                if not errorState.isExpectedState():
+                    print errorState.errorMessage()
                     retval = -1
                 if retval == -1:
                     for str in out_err:
-                        print str
+                        print str.rstrip('\n')
                 sys.stdout.flush()
             else:
                 retval = os.system(targetpath)

@@ -413,6 +413,53 @@ AS
           ,  C2
 ;
 
+-- View joining 2 tables
+CREATE VIEW VT3a
+(
+    C1
+,   C2
+,   TOTAL
+,   SUMUP
+)
+AS
+    SELECT T24.C1
+        ,  T24.C2
+        ,  COUNT(*)
+        ,  SUM(T24.C2)
+    AS
+        newTble
+    FROM T24
+    JOIN T23
+    ON T24.C1 = T23.C1
+    WHERE T24.C1 < 1000
+    GROUP BY T24.C1
+          ,  T24.C2
+;
+
+-- View joining 3 tables
+CREATE VIEW VT3b
+(
+    C1
+,   C2
+,   TOTAL
+,   SUMUP
+)
+AS
+    SELECT T24.C1
+        ,  T24.C2
+        ,  COUNT(*)
+        ,  SUM(T24.C2)
+    AS
+        newTble
+    FROM T24
+    JOIN T23
+    ON T24.C1 = T23.C1
+    JOIN T22
+    ON T23.C1=T22.C3
+    WHERE T24.C1 < 1000
+    GROUP BY T24.C1
+          ,  T24.C2
+;
 
 -- EXPORT TABLE
 -- basic
@@ -553,7 +600,7 @@ CREATE PROCEDURE FOO2 AS SELECT COUNT(*) FROM T28;
 -- Verify that consecutive procedure/view statements survive sqlcmd parsing
 CREATE PROCEDURE FOO3 AS SELECT * FROM T28;
 
-CREATE VIEW VT3
+CREATE VIEW VT4
 (
     C1
 ,   C2
@@ -568,7 +615,7 @@ AS
           ,  C2
 ;
 
-CREATE PROCEDURE FOO4 AS SELECT * FROM VT3;
+CREATE PROCEDURE FOO4 AS SELECT * FROM VT4;
 
 -- Verify that create procedure with INSERT INTO SELECT
 -- survives sqlcmd
@@ -595,7 +642,7 @@ CREATE TABLE T30A (
    PRIMARY KEY (C3)
 );
 
-CREATE VIEW VT30A
+CREATE VIEW VT40A
 (
     C1
 ,   C2
@@ -610,7 +657,7 @@ AS
           ,  C2
 ;
 
-CREATE VIEW VT30B
+CREATE VIEW VT40B
 (
     C2
 ,   C1
@@ -626,8 +673,8 @@ AS
 ;
 
 DROP VIEW VT000 IF EXISTS;
-DROP VIEW VT30A IF EXISTS;
-DROP VIEW VT30B;
+DROP VIEW VT40A IF EXISTS;
+DROP VIEW VT40B;
 
 -- DROP INDEX
 
@@ -677,7 +724,7 @@ CREATE TABLE T34 (
    C3 INTEGER NOT NULL,
    PRIMARY KEY (C3)
 );
-CREATE VIEW VT34A
+CREATE VIEW VT44A
 (
     C1
 ,   C2

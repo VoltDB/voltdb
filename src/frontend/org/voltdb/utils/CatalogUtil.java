@@ -35,6 +35,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -2247,6 +2248,26 @@ public abstract class CatalogUtil {
         stmt.setIndexesused(indexString);
 
         assert(tablesRead.size() == 0);
+    }
+
+    /**
+     * Get all normal table names from a in-memory catalog jar file.
+     * A normal table is one that's NOT a materialized view, nor an export table.
+     * @param InMemoryJarfile a in-memory catalog jar file
+     * @return A set of normal table names
+     */
+    public static Set<String> getNormalTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
+        Set<String> tableNames = new HashSet<>();
+        Catalog catalog = new Catalog();
+        catalog.execute(getSerializedCatalogStringFromJar(jarfile));
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        for (Table table : getNormalTables(db, true)) {
+            tableNames.add(table.getTypeName());
+        }
+        for (Table table : getNormalTables(db, false)) {
+            tableNames.add(table.getTypeName());
+        }
+        return tableNames;
     }
 
     /**

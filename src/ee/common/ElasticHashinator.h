@@ -126,6 +126,19 @@ protected:
         return tokens[(min - 1) * 2 + 1];
     }
 
+    std::string debug() const {
+        std::ostringstream buffer;
+        buffer << "\nToken      " << "   Partition" << std::endl;
+        buffer << "==========================" << std::endl;
+        for (int i = 0; i < tokenCount; i++) {
+            buffer << std::setw(11) << tokens[i * 2]
+                   << " => "
+                   << std::setw(9) << tokens[i * 2 + 1]
+                   << std::endl;
+        }
+        return buffer.str();
+    }
+
 private:
 
     ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {}

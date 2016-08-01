@@ -117,7 +117,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
                     "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
                     " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
         }
-        m_txnEgo = ego;
+        if (m_txnEgo.getTxnId() < ego.getTxnId()) {
+            m_txnEgo = ego;
+        }
     }
 
     final protected TxnEgo advanceTxnEgo()
