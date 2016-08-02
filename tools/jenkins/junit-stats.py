@@ -23,7 +23,7 @@ COMMUNITY = os.environ.get('community', None)
 PRO = os.environ.get('pro', None)
 
 # Number of failures in a row for a test needed to trigger a new Jira issue
-TOLERANCE = 2
+TOLERANCE = 3
 
 
 class Stats(object):
@@ -129,6 +129,7 @@ class Stats(object):
                     percent = fails * 100.0 / total
 
                 # Get timestamp job ran on.
+                # Appears to be same url as build_url
                 job_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
                 job_report = self.read_url(job_url)
                 if job_report is None:

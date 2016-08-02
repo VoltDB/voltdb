@@ -553,7 +553,7 @@ class JenkinsBot(object):
         existing = jira.search_issues('summary ~ \'%s\'' % summary)
         if len(existing) > 0:
             # Already reported
-            self.logger.info('Already logged issue with summary ' + summary)
+            self.logger.info('Already logged issue with summary "' + summary + '"')
             return
 
         issue_dict = {
@@ -593,7 +593,7 @@ class JenkinsBot(object):
         new_issue = jira.create_issue(fields=issue_dict)
 
         if self.connect_to_slack():
-            self.post_message('#junit', 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+            self.post_message(JUNIT, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
 
 
 if __name__ == '__main__':
