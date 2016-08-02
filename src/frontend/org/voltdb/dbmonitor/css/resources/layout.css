@@ -1522,6 +1522,12 @@ table.size-summary-table {
     width: 100%;
 }
 
+table.cluster-config-table {
+    border-left: 1px solid #cccccc;
+    border-right: 1px solid #cccccc;
+    width: 80%;
+}
+
 input.count-input {
     width: 100px;
     text-align: right;

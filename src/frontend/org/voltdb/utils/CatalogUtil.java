@@ -217,7 +217,7 @@ public abstract class CatalogUtil {
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
-        return new Pair<InMemoryJarfile, String>(jarfile, upgradedFromVersion);
+        return new Pair<>(jarfile, upgradedFromVersion);
     }
 
     /**
@@ -366,7 +366,7 @@ public abstract class CatalogUtil {
         assert(sortFieldName != null);
 
         // build a treemap based on the field value
-        TreeMap<Object, T> map = new TreeMap<Object, T>();
+        TreeMap<Object, T> map = new TreeMap<>();
         boolean hasField = false;
         for (T item : items) {
             // check the first time through for the field
@@ -379,7 +379,7 @@ public abstract class CatalogUtil {
         }
 
         // create a sorted list from the map
-        ArrayList<T> retval = new ArrayList<T>();
+        ArrayList<T> retval = new ArrayList<>();
         for (T item : map.values()) {
             retval.add(item);
         }
@@ -429,7 +429,7 @@ public abstract class CatalogUtil {
      * @return An ordered list of the primary key columns
      */
     public static Collection<Column> getPrimaryKeyColumns(Table catalogTable) {
-        Collection<Column> columns = new ArrayList<Column>();
+        Collection<Column> columns = new ArrayList<>();
         Index catalog_idx = null;
         try {
             catalog_idx = CatalogUtil.getPrimaryKeyIndex(catalogTable);
@@ -531,7 +531,7 @@ public abstract class CatalogUtil {
     public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
                                                        org.voltdb.catalog.Table table)
     {
-        ArrayList<Table> tlist = new ArrayList<Table>();
+        ArrayList<Table> tlist = new ArrayList<>();
         CatalogMap<Table> tables = database.getTables();
         for (Table t : tables) {
             Table matsrc = t.getMaterializer();
@@ -618,6 +618,7 @@ public abstract class CatalogUtil {
         return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
+
     public static String compileDeploymentString(Catalog catalog, String deploymentString,
                      boolean isPlaceHolderCatalog)
     {
@@ -656,13 +657,6 @@ public abstract class CatalogUtil {
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
 
-            //set path and path overrides
-            // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
-            // because path locations for snapshots and partition detection don't
-            // exist in the catalog until after those portions of the deployment
-            // file are handled.
-            setPathsInfo(catalog, deployment.getPaths());
-
             // set the users info
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
@@ -679,9 +673,12 @@ public abstract class CatalogUtil {
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
-
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+            //This is here so we can update our local list of paths.
+            //I would not have needed this if validateResourceMonitorInfo didnt exist here.
+            VoltDB.instance().loadLegacyPathProperties(deployment);
 
+            setupPaths(deployment.getPaths());
             validateResourceMonitorInfo(deployment);
         }
         catch (Exception e) {
@@ -698,7 +695,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings(), deployment.getPaths());
+        new ResourceUsageMonitor(deployment.getSystemsettings());
     }
 
 
@@ -708,7 +705,8 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
+        org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().add("log");
+
         Frequency freq = commandlog.getFrequency();
         if (freq != null) {
             long maxTxnsBeforeFsyncTemp = freq.getTransactions();
@@ -830,6 +828,58 @@ public abstract class CatalogUtil {
             } else {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    //For deployment if paths are empty or null populate with runtime paths.
+    public static void updateRuntimeDeploymentPaths(DeploymentType deployment) {
+        PathsType paths = deployment.getPaths();
+        if (paths.getVoltdbroot() == null) {
+            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
+            root.setPath(VoltDB.instance().getVoltDBRootPath());
+            paths.setVoltdbroot(root);
+        } else {
+            paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
+        }
+        //snapshot
+        if (paths.getSnapshots() == null) {
+            PathsType.Snapshots snap = new PathsType.Snapshots();
+            snap.setPath(VoltDB.instance().getSnapshotPath());
+            paths.setSnapshots(snap);
+        } else {
+            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
+        }
+        if (paths.getCommandlog() == null) {
+            //cl
+            PathsType.Commandlog cl = new PathsType.Commandlog();
+            cl.setPath(VoltDB.instance().getCommandLogPath());
+            paths.setCommandlog(cl);
+        } else {
+            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
+        }
+        if (paths.getCommandlogsnapshot() == null) {
+            //cl snap
+            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
+            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            paths.setCommandlogsnapshot(clsnap);
+        } else {
+            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
+        }
+        if (paths.getExportoverflow() == null) {
+            //export overflow
+            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
+            exp.setPath(VoltDB.instance().getExportOverflowPath());
+            paths.setExportoverflow(exp);
+        } else {
+            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
+        }
+        if (paths.getDroverflow() == null) {
+            //dr overflow
+            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
+            droverflow.setPath(VoltDB.instance().getDROverflowPath());
+            paths.setDroverflow(droverflow);
+        } else {
+            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
         }
     }
 
@@ -1011,7 +1061,7 @@ public abstract class CatalogUtil {
             marshaller.setSchema(m_schema);
             marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -1418,7 +1468,7 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
@@ -1567,7 +1617,7 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<>();
 
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
@@ -1582,7 +1632,7 @@ public abstract class CatalogUtil {
     }
 
     public static Map<String, ImportConfiguration> getImportProcessorConfig(ImportType importType) {
-        Map<String, ImportConfiguration> processorConfig = new HashMap<String, ImportConfiguration>();
+        Map<String, ImportConfiguration> processorConfig = new HashMap<>();
         if (importType == null) {
             return processorConfig;
         }
@@ -1676,50 +1726,21 @@ public abstract class CatalogUtil {
 
     /**
      * Set voltroot path, and set the path overrides for export overflow, partition, etc.
-     * @param catalog The catalog to be updated.
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths) {
+    private static void setupPaths( PathsType paths) {
         File voltDbRoot;
-        final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
         //Snapshot
-        File snapshotPath = getSnapshot(paths.getSnapshots(), voltDbRoot);
+        setupSnapshotPaths(paths.getSnapshots(), voltDbRoot);
         //export overflow
-        File exportOverflowPath = getExportOverflow(paths.getExportoverflow(), voltDbRoot);
+        setupExportOverflow(paths.getExportoverflow(), voltDbRoot);
         // only use these directories in the enterprise version
-        File commandLogPath = null;
-        File commandLogSnapshotPath = null;
-        commandLogPath = getCommandLog(paths.getCommandlog(), voltDbRoot);
-        commandLogSnapshotPath = getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
-
-        //Set the volt root in the catalog
-        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
-
-        //Set the auto-snapshot schedule path if there are auto-snapshots
-        SnapshotSchedule schedule = cluster.getDatabases().
-            get("database").getSnapshotschedule().get("default");
-        if (schedule != null) {
-            schedule.setPath(snapshotPath.getPath());
-        }
-
-        //Update the path in the schedule for ppd
-        schedule = cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
-        if (schedule != null) {
-            schedule.setPath(snapshotPath.getPath());
-        }
-
-        //Also set the export overflow directory
-        cluster.setExportoverflow(exportOverflowPath.getPath());
-
-        cluster.setDroverflow(getDROverflow(paths.getDroverflow(), voltDbRoot).getPath());
-
-        //Set the command log paths, also creates the command log entry in the catalog
-        final org.voltdb.catalog.CommandLog commandLogConfig = cluster.getLogconfig().add("log");
-        commandLogConfig.setInternalsnapshotpath(commandLogSnapshotPath.getPath());
-        commandLogConfig.setLogpath(commandLogPath.getPath());
+        setupCommandLog(paths.getCommandlog(), voltDbRoot);
+        setupCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
+        setupDROverflow(paths.getDroverflow(), voltDbRoot);
     }
 
     /**
@@ -1731,7 +1752,7 @@ public abstract class CatalogUtil {
      */
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
-        if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
+        if (paths == null || paths.getVoltdbroot() == null || VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()) == null) {
             voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
@@ -1740,7 +1761,7 @@ public abstract class CatalogUtil {
                 }
             }
         } else {
-            voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+            voltDbRoot = new VoltFile(VoltDB.instance().getVoltDBRootPath(paths.getVoltdbroot()));
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
                 if (!voltDbRoot.mkdirs()) {
@@ -1753,12 +1774,12 @@ public abstract class CatalogUtil {
         return voltDbRoot;
     }
 
-    public static File getSnapshot(PathsType.Snapshots paths, File voltDbRoot) {
+    public static void setupSnapshotPaths(PathsType.Snapshots paths, File voltDbRoot) {
         File snapshotPath;
-        snapshotPath = new File(paths.getPath());
+        snapshotPath = new File(VoltDB.instance().getSnapshotPath(paths));
         if (!snapshotPath.isAbsolute())
         {
-            snapshotPath = new VoltFile(voltDbRoot, paths.getPath());
+            snapshotPath = new VoltFile(voltDbRoot, VoltDB.instance().getSnapshotPath(paths));
         }
 
         if (!snapshotPath.exists()) {
@@ -1770,22 +1791,19 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("snapshot path", snapshotPath);
-
-        return snapshotPath;
-
     }
 
-    public static File getCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
+    public static void setupCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
             File commandlogPath =  new VoltFile(voltDbRoot, "command_log");
-            return commandlogPath;
+            return;
         }
         File commandlogPath;
-        commandlogPath = new File(paths.getPath());
+        commandlogPath = new File(VoltDB.instance().getCommandLogPath(paths));
         if (!commandlogPath.isAbsolute())
         {
-            commandlogPath = new VoltFile(voltDbRoot, paths.getPath());
+            commandlogPath = new VoltFile(voltDbRoot, VoltDB.instance().getCommandLogPath(paths));
         }
 
         if (!commandlogPath.exists()) {
@@ -1797,23 +1815,20 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("command log", commandlogPath);
-
-        return commandlogPath;
-
     }
 
-    public static File getCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
+    public static void setupCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
-            File commandlogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
-            return commandlogSnapshotPath;
+            new VoltFile(voltDbRoot, "command_log_snapshot");
+            return;
         }
 
         File commandlogSnapshotPath;
-        commandlogSnapshotPath = new File(paths.getPath());
+        commandlogSnapshotPath = new File(VoltDB.instance().getCommandLogSnapshotPath(paths));
         if (!commandlogSnapshotPath.isAbsolute())
         {
-            commandlogSnapshotPath = new VoltFile(voltDbRoot, paths.getPath());
+            commandlogSnapshotPath = new VoltFile(voltDbRoot, VoltDB.instance().getCommandLogSnapshotPath(paths));
         }
 
         if (!commandlogSnapshotPath.exists()) {
@@ -1825,17 +1840,14 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("command log snapshot", commandlogSnapshotPath);
-
-        return commandlogSnapshotPath;
-
     }
 
-    public static File getExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
+    public static void setupExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
         File exportOverflowPath;
-        exportOverflowPath = new File(paths.getPath());
+        exportOverflowPath = new File(VoltDB.instance().getExportOverflowPath(paths));
         if (!exportOverflowPath.isAbsolute())
         {
-            exportOverflowPath = new VoltFile(voltDbRoot, paths.getPath());
+            exportOverflowPath = new VoltFile(voltDbRoot, VoltDB.instance().getExportOverflowPath(paths));
         }
 
         if (!exportOverflowPath.exists()) {
@@ -1847,16 +1859,14 @@ public abstract class CatalogUtil {
             }
         }
         validateDirectory("export overflow", exportOverflowPath);
-        return exportOverflowPath;
-
     }
 
-    public static File getDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
+    public static File setupDROverflow(PathsType.Droverflow paths, File voltDbRoot) {
         File drOverflowPath;
-        drOverflowPath = new File(paths.getPath());
+        drOverflowPath = new File(VoltDB.instance().getDROverflowPath(paths));
         if (!drOverflowPath.isAbsolute())
         {
-            drOverflowPath = new VoltFile(voltDbRoot, paths.getPath());
+            drOverflowPath = new VoltFile(voltDbRoot, VoltDB.instance().getDROverflowPath(paths));
         }
 
         if (!drOverflowPath.exists()) {
@@ -1947,7 +1957,7 @@ public abstract class CatalogUtil {
      * @return a {@link Set} of role name
      */
     private static Set<String> extractUserRoles(final UsersType.User user) {
-        Set<String> roles = new TreeSet<String>();
+        Set<String> roles = new TreeSet<>();
         if (user == null) return roles;
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
@@ -2053,6 +2063,7 @@ public abstract class CatalogUtil {
                 long txnId,
                 long uniqueId,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
@@ -2067,16 +2078,21 @@ public abstract class CatalogUtil {
                     20 + // catalog SHA-1 hash
                     20   // deployment SHA-1 hash
                     );
+
+        if (catalogHash == null) {
+            try {
+                catalogHash = (new InMemoryJarfile(catalogBytes)).getSha1Hash();
+            }
+            catch (IOException ioe) {
+                VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
+                        true, ioe);
+            }
+        }
+
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        try {
-            versionAndBytes.put((new InMemoryJarfile(catalogBytes)).getSha1Hash());
-        }
-        catch (IOException ioe) {
-            VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
-                    true, ioe);
-        }
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
@@ -2095,11 +2111,12 @@ public abstract class CatalogUtil {
                 long txnId,
                 long uniqueId,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, deploymentBytes);
+                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
@@ -2113,11 +2130,12 @@ public abstract class CatalogUtil {
             long txnId,
             long uniqueId,
             byte[] catalogBytes,
+            byte[] catalogHash,
             byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, deploymentBytes);
+                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
@@ -2208,8 +2226,8 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
-        Collection<String> indexes = new TreeSet<String>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<>();
+        Collection<String> indexes = new TreeSet<>();
         if (topPlan != null) {
             topPlan.getTablesAndIndexes(tablesRead, indexes);
         }
@@ -2279,7 +2297,7 @@ public abstract class CatalogUtil {
      * @return A list of tables
      */
     public static List<Table> getNormalTables(Database catalog, boolean isReplicated) {
-        List<Table> tables = new ArrayList<Table>();
+        List<Table> tables = new ArrayList<>();
         for (Table table : catalog.getTables()) {
             if ((table.getIsreplicated() == isReplicated) &&
                 table.getMaterializer() == null &&
@@ -2513,7 +2531,7 @@ public abstract class CatalogUtil {
             // outdir
             PropertyType outdir = new PropertyType();
             outdir.setName("outdir");
-            outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            outdir.setValue(VoltDB.instance().getVoltDBRootPath() + "/" + DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
             // k-safe file export
@@ -2559,7 +2577,7 @@ public abstract class CatalogUtil {
     }
 
     public static Map<String, Column> getDRTableNamePartitionColumnMapping(Database db) {
-        Map<String, Column> res = new HashMap<String, Column>();
+        Map<String, Column> res = new HashMap<>();
         for (Table tb : db.getTables()) {
             if (!tb.getIsreplicated() && tb.getIsdred()) {
                 res.put(tb.getTypeName(), tb.getPartitioncolumn());

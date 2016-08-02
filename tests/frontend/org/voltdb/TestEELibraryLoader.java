@@ -23,13 +23,13 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.voltdb.catalog.Cluster;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 public class TestEELibraryLoader
 {
@@ -65,8 +65,6 @@ public class TestEELibraryLoader
             .thenReturn(realvolt.getEELibraryVersionString());
         CatalogContext catContext = mock(CatalogContext.class);
         Cluster cluster = mock(Cluster.class);
-        when(cluster.getVoltroot())
-            .thenReturn(System.getProperty("java.io.tmpdir"));
         when(catContext.getCluster())
             .thenReturn(cluster);
         when(mockitovolt.getCatalogContext())

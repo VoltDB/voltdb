@@ -6,9 +6,6 @@ begin Cluster                      "A set of connected hosts running one or more
   int httpdportno                  "The port number httpd will listen on. A 0 value implies 8080."
   bool jsonapi                     "Is the http/json interface enabled?"
   bool networkpartition            "Is network partition detection enabled?"
-  string voltRoot                  "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
-  string exportOverflow            "Directory where export data should overflow to"
-  string drOverflow                "Directory where DR data should overflow to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
   int adminport                    "The port number of the admin port"
   bool adminstartup                "Does the server start in admin mode?"
@@ -57,8 +54,6 @@ begin CommandLog javaonly     "Configuration for a command log"
   int fsyncInterval           "How often commands should be written to disk"
   int maxTxns                 "How many txns waiting to go to disk should trigger a flush"
   int logSize                 "Size of the command log in megabytes"
-  string logPath              "Directory to store log files"
-  string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end
 
 begin ConnectorTableInfo    "Per-export connector table configuration"
@@ -125,37 +120,28 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
 end
 
-begin Table                          "A table (relation) in the database"
-  Column* columns                    "The set of columns in the table"
-  Index* indexes                     "The set of indexes on the columns in the table"
-  Constraint* constraints            "The set of constraints on the table"
-  bool isreplicated                  "Is the table replicated?"
-  Column? partitioncolumn            "On which column is the table partitioned"
-  int estimatedtuplecount            "A rough estimate of the number of tuples in the table; used for planning"
-  MaterializedViewInfo* views        "Information about materialized views based on this table's content"
-  MaterializedViewHandler* mvHandler "Only on result table of a materialized view"
-  ViewTrigger* viewTriggers          "Only on the source table of a materialized view"
-  Table? materializer                "If this is a materialized view, this field stores the source table"
-  string signature                   "Catalog version independent signature of the table consisting of name and schema"
-  int tuplelimit                     "A maximum number of rows in a table"
-  bool isDRed                        "Is this table DRed?"
-  Statement* tuplelimitDeleteStmt    "Delete statement to execute if tuple limit will be exceeded"
+begin Table                                  "A table (relation) in the database"
+  Column* columns                            "The set of columns in the table"
+  Index* indexes                             "The set of indexes on the columns in the table"
+  Constraint* constraints                    "The set of constraints on the table"
+  bool isreplicated                          "Is the table replicated?"
+  Column? partitioncolumn                    "On which column is the table partitioned"
+  int estimatedtuplecount                    "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views                "Information about materialized views based on this table's content"
+  MaterializedViewHandlerInfo* mvHandlerInfo "Only on result table of a materialized view"
+  Table? materializer                        "If this is a materialized view, this field stores the source table"
+  string signature                           "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit                             "A maximum number of rows in a table"
+  bool isDRed                                "Is this table DRed?"
+  Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
 end
 
-begin ViewTrigger
-  Table? destTable
-  int tablePos
-end
-
-begin MaterializedViewHandler       "Information used to build and update a materialized view"
-  Table? dest                       "The table which will be updated when the source table is updated"
-  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
-  string predicate                  "A filtering predicate"
-  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
-  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
-  IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
-  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
-  Statement* createQuery            "The SELECT statement that defines the view"
+begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
+  Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
+  Statement* createQuery                "The SELECT statement that defines the view"
+  TableRef* sourceTables                "Source table(s) of this materialized view"
+  Table? destTable                      "The table which will be updated when the source table is updated"
+  int groupByColumnCount                "Number of group by columns"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
@@ -222,6 +208,10 @@ begin Index              "A index structure on a database table's columns"
   string predicatejson   "A serialized representation of the optional predicate for partial indexes"
 end
 
+begin TableRef
+  Table? table
+end
+
 begin ColumnRef    "A reference to a table column"
   int index        "The index within the set"
   Column? column   "The table column being referenced"
@@ -252,7 +242,6 @@ begin Column                    "A table column"
   string defaultvalue           "Default value of the column"
   int defaulttype               "Type of the default value of the column"
   ConstraintRef* constraints    "Constraints that use this column"
-  MaterializedViewInfo? matview "If part of a materialized view, ref of view info"
   int aggregatetype             "If part of a materialized view, represents aggregate type"
   Column? matviewsource         "If part of a materialized view, represents source column"
   bool inbytes                  "If a varchar column and size was specified in bytes"
@@ -263,6 +252,5 @@ begin SnapshotSchedule javaonly "A schedule for the database to follow when crea
   string frequencyUnit          "Unit of time frequency is specified in"
   int frequencyValue            "Frequency in some unit"
   int retain                    "How many snapshots to retain"
-  string path                   "Path where snapshots should be stored"
   string prefix                 "Prefix for snapshot filenames"
 end

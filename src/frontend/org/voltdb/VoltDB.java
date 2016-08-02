@@ -55,6 +55,7 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+import org.voltdb.compiler.deploymentfile.PathsType;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -78,10 +79,18 @@ public class VoltDB {
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
+    public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
     public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
+
+    public static final String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
+    public static final String CL_PATH_KEY = "org.voltdb.path.command_log";
+    public static final String SNAPTHOT_PATH_KEY = "org.voltdb.path.snapshots";
+    public static final String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
+    public static final String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
+    public static final String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -900,7 +909,7 @@ public class VoltDB {
         if (hm != null) {
             hostId = hm.getHostId();
         }
-        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
         try {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
             writer.println(message);
@@ -1032,7 +1041,7 @@ public class VoltDB {
                 {
                     TimestampType ts = new TimestampType(new java.util.Date());
                     CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
                     PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
                     writer.println("Time: " + ts);
                     writer.println("Message: " + errMsg);

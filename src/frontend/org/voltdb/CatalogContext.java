@@ -92,6 +92,7 @@ public class CatalogContext {
             long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
+            byte[] catalogBytesHash,
             byte[] deploymentBytes,
             int version)
     {
@@ -117,7 +118,14 @@ public class CatalogContext {
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            this.catalogHash = m_jarfile.getSha1Hash();
+
+            if (catalogBytesHash != null) {
+                // This is expensive to compute so if it was passed in to us, use it.
+                this.catalogHash = catalogBytesHash;
+            }
+            else {
+                this.catalogHash = m_jarfile.getSha1Hash();
+            }
         }
         else {
             throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
@@ -159,6 +167,7 @@ public class CatalogContext {
             long txnId,
             long uniqueId,
             byte[] catalogBytes,
+            byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes)
@@ -188,6 +197,7 @@ public class CatalogContext {
                     uniqueId,
                     newCatalog,
                     bytes,
+                    catalogBytesHash,
                     depbytes,
                     catalogVersion + incValue);
         return retval;
@@ -280,7 +290,7 @@ public class CatalogContext {
     // @UpdateApplicationCatalog
     SortedMap<String, String> getDebuggingInfoFromCatalog()
     {
-        SortedMap<String, String> logLines = new TreeMap<String, String>();
+        SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
@@ -302,7 +312,7 @@ public class CatalogContext {
                 partitionCount > 1 ? "s" : ""));
 
         // voltdb root
-        logLines.put("voltdbroot", "Using \"" + cluster.getVoltroot() + "\" for voltdbroot directory.");
+        logLines.put("voltdbroot", "Using \"" + VoltDB.instance().getVoltDBRootPath() + "\" for voltdbroot directory.");
 
         // partition detection
         if (cluster.getNetworkpartition()) {
@@ -340,7 +350,7 @@ public class CatalogContext {
                 msg = String.valueOf(ssched.getFrequencyvalue()) + " hours";
                 break;
             }
-            logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + ssched.getPath() +
+            logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + VoltDB.instance().getSnapshotPath() +
                          " and named with prefix '" + ssched.getPrefix() + "'.");
             logLines.put("snapshot-schedule2", "Database will retain a history of " + ssched.getRetain() +
                          " snapshots, generated every " + msg + ".");

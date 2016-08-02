@@ -607,7 +607,7 @@ class Daemonizer(daemon.Daemon):
         Post-daemonization call-back.
         """
         # Strip out things requiring shell interpretation, e.g. quotes.
-        args = [arg.replace('"', '') for arg in args_in]
+        args = [str(arg).replace('"', '') for arg in args_in]
         try:
             os.execvp(args[0], args)
         except (OSError, IOError), e:

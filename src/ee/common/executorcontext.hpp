@@ -218,7 +218,7 @@ class ExecutorContext {
 
     Table* executeExecutors(int subqueryId);
     Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                            int subqueryId);
+                            int subqueryId = 0);
 
     Table* getSubqueryOutputTable(int subqueryId) const;
 
