@@ -178,8 +178,19 @@
                             <div id="GraphBlock" class="">
                                 <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
                             </div>
+
                         </div>
                         <div class="rightShowhide">
+                            <div class="sliderGraph">
+                                <div class="labelSlider">
+                                    <label for="timeInterval">Retained Time Interval:</label>
+                                <input type="text" id="timeInterval" readonly ><span>mins</span>
+
+
+                                </div>
+                                <div id="slider-range-min" class="sliderMain"></div>
+                            </div>
+
                             <ul class="rightShowhideList" id="showHideRightlist">
                                 <li class="viewSelect">
                                     <label>View</label>
@@ -194,35 +205,60 @@
                         </div>
                         <div class="clear"></div>
                     </div>
+
                     <div id="mainGraphBlock">
+                    <div class="errorMsgLocalStorageFull" style="display:block">
+                        <div class="errorMsgLocalWrapper">
+                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
-                                    <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+                                    <h1>Server CPU <span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "cpu-data" }, "cpu");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationCpu" width="100%" height="350"></svg>
                             </div>
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
-                                    <h1>Server RAM<span class="activeServerName" title=""></span></h1>
+                                    <h1>Server RAM<span class="activeServerName" title=""></span>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "memory-data" }, "memory");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationRam" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Latency (99th percentile, ms)</h1>
+                                    <h1>Cluster Latency (99th percentile, ms)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "latency-data" }, "latency");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationLatency" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Transactions (tps)</h1>
+                                    <h1>Cluster Transactions (tps)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "clusterTransaction-data" }, "transaction");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Partition Idle Time</h1>
+                                    <h1>Partition Idle Time
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "partitionIdle-data" }, "partitionIdle");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="legend" style="display:none;">
                                     <ul>
@@ -235,13 +271,19 @@
                             </div>
                             <div id="ChartDrReplicationRate" class="chart" style="display: none">
                                 <div class="chartHeader">
-                                    <h1>Database Replication (DR)</h1>
+                                    <h1>Database Replication (DR)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "DrReplication-data" }, "dataReplication");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
                             </div>
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
-                                    <h1>Command Log Statistics</h1>
+                                    <h1>Command Log Statistics
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "CommandLog-data" }, "commandLog");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="cmdLogLegend" style="display:none;">
                                     <ul>
@@ -1139,6 +1181,7 @@
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
+
     <!-- POPUP Saved Preferences -->
     <!-- POPUP Alerts -->
     <div id="memoryAlerts" style="display: none">
