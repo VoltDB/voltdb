@@ -434,7 +434,7 @@ class JenkinsBot(object):
 
             # Try to reconnect only once
             if self.connect_to_slack() and not is_retry:
-                table = self.query(query, params, True)
+                table = self.query(query, params, True, insert=insert)
         finally:
             if cursor is not None:
                 cursor.close()
@@ -443,12 +443,14 @@ class JenkinsBot(object):
 
         return table
 
-    def response(self, tables, channels, filename):
+    def response(self, tables, channels, filename, vertical=False, edit=False):
         """
         Respond to a file to a channel
         :param tables: List of (header, rows) tuples i.e. tables to construct leaderboards from
         :param channels: The channels to post this file to
         :param filename: The filename to respond with
+        :param vertical: whether a vertical version of the table should be included
+        :param edit: whether the row entries should be edited
         """
 
         filecontent = ""
@@ -459,11 +461,11 @@ class JenkinsBot(object):
             rows = table[1]
             content = ""
 
-            if os.environ.get('vertical', False):
+            if vertical:
                 # If this is set generate a vertical leaderboard. Append to end of normal leaderboard.
                 content = '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(rows, headers)
 
-            if os.environ.get('edit', False):
+            if edit:
                 # Do some specific edits.
                 self.edit_rows(rows)
 
@@ -515,21 +517,24 @@ class JenkinsBot(object):
             'chat.postMessage', channel=channel, text=text, as_user=True
         )
 
-    def query_and_response(self, query, params, channels, filename):
+    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False):
         """
         Perform a single query and response
         :param query: Query to run
         :param params: Parameters for query
         :param channels: Channels to respond to
         :param filename: filename for the post
+        :param vertical: whether a vertical version of the table should be included
+        :param edit: whether the row entries should be edited
         """
         table = self.query(channels, query, params)
-        self.response([table], channels, filename)
+        self.response([table], channels, filename, vertical, edit)
 
-    def create_bug_issue(self, summary, description, component, version, label,
+    def create_bug_issue(self, channel, summary, description, component, version, label,
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
         """
         Creates a bug issue on Jira
+        :param channel: The channel to notify
         :param summary: The title summary
         :param description: Description field
         :param component: Component bug affects
@@ -553,7 +558,7 @@ class JenkinsBot(object):
         existing = jira.search_issues('summary ~ \'%s\'' % summary)
         if len(existing) > 0:
             # Already reported
-            self.logger.info('Already logged issue with summary "' + summary + '"')
+            self.logger.info('OLD: Already reported issue with summary "' + summary + '"')
             return
 
         issue_dict = {
@@ -592,8 +597,10 @@ class JenkinsBot(object):
 
         new_issue = jira.create_issue(fields=issue_dict)
 
+        self.logger.info('NEW: Reported issue with summary "' + summary + '"')
+
         if self.connect_to_slack():
-            self.post_message(JUNIT, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+            self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
 
 
 if __name__ == '__main__':
@@ -606,12 +613,16 @@ if __name__ == '__main__':
                 ML_QUERY,
                 {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
                 [JUNIT],
-                'master-past30days.txt'
+                'master-past30days.txt',
+                vertical=True,
+                edit=True
             )
         elif sys.argv[1] == 'core-leaderboard':
             jenkinsbot.query_and_response(
                 CL_QUERY,
                 {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
                 [JUNIT],
-                'coreextended-past2days.txt'
+                'coreextended-past2days.txt',
+                vertical=True,
+                edit=True
             )

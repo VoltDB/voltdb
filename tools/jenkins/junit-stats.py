@@ -14,9 +14,7 @@ import mysql.connector
 from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
-from six.moves.urllib.error import HTTPError
-from six.moves.urllib.error import URLError
-from six.moves.urllib.request import urlopen
+from urllib2 import HTTPError, URLError, urlopen
 
 # Get job names from environment variables
 COMMUNITY = os.environ.get('community', None)
@@ -24,6 +22,9 @@ PRO = os.environ.get('pro', None)
 
 # Number of failures in a row for a test needed to trigger a new Jira issue
 TOLERANCE = 3
+
+# Slack channel to notify if and when issue is reported
+JUNIT = os.environ.get('junit', None)
 
 
 class Stats(object):
@@ -189,9 +190,8 @@ class Stats(object):
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            report_url = child['child']['url'] + 'testReport/'
-                            report_url = report_url + \
-                                         name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            testcase_url = child['child']['url'] + 'testReport/' + name
+                            testcase_url.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
                             # Record tests that don't pass.
                             if status != 'PASSED':
                                 test_data = {
@@ -199,7 +199,7 @@ class Stats(object):
                                     'job': job,
                                     'status': status,
                                     'timestamp': test_stamp,
-                                    'url': report_url,
+                                    'url': testcase_url,
                                     'build': build,
                                     'host': host
                                 }
@@ -254,7 +254,7 @@ class Stats(object):
                 summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
                 description = error_url + '\n' + error_report['errorStackTrace']
                 # TODO get a current version instead of using V6.6
-                jenkinsbot.create_bug_issue(summary, description, 'Core', 'V6.6', 'junit-consistent-failure')
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', 'V6.6', 'junit-consistent-failure')
         except:
             logging.exception('Error with creating issue')
 
