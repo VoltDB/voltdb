@@ -82,7 +82,7 @@
                      "ddl": "int-DDL.sql",
                      "template": "numeric-ints.sql",
                      "normalizer": "normalizer.py",
-                     "precision": "10"},
+                     "precision": "9"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, DISABLING
 #    "advanced-decimal": {"schema": "decimal-schema.py",
 #                         "ddl": "DDL.sql",
