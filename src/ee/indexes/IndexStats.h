@@ -18,20 +18,17 @@
 #ifndef INDEXSTATS_H_
 #define INDEXSTATS_H_
 
-#include <vector>
-#include <string>
 #include "stats/StatsSource.h"
-#include "common/TupleSchema.h"
-#include "common/ids.h"
 
 namespace voltdb {
-
 class TableIndex;
+class TableTuple;
+class TempTable;
 
 /**
  * StatsSource extension for tables.
  */
-class IndexStats : public voltdb::StatsSource {
+class IndexStats : public StatsSource {
 public:
     /**
      * Static method to generate the column names for the tables which
@@ -48,7 +45,7 @@ public:
                                          std::vector<bool>& allowNull,
                                          std::vector<bool>& inBytes);
 
-    static Table* generateEmptyIndexStatsTable();
+    static TempTable* generateEmptyIndexStatsTable();
 
     /*
      * Constructor caches reference to the table that will be generating the statistics
@@ -61,16 +58,9 @@ public:
      * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
      * it is part of an Execution Site and that there is a site Id.
      * @parameter name Name of this set of statistics
-     * @parameter hostId id of the host this partition is on
-     * @parameter hostname name of the host this partition is on
-     * @parameter siteId this stat source is associated with
-     * @parameter partitionId this stat source is associated with
-     * @parameter databaseId Database this source is associated with
+     * @parameter tableName Name of the indexed table
      */
-    void configure(
-            std::string name,
-            std::string tableName,
-            voltdb::CatalogId databaseId);
+    void configure(std::string name, std::string tableName);
 
     void rename(std::string name);
 
@@ -79,7 +69,7 @@ protected:
     /**
      * Update the stats tuple with the latest statistics available to this StatsSource.
      */
-    virtual void updateStatsTuple(voltdb::TableTuple *tuple);
+    virtual void updateStatsTuple(TableTuple *tuple);
 
     /**
      * Generates the list of column names that will be in the statTable_. Derived classes must override this method and call

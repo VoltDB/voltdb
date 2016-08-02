@@ -212,12 +212,12 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  indexref.cpp
- materializedviewhandler.cpp
+ materializedviewhandlerinfo.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
  table.cpp
- viewtrigger.cpp
+ tableref.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -261,8 +261,10 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
+ abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
+ executorfactory.cpp
  executorutil.cpp
  indexcountexecutor.cpp
  indexscanexecutor.cpp
@@ -274,6 +276,7 @@ CTX.INPUT['executors'] = """
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
+ partitionbyexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
@@ -352,6 +355,7 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
  persistenttable.cpp
@@ -366,6 +370,7 @@ CTX.INPUT['storage'] = """
  TableStreamer.cpp
  TableStreamerContext.cpp
  tableutil.cpp
+ tabletuplefilter.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleBlock.cpp
@@ -436,6 +441,14 @@ if whichtests in ("${eetestsuite}", "logging"):
     logging_test
     """
 
+if whichtests in ("${eetestsuite}", "memleaktests"):
+   CTX.TESTS['memleaktests'] = """
+     definite_losses
+     indirect_losses
+     still_reachable_losses
+     possible_losses
+     rw_deleted
+   """
 if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
@@ -461,6 +474,8 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
+    PartitionByExecutorTest
+    TestGeneratedPlans
     """
 
 
@@ -498,6 +513,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
+     tabletuplefilter_test
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
@@ -554,6 +570,8 @@ elif CTX.PLATFORM == "Linux":
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
 
+print("Making in directory \"%s\" with %d threads" 
+		% (CTX.OUTPUT_PREFIX, numHardwareThreads))
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 if retval != 0:
     sys.exit(-1)

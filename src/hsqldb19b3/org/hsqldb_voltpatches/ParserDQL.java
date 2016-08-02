@@ -618,7 +618,7 @@ public class ParserDQL extends ParserBase {
 
         if (token.tokenType == Tokens.CORRESPONDING) {
             read();
-            queryExpression.setUnionCorresoponding();
+            queryExpression.setUnionCorresponding();
 
             if (token.tokenType == Tokens.BY) {
                 read();
@@ -3118,57 +3118,42 @@ public class ParserDQL extends ParserBase {
     }
 
     Expression XreadInValueList(int degree) {
-
-        HsqlArrayList list = new HsqlArrayList();
-
+        List<Expression> rowList = new ArrayList<>();
         while (true) {
-            Expression e = XreadValueExpression();
-
-            if (e.getType() != OpTypes.ROW) {
-                e = new Expression(OpTypes.ROW, new Expression[]{ e });
-            }
-
-            list.add(e);
-
-            if (token.tokenType == Tokens.COMMA) {
-                read();
-
-                continue;
-            }
-
-            break;
-        }
-
-        Expression[] array = new Expression[list.size()];
-
-        list.toArray(array);
-
-        Expression e = new Expression(OpTypes.TABLE, array);
-
-        for (int i = 0; i < array.length; i++) {
-            if (array[i].getType() != OpTypes.ROW) {
-                array[i] = new Expression(OpTypes.ROW,
-                                          new Expression[]{ array[i] });
-            }
-
-            Expression[] args = array[i].nodes;
-
-            if (args.length != degree) {
-
-                // SQL error message
-                throw unexpectedToken();
-            }
-
-            for (int j = 0; j < degree; j++) {
-                if (args[j].getType() == OpTypes.ROW) {
-
+            Expression row = XreadValueExpression();
+            if (row.getType() == OpTypes.ROW) {
+                // Disallow rows of the wrong length or rows of rows.
+                if (row.nodes.length != degree) {
                     // SQL error message
                     throw unexpectedToken();
                 }
+                for (Expression value : row.nodes) {
+                    if (value.getType() == OpTypes.ROW) {
+                        // SQL error message
+                        throw unexpectedToken();
+                    }
+                }
             }
+            // Degree > 1 can only be satisfied by a list of row expressions.
+            else if (degree != 1) {
+                throw unexpectedToken();
+            }
+            // Make a degree 1 row from a non-row value expression.
+            else {
+                row = new Expression(OpTypes.ROW, new Expression[]{ row });
+            }
+            rowList.add(row);
+
+            if (token.tokenType != Tokens.COMMA) {
+                break;
+            }
+            read(); // consume the comma
         }
 
-        return e;
+        Expression[] rowArray = new Expression[rowList.size()];
+        rowList.toArray(rowArray);
+
+        return new Expression(OpTypes.TABLE, rowArray);
     }
 
     private ExpressionLogical XreadLikePredicateRightPart(Expression a) {

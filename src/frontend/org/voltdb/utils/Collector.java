@@ -17,6 +17,8 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.VoltDB.CONFIG_DIR;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -222,7 +224,7 @@ public class Collector {
     }
 
     private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + "config_log" + File.separator;
+        String configLogDirPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator;
 
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
@@ -353,6 +355,8 @@ public class Collector {
             collectionFilesList.add("duvoltdbrootdata (result of executing \"du -h <voltdbroot>\")");
             collectionFilesList.add("dudroverflowdata (result of executing \"du -h <droverflow>\")");
             collectionFilesList.add("duexportoverflowdata (result of executing \"du -h <exportoverflow>\")");
+            collectionFilesList.add("ducommandlog (result of executing \"du -h <command_log>\")");
+            collectionFilesList.add("ducommandlogsnapshot (result of executing \"du -h <command_log_snapshot>\")");
 
             for (String fileName : m_systemStats.stringPropertyNames()) {
                 collectionFilesList.add(fileName + " (result of executing \"" + m_systemStats.getProperty(fileName) + "\")");
@@ -481,6 +485,8 @@ public class Collector {
 
                 String drOverflowPath = m_config.voltdbroot + File.separator + "dr_overflow";
                 String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
+                String commandLogPath = m_config.voltdbroot + File.separator + "command_log";
+                String commandLogSnapshotPath = m_config.voltdbroot + File.separator + "command_log_snapshot";
                 DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
                 PathsType deploymentPaths = deployment.getPaths();
                 if (deploymentPaths != null) {
@@ -496,6 +502,12 @@ public class Collector {
 
                 String[] duExportOverflowCmd = {"bash", "-c", duCommand + " " + exportOverflowPath};
                 cmd(zipStream, duExportOverflowCmd, folderPath + "system_logs" + File.separator, "duexportoverflowdata");
+
+                String[] duCommadLodCmd = {"bash", "-c", duCommand + " " + commandLogPath};
+                cmd(zipStream, duCommadLodCmd, folderPath + "system_logs" + File.separator, "ducommandlog");
+
+                String[] commandLogSnapshotCmd = {"bash", "-c", duCommand + " " + commandLogSnapshotPath};
+                cmd(zipStream, commandLogSnapshotCmd, folderPath + "system_logs" + File.separator, "ducommandlogsnapshot");
             }
 
             for (String fileName : m_systemStats.stringPropertyNames()) {

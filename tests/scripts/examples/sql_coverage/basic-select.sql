@@ -74,10 +74,10 @@ SELECT @star FROM @fromtables B13 WHERE (_variable[#arg @comparabletype] @cmp @c
 SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
 
 {_optionallimitoffset |= ""}
-{_optionallimitoffset |= "LIMIT _value[int:1,3]"}
-{_optionallimitoffset |= "LIMIT _value[int:1,3] OFFSET _value[int:1,3]"}
--- OFFSET without LIMIT not supported -- is that SQL standard?
---{_optionallimitoffset |= "                      OFFSET _value[int:1,3]"}
+{_optionallimitoffset |= "LIMIT _value[int:0,3]"}
+{_optionallimitoffset |= "LIMIT _value[int:0,3] OFFSET _value[int:0,3]"}
+-- include OFFSET without LIMIT, which now works fine
+{_optionallimitoffset |= "                      OFFSET _value[int:0,3]"}
 
 -- test ORDER BY with optional LIMIT/OFFSET
 -- HSQL disagrees about ordering of NULLs descending, this only shows as an error on limit/offset queries,

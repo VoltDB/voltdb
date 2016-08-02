@@ -77,7 +77,7 @@ def not_found(error):
     Returns:
         Error message.
     """
-    return make_response(jsonify({'error': 'Bad request'}), 400)
+    return make_response(jsonify({'status': 400, 'statusString': 'Bad request'}), 400)
 
 
 @APP.errorhandler(404)
@@ -89,7 +89,7 @@ def not_found(error):
     Returns:
         Error message.
     """
-    return make_response(jsonify({'error': 'Not found'}), 404)
+    return make_response(jsonify({'status': 404, 'statusString': 'Not found'}), 404)
 
 
 @APP.route("/")
@@ -514,8 +514,8 @@ def check_port_valid(port_option, server):
         port = get_port(request.json[port_option])
 
     if port == server_port:
-        return jsonify(success=False,
-                       errors="Port %s for the same host is already used by server %s for %s." % \
+        return jsonify(status= 401,
+                       statusString="Port %s for the same host is already used by server %s for %s." % \
                               (port, server['hostname'], port_option))
 
 
@@ -536,7 +536,7 @@ def validate_server_ports(database_id, server_id=-1):
         value = specified_port_values[option]
         for port_key in specified_port_values.keys():
             if option != port_key and value is not None and specified_port_values[port_key] == value:
-                return jsonify(success=False, errors="Duplicate port")
+                return jsonify(status=401, statusString="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
     if server_id == -1:
         servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
@@ -722,11 +722,11 @@ class ServerAPI(MethodView):
             Information and the status of server if it is saved otherwise the error message.
         """
         if 'id' in request.json:
-            return make_response(jsonify({'errors': 'You cannot specify \'Id\' while creating server.'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'You cannot specify \'Id\' while creating server.'}), 404)
 
         inputs = ServerInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401,statusString=inputs.errors)
 
         result = validate_server_ports(database_id)
         if result is not None:
@@ -752,7 +752,7 @@ class ServerAPI(MethodView):
             'public-interface': request.json.get('public-interface', "").strip(),
             'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
             'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
-            'placement-group': request.json.get('placement-group', "").strip()
+            'placement-group': str(request.json.get('placement-group', "")).strip()
         }
 
         # Add server to the current database
@@ -826,7 +826,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'errors': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -836,7 +836,7 @@ class ServerAPI(MethodView):
         if server_id in members:
             inputs = ServerInputs(request)
             if not inputs.validate():
-                return jsonify(success=False, errors=inputs.errors)
+                return jsonify(status=401, statusString=inputs.errors)
             current_server = Global.SERVERS.get(server_id)
             if current_server is None:
                 abort(404)
@@ -872,7 +872,7 @@ class ServerAPI(MethodView):
             current_server['public-interface'] = \
                 request.json.get('public-interface', current_server['public-interface'])
             current_server['placement-group'] = \
-                request.json.get('placement-group', current_server['placement-group'])
+                str(request.json.get('placement-group', current_server['placement-group']))
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
@@ -919,11 +919,11 @@ class DatabaseAPI(MethodView):
                 jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         databases = [v if type(v) is list else [v] for v in Global.DATABASES.values()]
         if request.json['name'] in [(d["name"]) for item in databases for d in item]:
-            return make_response(jsonify({'status':400, 'error': 'database name already exists'}), 400)
+            return make_response(jsonify({'status':400, 'statusString': 'database name already exists'}), 400)
 
         if not Global.DATABASES:
             database_id = 1
@@ -963,13 +963,13 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is updated otherwise the error message.
         """
         if 'members' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Members\' while updating database.'}), 404)
+            return make_response(jsonify({'status':404, 'statusString': 'You cannot specify \'Members\' while updating database.'}), 404)
         if 'id' in request.json and database_id != request.json['id']:
-            return make_response(jsonify({'error': 'Database Id mentioned in the payload and url doesn\'t match.'}),
+            return make_response(jsonify({'status': 404, 'statusString': 'Database Id mentioned in the payload and url doesn\'t match.'}),
                                  404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -1052,15 +1052,15 @@ class DeploymentUserAPI(MethodView):
         #     """
         inputs = UserInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         is_invalid_roles = check_invalid_roles(request.json['roles'])
         if not is_invalid_roles:
-            return make_response(jsonify({'error': 'Invalid user roles.'}))
+            return make_response(jsonify({'status': 404, 'statusString': 'Invalid user roles.'}))
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
-            return make_response(jsonify({'error': 'user name already exists'}), 404)
+            return make_response(jsonify({'status': 404,  'statusString': 'user name already exists'}), 404)
 
         user_roles = ','.join(set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
@@ -1098,20 +1098,20 @@ class DeploymentUserAPI(MethodView):
 
         inputs = UserInputs(request)
         if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
+            return jsonify(status=401, statusString=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
         if current_user is None:
-            return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
+            return make_response(jsonify({'status': 401, 'statusString': 'No user found for id: %u' % user_id}), 404)
 
         is_invalid_roles = check_invalid_roles(request.json['roles'])
         if not is_invalid_roles:
-            return make_response(jsonify({'error': 'Invalid user roles.'}))
+            return make_response(jsonify({'status': 404, 'statusString': 'Invalid user roles.'}))
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
-            return make_response(jsonify({'error': 'user name already exists'}), 404)
+            return make_response(jsonify({'status': 404, 'statusString': 'user name already exists'}), 404)
         user_roles = ','.join(set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
@@ -1190,13 +1190,15 @@ class RecoverDatabaseAPI(MethodView):
         try:
             if 'pause' in request.args:
                 pause = request.args.get('pause')
+            else:
+                pause = "false"
 
             database = voltdbserver.VoltDatabase(database_id)
             response = database.start_database(True, pause)
             return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
+            return make_response(jsonify({'status':500, 'statusString': str(err)}),
                                  500)
 
 
@@ -1219,14 +1221,14 @@ class StopDatabaseAPI(MethodView):
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.kill_database(database_id)
+            response = server.stop_database(database_id)
             resp_json = json.loads(response.data)
             return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}))
 
         else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
-                response = server.stop_database()
+                response = server.kill_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
                 resp_json = json.loads(json.loads(response.data)['statusString'])
@@ -1238,7 +1240,7 @@ class StopDatabaseAPI(MethodView):
                                      200)
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusString': str(err)}),
+                return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                      500)
 
 
@@ -1322,7 +1324,7 @@ class StartServerAPI(MethodView):
                 return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                  500)
 
 
@@ -1424,7 +1426,7 @@ class SyncVdmConfiguration(MethodView):
 
         except Exception, errs:
             print traceback.format_exc()
-            return jsonify({'status': 'success', 'error': str(errs)})
+            return jsonify({'status': 'success', 'statusString': str(errs)})
 
         try:
             Global.DATABASES = databases
@@ -1433,9 +1435,9 @@ class SyncVdmConfiguration(MethodView):
             Global.DEPLOYMENT_USERS = deployment_users
         except Exception, errs:
             print traceback.format_exc()
-            return jsonify({'status': 'success', 'error': str(errs)})
+            return jsonify({'status': 'success', 'statusString': str(errs)})
 
-        return jsonify({'status': 'success'})
+        return jsonify({'status': '201', 'statusString': 'success'})
 
 
 class VdmConfiguration(MethodView):
@@ -1515,22 +1517,22 @@ class DatabaseDeploymentAPI(MethodView):
         if 'application/json' in request.headers['Content-Type']:
             inputs = JsonInputs(request)
             if not inputs.validate():
-                return jsonify(success=False, errors=inputs.errors)
+                return jsonify(status=401, statusString=inputs.errors)
             result = Configuration.check_validation_deployment(request)
-            if 'status' in result and result['status'] == 'error':
+            if 'status' in result and result['status'] == 401:
                 return jsonify(result)
             if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
-                return jsonify({'status': 'error', 'error': 'DR id is required.'})
+                return jsonify({'status': '401', 'statusString': 'DR id is required.'})
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'Ok', 'deployment': deployment})
         else:
             result = Configuration.set_deployment_for_upload(database_id, request)
-            if 'status' in result and result['status'] == 'failure':
-                return jsonify(result)
+            if 'status' in result and result['status'] == 401:
+                return jsonify({'status': 401, 'statusString': result['statusString']})
             else:
-                return jsonify({'status': 'success'})
+                return jsonify({'status': 201, 'statusString': 'success'})
 
 
 class VdmAPI(MethodView):
@@ -1556,7 +1558,7 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_run = False
         if not database:
-            return make_response(jsonify({"status": 404, 'error': 'Not found'}), 404)
+            return make_response(jsonify({"status": 404, 'statusString': 'Not found'}), 404)
         else:
             if len(database['members']) == 0:
                 return jsonify({"status": 404, "statusString": "No Members"})
@@ -1605,7 +1607,7 @@ class StatusDatabaseServerAPI(MethodView):
         else:
             server = Global.SERVERS.get(server_id)
             if len(database['members']) == 0:
-                return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
+                return jsonify({"status": 200, "statusString": "OK", 'statusString': 'errorNoMembers'})
             if not server:
                 return make_response(jsonify({"status": 404, "statusString": "Not found"}), 404)
             elif server_id not in database['members']:

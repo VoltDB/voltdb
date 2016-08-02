@@ -152,7 +152,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
                 temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
             }
         }
-        output_table->insertTupleNonVirtual(temp_tuple);
+        output_table->insertTempTuple(temp_tuple);
 
         VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
     }

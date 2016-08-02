@@ -28,12 +28,14 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -43,6 +45,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
@@ -150,6 +154,8 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
 
+    public static final String ADMIN = "administrator";
+
     // DR conflicts export table name prefix
     public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
     public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
@@ -161,6 +167,9 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+    public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
+    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -172,6 +181,7 @@ public abstract class CatalogUtil {
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
+
     static {
         try {
             // This schema shot the sheriff.
@@ -956,20 +966,52 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0, and adminstartup set to false
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
+        normalized = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("hostcount=\"0\"");
+        matcher = ADMINMODE_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("adminstartup=\"false\"");
+        return Digester.md5AsUUID(normalized);
+    }
+
+    /**
      * Given the deployment object generate the XML
      * @param deployment
      * @return XML of deployment object.
      * @throws IOException
      */
     public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     *
+     * @param deployment
+     * @param indent
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment, boolean indent) throws IOException {
         try {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
             Marshaller marshaller = m_jc.createMarshaller();
             marshaller.setSchema(m_schema);
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -1005,7 +1047,7 @@ public abstract class CatalogUtil {
                     continue;
 
                 for (String role : extractUserRoles(user)) {
-                    if (role.equalsIgnoreCase("ADMINISTRATOR")) {
+                    if (role.equalsIgnoreCase(ADMIN)) {
                         foundAdminUser = true;
                         break;
                     }
@@ -1093,7 +1135,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
-    private static void validateDirectory(String type, File path) {
+    public static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
@@ -1690,7 +1732,7 @@ public abstract class CatalogUtil {
     public static File getVoltDbRoot(PathsType paths) {
         File voltDbRoot;
         if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null) {
-            voltDbRoot = new VoltFile("voltdbroot");
+            voltDbRoot = new VoltFile(VoltDB.DBROOT);
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
                 if (!voltDbRoot.mkdirs()) {
@@ -1834,8 +1876,9 @@ public abstract class CatalogUtil {
      * Set user info in the catalog.
      * @param catalog The catalog to be updated.
      * @param users A reference to the <users> element of the deployment.xml file.
+     * @throws RuntimeException when there is an user with invalid masked password.
      */
-    private static void setUsersInfo(Catalog catalog, UsersType users) {
+    private static void setUsersInfo(Catalog catalog, UsersType users) throws RuntimeException {
         if (users == null) {
             return;
         }
@@ -1847,8 +1890,9 @@ public abstract class CatalogUtil {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
-        for (UsersType.User user : users.getUser()) {
 
+        for (UsersType.User user : users.getUser()) {
+            Set<String> roles = extractUserRoles(user);
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
@@ -1859,8 +1903,10 @@ public abstract class CatalogUtil {
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
-                hostLog.fatal("Invalid masked password in deployment file. Please re-run voltdb mask on the original deployment file using current version of software.");
-                System.exit(-1);
+                // if one user has invalid password, give a warn.
+                hostLog.warn("User \"" + user.getName() + "\" has invalid masked password in deployment file.");
+                // throw exception disable user with invalid masked password
+                throw new RuntimeException("User \"" + user.getName() + "\" has invalid masked password in deployment file");
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
 
@@ -1878,7 +1924,7 @@ public abstract class CatalogUtil {
             catUser.setSha256shadowpassword(hashedPW256);
 
             // process the @groups and @roles comma separated list
-            for (final String role : extractUserRoles(user)) {
+            for (final String role : roles) {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
@@ -2202,6 +2248,26 @@ public abstract class CatalogUtil {
         stmt.setIndexesused(indexString);
 
         assert(tablesRead.size() == 0);
+    }
+
+    /**
+     * Get all normal table names from a in-memory catalog jar file.
+     * A normal table is one that's NOT a materialized view, nor an export table.
+     * @param InMemoryJarfile a in-memory catalog jar file
+     * @return A set of normal table names
+     */
+    public static Set<String> getNormalTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
+        Set<String> tableNames = new HashSet<>();
+        Catalog catalog = new Catalog();
+        catalog.execute(getSerializedCatalogStringFromJar(jarfile));
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        for (Table table : getNormalTables(db, true)) {
+            tableNames.add(table.getTypeName());
+        }
+        for (Table table : getNormalTables(db, false)) {
+            tableNames.add(table.getTypeName());
+        }
+        return tableNames;
     }
 
     /**

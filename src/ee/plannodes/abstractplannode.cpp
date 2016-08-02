@@ -51,12 +51,16 @@
 #include "storage/TableCatalogDelegate.hpp"
 
 #include <sstream>
+#include <vector>
 
 using namespace std;
 
 namespace voltdb {
 
-AbstractPlanNode::AbstractPlanNode() : m_planNodeId(-1), m_isInline(false) { }
+AbstractPlanNode::AbstractPlanNode()
+    : m_planNodeId(-1),
+      m_isInline(false),
+      m_validOutputColumnCount(0) { }
 
 AbstractPlanNode::~AbstractPlanNode()
 {
@@ -409,4 +413,31 @@ void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject
     }
 }
 
+void AbstractPlanNode::loadSortListFromJSONObject(PlannerDomValue obj,
+                                                      std::vector<AbstractExpression*> *sortExprs,
+                                                      std::vector<SortDirectionType>   *sortDirs) {
+    PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
+
+    for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
+        PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
+        bool hasDirection = (sortDirs == NULL), hasExpression = (sortExprs == NULL);
+
+        if (sortDirs && sortColumn.hasNonNullKey("SORT_DIRECTION")) {
+            hasDirection = true;
+            std::string sortDirectionStr = sortColumn.valueForKey("SORT_DIRECTION").asStr();
+            sortDirs->push_back(stringToSortDirection(sortDirectionStr));
+        }
+        if (sortExprs && sortColumn.hasNonNullKey("SORT_EXPRESSION")) {
+            hasExpression = true;
+            PlannerDomValue exprDom = sortColumn.valueForKey("SORT_EXPRESSION");
+            sortExprs->push_back(AbstractExpression::buildExpressionTree(exprDom));
+        }
+
+        if (!(hasExpression && hasDirection)) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "OrderByPlanNode::loadFromJSONObject:"
+                                          " Does not have expression and direction.");
+        }
+    }
+}
 } // namespace voltdb

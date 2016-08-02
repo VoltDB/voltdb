@@ -42,23 +42,23 @@ SELECT 1, @star FROM @fromtables A WHERE @columnpredicate
 SELECT 2, @star FROM @fromtables A WHERE @optionalfn(A._variable[#some numeric]) @somecmp (            A._variable[#other numeric]  _math 2)
 SELECT 3, @star FROM @fromtables A WHERE             A._variable[#some numeric]  @somecmp (@optionalfn(A._variable[#other numeric]) _math 3)
 
-SELECT @optionalfn(A._variable[#picked @columntype]) AS Q4 FROM @fromtables A ORDER BY @optionalfn(A.__[#picked]), 1 LIMIT _value[int:1,10]
+SELECT @optionalfn(A._variable[#picked @columntype]) AS Q4 FROM @fromtables A ORDER BY @optionalfn(A.__[#picked]), 1 LIMIT _value[int:0,10]
 
 -- Found eng-3191 (or similar, anyway) crashed (fixed, since?) with these statements:
 -- -- combine where and limit
--- SELECT @optionalfn(A._variable[#picked @columntype]) AS Q5 FROM @fromtables A WHERE  @optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:1,100]
+-- SELECT @optionalfn(A._variable[#picked @columntype]) AS Q5 FROM @fromtables A WHERE  @optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:0,100]
 -- -- combine where and offset
--- SELECT @optionalfn(A._variable[#picked @columntype]) AS Q6 FROM @fromtables A WHERE  @optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:1,100] OFFSET _value[int:1,100]
+-- SELECT @optionalfn(A._variable[#picked @columntype]) AS Q6 FROM @fromtables A WHERE  @optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:0,100] OFFSET _value[int:0,100]
 -- -- compare more columns
 -- SELECT @optionalfn(A._variable[@comparabletype]    ) AS Q7 FROM @fromtables A WHERE (@optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype])) _logicop (@optionalfn(A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]))
 -- Now that eng-3191 is fixed, we keep them watered down to reduce the number of generated combinations:
 -- Even simplified like this, it crashes (or DID, anyway):
--- SELECT @optionalfn(A._variable[#picked            ]) AS Q5 FROM @fromtables A WHERE             (A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:1,100]
+-- SELECT @optionalfn(A._variable[#picked            ]) AS Q5 FROM @fromtables A WHERE             (A._variable[@comparabletype]) @somecmp @optionalfn(A._variable[@comparabletype]) ORDER BY @optionalfn(A.__[#picked]) LIMIT _value[int:0,100]
 -- so, it was simplified even further
 -- combine where and limit
-   SELECT @optionalfn(A._variable[#picked @columntype]) AS Q5 FROM @fromtables A WHERE             (A.__[#picked]               ) @somecmp            (A._variable[@comparabletype]) ORDER BY 1                        LIMIT _value[int:1,100]
+   SELECT @optionalfn(A._variable[#picked @columntype]) AS Q5 FROM @fromtables A WHERE             (A.__[#picked]               ) @somecmp            (A._variable[@comparabletype]) ORDER BY 1                        LIMIT _value[int:0,100]
 -- combine where and offset
-   SELECT @optionalfn(A._variable[#picked @columntype]) AS Q6 FROM @fromtables A WHERE             (A._variable[@comparabletype]) @somecmp            (A.__[#picked]               ) ORDER BY 1                        LIMIT _value[int:1,100] OFFSET _value[int:1,100]
+   SELECT @optionalfn(A._variable[#picked @columntype]) AS Q6 FROM @fromtables A WHERE             (A._variable[@comparabletype]) @somecmp            (A.__[#picked]               ) ORDER BY 1                        LIMIT _value[int:0,100] OFFSET _value[int:0,100]
 -- compare more columns
    SELECT @optionalfn(A._variable[#picked @columntype]) AS Q7 FROM @fromtables A WHERE (           (A.__[#picked]               ) @somecmp            (A._variable[@comparabletype])) _logicop ( @columnpredicate )
 

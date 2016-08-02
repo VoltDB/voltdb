@@ -204,6 +204,9 @@ public class ExtensibleSnapshotDigestData {
     static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerState)
             throws JSONException {
         JSONObject clusters = new JSONObject();
+        if (drMixedClusterSizeConsumerState == null) {
+            return clusters;
+        }
         for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
             // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
             // from the local cluster's partition count (which is not tracked here)

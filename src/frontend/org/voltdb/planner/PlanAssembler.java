@@ -93,8 +93,6 @@ import org.voltdb.utils.CatalogUtil;
  *
  */
 public class PlanAssembler {
-    public static boolean HANDLE_WINDOWED_OPERATORS = Boolean.valueOf(System.getProperty("org.voltdb.handlewindowedfunctions", "False"));
-
     // The convenience struct to accumulate results after parsing multiple statements
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
@@ -221,7 +219,7 @@ public class PlanAssembler {
 
         for (ParsedColInfo groupbyCol: groupbyColumns) {
             StmtTableScan scanTable = m_parsedSelect.getStmtTableScanByAlias(groupbyCol.tableAlias);
-            // table alias may be from "VOLT_TEMP_TABLE".
+            // table alias may be from AbstractParsedStmt.TEMP_TABLE_NAME.
             if (scanTable != null && scanTable.getPartitioningColumns() != null) {
                 for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
                     if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
@@ -254,7 +252,7 @@ public class PlanAssembler {
         TupleValueExpression tve = (TupleValueExpression) aggArg;
         String tableAlias = tve.getTableAlias();
         StmtTableScan scanTable = m_parsedSelect.getStmtTableScanByAlias(tableAlias);
-        // table alias may be from "VOLT_TEMP_TABLE".
+        // table alias may be from AbstractParsedStmt.TEMP_TABLE_NAME.
         if (scanTable == null || scanTable.getPartitioningColumns() == null) {
             return false;
         }
@@ -288,13 +286,13 @@ public class PlanAssembler {
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
             if (m_parsedSelect.m_joinTree instanceof BranchNode) {
-                // The execution engine expects to see the outer table on the left side only
-                // which means that RIGHT joins need to be converted to the LEFT ones
-                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-
                 if (! m_parsedSelect.hasJoinOrder()) {
                     simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
                 }
+
+                // Convert RIGHT joins to the LEFT ones
+                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
+
             }
             m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
@@ -692,7 +690,7 @@ public class PlanAssembler {
         AbstractPlanNode subUnionRoot = new UnionPlanNode(m_parsedUnion.m_unionType);
         m_recentErrorMsg = null;
 
-        ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
+        ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
         StatementPartitioning commonPartitioning = null;
 
         // Build best plans for the children first
@@ -1229,8 +1227,8 @@ public class PlanAssembler {
             AbstractExpression addressExpr = new TupleAddressExpression();
             NodeSchema proj_schema = new NodeSchema();
             // This planner-created column is magic.
-            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                                   "VOLT_TEMP_TABLE",
+            proj_schema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                   AbstractParsedStmt.TEMP_TABLE_NAME,
                                                    "tuple_address",
                                                    "tuple_address",
                                                    addressExpr));
@@ -1312,8 +1310,8 @@ public class PlanAssembler {
         TupleAddressExpression tae = new TupleAddressExpression();
         NodeSchema proj_schema = new NodeSchema();
         // This planner-generated column is magic.
-        proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                               "VOLT_TEMP_TABLE",
+        proj_schema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                               AbstractParsedStmt.TEMP_TABLE_NAME,
                                                "tuple_address",
                                                "tuple_address",
                                                tae));
@@ -1333,8 +1331,8 @@ public class PlanAssembler {
             AbstractExpression expr = col.getValue();
             expr.setInBytes(col.getKey().getInbytes());
 
-            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                                   "VOLT_TEMP_TABLE",
+            proj_schema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                   AbstractParsedStmt.TEMP_TABLE_NAME,
                                                    tableName,
                                                    tableName,
                                                    expr));
@@ -1553,11 +1551,11 @@ public class PlanAssembler {
                 // -- such as for out of range values.
                 valExpr = castExprIfNeeded(valExpr, col);
 
-                matSchema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                        "VOLT_TEMP_TABLE",
-                        col.getTypeName(),
-                        col.getTypeName(),
-                        valExpr));
+                matSchema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                     AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                     col.getTypeName(),
+                                                     col.getTypeName(),
+                                                     valExpr));
             }
 
             i++;
@@ -1628,7 +1626,11 @@ public class PlanAssembler {
             // This TVE is magic.
             // really really need to make this less hard-wired
             TupleValueExpression count_tve = new TupleValueExpression(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    "modified_tuples",
+                    "modified_tuples",
+                    0);
             count_tve.setValueType(VoltType.BIGINT);
             count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
@@ -1638,15 +1640,20 @@ public class PlanAssembler {
             // this is sufficient for now.  This looks identical to the above
             // TVE but it's logically different so we'll create a fresh one.
             TupleValueExpression tve = new TupleValueExpression(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    AbstractParsedStmt.TEMP_TABLE_NAME,
+                    "modified_tuples",
+                    "modified_tuples",
+                    0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             NodeSchema count_schema = new NodeSchema();
-            SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
-                    "VOLT_TEMP_TABLE",
-                    "modified_tuples",
-                    "modified_tuples",
-                    tve);
+            SchemaColumn col = new SchemaColumn(
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        "modified_tuples",
+                        "modified_tuples",
+                        tve);
             count_schema.addColumn(col);
             countNode.setOutputSchema(count_schema);
         }
@@ -2114,25 +2121,20 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
-        if ( ! HANDLE_WINDOWED_OPERATORS ) {
-            throw new PlanningErrorException("Windowed operators are not supported in this version of VoltDB.");
-        }
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
-        ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
-        assert(colInfo != null);
-        SchemaColumn windowedSchemaColumn = colInfo.asSchemaColumn();
+        WindowedExpression winExpr = m_parsedSelect.getWindowedExpressions().get(0);
+        assert(winExpr != null);
 
         // This will set the output schema to contain the
         // windowed schema column only.  In generateOutputSchema
         // we will add the input columns.
         PartitionByPlanNode pnode = new PartitionByPlanNode();
-        pnode.setWindowedColumn(windowedSchemaColumn);
+        pnode.setWindowedExpression(winExpr);
         OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.
         // to construct the output schema.
-        WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
-        List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
+        List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
         // If the order by expression list contains a partition by expression then
         // we won't have to sort by it twice.  We sort by the partition by expressions
         // first, and we don't care what order we sort by them.  So, find the
@@ -2143,20 +2145,20 @@ public class PlanAssembler {
         // We choose to make this dontsort rather than dosort because the
         // Java default value for boolean is false, and we want to sort by
         // default.
-        boolean dontsort[] = new boolean[windowedExpression.getOrderbySize()];
-        List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
-        List<SortDirectionType>  orderByDirections  = windowedExpression.getOrderByDirections();
-        for (int idx = 0; idx < windowedExpression.getPartitionbySize(); idx += 1) {
+        boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
+        List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
+        List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
+        for (int idx = 0; idx < winExpr.getPartitionbySize(); idx += 1) {
             SortDirectionType pdir = SortDirectionType.ASC;
             AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
-            int sidx = windowedExpression.getSortIndexOfOrderByExpression(partitionByExpression);
+            int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
             if (0 <= sidx) {
                 pdir = orderByDirections.get(sidx);
                 dontsort[sidx] = true;
             }
             onode.addSort(partitionByExpression, pdir);
         }
-        for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
+        for (int idx = 0; idx < winExpr.getOrderbySize(); idx += 1) {
             if (!dontsort[idx]) {
                 AbstractExpression orderByExpr = orderByExpressions.get(idx);
                 SortDirectionType  orderByDir  = orderByDirections.get(idx);
@@ -2239,14 +2241,26 @@ public class PlanAssembler {
                     // aggregate node that we're computing.
                     // Oh, oh, it's magic, you know..
                     TupleValueExpression tve = new TupleValueExpression(
-                            "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
+                            AbstractParsedStmt.TEMP_TABLE_NAME,
+                            AbstractParsedStmt.TEMP_TABLE_NAME,
+                            "",
+                            col.alias,
+                            outputColumnIndex);
                     tve.setTypeSizeBytes(rootExpr.getValueType(), rootExpr.getValueSize(),
                             rootExpr.getInBytes());
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
-                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);
+                    schema_col = new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                  AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                  "",
+                                                  col.alias,
+                                                  tve);
+                    top_schema_col = new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                      AbstractParsedStmt.TEMP_TABLE_NAME,
+                                                      "",
+                                                      col.alias,
+                                                      tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -2411,7 +2425,7 @@ public class PlanAssembler {
                 // do not try to look at Partial/Sparse index
                 continue;
             }
-            ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> bindings = new ArrayList<>();
             List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
                     index, fromTableAlias, bindings);
 
@@ -2850,7 +2864,7 @@ public class PlanAssembler {
      *         removed.
      */
     private static Set<String> getIndexedColumnSetForTable(Table table) {
-        HashSet<String> columns = new HashSet<String>();
+        HashSet<String> columns = new HashSet<>();
 
         for (Index index : table.getIndexes()) {
             for (ColumnRef colRef : index.getColumns()) {
@@ -2875,13 +2889,16 @@ public class PlanAssembler {
      *  For each join node n1 do:
      *    For each expression expr (join and where) at the node n1
      *      For each join node n2 descended from n1 do:
-     *          If expr rejects nulls introduced by n2 inner table,
-     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
-     *          for n2 inner and outer tables
+     *          If expr rejects nulls introduced by n2 inner table, then
+     *              - convert LEFT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to RIGHT OUTER join
+     *          If expr rejects nulls introduced by n2 outer table, then
+     *              - convert RIGHT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to LEFT OUTER join
      */
     private static void simplifyOuterJoin(BranchNode joinTree) {
         assert(joinTree != null);
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> exprs = new ArrayList<>();
         JoinNode leftNode = joinTree.getLeftNode();
         JoinNode rightNode = joinTree.getRightNode();
         // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
@@ -2899,38 +2916,37 @@ public class PlanAssembler {
         JoinNode leftNode = joinNode.getLeftNode();
         JoinNode rightNode = joinNode.getRightNode();
         if (joinNode.getJoinType() == JoinType.LEFT) {
-            for (AbstractExpression expr : exprs) {
-                // Get all the tables underneath this node and
-                // see if the expression is NULL-rejecting for any of them
-                Collection<String> tableAliases = rightNode.generateTableJoinOrder();
-                boolean rejectNull = false;
-                for (String tableAlias : tableAliases) {
-                    if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
-                        // We are done at this level
-                        joinNode.setJoinType(JoinType.INNER);
-                        rejectNull = true;
-                        break;
-                    }
-                }
-                if (rejectNull) {
-                    break;
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.RIGHT) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.LEFT);
+            }
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                if (JoinType.FULL == joinNode.getJoinType()) {
+                    joinNode.setJoinType(JoinType.RIGHT);
+                } else {
+                    // LEFT join was just removed
+                    joinNode.setJoinType(JoinType.INNER);
                 }
             }
-        } else {
-            assert(joinNode.getJoinType() == JoinType.INNER);
         }
 
-        // Now add this node expression to the list and descend
-        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
-        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
-        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
-        if (leftNode.getJoinExpression() != null) {
-            newExprs.add(leftNode.getJoinExpression());
-        }
-        if (rightNode.getJoinExpression() != null) {
-            newExprs.add(rightNode.getJoinExpression());
-        }
-
+        // Now add this node expression to the list and descend. The WHERE expressions
+        // can be combined with the input list because they simplify both inner and outer nodes.
         if (leftNode.getWhereExpression() != null) {
             exprs.add(leftNode.getWhereExpression());
         }
@@ -2938,22 +2954,64 @@ public class PlanAssembler {
             exprs.add(rightNode.getWhereExpression());
         }
 
-        if (joinNode.getJoinType() == JoinType.INNER) {
-            exprs.addAll(newExprs);
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
-            if (rightNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
-            }
-        } else {
-            if (rightNode instanceof BranchNode) {
-                newExprs.addAll(exprs);
-                simplifyOuterJoinRecursively((BranchNode)rightNode, newExprs);
-            }
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
+        // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
+        List<AbstractExpression> exprsForInnerNode = new ArrayList<AbstractExpression>(exprs);
+        if (leftNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(leftNode.getJoinExpression());
+        }
+        if (rightNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(rightNode.getJoinExpression());
+        }
+
+        List<AbstractExpression> leftNodeExprs;
+        List<AbstractExpression> rightNodeExprs;
+        switch (joinNode.getJoinType()) {
+            case INNER:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case LEFT:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case RIGHT:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprs;
+                break;
+            case FULL:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprs;
+                break;
+            default:
+                // shouldn't get there
+                leftNodeExprs = null;
+                rightNodeExprs = null;
+                assert(false);
+        }
+        if (leftNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)leftNode, leftNodeExprs);
+        }
+        if (rightNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)rightNode, rightNodeExprs);
         }
     }
+
+    /**
+     * Verify if an expression from the input list is NULL-rejecting for any of the tables from the list
+     * @param tableAliases list of tables
+     * @param exprs list of expressions
+     * @return TRUE if there is a NULL-rejecting expression
+     */
+    private static boolean isNullRejecting(Collection<String> tableAliases, List<AbstractExpression> exprs) {
+        for (AbstractExpression expr : exprs) {
+            for (String tableAlias : tableAliases) {
+                if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                    // We are done at this level
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }
