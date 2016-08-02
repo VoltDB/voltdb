@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -51,6 +52,9 @@ import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -687,82 +691,36 @@ public class MaterializedViewProcessor {
      * Process materialized view warnings.
      */
     public void processMaterializedViewWarnings(Database db, HashMap<Table, String> matViewMap) throws VoltCompilerException {
-        HashSet <String> viewTableNames = new HashSet<>();
-        for (Entry<Table, String> entry : matViewMap.entrySet()) {
-            viewTableNames.add(entry.getKey().getTypeName());
-        }
-
-        for (Entry<Table, String> entry : matViewMap.entrySet()) {
-            Table destTable = entry.getKey();
-            String query = entry.getValue();
-
-            // get the xml for the query
-            VoltXMLElement xmlquery = null;
-            try {
-                xmlquery = m_hsql.getXMLCompiledStatement(query);
-            }
-            catch (HSQLParseException e) {
-                e.printStackTrace();
-            }
-            assert(xmlquery != null);
-
-            // parse the xml like any other sql statement
-            ParsedSelectStmt stmt = null;
-            try {
-                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
-            }
-            catch (Exception e) {
-                throw m_compiler.new VoltCompilerException(e.getMessage());
-            }
-            assert(stmt != null);
-
-            String viewName = destTable.getTypeName();
-            // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.m_tableList.get(0);
-            //export table does not need agg min and max warning.
-            if (CatalogUtil.isTableExportOnly(db, srcTable)) continue;
-
-            MaterializedViewInfo matviewinfo = srcTable.getViews().get(viewName);
-            if (matviewinfo == null) {
-                return;
-            }
-
-            boolean hasMinOrMaxAgg = false;
-            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
-            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
-                ParsedColInfo col = stmt.m_displayColumns.get(i);
-                AbstractExpression aggExpr = col.expression.getLeft();
-                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
-                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
-                    hasMinOrMaxAgg = true;
-                    minMaxAggs.add(aggExpr);
-                }
-            }
-
-            if (hasMinOrMaxAgg) {
-                List<AbstractExpression> groupbyExprs = null;
-
-                if (stmt.hasComplexGroupby()) {
-                    groupbyExprs = new ArrayList<AbstractExpression>();
-                    for (ParsedColInfo col: stmt.m_groupByColumns) {
-                        groupbyExprs.add(col.expression);
+        boolean needsWarning = true;
+        try {
+            for (Table table : db.getTables()) {
+                for (MaterializedViewInfo mvInfo : table.getViews()) {
+                    needsWarning = true;
+                    for (Statement stmt : mvInfo.getFallbackquerystmts()) {
+                        JSONObject jsonPlan = new JSONObject(
+                                                    org.voltdb.utils.Encoder.decodeBase64AndDecompress(
+                                                        stmt.getFragments().get("0").getPlannodetree()));
+                        PlanNodeTree pnt = new PlanNodeTree();
+                        pnt.loadFromJSONPlan(jsonPlan, db);
+                        for (AbstractPlanNode apn : pnt.getNodeList()) {
+                            if (apn instanceof IndexScanPlanNode) {
+                                needsWarning = false;
+                                break;
+                            }
+                        }
+                        if (! needsWarning) {
+                            break;
+                        }
                     }
-                }
-
-                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                boolean needsWarning = false;
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
-                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
-                    if (found == null) {
-                        needsWarning = true;
-                    }
-                }
-                if (needsWarning) {
-                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
-                            matviewinfo.getTypeName() +
-                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                    // if (needsWarning) {
+                    //     m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
+                    //             mvInfo.getTypeName() +
+                    //             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                    // }
                 }
             }
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 
