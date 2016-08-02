@@ -55,6 +55,7 @@ public class ClientConfig {
     boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
+    boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
 
 
     final static String getUserNameFromSubject(Subject subject) {
@@ -316,10 +317,29 @@ public class ClientConfig {
      *
      * <p>If you are using persistent connections you definitely want this.</p>
      *
+     * <p>Defaults to TRUE.</p>
+     *
      * @param on Enable or disable the affinity feature.
      */
     public void setClientAffinity(boolean on) {
         m_useClientAffinity = on;
+    }
+
+    /**
+     * <p>By default, reads are sent to the leader replica for each partition. This
+     * is usually optimal for the default read consistency value, SAFE. If you are
+     * using FAST reads, enabling this setting will load balance reads amongst
+     * partition replicas, often increasing throughput and decreasing latency.</p>
+     *
+     * <p>See section <a href="https://docs.voltdb.com/AdminGuide/HostConfigDBOpts.php">
+     * A.3.4 of the Administrators Guide</a> for info on SAFE vs. FAST.</p>
+     *
+     * <p>Defaults to FALSE. Has no effect if Client Affinity is disabled.</p>
+     *
+     * @param on Enable or disable sending reads to replicas.
+     */
+    public void setSendReadsToReplicasByDefault(boolean on) {
+        m_sendReadsToReplicasBytDefaultIfCAEnabled = on;
     }
 
     /**
