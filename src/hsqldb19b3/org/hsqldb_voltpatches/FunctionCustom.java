@@ -133,7 +133,8 @@ public class FunctionCustom extends FunctionSQL {
     private static final int FUNC_SUBSTR           = 139;
     private static final int FUNC_DATEDIFF         = 140;
     private static final int FUNC_SECONDS_MIDNIGHT = 141;
-
+    private static final int FUNC_CSC              = 142;
+    private static final int FUNC_SEC              = 143;
     //
     static final IntKeyIntValueHashMap customRegularFuncMap =
         new IntKeyIntValueHashMap();
@@ -229,6 +230,8 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.SOUNDEX, FUNC_SOUNDEX);
         customRegularFuncMap.put(Tokens.SPACE, FUNC_SPACE);
         customRegularFuncMap.put(Tokens.DATEDIFF, FUNC_DATEDIFF);
+        customRegularFuncMap.put(Tokens.CSC, FUNC_CSC);
+        customRegularFuncMap.put(Tokens.SEC, FUNC_SEC);
     }
 
     static final IntKeyIntValueHashMap customValueFuncMap =
@@ -506,11 +509,31 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ASIN :
             case FUNC_ATAN :
             case FUNC_ATAN2 :
+            case FUNC_CSC :
+                name = Tokens.T_CSC;
+                parseList = singleParamList;
+                break;
             case FUNC_COS :
+                name = Tokens.T_COS;
+                parseList = singleParamList;
+                break;
             case FUNC_COT :
+                name = Tokens.T_COT;
+                parseList = singleParamList;
+                break;
             case FUNC_DEGREES :
             case FUNC_SIN :
+                name = Tokens.T_SIN;
+                parseList = singleParamList;
+                break;
+            case FUNC_SEC :
+                name = Tokens.T_SEC;
+                parseList = singleParamList;
+                break;
             case FUNC_TAN :
+                name = Tokens.T_TAN;
+                parseList = singleParamList;
+                break;
             case FUNC_RADIANS :
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
@@ -941,6 +964,20 @@ public class FunctionCustom extends FunctionSQL {
 
                 return Double.valueOf(java.lang.Math.cos(d));
             }
+            case FUNC_CSC : {
+                if (data[0] == null) {
+                    return null;
+                }
+
+                double c = NumberType.toDouble(data[0]);
+                double sinValue = java.lang.Math.sin(c);
+                if(sinValue == 0){
+                    return null;
+                }
+                double d = 1.0 / sinValue;
+
+                return Double.valueOf(d);
+            }
             case FUNC_COT : {
                 if (data[0] == null) {
                     return null;
@@ -968,6 +1005,20 @@ public class FunctionCustom extends FunctionSQL {
                 double d = NumberType.toDouble(data[0]);
 
                 return Double.valueOf(java.lang.Math.sin(d));
+            }
+            case FUNC_SEC : {
+                if (data[0] == null) {
+                    return null;
+                }
+
+                double c = NumberType.toDouble(data[0]);
+                double cosValue = java.lang.Math.cos(c);
+                if(cosValue == 0){
+                    return null;
+                }
+                double d = 1.0 / cosValue;
+
+                return Double.valueOf(d);
             }
             case FUNC_TAN : {
                 if (data[0] == null) {
@@ -1429,9 +1480,11 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ASIN :
             case FUNC_ATAN :
             case FUNC_COS :
+            case FUNC_CSC:
             case FUNC_COT :
             case FUNC_DEGREES :
             case FUNC_SIN :
+            case FUNC_SEC:
             case FUNC_TAN :
             case FUNC_LOG10 :
             case FUNC_RADIANS :
@@ -1720,9 +1773,11 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ATAN :
             case FUNC_ATAN2 :
             case FUNC_COS :
+            case FUNC_CSC :
             case FUNC_COT :
             case FUNC_DEGREES :
             case FUNC_SIN :
+            case FUNC_SEC :
             case FUNC_TAN :
             case FUNC_LOG10 :
             case FUNC_RADIANS :

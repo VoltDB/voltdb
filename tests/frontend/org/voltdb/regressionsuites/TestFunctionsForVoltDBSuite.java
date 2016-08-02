@@ -88,6 +88,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
 
+                "CREATE TABLE P4 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P4 ON COLUMN ID;\n" +
+
                 "CREATE TABLE R3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "TINY TINYINT, " +
@@ -2816,6 +2821,180 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 verifyProcFails(client, "VOLTDB ERROR: SQL ERROR\n .* can't be cast as TIMESTAMP", "BadParamTypesForTimestamp", procEntry, valueIndexToTestWith);
             }
         }
+    }
+
+    public void testSin() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test SIN function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT sin(0) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sin(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0.8414709848078965"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sin(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("9.265358966049026E-5"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sin(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-0.5440211108893698"), vt.getDouble(0));
+    }
+
+    public void testCos() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test COS function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT cos(0) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1.0"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT cos(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0.5403023058681398"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT cos(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-0.9999999957076562"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT cos(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-0.8390715290764524"), vt.getDouble(0));
+    }
+
+    public void testTan() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test TAN function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT tan(0) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0.0"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT tan(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1.5574077246549023"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT tan(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-9.265359005819132E-5"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT tan(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0.6483608274590866"), vt.getDouble(0));
+    }
+
+    public void testCot() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test COT function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        boolean throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT cot(0) FROM P4  WHERE ID = 10000;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("infinite"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        vt = client.callProcedure("@AdHoc", "SELECT cot(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("0.6420926159343306"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT cot(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-10792.889939525792"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT cot(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1.5423510453569202"), vt.getDouble(0));
+    }
+
+    public void testCsc() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test CSC function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        boolean throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT csc(0) FROM P4  WHERE ID = 10000;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("infinite"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        vt = client.callProcedure("@AdHoc", "SELECT csc(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1.1883951057781212"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT csc(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("10792.889985852586"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT csc(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-1.8381639608896658"), vt.getDouble(0));
+    }
+
+    public void testSec() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test SEC function tests");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P4 (ID) VALUES (10000);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT sec(0) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sec(1) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("1.8508157176809255"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sec(3.1415) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-1.0000000042923438"), vt.getDouble(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT sec(10) FROM P4 WHERE ID = 10000;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Double.valueOf("-1.1917935066878957"), vt.getDouble(0));
     }
 
     public void testRegexpPosition() throws Exception {

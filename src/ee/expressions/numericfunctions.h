@@ -210,6 +210,96 @@ template<> inline NValue NValue::callUnary<FUNC_LOG10>() const {
 }
 
 
+/** implement the SQL SIN function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_SIN>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::sin(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function SIN");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL COS function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_COS>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::cos(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function COS");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL TAN function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_TAN>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::tan(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function TAN");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL COT function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_COT>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double tanDouble = std::tan(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(tanDouble, "function COT");
+    if (tanDouble == 0) {
+        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
+    }
+    double resultDouble = 1 / tanDouble;
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL CSC function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_CSC>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double sinDouble = std::sin(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(sinDouble, "function CSC");
+    if (sinDouble == 0) {
+        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
+    }
+    double resultDouble = 1 / sinDouble;
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+/** implement the SQL SEC function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double cosDouble = std::cos(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(cosDouble, "function SEC");
+    if (cosDouble == 0) {
+        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
+    }
+    double resultDouble = 1 / cosDouble;
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);

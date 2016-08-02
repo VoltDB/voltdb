@@ -773,6 +773,7 @@ public class Tokens {
     static final String        T_ASIN             = "ASIN";
     static final String        T_ATAN             = "ATAN";
     static final String        T_ATAN2            = "ATAN2";
+    static final String        T_CSC              = "CSC";
     static final String        T_COS              = "COS";
     static final String        T_COT              = "COT";
     static final String        T_DEGREES          = "DEGREES";
@@ -785,6 +786,7 @@ public class Tokens {
     static final String        T_ROUND            = "ROUND";
     static final String        T_SIGN             = "SIGN";
     static final String        T_SIN              = "SIN";
+    static final String        T_SEC              = "SEC";
     static final String        T_TAN              = "TAN";
     static final String        T_BITAND           = "BITAND";
     static final String        T_BITOR            = "BITOR";
@@ -1495,7 +1497,8 @@ public class Tokens {
     static final int        UCASE            = 654;
     static final int        DATEDIFF         = 655;
     public static final int SECONDS_MIDNIGHT = 656;
-
+    static final int        CSC              = 657;
+    static final int        SEC              = 658;
     //
     static final int CONTROL = 657;
     static final int LOCK    = 658;
@@ -2163,6 +2166,7 @@ public class Tokens {
         commandSet.put(T_ATAN, ATAN);
         commandSet.put(T_ATAN2, ATAN2);
         commandSet.put(T_COS, COS);
+        commandSet.put(T_CSC, CSC);
         commandSet.put(T_COT, COT);
         commandSet.put(T_DEGREES, DEGREES);
         commandSet.put(T_DMOD, DMOD);
@@ -2174,6 +2178,7 @@ public class Tokens {
         commandSet.put(T_ROUND, ROUND);
         commandSet.put(T_SIGN, SIGN);
         commandSet.put(T_SIN, SIN);
+        commandSet.put(T_SEC, SEC);
         commandSet.put(T_TAN, TAN);
         commandSet.put(T_BITAND, BITAND);
         commandSet.put(T_BITOR, BITOR);
