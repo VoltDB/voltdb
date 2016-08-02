@@ -1488,7 +1488,7 @@ class SyncVdmConfiguration(MethodView):
         except Exception, errs:
             print traceback.format_exc()
             return jsonify({'status': 'success', 'statusString': str(errs)})
-
+        Configuration.write_configuration_file()
         return jsonify({'status': '201', 'statusString': 'success'})
 
 
