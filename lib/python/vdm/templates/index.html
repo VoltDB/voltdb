@@ -1351,7 +1351,105 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Delete Database -->
+<!-- View Server Details -->
+<div id="viewServerDetails" class="modal custom fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center modelServerDetails">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Server Details <span id="serverStatus"></span></h4>
+      </div>
+      <div class="modal-body" style="overflow:auto; height:300px;">
+        <div class="grid">
 
+          <div class="row serverDetails">
+            <label for="lblHostName" class="col-sm-6 control-label" >Host Name:</label>
+            <div class="col-sm-6">
+              <label id="lblHostName"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblServerName" class="col-sm-6 control-label" >Display Name:</label>
+            <div class="col-sm-6">
+              <label id="lblServerName"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblDescription" class="col-sm-6 control-label" >Description:</label>
+            <div class="col-sm-6">
+              <label id="lblDescription"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblClientListener" class="col-sm-6 control-label" >Client Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblClientListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblAdminListener" class="col-sm-6 control-label" >Admin Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblAdminListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblInternalListener" class="col-sm-6 control-label" >Internal Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblInternalListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblHttpListener" class="col-sm-6 control-label" >HTTP Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblHttpListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblZookeeperListener" class="col-sm-6 control-label" >Zookeeper Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblZookeeperListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblReplicationListener" class="col-sm-6 control-label" >Replication Listener:</label>
+            <div class="col-sm-6">
+              <label id="lblReplicationListener"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblInternalInterface" class="col-sm-6 control-label" >Internal Interface:</label>
+            <div class="col-sm-6">
+              <label id="lblInternalInterface"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblExternalInterface" class="col-sm-6 control-label" >External Interface:</label>
+            <div class="col-sm-6">
+              <label id="lblExternalInterface"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblPublicInterface" class="col-sm-6 control-label" >Public Interface:</label>
+            <div class="col-sm-6">
+              <label id="lblPublicInterface"></label>
+            </div>
+          </div>
+          <div class="row serverDetails">
+            <label for="lblPlacementGroup" class="col-sm-6 control-label" >Placement Group:</label>
+            <div class="col-sm-6">
+              <label id="lblPlacementGroup"></label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-dismiss="modal">ok</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- View Server Details -->
 
 <div class="loader" ></div>
 </div>

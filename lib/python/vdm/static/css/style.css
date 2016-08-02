@@ -1072,6 +1072,16 @@ table.tblPopup {
 	resize: none;
 }
 /****************Server Settings**********************/
+.modal-dialog.modal-dialog-center.modelServerDetails {
+    width: 34%;
+    margin: 0 auto;
+}
+
+.serverDetails {
+    border-bottom: 1px solid #ccc;
+    line-height: 28px;
+    margin: 0 -10px 0 -5px;
+}
 .serverTop {
 	background-color: #f5f6f6;
 	border-left: 1px solid #CCCCCC;
@@ -1830,6 +1840,14 @@ ul.drList {
 .formServer input[type="text"], .formServer textarea {
 	width: 100%;
 }
+
+.modelServerDetails { width:450px;}
+.serverDetails {
+    border-bottom: 1px solid #ccc;
+    line-height: 28px;
+    margin: 0 -10px 0 -5px;
+}
+
 .modal .connectionSourceModel {
 	overflow: auto;
 	height: 450px;
