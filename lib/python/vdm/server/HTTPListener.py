@@ -1434,7 +1434,7 @@ class AddLocalServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, -1, True )
+            return server.check_and_start_local_server(sid, 'False', database_id, False, -1, True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
