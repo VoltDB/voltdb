@@ -37,7 +37,11 @@
         this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
-
+        this.enumPartitionColor = {
+            localPartition: "#D3D3D3",
+            maxMinPartition: "#4C76B0",
+            multiPartition: "#FF8C00"
+        }
         this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
@@ -90,11 +94,11 @@
                             arr.push(emptyData[0]);
                             arr.push(emptyData[emptyData.length - 1]);
                             if (datatype == "data") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#D3D3D3" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.localPartition });
                             } else if (datatype == "dataMPI") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#FF8C00" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.multiPartition });
                             } else if (datatype == "dataMax" || datatype == "dataMin") {
-                                dataPartition.push({ key: partitionKey, values: arr, color: "#4C76B0" });
+                                dataPartition.push({ key: partitionKey, values: arr, color: MonitorGraphUI.enumPartitionColor.maxMinPartition});
                             }
                             dataMapperSec[partitionKey] = count;
                             count++;
@@ -1214,7 +1218,7 @@
 
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
-            
+
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 
@@ -1480,6 +1484,7 @@
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
+
             var monitor = MonitorGraphUI.Monitors;
 
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
@@ -1502,6 +1507,7 @@
             var partitionDetailsArr = [];
             var partitionDetailsArrMin = [];
             var partitionDetailsArrDay = [];
+
 
             if(localStorage.partitionDetailsMin != undefined)
                 partitionDetailsArrMin = JSON.parse(localStorage.partitionDetailsMin)
@@ -1529,6 +1535,7 @@
                         monitor.partitionData[keyIndexSec]["values"].push({"x": new Date(partitionDetailsArr[i]["values"][b].x), "y": partitionDetailsArr[i]["values"][b].y})
                     }
                 }
+
                 if(typeof(partitionDetailsArrMin) != "object" )
                     partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){

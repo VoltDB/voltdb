@@ -411,6 +411,232 @@ $(document).ready(function () {
     };
 });
 
+
+function convertArrayOfObjectsToCSV(args) {
+    var result, ctr, keys, columnDelimiter, lineDelimiter, data;
+
+    data = args.data || null;
+    if (data == null || !data.length) {
+        return null;
+    }
+
+    columnDelimiter = args.columnDelimiter || ',';
+    lineDelimiter = args.lineDelimiter || '\n';
+
+    keys = Object.keys(data[0]);
+
+    result = '';
+    result += keys.join(columnDelimiter);
+    result += lineDelimiter;
+
+    data.forEach(function(item) {
+        ctr = 0;
+        keys.forEach(function(key) {
+            if (ctr > 0) result += columnDelimiter;
+                if (key == "timestamp"){
+                    result += new Date(item[key]).getHours() + ":" + new Date(item[key]).getMinutes() + ":" + new Date(item[key]).getSeconds()
+                }
+                else
+                    result += item[key];
+
+            ctr++;
+        });
+        result += lineDelimiter;
+    });
+
+    return result;
+}
+
+function downloadCSV(args,whichChart) {
+    var data, filename, link;
+    var graphView = $("#graphView").val()
+    var chartData = {}
+
+    if (whichChart == "cpu"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.cpuDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.cpuDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.cpuDetailsDay)
+        }
+
+    }
+    else if (whichChart == "memory"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.memoryDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.memoryDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.memoryDetailsDay)
+        }
+    }
+    else if (whichChart == "transaction"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.transDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.transDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.transDetailsDay)
+        }
+
+    }
+    else if (whichChart == "latency"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.latency)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.latencyMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.latencyDay)
+        }
+
+    }
+    else if (whichChart == "partitionIdle"){
+        if (graphView == "Seconds"){
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetails))
+        }
+        else if (graphView == "Minutes"){
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetailsMin))
+        }
+        else if (graphView == "Days"){
+            chartData = convertPartitionData(JSON.parse(localStorage.partitionDetailsDay))
+        }
+
+    }
+    else if (whichChart == "dataReplication"){
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.drDetails)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.drDetailsMin)
+        }
+        else if (graphView == "Days"){
+            chartData = JSON.parse(localStorage.drDetailsDay)
+        }
+    }
+    else if (whichChart == "commandLog"){
+        var overLayData = convertOverlayData(JSON.parse(localStorage.SnapshotOverlayData))
+        if (graphView == "Seconds"){
+            chartData = JSON.parse(localStorage.cmdLog)
+        }
+        else if (graphView == "Minutes"){
+            chartData = JSON.parse(localStorage.cmdLogMin)
+        }
+        else if (graphView == "Days"){
+            chartData =  JSON.parse(localStorage.cmdLogDay)
+        }
+            var csvCmdLog = convertArrayOfObjectsToCSV({
+                data: chartData
+            });
+            var csvOverlay = convertArrayOfObjectsToCSV({
+                data: overLayData
+            });
+            var filename_cmdLog = args.filename + "-" + graphView + ".csv";
+            var filename_overlay = "Overlay-" + graphView + ".csv";
+
+            downloadAll([
+                [filename_cmdLog, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvCmdLog)],
+                [filename_overlay, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvOverlay)],
+            ]);
+    }
+
+    if(whichChart != "commandLog"){
+        var csv = convertArrayOfObjectsToCSV({
+            data: chartData
+        });
+        if (csv == null) return;
+
+        filename = args.filename + "-" + graphView + ".csv";
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        data = encodeURI(csv);
+
+        link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+    }
+}
+
+function downloadAll(files){
+    if(files.length == 0) return;
+    file = files.pop();
+    var theAnchor = $('<a />')
+        .attr('href', file[1])
+        .attr('download',file[0]);
+    document.body.appendChild(theAnchor[0]);
+    theAnchor[0].click();
+    theAnchor.remove();
+    downloadAll(files);
+}
+
+
+function convertPartitionData(data){
+    var chartData = [];
+    for (var i=0; i< data.length; i++){
+        for(var j=0 ; j< data[i].values.length; j++){
+            chartData.push({
+            "key": data[i].key.replace(" ", ""),
+            "type": getPartitionType(data[i].key, data[i].color),
+            "timestamp": data[i].values[j].x,
+            "value": data[i].values[j].y
+        })
+        }
+    }
+    return chartData;
+}
+
+function getPartitionType(key, color){
+    var type = "local-partitiion"
+    if(color == MonitorGraphUI.enumPartitionColor.maxMinPartition){
+        if(key.substr(key.length-4, 3) == "Max"){
+            type = "maximum-partition"
+        } else {
+            type = "minimum-partition"
+        }
+    } else if(color ==  MonitorGraphUI.enumPartitionColor.multiPartition){
+        type = "multi-partition"
+    }
+    return type
+}
+
+function convertOverlayData(data){
+     var chartData = [];
+     for (var i=0; i< data.length; i++){
+        var startTime = new Date(data[i].startTime *1000);
+        var endTime = new Date(data[i].endTime *1000);
+        var starthours = startTime.getHours();
+        var startminutes = "0" + startTime.getMinutes();
+        var startseconds = "0" + startTime.getSeconds();
+        var startformattedTime = starthours + ':' + startminutes.substr(-2) + ':' + startseconds.substr(-2);
+        var endhours = endTime.getHours();
+        var endminutes = "0" + endTime.getMinutes();
+        var endseconds = "0" + endTime.getSeconds();
+        var endformattedTime = endhours + ':' + endminutes.substr(-2) + ':' + endseconds.substr(-2);
+
+        chartData.push({
+        "startTime": startformattedTime,
+        "endTime": endformattedTime
+        })
+     }
+
+    return chartData
+
+}
+
 function logout() {
     saveSessionCookie("username", null);
     saveSessionCookie("password", null);
