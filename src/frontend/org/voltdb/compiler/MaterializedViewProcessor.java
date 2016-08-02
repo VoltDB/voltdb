@@ -58,6 +58,7 @@ import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -688,39 +689,59 @@ public class MaterializedViewProcessor {
     }
 
     /**
-     * Process materialized view warnings.
+     * check if the plan contained in the catalog statement uses index scan.
+     * @param stmt the statement to check
+     * @return if the plan has index scan
      */
-    public void processMaterializedViewWarnings(Database db, HashMap<Table, String> matViewMap) throws VoltCompilerException {
-        boolean needsWarning = true;
+    private boolean statementHasIndexScan(Database db, Statement stmt) {
         try {
-            for (Table table : db.getTables()) {
-                for (MaterializedViewInfo mvInfo : table.getViews()) {
-                    needsWarning = true;
-                    for (Statement stmt : mvInfo.getFallbackquerystmts()) {
-                        JSONObject jsonPlan = new JSONObject(
-                                                    org.voltdb.utils.Encoder.decodeBase64AndDecompress(
-                                                        stmt.getFragments().get("0").getPlannodetree()));
-                        PlanNodeTree pnt = new PlanNodeTree();
-                        pnt.loadFromJSONPlan(jsonPlan, db);
-                        for (AbstractPlanNode apn : pnt.getNodeList()) {
-                            if (apn instanceof IndexScanPlanNode) {
-                                needsWarning = false;
-                                break;
-                            }
-                        }
-                        if (! needsWarning) {
-                            break;
-                        }
-                    }
-                    // if (needsWarning) {
-                    //     m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
-                    //             mvInfo.getTypeName() +
-                    //             ", and a sequential scan might be issued when current min / max value is updated / deleted.");
-                    // }
+            JSONObject jsonPlan = new JSONObject(
+                                        org.voltdb.utils.Encoder.decodeBase64AndDecompress(
+                                            stmt.getFragments().get("0").getPlannodetree()));
+            PlanNodeTree pnt = new PlanNodeTree();
+            pnt.loadFromJSONPlan(jsonPlan, db);
+            for (AbstractPlanNode apn : pnt.getNodeList()) {
+                if (apn instanceof IndexScanPlanNode || apn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null) {
+                    return true;
                 }
             }
         } catch (JSONException e) {
             e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Process materialized view warnings.
+     */
+    public void processMaterializedViewWarnings(Database db, HashMap<Table, String> matViewMap) throws VoltCompilerException {
+        for (Table table : db.getTables()) {
+            for (MaterializedViewInfo mvInfo : table.getViews()) {
+                for (Statement stmt : mvInfo.getFallbackquerystmts()) {
+                    // If there is any statement in the fallBackQueryStmts map, then
+                    // there must be some min/max columns.
+                    // Only check if the plan uses index scan.
+                    if (! statementHasIndexScan(db, stmt)) {
+                        m_compiler.addWarn(
+                                "No index found to support UPDATE and DELETE on some of the min() / max() columns " +
+                                "in the materialized view " + mvInfo.getTypeName() +
+                                ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                        break;
+                    }
+                }
+            }
+            // If it's a view on join query case, we check if the join can utilize indices.
+            // We throw out warning only if no index scan is used in the plan (ENG-10864).
+            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get("mvHandlerInfo");
+            if (mvHandlerInfo != null) {
+                Statement createQueryStatement = mvHandlerInfo.getCreatequery().get("createQuery");
+                if (! statementHasIndexScan(db, createQueryStatement)) {
+                    m_compiler.addWarn(
+                            "No index found to support refreshing the materialized view " +
+                            table.getTypeName() +
+                            ", which was defined by a join query. The refreshing may be slow.");
+                }
+            }
         }
     }
 
