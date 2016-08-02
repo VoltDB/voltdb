@@ -134,7 +134,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-        SortedSet<String> nonEmptyTables = new TreeSet<String>();
+        SortedSet<String> nonEmptyTables = new TreeSet<>();
 
         // find all empty tables
         while (stats.advanceRow()) {
@@ -164,7 +164,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         }
     }
 
-    public final static HashMap<Integer, String> m_versionMap = new HashMap<Integer, String>();
+    public final static HashMap<Integer, String> m_versionMap = new HashMap<>();
     static {
         m_versionMap.put(45, "Java 1.1");
         m_versionMap.put(46, "Java 1.2");
@@ -483,6 +483,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 getUniqueId(),
                 catalogBytes,
+                catalogHash,
                 deploymentBytes);
 
         try {
@@ -504,6 +505,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     catalogStuff.txnId,
                     catalogStuff.uniqueId,
                     catalogStuff.catalogBytes,
+                    catalogStuff.getCatalogHash(),
                     catalogStuff.deploymentBytes);
 
             // hopefully this will throw a SpecifiedException if the fragment threw one

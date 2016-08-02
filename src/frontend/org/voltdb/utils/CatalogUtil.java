@@ -217,7 +217,7 @@ public abstract class CatalogUtil {
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
-        return new Pair<InMemoryJarfile, String>(jarfile, upgradedFromVersion);
+        return new Pair<>(jarfile, upgradedFromVersion);
     }
 
     /**
@@ -366,7 +366,7 @@ public abstract class CatalogUtil {
         assert(sortFieldName != null);
 
         // build a treemap based on the field value
-        TreeMap<Object, T> map = new TreeMap<Object, T>();
+        TreeMap<Object, T> map = new TreeMap<>();
         boolean hasField = false;
         for (T item : items) {
             // check the first time through for the field
@@ -379,7 +379,7 @@ public abstract class CatalogUtil {
         }
 
         // create a sorted list from the map
-        ArrayList<T> retval = new ArrayList<T>();
+        ArrayList<T> retval = new ArrayList<>();
         for (T item : map.values()) {
             retval.add(item);
         }
@@ -429,7 +429,7 @@ public abstract class CatalogUtil {
      * @return An ordered list of the primary key columns
      */
     public static Collection<Column> getPrimaryKeyColumns(Table catalogTable) {
-        Collection<Column> columns = new ArrayList<Column>();
+        Collection<Column> columns = new ArrayList<>();
         Index catalog_idx = null;
         try {
             catalog_idx = CatalogUtil.getPrimaryKeyIndex(catalogTable);
@@ -531,7 +531,7 @@ public abstract class CatalogUtil {
     public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
                                                        org.voltdb.catalog.Table table)
     {
-        ArrayList<Table> tlist = new ArrayList<Table>();
+        ArrayList<Table> tlist = new ArrayList<>();
         CatalogMap<Table> tables = database.getTables();
         for (Table t : tables) {
             Table matsrc = t.getMaterializer();
@@ -1061,7 +1061,7 @@ public abstract class CatalogUtil {
             marshaller.setSchema(m_schema);
             marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -1468,7 +1468,7 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
@@ -1617,7 +1617,7 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<String>();
+        List<String> streamList = new ArrayList<>();
 
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
@@ -1632,7 +1632,7 @@ public abstract class CatalogUtil {
     }
 
     public static Map<String, ImportConfiguration> getImportProcessorConfig(ImportType importType) {
-        Map<String, ImportConfiguration> processorConfig = new HashMap<String, ImportConfiguration>();
+        Map<String, ImportConfiguration> processorConfig = new HashMap<>();
         if (importType == null) {
             return processorConfig;
         }
@@ -1957,7 +1957,7 @@ public abstract class CatalogUtil {
      * @return a {@link Set} of role name
      */
     private static Set<String> extractUserRoles(final UsersType.User user) {
-        Set<String> roles = new TreeSet<String>();
+        Set<String> roles = new TreeSet<>();
         if (user == null) return roles;
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
@@ -2063,6 +2063,7 @@ public abstract class CatalogUtil {
                 long txnId,
                 long uniqueId,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
@@ -2077,16 +2078,21 @@ public abstract class CatalogUtil {
                     20 + // catalog SHA-1 hash
                     20   // deployment SHA-1 hash
                     );
+
+        if (catalogHash == null) {
+            try {
+                catalogHash = (new InMemoryJarfile(catalogBytes)).getSha1Hash();
+            }
+            catch (IOException ioe) {
+                VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
+                        true, ioe);
+            }
+        }
+
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        try {
-            versionAndBytes.put((new InMemoryJarfile(catalogBytes)).getSha1Hash());
-        }
-        catch (IOException ioe) {
-            VoltDB.crashLocalVoltDB("Unable to build InMemoryJarfile from bytes, should never happen.",
-                    true, ioe);
-        }
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(makeDeploymentHash(deploymentBytes));
         versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
@@ -2105,11 +2111,12 @@ public abstract class CatalogUtil {
                 long txnId,
                 long uniqueId,
                 byte[] catalogBytes,
+                byte[] catalogHash,
                 byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, deploymentBytes);
+                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
@@ -2123,11 +2130,12 @@ public abstract class CatalogUtil {
             long txnId,
             long uniqueId,
             byte[] catalogBytes,
+            byte[] catalogHash,
             byte[] deploymentBytes)
         throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogBytes, deploymentBytes);
+                txnId, uniqueId, catalogBytes, catalogHash, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
@@ -2218,8 +2226,8 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
-        Collection<String> indexes = new TreeSet<String>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<>();
+        Collection<String> indexes = new TreeSet<>();
         if (topPlan != null) {
             topPlan.getTablesAndIndexes(tablesRead, indexes);
         }
@@ -2289,7 +2297,7 @@ public abstract class CatalogUtil {
      * @return A list of tables
      */
     public static List<Table> getNormalTables(Database catalog, boolean isReplicated) {
-        List<Table> tables = new ArrayList<Table>();
+        List<Table> tables = new ArrayList<>();
         for (Table table : catalog.getTables()) {
             if ((table.getIsreplicated() == isReplicated) &&
                 table.getMaterializer() == null &&
@@ -2569,7 +2577,7 @@ public abstract class CatalogUtil {
     }
 
     public static Map<String, Column> getDRTableNamePartitionColumnMapping(Database db) {
-        Map<String, Column> res = new HashMap<String, Column>();
+        Map<String, Column> res = new HashMap<>();
         for (Table tb : db.getTables()) {
             if (!tb.getIsreplicated() && tb.getIsdred()) {
                 res.put(tb.getTypeName(), tb.getPartitioncolumn());
