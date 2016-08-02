@@ -1,13 +1,21 @@
+Start of error output.
+
+Expect to fail because the jar has not been loaded yet.
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
    java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+Expect to fail as Trivial should have failed proc creation.
 Undefined procedure: Trivial
+Expect to fail because of failure to "redefine" the Trivial proc with its
+    underlying class removed. The error message could be better here.
 Unexpected IO exception @UpdateClasses modifying classes from catalog: DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
    java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+Expect to fail now that class has been successfully removed
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
    java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+Expect to fail because the jar has been sabotaged by dropping dependent classes
 VOLTDB ERROR: UNEXPECTED FAILURE:
   java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged
 	at sqlcmdtest.Breakable0.run(Breakable0.java:#)
@@ -29,6 +37,8 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
 	... 11 more
 
+Expect to fail because the jar has been killed by dropping a statically
+    dependent class.
 VOLTDB ERROR: UNEXPECTED FAILURE:
   org.voltdb.VoltProcedure$VoltAbortException: sqlcmdtest/Breakable1$NestedGetsKilled
 	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
@@ -54,6 +64,7 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable1$NestedGetsKil
 	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
 	... 12 more
 
+Expect to fail because the jar has been sabotaged by dropping dependent classes
 VOLTDB ERROR: UNEXPECTED FAILURE:
   java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged
 	at sqlcmdtest.Breakable0.run(Breakable0.java:#)
@@ -75,3 +86,5 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
 	... 11 more
 
+
+End of error output.
