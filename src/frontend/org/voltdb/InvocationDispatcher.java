@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +85,8 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 public final class InvocationDispatcher {
 
@@ -976,7 +976,7 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            AuthUser user
+            final AuthUser user
             )
     {
         CatalogContext catalogContext = m_catalogContext.get();
@@ -1009,7 +1009,7 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setParams(catalog,dep);
 
             final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
-            SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
+            final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                     alternateConnectionId, "Empty database snapshot restore catalog update"
                     );
             final InvocationClientHandler alternateHandler = new InvocationClientHandler() {

@@ -452,7 +452,7 @@ public class SystemInformation extends VoltSystemProcedure
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
         // from the RestApiDescription.xml (or the equivalent thereof) someday --izzy
-        results.addRow("voltdbroot", cluster.getVoltroot());
+        results.addRow("voltdbroot", VoltDB.instance().getVoltDBRootPath());
 
         Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(deploy.getHostcount()));
@@ -480,7 +480,7 @@ public class SystemInformation extends VoltSystemProcedure
         {
             snap_enabled = "true";
             String snap_freq = Integer.toString(snaps.getFrequencyvalue()) + snaps.getFrequencyunit();
-            results.addRow("snapshotpath", snaps.getPath());
+            results.addRow("snapshotpath", VoltDB.instance().getSnapshotPath());
             results.addRow("snapshotprefix", snaps.getPrefix());
             results.addRow("snapshotfrequency", snap_freq);
             results.addRow("snapshotretain", Integer.toString(snaps.getRetain()));
@@ -490,7 +490,7 @@ public class SystemInformation extends VoltSystemProcedure
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                results.addRow("exportoverflowpath", cluster.getExportoverflow());
+                results.addRow("exportoverflowpath", VoltDB.instance().getExportOverflowPath());
                 break;
             }
         }
@@ -500,8 +500,7 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPath();
+            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
             String partition_detect_snapshot_prefix =
                 cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
             results.addRow("snapshotpath",
@@ -532,8 +531,8 @@ public class SystemInformation extends VoltSystemProcedure
             {
                 command_log_mode = "sync";
             }
-            String command_log_path = command_log.getLogpath();
-            String command_log_snaps = command_log.getInternalsnapshotpath();
+            String command_log_path = VoltDB.instance().getCommandLogPath();
+            String command_log_snaps = VoltDB.instance().getCommandLogSnapshotPath();
             String command_log_fsync_interval =
                 Integer.toString(command_log.getFsyncinterval());
             String command_log_max_txns =

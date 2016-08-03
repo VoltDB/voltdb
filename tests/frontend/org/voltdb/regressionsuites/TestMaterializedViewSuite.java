@@ -25,8 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.net.URL;
-
-import junit.framework.Test;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -47,6 +48,10 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
+
+import com.google_voltpatches.common.collect.Lists;
+
+import junit.framework.Test;
 
 
 public class TestMaterializedViewSuite extends RegressionSuite {
@@ -84,7 +89,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
         int nStatement = 0;
         for (VoltTable countTable : results) {
-            // System.out.println(countTable);
             ++nStatement;
             long count = countTable.asScalarLong();
             assertEquals("COUNT statement " + nStatement + "/" +
@@ -176,64 +180,39 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "3", "200.0", "9");
     }
 
-    private void insertENG6511(Client client, Integer pid, Integer d1, Integer d2, Integer v1, Integer v2) throws IOException, ProcCallException
-    {
-        VoltTable[] results = null;
-
-        results = client.callProcedure("ENG6511.insert", pid, d1, d2, v1, v2).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
-    }
-
-    private void assertTableContentEquals(VoltTable[] ra, VoltTable[] rb)
-    {
-        assertEquals(1, ra.length);
-        assertEquals(1, rb.length);
-        VoltTable a = ra[0];
-        VoltTable b = rb[0];
-        assertEquals(a.getRowCount(), b.getRowCount());
-        assertEquals(a.getColumnCount(), b.getColumnCount());
-        for (int i=0; i<a.getRowCount(); ++i) {
-            a.advanceRow();
-            b.advanceRow();
-            for (int j=0; j<a.getColumnCount(); ++j) {
-                assertEquals(a.getLong(j), b.getLong(j));
-            }
-        }
-    }
-
     private void verifyENG6511(Client client) throws IOException, ProcCallException
     {
-        VoltTable[] vresult = null;
-        VoltTable[] tresult = null;
+        VoltTable vresult = null;
+        VoltTable tresult = null;
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result ";
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511C: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511TwoIndexes: ", tresult, vresult);
 
-        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults();
-        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults();
-        assertTableContentEquals(vresult, tresult);
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults()[0];
+        assertTablesAreEqual(prefix + "VENG6511NoGroup: ", tresult, vresult);
     }
 
     private void runAndVerifyENG6511(Client client, String query) throws IOException, ProcCallException
@@ -251,27 +230,27 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         truncateBeforeTest(client);
         int pid = singlePartition ? 1 : 2;
 
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, pid, 1, 3, 9, 70);
-        insertENG6511(client, pid, 1, 3, 256, 412);
-        insertENG6511(client, pid, 1, 3, 70, -46);
+        insertRow(client, "ENG6511", 1, 1, 3, 70, 46);
+        insertRow(client, "ENG6511", 1, 1, 3, 70, 46);
+        insertRow(client, "ENG6511", 1, 1, 3, 12, 66);
+        insertRow(client, "ENG6511", pid, 1, 3, 9, 70);
+        insertRow(client, "ENG6511", pid, 1, 3, 256, 412);
+        insertRow(client, "ENG6511", pid, 1, 3, 70, -46);
 
-        insertENG6511(client, 1, 1, 4, 17, 218);
-        insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, pid, 1, 4, 48, 65);
-        insertENG6511(client, pid, 1, 4, -48, 70);
+        insertRow(client, "ENG6511", 1, 1, 4, 17, 218);
+        insertRow(client, "ENG6511", 1, 1, 4, 25, 28);
+        insertRow(client, "ENG6511", pid, 1, 4, 48, 65);
+        insertRow(client, "ENG6511", pid, 1, 4, -48, 70);
 
-        insertENG6511(client, 1, 2, 5, -71, 75);
-        insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, pid, 2, 5, 64, 16);
-        insertENG6511(client, pid, 2, 5, null, 91);
+        insertRow(client, "ENG6511", 1, 2, 5, -71, 75);
+        insertRow(client, "ENG6511", 1, 2, 5, -4, 5);
+        insertRow(client, "ENG6511", pid, 2, 5, 64, 16);
+        insertRow(client, "ENG6511", pid, 2, 5, null, 91);
 
-        insertENG6511(client, 1, 2, 6, -9, 85);
-        insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, pid, 2, 6, 21, -51);
-        insertENG6511(client, pid, 2, 6, null, 17);
+        insertRow(client, "ENG6511", 1, 2, 6, -9, 85);
+        insertRow(client, "ENG6511", 1, 2, 6, 38, 43);
+        insertRow(client, "ENG6511", pid, 2, 6, 21, -51);
+        insertRow(client, "ENG6511", pid, 2, 6, null, 17);
         verifyENG6511(client);
 
         runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
@@ -663,18 +642,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
 
-        results = client.callProcedure("DEPT_PEOPLE.insert", 1, 1L, 31L, 1000.00, 3).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 2, 1L, 31L, 900.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 3, 1L, 31L, 900.00, 1).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 4, 1L, 31L, 2500.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
+        insertRow(client, "DEPT_PEOPLE", 1, 1L, 31L, 1000.00, 3);
+        insertRow(client, "DEPT_PEOPLE", 2, 1L, 31L, 900.00, 5);
+        insertRow(client, "DEPT_PEOPLE", 3, 1L, 31L, 900.00, 1);
+        insertRow(client, "DEPT_PEOPLE", 4, 1L, 31L, 2500.00, 5);
 
         VoltTable t;
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_AGE_MATVIEW").getResults();
@@ -752,18 +723,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         assertEquals(0, results[0].getRowCount());
 
-        results = client.callProcedure("DEPT_PEOPLE.insert", 1, 1L, 31L, 1000.00, 3).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 2, 1L, 31L, 900.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 3, 1L, 31L, 900.00, 1).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
-        results = client.callProcedure("DEPT_PEOPLE.insert", 4, 1L, 31L, 2500.00, 5).getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].getRowCount());
+        insertRow(client, "DEPT_PEOPLE", 1, 1L, 31L, 1000.00, 3);
+        insertRow(client, "DEPT_PEOPLE", 2, 1L, 31L, 900.00, 5);
+        insertRow(client, "DEPT_PEOPLE", 3, 1L, 31L, 900.00, 1);
+        insertRow(client, "DEPT_PEOPLE", 4, 1L, 31L, 2500.00, 5);
 
         VoltTable t;
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_AGE_FILTER_MATVIEW").getResults();
@@ -1206,45 +1169,30 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         int delay = 0; // keeps the clock moving forward.
         // +1 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-        results = client.callProcedure("CONTEST.insert",
-            "Senior", timestampInitializer, "Boston", "Jack").getResults();
-        assertEquals(1, results.length);
-        assertEquals(1L, results[0].asScalarLong());
+        insertRow(client, "CONTEST", "Senior", timestampInitializer, "Boston", "Jack");
 
         // +1 V_TEAM_MEMBERSHIP, +4 V_TEAM_TIMES
         for (ii = 0; ii < 4; ++ii) {
             timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Cambridge", "anonymous " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Cambridge", "anonymous " + ii);
         }
 
         // +0 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
         for (ii = 0; ii < 3; ++ii) {
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Boston",  "not Jack " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Boston",  "not Jack " + ii);
         }
 
         // +1 V_TEAM_MEMBERSHIP, +1 V_TEAM_TIMES
         timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
         for (ii = 0; ii < 3; ++ii) {
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Concord", "Emerson " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Concord", "Emerson " + ii);
         }
 
         // +1 V_TEAM_MEMBERSHIP, +2 V_TEAM_TIMES
         for (ii = 0; ii < 2; ++ii) {
             timestampInitializer = (System.currentTimeMillis() + (++delay))*1000;
-            results = client.callProcedure("CONTEST.insert",
-                "Senior", timestampInitializer, "Lexington", "Luis " + ii).getResults();
-            assertEquals(1, results.length);
-            assertEquals(1L, results[0].asScalarLong());
+            insertRow(client, "CONTEST", "Senior", timestampInitializer, "Lexington", "Luis " + ii);
         }
 
         if ( ! isHSQL()) {
@@ -1269,13 +1217,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         /**
          * Current data in MV table: V_TEAM_MEMBERSHIP.
          *  header size: 39
-             status code: -128 column count: 3
-             cols (RUNNER_CLASS:STRING), (TEAM:STRING), (TOTAL:INTEGER),
-             rows -
-              Senior,Boston,4
-              Senior,Cambridge,4
-              Senior,Concord,3
-              Senior,Lexington,2
+         *   status code: -128 column count: 3
+         *   cols (RUNNER_CLASS:STRING), (TEAM:STRING), (TOTAL:INTEGER),
+         *   rows -
+         *    Senior,Boston,4
+         *    Senior,Cambridge,4
+         *    Senior,Concord,3
+         *    Senior,Lexington,2
          */
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
@@ -1445,6 +1393,185 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(0, (int)(t.getDouble(3)));
         assertEquals(10, t.getLong(4));
 
+    }
+
+    private void insertRow(Client client, Object... parameters) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        results = client.callProcedure(parameters[0].toString() + ".insert", Arrays.copyOfRange(parameters, 1, parameters.length)).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        String tableName = parameters[0].toString();
+        if (tableName.equalsIgnoreCase("ORDERITEMS")) {
+            results = client.callProcedure("DELETEORDERITEMS", parameters[1], parameters[2]).getResults();
+        }
+        else {
+            results = client.callProcedure(tableName + ".delete", parameters[1]).getResults();
+        }
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    private void updateRow(Client client, Object[] oldRow, Object[] newRow) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        String tableName1 = oldRow[0].toString();
+        String tableName2 = newRow[0].toString();
+        assertEquals("Trying to update table " + tableName1 + " with " + tableName2 + " data.", tableName1, tableName2);
+        results = client.callProcedure("UPDATE" + tableName1, newRow[2], newRow[3],
+                                                              oldRow[1], oldRow[2], oldRow[3]).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
+    private void verifyViewOnJoinQueryResult(Client client) throws IOException, ProcCallException
+    {
+        VoltTable vresult = null;
+        VoltTable tresult = null;
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result ";
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_NOPCOL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_NOPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_NOPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_NOPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_WITHPCOL ORDER BY 1, 2;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER_DETAIL_WITHPCOL").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_WITHPCOL: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER2016 ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_ORDER2016").getResults()[0];
+        assertTablesAreEqual(prefix + "ORDER2016: ", tresult, vresult);
+    }
+
+    public void testViewOnJoinQuery() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        truncateBeforeTest(client);
+        ArrayList<Object[]> dataList1 = Lists.newArrayList(
+            new Object[][] {
+                {"CUSTOMERS", 1, "Tom", "VoltDB"},
+                {"CUSTOMERS", 2, "Jerry", "Bedford"},
+                {"CUSTOMERS", 3, "Rachael", "USA"},
+                {"CUSTOMERS", 4, "Ross", "Massachusetts"},
+                {"CUSTOMERS", 5, "Stephen", "Houston TX"},
+                {"ORDERS", 1, 2, "2016-04-23 13:24:57.671000"},
+                {"ORDERS", 2, 7, "2015-04-12 10:24:10.671400"},
+                {"ORDERS", 3, 5, "2016-01-20 09:24:15.943000"},
+                {"ORDERS", 4, 1, "2015-10-30 19:24:00.644000"},
+                {"PRODUCTS", 1, "H MART", 20.97},
+                {"PRODUCTS", 2, "COSTCO WHOLESALE", 62.66},
+                {"PRODUCTS", 3, "CENTRAL ROCK GYM", 22.00},
+                {"PRODUCTS", 4, "ATT*BILL PAYMENT", 48.90},
+                {"PRODUCTS", 5, "APL* ITUNES", 16.23},
+                {"PRODUCTS", 6, "GOOGLE *YouTube", 10.81},
+                {"PRODUCTS", 7, "UNIV OF HOUSTON SYSTEM", 218.35},
+                {"PRODUCTS", 8, "THE UPS STORE 2287", 36.31},
+                {"PRODUCTS", 9, "NNU*XFINITYWIFI", 7.95},
+                {"PRODUCTS", 10, "IKEA STOUGHTON", 61.03},
+                {"PRODUCTS", 11, "WM SUPERCENTER #5752", 9.74},
+                {"PRODUCTS", 12, "STOP & SHOP 0831", 12.28},
+                {"PRODUCTS", 13, "VERANDA NOODLE HOUSE", 29.81},
+                {"PRODUCTS", 14, "AMC 34TH ST 14 #2120", 38.98},
+                {"PRODUCTS", 15, "STARBUCKS STORE 19384", 5.51},
+                {"ORDERITEMS", 1, 2, 1},
+                {"ORDERITEMS", 1, 7, 1},
+                {"ORDERITEMS", 2, 5, 2},
+                {"ORDERITEMS", 3, 1, 3},
+                {"ORDERITEMS", 3, 15, 1},
+                {"ORDERITEMS", 3, 20, 1},
+                {"ORDERITEMS", 3, 4, 2},
+                {"ORDERITEMS", 3, 26, 5},
+                {"ORDERITEMS", 4, 30, 1},
+                {"ORDERITEMS", 5, 8, 1},
+            }
+        );
+        ArrayList<Object[]> dataList2 = Lists.newArrayList(
+            new Object[][] {
+                {"CUSTOMERS", 6, "Mike", "WPI"},
+                {"CUSTOMERS", 7, "Max", "New York"},
+                {"CUSTOMERS", 8, "Ethan", "Beijing China"},
+                {"CUSTOMERS", 9, "Selina", "France"},
+                {"CUSTOMERS", 10, "Harry Potter", "Hogwarts"},
+                {"ORDERS", 5, 3, "2015-04-23 00:24:45.768000"},
+                {"ORDERS", 6, 2, "2016-07-05 16:24:31.384000"},
+                {"ORDERS", 7, 4, "2015-03-09 21:24:15.768000"},
+                {"ORDERS", 8, 2, "2015-09-01 16:24:42.279300"},
+                {"PRODUCTS", 16, "SAN SOO KAP SAN SHUSHI", 10.69},
+                {"PRODUCTS", 17, "PLASTC INC.", 155.00},
+                {"PRODUCTS", 18, "MANDARIN MALDEN", 34.70},
+                {"PRODUCTS", 19, "MCDONALDS F16461", 7.25},
+                {"PRODUCTS", 20, "UBER US JUL20 M2E3D", 31.33},
+                {"PRODUCTS", 21, "TOUS LES JOURS", 13.25},
+                {"PRODUCTS", 22, "GINGER JAPANESE RESTAU", 69.20},
+                {"PRODUCTS", 23, "WOO JEON II", 9.58},
+                {"PRODUCTS", 24, "INFLIGHT WI-FI - LTV", 7.99},
+                {"PRODUCTS", 25, "EXPEDIA INC", 116.70},
+                {"PRODUCTS", 26, "THE ICE CREAM STORE", 5.23},
+                {"PRODUCTS", 27, "WEGMANS BURLINGTON #59", 22.13},
+                {"PRODUCTS", 28, "ACADEMY EXPRESS", 46.80},
+                {"PRODUCTS", 29, "TUCKS CANDY FACTORY INC", 7.00},
+                {"PRODUCTS", 30, "SICHUAN GOURMET", 37.12},
+                {"ORDERITEMS", 5, 12, 6},
+                {"ORDERITEMS", 5, 1, 0},
+                {"ORDERITEMS", 5, 27, 1},
+                {"ORDERITEMS", 6, 0, 1},
+                {"ORDERITEMS", 6, 21, 1},
+                {"ORDERITEMS", 7, 8, 1},
+                {"ORDERITEMS", 7, 19, 1},
+                {"ORDERITEMS", 7, 30, 4},
+                {"ORDERITEMS", 7, 1, 1},
+                {"ORDERITEMS", 8, 25, 2}
+            }
+        );
+        assertEquals(dataList1.size(), dataList2.size());
+
+        // Test updating the data in the source tables.
+        // There are two lists of data, we first insert the data in the first list
+        // to the corresponding source tables, then update each row with the data
+        // from the second data list.
+        for (int i=0; i<dataList1.size(); i++) {
+            insertRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+        for (int i=0; i<dataList2.size(); i++) {
+            updateRow(client, dataList1.get(i), dataList2.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+        truncateBeforeTest(client);
+
+        // Merge two sub-lists for the following tests.
+        dataList1.addAll(dataList2);
+
+        // Test inserting the data into the source tables.
+        // We do a shuffle here and in the delete test. But I do believe we still
+        // have the full coverage of all the cases because we are inserting and deleting
+        // all the rows. The cases updating values of all kinds of aggregations will be
+        // tested in one row or another.
+        Collections.shuffle(dataList1);
+        for (int i=0; i<dataList1.size(); i++) {
+            insertRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+
+        // Test deleting the data from the source tables.
+        Collections.shuffle(dataList1);
+        for (int i=0; i<dataList1.size(); i++) {
+            deleteRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
     }
 
     /**

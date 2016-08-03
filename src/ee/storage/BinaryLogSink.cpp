@@ -506,22 +506,24 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     sequenceNumber = taskInfo->readLong();
 
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
-    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI);
+    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI || hashFlag == TXN_PAR_HASH_SPECIAL);
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     if (isMultiHash) {
         skipWrongHashRows = !engine->isLocalSite(partitionHash);
     }
     else {
-        // check if the sp txn is for local site.
-        assert(hashFlag != TXN_PAR_HASH_SINGLE || engine->isLocalSite(partitionHash));
-        skipWrongHashRows = false;
+        // Check MP single hash txn to see if it is for local site.
+        // This also handles TXN_PAR_HASH_REPLICATED case, where nothing ever needs to be skipped.
+        skipWrongHashRows = hashFlag == TXN_PAR_HASH_SINGLE &&
+            UniqueId::isMpUniqueId(uniqueId) &&
+            !engine->isLocalSite(partitionHash);
     }
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
-    do {
+    while (type != DR_RECORD_END_TXN) {
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                          txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+                txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
         type = static_cast<DRRecordType>(taskInfo->readByte());
         if (type == DR_RECORD_HASH_DELIMITER) {
             assert(isMultiHash);
@@ -529,7 +531,8 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
             skipWrongHashRows = !engine->isLocalSite(partitionHash);
             type = static_cast<DRRecordType>(taskInfo->readByte());
         }
-    } while (type != DR_RECORD_END_TXN);
+    }
+
     int64_t tempSequenceNumber = taskInfo->readLong();
     if (tempSequenceNumber != sequenceNumber) {
         throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
@@ -732,9 +735,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
         std::string tableName = taskInfo->readTextString();
-        if (skipRow) {
-            break;
-        }
+        // ignore the value of skipRow for truncate table record
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {

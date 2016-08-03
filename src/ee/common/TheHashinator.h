@@ -79,6 +79,8 @@ class TheHashinator {
      */
     virtual int32_t partitionForToken(int32_t hashCode) const = 0;
 
+    virtual std::string debug() const = 0;
+
     virtual ~TheHashinator() {}
 
   protected:

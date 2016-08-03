@@ -29,33 +29,34 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.nio.file.Files;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
-public class TestInitStartAction {
+final public class TestInitStartAction {
 
     static File rootDH;
+    static File cmdlogDH;
+
     private static final String[] deploymentXML = {
             "<?xml version=\"1.0\"?>",
             "<deployment>",
             "    <cluster hostcount=\"1\"/>",
             "    <paths>",
-            "        <voltdbroot path=\"_REPLACE_ME_\"/>",
+            "        <voltdbroot path=\"_VOLTDBROOT_PATH_\"/>",
+            "        <commandlog path=\"_COMMANDLOG_PATH_\"/>",
             "    </paths>",
             "    <httpd enabled=\"true\">",
             "        <jsonapi enabled=\"true\"/>",
@@ -64,37 +65,31 @@ public class TestInitStartAction {
             "</deployment>"
         };
 
-    static final Pattern replaceRE = Pattern.compile("_REPLACE_ME_");
+    static final Pattern voltdbrootRE = Pattern.compile("_VOLTDBROOT_PATH_");
+    static final Pattern commandlogRE = Pattern.compile("_COMMANDLOG_PATH_");
     static File legacyDeploymentFH;
+
+    @ClassRule
+    static public final TemporaryFolder tmp = new TemporaryFolder();
 
     @BeforeClass
     public static void setupClass() throws Exception {
-        rootDH = Files.createTempDirectory("voltdb-test-").toFile();
+        rootDH = tmp.newFolder();
+        cmdlogDH = new File(tmp.newFolder(), "commandlog");
+
         legacyDeploymentFH = new File(rootDH, "deployment.xml");
         try (FileWriter fw = new FileWriter(legacyDeploymentFH)) {
-            Matcher mtc = replaceRE.matcher(Joiner.on('\n').join(deploymentXML));
-            fw.write(mtc.replaceAll(new File(rootDH, "voltdbroot").getPath()));
-        } finally {
+            Matcher mtc = voltdbrootRE.matcher(Joiner.on('\n').join(deploymentXML));
+            String expnd = mtc.replaceAll(new File(rootDH, "voltdbroot").getPath());
+
+            mtc = commandlogRE.matcher(expnd);
+            expnd = mtc.replaceAll(cmdlogDH.getPath());
+
+            fw.write(expnd);
         }
         System.setProperty("VOLT_JUSTATEST", "YESYESYES");
         VoltDB.ignoreCrash = true;
     }
-
-    @AfterClass
-    public static void teardownClass() throws Exception {
-        MiscUtils.deleteRecursively(rootDH);
-    }
-
-    @Before
-    public void setup() throws Exception {
-        VoltFile.initNewSubrootForThisProcess();
-    }
-
-    @After
-    public void teardown() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
-    }
-
 
     AtomicReference<Throwable> serverException = new AtomicReference<>(null);
 
@@ -109,7 +104,8 @@ public class TestInitStartAction {
     public void testInitStartAction() throws Exception {
 
         File deplFH = new VoltFile(new VoltFile(new VoltFile(rootDH, "voltdbroot"), "config"), "deployment.xml");
-        Configuration c1 = new Configuration(new String[]{"initialize", "voltdbroot", rootDH.getPath()});
+        Configuration c1 = new Configuration(
+                new String[]{"initialize", "voltdbroot", rootDH.getPath(), "deployment", legacyDeploymentFH.getPath()});
         ServerThread server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
         c1.m_forceVoltdbCreate = false;
@@ -132,9 +128,23 @@ public class TestInitStartAction {
 
         assertTrue(deplFH.exists() && deplFH.isFile() && deplFH.canRead());
 
+        if (c1.m_isEnterprise) {
+            assertTrue(cmdlogDH.exists()
+                    && cmdlogDH.isDirectory()
+                    && cmdlogDH.canRead()
+                    && cmdlogDH.canWrite()
+                    && cmdlogDH.canExecute());
+
+            for (int i=0; i<10; ++i) {
+                new FileOutputStream(new File(cmdlogDH, String.format("dummy-%02d.log", i))).close();
+            }
+            assertEquals(10, cmdlogDH.list().length);
+        }
+
         serverException.set(null);
         // server thread sets m_forceVoltdbCreate to true by default
-        c1 = new Configuration(new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force"});
+        c1 = new Configuration(
+                new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force", "deployment", legacyDeploymentFH.getPath()});
         assertTrue(c1.m_forceVoltdbCreate);
         server = new ServerThread(c1);
         server.setUncaughtExceptionHandler(handleUncaught);
@@ -148,6 +158,14 @@ public class TestInitStartAction {
         assertEquals(0, exitex.getStatus());
 
         assertTrue(deplFH.exists() && deplFH.isFile() && deplFH.canRead());
+        if (c1.m_isEnterprise) {
+            assertTrue(cmdlogDH.exists()
+                    && cmdlogDH.isDirectory()
+                    && cmdlogDH.canRead()
+                    && cmdlogDH.canWrite()
+                    && cmdlogDH.canExecute());
+            assertEquals(0, cmdlogDH.list().length);
+        }
 
         try {
             c1 = new Configuration(new String[]{"initialize", "voltdbroot", rootDH.getPath()});
@@ -170,7 +188,7 @@ public class TestInitStartAction {
         assertNotNull(serverException.get());
         assertTrue(serverException.get() instanceof AssertionError);
         assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("cannot use legacy start action"));
+        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         if (!c1.m_isEnterprise) return;
 
@@ -188,7 +206,7 @@ public class TestInitStartAction {
         assertNotNull(serverException.get());
         assertTrue(serverException.get() instanceof AssertionError);
         assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("cannot use legacy start action"));
+        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         // this test which action should be considered legacy
         EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE));

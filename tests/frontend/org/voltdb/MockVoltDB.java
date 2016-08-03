@@ -62,6 +62,9 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import java.io.IOException;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -84,7 +87,7 @@ public class MockVoltDB implements VoltDBInterface
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
-            new HashMap<MailboxType, List<MailboxNodeContent>>();
+            new HashMap<>();
     private boolean m_replicationActive = false;
 
     public MockVoltDB() {
@@ -206,6 +209,7 @@ public class MockVoltDB implements VoltDBInterface
         getCluster().setDrconsumerenabled(enabled);
     }
 
+    String m_clSnapshotPath = "command_log_snapshot";
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");
@@ -216,16 +220,24 @@ public class MockVoltDB implements VoltDBInterface
         logConfig.setSynchronous(sync);
         logConfig.setFsyncinterval(fsyncInterval);
         logConfig.setMaxtxns(maxTxns);
-        logConfig.setLogpath(logPath);
-        logConfig.setInternalsnapshotpath(snapshotPath);
+        m_clSnapshotPath = snapshotPath;
+    }
+    @Override
+    public String getCommandLogSnapshotPath() {
+        return m_clSnapshotPath;
     }
 
+    String m_autoSnapshotPath = "snapshots";
     public void configureSnapshotSchedulePath(String autoSnapshotPath) {
         org.voltdb.catalog.SnapshotSchedule scheduleConfig = getDatabase().getSnapshotschedule().get("default");
         if (scheduleConfig == null) {
             scheduleConfig = getDatabase().getSnapshotschedule().add("default");
         }
-        scheduleConfig.setPath(autoSnapshotPath);
+        m_autoSnapshotPath = autoSnapshotPath;
+    }
+    @Override
+    public String getSnapshotPath() {
+        return m_autoSnapshotPath;
     }
 
     public void addColumnToTable(String tableName, String columnName,
@@ -273,7 +285,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, new byte[] {}, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, null, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -491,6 +503,48 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public boolean rejoining() {
         return false;
+    }
+
+    @Override
+    public String getVoltDBRootPath(PathsType.Voltdbroot path) { return path.getPath(); }
+    @Override
+    public String getCommandLogPath(PathsType.Commandlog path) { return path.getPath(); }
+    @Override
+    public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) { return path.getPath(); }
+    @Override
+    public String getSnapshotPath(PathsType.Snapshots path) { return path.getPath(); }
+    @Override
+    public String getExportOverflowPath(PathsType.Exportoverflow path) { return path.getPath(); }
+    @Override
+    public String getDROverflowPath(PathsType.Droverflow path) { return path.getPath(); }
+
+    @Override
+    public String getCommandLogPath() {
+        return "command_log";
+    }
+
+    @Override
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
+    }
+
+    @Override
+    public String getVoltDBRootPath() {
+        return "voltdbroot";
+    }
+
+    @Override
+    public String getExportOverflowPath() {
+        return "export_overflow";
+    }
+
+    @Override
+    public String getDROverflowPath() {
+        return "dr_overflow";
+    }
+
+    @Override
+    public String getPath(String name) {
+        return "";
     }
 
     @Override

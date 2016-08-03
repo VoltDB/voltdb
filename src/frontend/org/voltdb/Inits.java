@@ -76,14 +76,14 @@ public class Inits {
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
 
-    final Map<Class<? extends InitWork>, InitWork> m_jobs = new HashMap<Class<? extends InitWork>, InitWork>();
-    final PriorityBlockingQueue<InitWork> m_readyJobs = new PriorityBlockingQueue<InitWork>();
+    final Map<Class<? extends InitWork>, InitWork> m_jobs = new HashMap<>();
+    final PriorityBlockingQueue<InitWork> m_readyJobs = new PriorityBlockingQueue<>();
     final int m_threadCount;
-    final Set<Thread> m_initThreads = new HashSet<Thread>();
+    final Set<Thread> m_initThreads = new HashSet<>();
 
     abstract class InitWork implements Comparable<InitWork>, Runnable {
-        Set<Class<? extends InitWork>> m_blockers = new HashSet<Class<? extends InitWork>>();
-        Set<Class<? extends InitWork>> m_blockees = new HashSet<Class<? extends InitWork>>();
+        Set<Class<? extends InitWork>> m_blockers = new HashSet<>();
+        Set<Class<? extends InitWork>> m_blockees = new HashSet<>();
 
         protected void dependsOn(Class<? extends InitWork> cls) {
             m_blockers.add(cls);
@@ -153,7 +153,7 @@ public class Inits {
         }
 
         // collect initially ready jobs
-        List<Class<? extends InitWork>> toRemove = new ArrayList<Class<? extends InitWork>>();
+        List<Class<? extends InitWork>> toRemove = new ArrayList<>();
         for (Entry<Class<? extends InitWork>, InitWork> e : m_jobs.entrySet()) {
             if (e.getValue().m_blockers.size() == 0) {
                 toRemove.add(e.getKey());
@@ -318,6 +318,7 @@ public class Inits {
                             0, catalogTxnId,
                             catalogUniqueId,
                             catalogBytes,
+                            null,
                             deploymentBytes);
                 }
                 catch (IOException e) {
@@ -353,13 +354,15 @@ public class Inits {
             } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
             String serializedCatalog = null;
-            byte[] catalogJarBytes = catalogStuff.catalogBytes;
+            byte[] catalogJarBytes = null;
+            byte[] catalogJarHash = null;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
                     CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
                 serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();
+                catalogJarHash = loadResults.getFirst().getSha1Hash();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
@@ -392,6 +395,7 @@ public class Inits {
                         catalogStuff.uniqueId,
                         catalog,
                         catalogJarBytes,
+                        catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
                         catalogStuff.version);
@@ -452,8 +456,8 @@ public class Inits {
                             m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
                                                                                        logConfig.getFsyncinterval(),
                                                                                        logConfig.getMaxtxns(),
-                                                                                       logConfig.getLogpath(),
-                                                                                       logConfig.getInternalsnapshotpath());
+                                                                                       VoltDB.instance().getCommandLogPath(),
+                                                                                       VoltDB.instance().getCommandLogSnapshotPath());
                         }
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
@@ -716,7 +720,7 @@ public class Inits {
             if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
-                    snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
+                    snapshotPath = VoltDB.instance().getSnapshotPath();
                 }
 
                 int[] allPartitions = new int[m_rvdb.m_configuredNumberOfPartitions];
@@ -725,6 +729,7 @@ public class Inits {
                 }
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+                if (cl == null) return;
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
@@ -733,11 +738,11 @@ public class Inits {
                                                       m_rvdb,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
-                                                      cl.getLogpath(),
-                                                      cl.getInternalsnapshotpath(),
+                                                      VoltDB.instance().getCommandLogPath(),
+                                                      VoltDB.instance().getCommandLogSnapshotPath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
+                                                      VoltDB.instance().getVoltDBRootPath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }

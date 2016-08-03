@@ -40,6 +40,8 @@ import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -158,8 +160,9 @@ public class SnapshotCompletionMonitor {
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
-        String path = jsonObj.getString("path");
-        String nonce = jsonObj.getString("nonce");
+        String path = jsonObj.getString(SnapshotUtil.JSON_PATH);
+        SnapshotPathType stype = SnapshotPathType.valueOf(jsonObj.getString(SnapshotUtil.JSON_PATH_TYPE));
+        String nonce = jsonObj.getString(SnapshotUtil.JSON_NONCE);
         boolean truncation = jsonObj.getBoolean("isTruncation");
         boolean didSucceed = jsonObj.getBoolean("didSucceed");
         // A truncation request ID is not always provided. It's used for
@@ -238,6 +241,7 @@ public class SnapshotCompletionMonitor {
                     interest.snapshotCompleted(
                             new SnapshotCompletionEvent(
                                 path,
+                                stype,
                                 nonce,
                                 txnId,
                                 partitionTxnIdsMap,

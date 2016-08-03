@@ -53,6 +53,10 @@
 #include <vector>
 #include <map>
 
+namespace catalog {
+class Statement;
+}
+
 namespace voltdb {
 
 class VoltDBEngine;
@@ -72,6 +76,8 @@ public:
     static boost::shared_ptr<ExecutorVector> fromJsonPlan(VoltDBEngine* engine,
                                                           const std::string& jsonPlan,
                                                           int64_t fragId);
+    static boost::shared_ptr<ExecutorVector> fromCatalogStatement(VoltDBEngine* engine,
+                                                                  catalog::Statement *stmt);
 
     /** Build the list of executors from its plan node fragment */
     void init(VoltDBEngine* engine);

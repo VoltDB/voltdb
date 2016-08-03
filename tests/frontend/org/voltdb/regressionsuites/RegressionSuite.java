@@ -30,6 +30,8 @@ import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -74,8 +76,8 @@ public class RegressionSuite extends TestCase {
     protected VoltServerConfig m_config;
     protected String m_username = "default";
     protected String m_password = "password";
-    private final ArrayList<Client> m_clients = new ArrayList<Client>();
-    private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<SocketChannel>();
+    private final ArrayList<Client> m_clients = new ArrayList<>();
+    private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
     protected final String m_methodName;
 
     /**
@@ -531,6 +533,27 @@ public class RegressionSuite extends TestCase {
 
     static protected void validateRowOfLongs(VoltTable vt, long [] expected) {
         validateRowOfLongs("", vt, expected);
+    }
+
+    /**
+     * Given a two dimensional array of longs, randomly permute the rows, but
+     * leave the columns alone.  This is used to generate test cases for kinds
+     * of sorts.
+     *
+     * @param input
+     */
+    static protected void shuffleArrayOfLongs(long [][] input) {
+        Integer [] indices = new Integer[input.length];
+        for (int idx = 0; idx < indices.length; idx += 1) {
+            indices[idx] = Integer.valueOf(idx);
+        }
+        List<Integer> permutation = Arrays.asList(indices);
+        Collections.shuffle(permutation);
+        long[] tmp = input[permutation.get(0)];
+        for (int idx = 0; idx < input.length-1; idx += 1) {
+            input[permutation.get(idx)] = input[permutation.get(idx + 1)];
+        }
+        input[permutation.get(input.length-1)] = tmp;
     }
 
     static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {

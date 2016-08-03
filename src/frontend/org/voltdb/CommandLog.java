@@ -24,14 +24,17 @@ import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public interface CommandLog {
+
     /**
      *
-     * @param context
-     * @param txnId
-     *            The txnId of the truncation snapshot at the end of restore, or
-     * @param partitionCount
+     * @param logSize log size for splitting in segments.
+     * @param txnId The txnId of the truncation snapshot at the end of restore, or
+     * @param coreBinding PosixJNAAffinity bindings.
+     * @param perPartitionTxnId per partition transaction ids
+     * @param partitionCount partition count
      */
     public abstract void init(int logSize,
                                  long txnId,
@@ -39,11 +42,13 @@ public interface CommandLog {
                                  Map<Integer, Long> perPartitionTxnId);
 
     /**
-    *
-     * @param txnId
-     *            The txnId of the truncation snapshot at the end of restore, or
-     *            Long.MIN if there was none.
-     * @param partitionCount
+     *
+     * @param logSize log size for splitting in segments.
+     * @param txnId The txnId of the truncation snapshot at the end of restore, or Long.MIN if there was none.
+     * @param partitionCount Partition count
+     * @param isRejoin Is Rejoin
+     * @param coreBinding PosixJNAAffinity bindings.
+     * @param perPartitionTxnId per partition transaction ids
      */
     public abstract void initForRejoin(int logSize,
                                           long txnId,
@@ -72,9 +77,10 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
+     * IV2-only method. Write this Iv2FaultLogEntry to the fault log portion of the command log.
+     * @return a settable future that is set true after the entry has been written to disk.
      */
-    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+    public abstract SettableFuture<Boolean> logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
     /**

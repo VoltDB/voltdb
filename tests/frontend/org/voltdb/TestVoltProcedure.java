@@ -51,7 +51,6 @@
 package org.voltdb;
 
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -62,6 +61,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
 
 import junit.framework.TestCase;
+import static org.mockito.Mockito.mock;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {

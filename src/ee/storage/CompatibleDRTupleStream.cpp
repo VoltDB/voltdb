@@ -488,7 +488,10 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
     // Override start sequence number
     stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
-        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
+        bool isMp = (flagList[ii] == TXN_PAR_HASH_MULTI && partitionKeyValueList[ii] != -1) ||
+                    flagList[ii] == TXN_PAR_HASH_SPECIAL ||
+                    (flagList[ii] == TXN_PAR_HASH_SINGLE && partitionKeyValueList[ii] == -1);
+        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, isMp ? 16383 : partitionId);
         tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
 
         if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
