@@ -95,68 +95,6 @@ RIGHT JOIN `junit-builds` AS jr
            jr.name=%(job)s
 """)
 
-# Master Leaderboard - See a specific leaderboard for three jobs.
-ML_QUERY = ("""
-  SELECT job AS 'Job name',
-         name AS 'Test name',
-         fails AS 'Fails',
-         total AS 'Total',
-         fails/total*100. AS "Fail %",
-         latest AS 'Latest failure'
-    FROM
-        (
-           SELECT job,
-                  name,
-                  (
-                   SELECT COUNT(*)
-                     FROM `junit-builds` AS jr
-                    WHERE jr.name = tf.job AND
-                          NOW() - INTERVAL 30 DAY <= jr.stamp
-                  ) AS total,
-                  COUNT(*) AS fails,
-                  MAX(tf.stamp) AS latest
-             FROM `junit-test-failures` AS tf
-            WHERE NOT status='FIXED' AND
-                  (job=%(jobA)s OR job=%(jobB)s OR job=%(jobC)s) AND
-                  NOW() - INTERVAL 30 DAY <= tf.stamp
-         GROUP BY job,
-                  name,
-                  total
-        ) AS intermediate
-ORDER BY 5 DESC
-""")
-
-# Core Extended Leaderboard - See a specific leaderboard for three jobs.
-CL_QUERY = ("""
-  SELECT job AS 'Job name',
-         name AS 'Test name',
-         fails AS 'Fails',
-         total AS 'Total',
-         fails/total*100. AS "Fail %",
-         latest AS 'Latest failure'
-    FROM
-        (
-           SELECT job,
-                  name,
-                  (
-                   SELECT COUNT(*)
-                     FROM `junit-builds` AS jr
-                    WHERE jr.name = tf.job AND
-                          NOW() - INTERVAL 2 DAY <= jr.stamp
-                  ) AS total,
-                  COUNT(*) AS fails,
-                  MAX(tf.stamp) AS latest
-             FROM `junit-test-failures` AS tf
-            WHERE NOT status='FIXED' AND
-                  (job=%(jobA)s OR job=%(jobB)s OR job=%(jobC)s OR job=%(jobD)s) AND
-                  NOW() - INTERVAL 2 DAY <= tf.stamp
-         GROUP BY job,
-                  name,
-                  total
-        ) AS intermediate
-ORDER BY 5 DESC
-""")
-
 # All Failures - See all failures for a job over time and view them as most recent.
 AF_QUERY = ("""
   SELECT tf.name AS 'Test name',
@@ -181,6 +119,38 @@ GA_QUERY = ("""
       FROM `jenkinsbot-user-aliases`
      WHERE alias=%(alias)s AND
            slack_user_id=%(slack_user_id)s
+""")
+
+# System Leaderboard - Leaderboard for master system tests
+SL_QUERY = ("""
+  SELECT job_name AS 'Job name',
+         workload AS 'Workload',
+         fails AS 'Fails',
+         total AS 'Total',
+         fails/total*100. AS 'Fail %',
+         latest AS 'Latest'
+    FROM
+        (
+           SELECT job_name,
+                  workload,
+                  COUNT(*) AS fails,
+                  (
+                   SELECT COUNT(*)
+                     FROM `apprunnerfailures` AS run
+                    WHERE NOW() - INTERVAL 30 DAY <= run.datetime AND
+                          run.job_name=failure.job_name AND
+                          run.workload=failure.workload AND
+                          run.branch_name=failure.branch_name
+                  ) AS total,
+                  MAX(failure.datetime) AS latest
+            FROM `apprunnerfailures` AS failure
+            WHERE NOW() - INTERVAL 30 DAY <= datetime AND
+                  result='FAIL' AND
+                  failure.branch_name='master'
+         GROUP BY job_name,
+                  workload
+        ) AS intermediate
+GROUP BY 6 DESC
 """)
 
 
@@ -238,9 +208,9 @@ class JenkinsBot(object):
         """
         :param incoming: A dictionary describing what data is incoming to the bot
         :return: true if bot can act on incoming data - There is incoming data, it is text data, it's not from a bot,
-        the text isn't in a file, the channel isn't in #general,  #random, #junit which jenkinsbot is part of
+        the text isn't in a file, the channel isn't in #general, #random, #junit which jenkinsbot is part of
         """
-        # TODO rather than check if is channel, just check this is an instant message
+        # TODO rather than check all channels, just check if this is an direct message
         return (len(incoming) > 0 and incoming[0].get('text', None) is not None
                 and incoming[0].get('bot_id', None) is None and incoming[0].get('file', None) is None
                 and incoming[0]['channel'] != GENERAL_CHANNEL and incoming[0]['channel'] != RANDOM_CHANNEL
@@ -266,8 +236,8 @@ class JenkinsBot(object):
                     channel = incoming[0].get('channel', None)
                     user = incoming[0].get('user', None)
                     if 'end-session' in text:
-                        # Command for making jenkinsbot inactive. Script has to be run again with proper environment
-                        # variables to turn jenkinsbot on.
+                        # Keyword command for making jenkinsbot inactive. Script has to be run again with proper
+                        # environment variables to turn jenkinsbot on.
                         self.post_message(channel, 'Leaving...')
                         sys.exit(0)
                     elif 'help' in text:
@@ -335,7 +305,7 @@ class JenkinsBot(object):
                 job = args[1]
             else:
                 self.post_message(channel, "Couldn't parse: " + text)
-                self.post_message(channel, self.help_text)
+                self.post_message(channel, ''.join(self.help_text))
                 return query, params, filename
 
         if '=' in text:
@@ -418,12 +388,12 @@ class JenkinsBot(object):
             cursor = database.cursor()
             cursor.execute(query, params)
 
-            if not insert:
+            if insert:
+                database.commit()
+            else:
                 headers = list(cursor.column_names)
                 rows = cursor.fetchall()  # List of tuples
                 table = (headers, rows)
-            else:
-                database.commit()
 
         except MySQLError:
             self.logger.exception('Either could not connect to database or execution error')
@@ -496,7 +466,7 @@ class JenkinsBot(object):
     def edit_rows(self, rows):
         """
         Edit the rows to fit on most screens.
-        :param rows: Rows to edit. This method is specific to ML_QUERY and CL_QUERY
+        :param rows: Rows to edit. This method is specific to L_QUERY
         """
         for i, row in enumerate(rows):
             rows[i] = list(row)
@@ -506,6 +476,51 @@ class JenkinsBot(object):
             rows[i][1] = rows[i][1].replace('org.voltdb.', '')
             rows[i][1] = rows[i][1].replace('org.voltcore.', '')
             rows[i][1] = rows[i][1].replace('regressionsuites.', '')
+
+    def leaderboard_query(self, jobs, days=30):
+        """
+        This constructs a completed leaderboard query which doesn't need parameters. Returns () for parameters
+        :param jobs: The jobs to coalesce into a leaderboard
+        :param days: Number of days to go back in query
+        :return: A completed leaderboard query for the jobs and empty params
+        """
+        jobs_filter = map(lambda j: 'job=' + '"' + j + '"', jobs)
+        job_params = ' OR '.join(jobs_filter)
+        job_params = '(' + job_params + ')'
+
+        # Leaderboard - See a leaderboard for jobs.
+        junit_leaderboard_query = (
+                          """
+          SELECT job AS 'Job name',
+                 name AS 'Test name',
+                 fails AS 'Fails',
+                 total AS 'Total',
+                 fails/total*100. AS 'Fail %',
+                 latest AS 'Latest failure'
+            FROM
+                (
+                   SELECT job,
+                          name,
+                          COUNT(*) AS fails,
+                          (
+                           SELECT COUNT(*)
+                             FROM `junit-builds` AS jr
+                            WHERE jr.name = tf.job AND
+                                  NOW() - INTERVAL 30 DAY <= jr.stamp
+                          ) AS total,
+                          MAX(tf.stamp) AS latest
+                     FROM `junit-test-failures` AS tf
+                    WHERE NOT status='FIXED' AND
+                          """ + job_params + """ AND
+                          NOW() - INTERVAL """ + str(days) + """ DAY <= tf.stamp
+                 GROUP BY job,
+                          name,
+                          total
+                ) AS intermediate
+        ORDER BY 6 DESC
+        """)
+
+        return junit_leaderboard_query, ()
 
     def post_message(self, channel, text):
         """
@@ -521,7 +536,7 @@ class JenkinsBot(object):
         """
         Perform a single query and response
         :param query: Query to run
-        :param params: Parameters for query
+        :param params: Parameters for query.
         :param channels: Channels to respond to
         :param filename: filename for the post
         :param vertical: whether a vertical version of the table should be included
@@ -608,21 +623,33 @@ if __name__ == '__main__':
     if jenkinsbot.connect_to_slack() and len(sys.argv) == 2:
         if sys.argv[1] == 'listen':
             jenkinsbot.listen()
-        elif sys.argv[1] == 'master-leaderboard':
+        elif sys.argv[1] == 'master':
+            jobs = [PRO, COMMUNITY, VDM]
+            query, params = jenkinsbot.leaderboard_query(jobs, days=30)
             jenkinsbot.query_and_response(
-                ML_QUERY,
-                {'jobA': PRO, 'jobB': COMMUNITY, 'jobC': VDM},
+                query,
+                params,
                 [JUNIT],
                 'master-past30days.txt',
                 vertical=True,
                 edit=True
             )
-        elif sys.argv[1] == 'core-leaderboard':
+        elif sys.argv[1] == 'core':
+            jobs = [MEMVALDEBUG, DEBUG, MEMVAL, FULLMEMCHECK]
+            query, params = jenkinsbot.leaderboard_query(jobs, days=2)
             jenkinsbot.query_and_response(
-                CL_QUERY,
-                {'jobA': MEMVALDEBUG, 'jobB': DEBUG, 'jobC': MEMVAL, 'jobD': FULLMEMCHECK},
+                query,
+                params,
                 [JUNIT],
                 'coreextended-past2days.txt',
                 vertical=True,
                 edit=True
+            )
+        elif sys.argv[1] == 'system':
+            jenkinsbot.query_and_response(
+                SL_QUERY,
+                (),
+                [JUNIT],
+                'systems-master-past30days.txt',
+                vertical=True
             )
