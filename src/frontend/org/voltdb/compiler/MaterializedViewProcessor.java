@@ -695,9 +695,8 @@ public class MaterializedViewProcessor {
      */
     private boolean statementHasIndexScan(Database db, Statement stmt) {
         try {
-            JSONObject jsonPlan = new JSONObject(
-                                        org.voltdb.utils.Encoder.decodeBase64AndDecompress(
-                                            stmt.getFragments().get("0").getPlannodetree()));
+            JSONObject jsonPlan = new JSONObject(org.voltdb.utils.Encoder.decodeBase64AndDecompress(
+                                                    stmt.getFragments().get("0").getPlannodetree()));
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadFromJSONPlan(jsonPlan, db);
             for (AbstractPlanNode apn : pnt.getNodeList()) {
