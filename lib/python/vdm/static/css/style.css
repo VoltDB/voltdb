@@ -1841,13 +1841,6 @@ ul.drList {
 	width: 100%;
 }
 
-.modelServerDetails { width:450px;}
-.serverDetails {
-    border-bottom: 1px solid #ccc;
-    line-height: 28px;
-    margin: 0 -10px 0 -5px;
-}
-
 .modal .connectionSourceModel {
 	overflow: auto;
 	height: 450px;
