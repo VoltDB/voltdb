@@ -1454,6 +1454,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER2016 ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER2016").getResults()[0];
         assertTablesAreEqual(prefix + "ORDER2016: ", tresult, vresult);
+
+        vresult = client.callProcedure("@AdHoc", "SELECT * FROM QTYPERPRODUCT ORDER BY 1;").getResults()[0];
+        tresult = client.callProcedure("PROC_QTYPERPRODUCT").getResults()[0];
+        assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult);
     }
 
     public void testViewOnJoinQuery() throws IOException, ProcCallException
@@ -1538,10 +1542,11 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         );
         assertEquals(dataList1.size(), dataList2.size());
 
-        // Test updating the data in the source tables.
+        // -- 1 -- Test updating the data in the source tables.
         // There are two lists of data, we first insert the data in the first list
         // to the corresponding source tables, then update each row with the data
         // from the second data list.
+        System.out.println("Now testing updating the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
             insertRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
@@ -1555,19 +1560,47 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // Merge two sub-lists for the following tests.
         dataList1.addAll(dataList2);
 
-        // Test inserting the data into the source tables.
+        // -- 2 -- Test inserting the data into the source tables.
         // We do a shuffle here and in the delete test. But I do believe we still
         // have the full coverage of all the cases because we are inserting and deleting
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
         Collections.shuffle(dataList1);
+        System.out.println("Now testing inserting data to the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
             insertRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
 
-        // Test deleting the data from the source tables.
+        // -- 3 -- Test altering the source table
+        // 3.1 add column
+        try {
+            client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            assertTrue("Should be able to add column to a view source table.", false);
+        }
+        verifyViewOnJoinQueryResult(client);
+        // 3.2 drop column
+        try {
+            client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            assertTrue("Should be able to drop column on a view source table.", false);
+        }
+        verifyViewOnJoinQueryResult(client);
+        // 3.3 alter column
+        try {
+            client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            assertTrue("Should be able to alter column in a view source table.", false);
+        }
+        verifyViewOnJoinQueryResult(client);
+
+        // -- 4 -- Test deleting the data from the source tables.
         Collections.shuffle(dataList1);
+        System.out.println("Now testing deleting data from the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
@@ -1601,6 +1634,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
+        project.setUseDDLSchema(true);
         //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
         project.addSchema(schemaPath);
 
