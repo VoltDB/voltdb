@@ -104,7 +104,8 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     print_seconds(diff_time, message_end, message_begin)
     return diff_time
 
-def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
+def run_once(name, command, statements_path, results_path,
+             submit_verbosely, testConfigKit, precision):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -122,7 +123,6 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
             port = testConfigKit["hostport"]
 
     global normalize
-    global precision
     if(host == defaultHost):
         server = subprocess.Popen(command + " backend=" + name, shell=True)
 
@@ -242,15 +242,13 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
 
-    global precision
     precision = 0
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if key == "precision":
             precision = int(config["precision"])
-        else:
-            if not os.path.isabs(config[key]):
-                config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+        elif not os.path.isabs(config[key]):
+            config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -328,7 +326,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     num_crashes = 0
     failed = False
     try:
-        if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
+        if run_once("jni", command, statements_path, jni_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
             print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors (crash?)."
             failed = True
     except:
@@ -351,7 +350,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
 
     failed = False
     try:
-        if run_once(comparison_database_lower, command, statements_path, cmpdb_path, submit_verbosely, testConfigKit) != 0:
+        if run_once(comparison_database_lower, command, statements_path, cmpdb_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
             print >> sys.stderr, "Test with the " + comparison_database + " backend had errors (crash?)."
             failed = True
     except:
