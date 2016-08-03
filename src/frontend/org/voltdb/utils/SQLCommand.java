@@ -74,7 +74,7 @@ public class SQLCommand
     private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
     private static boolean m_interactive;
-    private static boolean m_version_check = true;
+    private static boolean m_versionCheck = true;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
@@ -1329,7 +1329,7 @@ public class SQLCommand
                 printUsage(0);
             }
             else if (arg.equals("--no-version-check")) {
-                m_version_check = false; // Disable new version phone home check
+                m_versionCheck = false; // Disable new version phone home check
             }
             else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
                 printUsage(0);
@@ -1343,8 +1343,7 @@ public class SQLCommand
         String[] servers = serverList.split(",");
 
         // Phone home to see if there is a newer version of VoltDB
-        if (m_version_check)
-        {
+        if (m_versionCheck) {
             openURLAsync();
         }
 
