@@ -54,11 +54,11 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -688,24 +688,32 @@ public class MaterializedViewProcessor {
                           StatementPartitioning.forceSP());
     }
 
-    /**
-     * check if the plan contained in the catalog statement uses index scan.
-     * @param stmt the statement to check
-     * @return if the plan has index scan
-     */
-    private boolean statementHasIndexScan(Database db, Statement stmt) {
+    private PlanNodeTree getPlanNodeTreeFromCatalogStatement(Database db, Statement stmt) {
+        PlanNodeTree pnt = new PlanNodeTree();
         try {
             JSONObject jsonPlan = new JSONObject(org.voltdb.utils.Encoder.decodeBase64AndDecompress(
                                                     stmt.getFragments().get("0").getPlannodetree()));
-            PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadFromJSONPlan(jsonPlan, db);
-            for (AbstractPlanNode apn : pnt.getNodeList()) {
-                if (apn instanceof IndexScanPlanNode || apn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null) {
-                    return true;
-                }
-            }
         } catch (JSONException e) {
             e.printStackTrace();
+        }
+        return pnt;
+    }
+
+    private boolean needsWarningForSingleTableView(PlanNodeTree pnt) {
+        for (AbstractPlanNode apn : pnt.getNodeList()) {
+            if (apn instanceof IndexScanPlanNode) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean needsWarningForJoinQueryView(PlanNodeTree pnt) {
+        for (AbstractPlanNode apn : pnt.getNodeList()) {
+            if (apn instanceof NestLoopPlanNode) {
+                return true;
+            }
         }
         return false;
     }
@@ -720,7 +728,7 @@ public class MaterializedViewProcessor {
                     // If there is any statement in the fallBackQueryStmts map, then
                     // there must be some min/max columns.
                     // Only check if the plan uses index scan.
-                    if (! statementHasIndexScan(db, stmt)) {
+                    if (needsWarningForSingleTableView( getPlanNodeTreeFromCatalogStatement(db, stmt))) {
                         m_compiler.addWarn(
                                 "No index found to support UPDATE and DELETE on some of the min() / max() columns " +
                                 "in the materialized view " + mvInfo.getTypeName() +
@@ -734,7 +742,7 @@ public class MaterializedViewProcessor {
             MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get("mvHandlerInfo");
             if (mvHandlerInfo != null) {
                 Statement createQueryStatement = mvHandlerInfo.getCreatequery().get("createQuery");
-                if (! statementHasIndexScan(db, createQueryStatement)) {
+                if (needsWarningForJoinQueryView( getPlanNodeTreeFromCatalogStatement(db, createQueryStatement))) {
                     m_compiler.addWarn(
                             "No index found to support refreshing the materialized view " +
                             table.getTypeName() +
