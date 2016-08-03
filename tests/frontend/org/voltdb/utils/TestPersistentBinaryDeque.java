@@ -350,7 +350,7 @@ public class TestPersistentBinaryDeque {
 
     @Test
     public void testCloseOldSegments() throws Exception {
-        System.out.println("Running testOfferMoreThanPoll");
+        System.out.println("Running testCloseOldSegments");
         BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 

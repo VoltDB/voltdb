@@ -19,7 +19,9 @@ package org.voltdb.utils;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
 import java.io.EOFException;
 import java.io.File;
@@ -115,27 +117,28 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public int readIndex(String cursorId)
-    {
-        return m_readCursors.get(cursorId).m_objectReadIndex;
-    }
-
-    @Override
     public boolean isOpenForReading(String cursorId) {
         return m_readCursors.containsKey(cursorId);
     }
 
     @Override
-    public void openForRead(String cursorId) throws IOException
+    public PBDSegmentReader openForRead(String cursorId) throws IOException
     {
         if (m_readCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }
 
-        m_readCursors.put(cursorId, new SegmentReader(cursorId));
         if (m_closed) {
             open(false, false);
         }
+        SegmentReader reader = new SegmentReader(cursorId);
+        m_readCursors.put(cursorId, reader);
+        return reader;
+    }
+    
+    @Override
+    public PBDSegmentReader getReader(String cursorId) {
+        return m_readCursors.get(cursorId);
     }
 
     @Override
@@ -220,7 +223,10 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public void close() throws IOException {
-        m_readCursors.clear();
+        Map<String, PBDSegmentReader> copy = new HashMap<>(m_readCursors);
+        for (PBDSegmentReader segmentReader : copy.values()) {
+            segmentReader.close();
+        }
         try {
             if (m_fc != null) {
                 m_fc.close();
@@ -243,15 +249,6 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public boolean hasMoreEntries(String cursorId) throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
-
-        if (m_readCursors.size() == 0) return false;
-
-        return m_readCursors.get(cursorId).m_objectReadIndex < m_numOfEntries;
-    }
-
-    @Override
     public boolean hasAllFinishedReading() throws IOException {
         if (m_closed) throw new IOException("Segment closed");
 
@@ -265,12 +262,6 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         return true;
-    }
-
-    @Override
-    public boolean isCursorEmpty(String cursorId) throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
-        return m_readCursors.get(cursorId).m_discardCount == m_numOfEntries;
     }
 
     @Override
@@ -362,115 +353,8 @@ public class PBDRegularSegment extends PBDSegment {
     }
 
     @Override
-    public DBBPool.BBContainer poll(String cursorId, BinaryDeque.OutputContainerFactory factory) throws IOException
-    {
-        if (m_closed) throw new IOException("closed");
-
-        if (!hasMoreEntries(cursorId)) {
-            return null;
-        }
-
-        final long writePos = m_fc.position();
-        SegmentReader reader = m_readCursors.get(cursorId);
-        m_fc.position(reader.m_readOffset);
-        reader.m_objectReadIndex++;
-
-        try {
-            //Get the length and size prefix and then read the object
-            m_tmpHeaderBuf.b().clear();
-            while (m_tmpHeaderBuf.b().hasRemaining()) {
-                int read = m_fc.read(m_tmpHeaderBuf.b());
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            m_tmpHeaderBuf.b().flip();
-            final int length = m_tmpHeaderBuf.b().getInt();
-            final int flags = m_tmpHeaderBuf.b().getInt();
-            final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
-            final int uncompressedLen;
-
-            if (length < 1) {
-                throw new IOException("Read an invalid length");
-            }
-
-            final DBBPool.BBContainer retcont;
-            if (compressed) {
-                final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
-                try {
-                    while (compressedBuf.b().hasRemaining()) {
-                        int read = m_fc.read(compressedBuf.b());
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    compressedBuf.b().flip();
-
-                    uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
-                    retcont = factory.getContainer(uncompressedLen);
-                    retcont.b().limit(uncompressedLen);
-                    CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
-                } finally {
-                    compressedBuf.discard();
-                }
-            } else {
-                uncompressedLen = length;
-                retcont = factory.getContainer(length);
-                retcont.b().limit(length);
-                while (retcont.b().hasRemaining()) {
-                    int read = m_fc.read(retcont.b());
-                    if (read == -1) {
-                        throw new EOFException();
-                    }
-                }
-                retcont.b().flip();
-            }
-
-            reader.m_bytesRead += uncompressedLen;
-
-            return new DBBPool.BBContainer(retcont.b()) {
-                private boolean m_discarded = false;
-
-                @Override
-                public void discard() {
-                    checkDoubleFree();
-                    if (m_discarded) {
-                        LOG.error("PBD Container discarded more than once");
-                        return;
-                    }
-
-                    m_discarded = true;
-                    retcont.discard();
-                    reader.m_discardCount++;
-                }
-            };
-        } finally {
-            reader.m_readOffset = m_fc.position();
-            m_fc.position(writePos);
-        }
-    }
-
-    @Override
-    public int uncompressedBytesToRead(String cursorId) {
-        if (m_closed) throw new RuntimeException("Segment closed");
-        return m_size - m_readCursors.get(cursorId).m_bytesRead;
-    }
-
-    @Override
     public int size() {
         return m_size;
-    }
-
-    @Override
-    protected long readOffset(String cursorId)
-    {
-        return m_readCursors.get(cursorId).m_readOffset;
-    }
-
-    @Override
-    protected void rewindReadOffset(String cursorId, int byBytes)
-    {
-        m_readCursors.get(cursorId).m_readOffset -= byBytes;
     }
 
     @Override
@@ -491,17 +375,154 @@ public class PBDRegularSegment extends PBDSegment {
         return written;
     }
 
-    private class SegmentReader {
-        @SuppressWarnings("unused")
+    private class SegmentReader implements PBDSegmentReader {
         private final String m_cursorId;
         private long m_readOffset = SEGMENT_HEADER_BYTES;
         //Index of the next object to read, not an offset into the file
         private int m_objectReadIndex = 0;
         private int m_bytesRead = 0;
-        private int m_discardCount;
+        private int m_discardCount = 0;
+        private boolean m_closed = false;
 
         public SegmentReader(String cursorId) {
             m_cursorId = cursorId;
+        }
+
+        @Override
+        public boolean hasMoreEntries() throws IOException
+        {
+            if (m_closed) throw new IOException("Reader closed");
+
+            return m_objectReadIndex < m_numOfEntries;
+        }
+
+        @Override
+        public boolean isEmpty() throws IOException
+        {
+            if (m_closed) throw new IOException("Reader closed");
+            
+            return m_discardCount == m_numOfEntries;
+        }
+
+        @Override
+        public BBContainer poll(OutputContainerFactory factory) throws IOException
+        {
+            if (m_closed) throw new IOException("Reader closed");
+
+            if (!hasMoreEntries()) {
+                return null;
+            }
+
+            final long writePos = m_fc.position();
+            m_fc.position(m_readOffset);
+            m_objectReadIndex++;
+
+            try {
+                //Get the length and size prefix and then read the object
+                m_tmpHeaderBuf.b().clear();
+                while (m_tmpHeaderBuf.b().hasRemaining()) {
+                    int read = m_fc.read(m_tmpHeaderBuf.b());
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                m_tmpHeaderBuf.b().flip();
+                final int length = m_tmpHeaderBuf.b().getInt();
+                final int flags = m_tmpHeaderBuf.b().getInt();
+                final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
+                final int uncompressedLen;
+
+                if (length < 1) {
+                    throw new IOException("Read an invalid length");
+                }
+
+                final DBBPool.BBContainer retcont;
+                if (compressed) {
+                    final DBBPool.BBContainer compressedBuf = DBBPool.allocateDirectAndPool(length);
+                    try {
+                        while (compressedBuf.b().hasRemaining()) {
+                            int read = m_fc.read(compressedBuf.b());
+                            if (read == -1) {
+                                throw new EOFException();
+                            }
+                        }
+                        compressedBuf.b().flip();
+
+                        uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
+                        retcont = factory.getContainer(uncompressedLen);
+                        retcont.b().limit(uncompressedLen);
+                        CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
+                    } finally {
+                        compressedBuf.discard();
+                    }
+                } else {
+                    uncompressedLen = length;
+                    retcont = factory.getContainer(length);
+                    retcont.b().limit(length);
+                    while (retcont.b().hasRemaining()) {
+                        int read = m_fc.read(retcont.b());
+                        if (read == -1) {
+                            throw new EOFException();
+                        }
+                    }
+                    retcont.b().flip();
+                }
+
+                m_bytesRead += uncompressedLen;
+
+                return new DBBPool.BBContainer(retcont.b()) {
+                    private boolean m_discarded = false;
+
+                    @Override
+                    public void discard() {
+                        checkDoubleFree();
+                        if (m_discarded) {
+                            LOG.error("PBD Container discarded more than once");
+                            return;
+                        }
+
+                        m_discarded = true;
+                        retcont.discard();
+                        m_discardCount++;
+                    }
+                };
+            } finally {
+                m_readOffset = m_fc.position();
+                m_fc.position(writePos);
+            }
+        }
+
+        @Override
+        public int uncompressedBytesToRead()
+        {
+            if (m_closed) throw new RuntimeException("Reader closed");
+            
+            return m_size - m_bytesRead;
+        }
+
+        @Override
+        public long readOffset()
+        {
+            return m_readOffset;
+        }
+
+        @Override
+        public int readIndex()
+        {
+            return m_objectReadIndex;
+        }
+
+        @Override
+        public void rewindReadOffset(int byBytes)
+        {
+            m_readOffset -= byBytes;
+        }
+
+        @Override
+        public void close()
+        {
+            m_closed = true;
+            m_readCursors.remove(m_cursorId);
         }
     }
 }
