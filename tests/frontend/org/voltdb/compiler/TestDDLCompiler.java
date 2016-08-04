@@ -452,7 +452,7 @@ public class TestDDLCompiler extends TestCase {
         int expectWarningType[] = { 0, 0, 0, 0, 0, 0, 1, 1 };
         final String warningPrefix[] = {
                 "No index found to support UPDATE and DELETE on some of the min() / max() columns",
-                "No index found to support refreshing the materialized view"
+                "No index found to support some of the join operations required to refresh the materialized view"
         };
         // boilerplate for making a project
         final String simpleProject =

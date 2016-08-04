@@ -744,9 +744,9 @@ public class MaterializedViewProcessor {
                 Statement createQueryStatement = mvHandlerInfo.getCreatequery().get("createQuery");
                 if (needsWarningForJoinQueryView( getPlanNodeTreeFromCatalogStatement(db, createQueryStatement))) {
                     m_compiler.addWarn(
-                            "No index found to support refreshing the materialized view " +
+                            "No index found to support some of the join operations required to refresh the materialized view " +
                             table.getTypeName() +
-                            ", which was defined by a join query. The refreshing may be slow.");
+                            ". The refreshing may be slow.");
                 }
             }
         }
