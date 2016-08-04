@@ -315,12 +315,12 @@ public class TestDDLCompiler extends TestCase {
         assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
     }
 
-    public void testIndexedMinMaxViews() {
+    public void testViewIndexSelectionWarning() {
         File jarOut = new File("indexedMinMaxViews.jar");
         jarOut.deleteOnExit();
 
         String schema[] = {
-                // no indexes (should produce warnings)
+                // #1, no indices (should produce warnings)
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                 "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
@@ -339,43 +339,44 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T WHERE D1 > 3 " +
                 "GROUP BY D1 + D2, ABS(D3);",
 
-                // schema with indexes (should have no warnings)
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE INDEX T_TREE_1 ON T(D1);\n" +
-               "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
-               "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
-               "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
-               "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
-               "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);" +
-               "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1 + D2, ABS(D3);",
+                // #2, schema with indices (should have no warnings)
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE INDEX T_TREE_1 ON T(D1);\n" +
+                "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
+                "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
+                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
+                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);" +
+                "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1 + D2, ABS(D3);",
 
-               // schema with no indexes and mat view with no min / max
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
-               "AS SELECT D1, D2, D3, COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);",
+                // #3, schema with no indices and mat view with no min / max (should have no warnings)
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
+                "AS SELECT D1, D2, D3, COUNT(*) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);",
 
-                // schema with index but can not be used for mat view with min / max
+                // #4, schema with indices but hard-coded function cannot find a usable one.
+                // The query planner can tell us to use T_TREE_3 for all min/nax columns. (should have no warnings)
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                 "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
                 "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
@@ -390,15 +391,15 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T " +
                 "GROUP BY D1, D2, D3;\n",
 
-                // schemas with index but can not be used for mat view with min / max
+                // #5, schemas with indices, both hard-coded function and query planner cannot find a usable index.
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
-                "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
-                "CREATE INDEX T_TREE_3 ON T(D1, D2);\n" +
-                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3, VAL1);\n" +
-                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3, ABS(VAL1));\n" +
-                "CREATE INDEX T_TREE_6 ON T(D1, D2-D3);\n" +
-                "CREATE INDEX T_TREE_7 ON T(D1, D2-D3, D3, D2);\n" +
+                "CREATE INDEX T_TREE_1 ON T(VAL1, D2 + D3);\n" +
+                "CREATE INDEX T_TREE_2 ON T(VAL1, D2 + D3, D3);\n" +
+                "CREATE INDEX T_TREE_3 ON T(VAL1, D2);\n" +
+                "CREATE INDEX T_TREE_4 ON T(VAL1, D2, D3, VAL2);\n" +
+                "CREATE INDEX T_TREE_5 ON T(VAL1, D2, D3, ABS(VAL1));\n" +
+                "CREATE INDEX T_TREE_6 ON T(VAL1, D2-D3);\n" +
+                "CREATE INDEX T_TREE_7 ON T(VAL1, D2-D3, D3, D2);\n" +
                 "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
                 "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                 "FROM T " +
@@ -408,7 +409,12 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T " +
                 "GROUP BY D1, D2-D3, D3;",
 
-                // schemas with index but not all min/max columns in the view can have a usable index (ENG-8512)
+                // #6, schemas with indices but hard-coded function cannot find usable index for ALL min/max columns.
+                // For VT1, hard-coded function can find T_TREE_7 for min;
+                //          query planner will find T_TREE_4 for max.
+                // This means we will use the hard-coded path for min, and query plan for the max.
+                // For VT2, hard-coded function can find T_TREE_6 for max;
+                //          query planner will find T_TREE_6 for min.
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                 "CREATE INDEX T_TREE_1 ON T(D1, D2 + D3);\n" +
                 "CREATE INDEX T_TREE_2 ON T(D1, D2 + D3, D3);\n" +
@@ -425,9 +431,29 @@ public class TestDDLCompiler extends TestCase {
                 "AS SELECT D1, D2-D3, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
                 "FROM T " +
                 "GROUP BY D1, D2-D3, D3;",
+
+                // #7, join case, no index, has warnings
+                "CREATE TABLE CUSTOMERS (ID INTEGER NOT NULL, NAME VARCHAR(20), AGE INTEGER NOT NULL, ADDRESS VARCHAR(20));\n" +
+                "CREATE TABLE ORDERS (OID INTEGER NOT NULL, DATE TIMESTAMP, CUSTOMER_ID INTEGER NOT NULL, AMOUNT INTEGER NOT NULL);\n" +
+                "CREATE VIEW ORDERSUM (NAME, CNT, SUMAMT, MINAMT, MAXAMT) AS\n" +
+                "  SELECT CUSTOMERS.NAME, COUNT(*), SUM(ORDERS.AMOUNT), MIN(ORDERS.AMOUNT), MAX(ORDERS.AMOUNT) FROM\n" +
+                "  CUSTOMERS JOIN ORDERS ON CUSTOMERS.ID = ORDERS.CUSTOMER_ID GROUP BY CUSTOMERS.NAME;",
+
+                // #8, join case, has index, no warnings.
+                "CREATE TABLE CUSTOMERS (ID INTEGER NOT NULL, NAME VARCHAR(20), AGE INTEGER NOT NULL, ADDRESS VARCHAR(20));\n" +
+                "CREATE TABLE ORDERS (OID INTEGER NOT NULL, DATE TIMESTAMP, CUSTOMER_ID INTEGER NOT NULL, AMOUNT INTEGER NOT NULL);\n" +
+                "CREATE INDEX IDX ON CUSTOMERS(ID);\n" +
+                "CREATE VIEW ORDERSUM (NAME, CNT, SUMAMT, MINAMT, MAXAMT) AS\n" +
+                "  SELECT CUSTOMERS.NAME, COUNT(*), SUM(ORDERS.AMOUNT), MIN(ORDERS.AMOUNT), MAX(ORDERS.AMOUNT) FROM\n" +
+                "  CUSTOMERS JOIN ORDERS ON CUSTOMERS.ID = ORDERS.CUSTOMER_ID GROUP BY CUSTOMERS.NAME;",
         };
 
-        int expectWarning[] = { 4, 0, 0, 2, 2, 2 };
+        int expectWarning[] = { 4, 0, 0, 0, 2, 0, 1, 0 };
+        int expectWarningType[] = { 0, 0, 0, 0, 0, 0, 1, 1 };
+        final String warningPrefix[] = {
+                "No index found to support UPDATE and DELETE on some of the min() / max() columns",
+                "No index found to support some of the join operations required to refresh the materialized view"
+        };
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +
@@ -451,7 +477,7 @@ public class TestDDLCompiler extends TestCase {
             // verify the warnings exist
             int foundWarnings = 0;
             for (VoltCompiler.Feedback f : compiler.m_warnings) {
-                if (f.message.toLowerCase().contains("min")) {
+                if (f.message.contains(warningPrefix[expectWarningType[ii]])) {
                     System.out.println(f.message);
                     foundWarnings++;
                 }
@@ -479,8 +505,8 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
-    // ENG-6511
-    public void testMinMaxViewIndexSelection() {
+    // ENG-6511 This test is for the hard-coded index selection function.
+    public void testMinMaxViewIndexSelectionFunction() {
         File jarOut = new File("minMaxViewIndexSelection.jar");
         jarOut.deleteOnExit();
 
