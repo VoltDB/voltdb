@@ -488,9 +488,30 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_PI :
                 name = Tokens.T_PI;
                 parseList = emptyParamList;
-                // A VoltDB extension to customize the SQL function set support
-                // voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // End of VoltDB extension
+                break;
+            case FUNC_SIN :
+                name = Tokens.T_SIN;
+                parseList = singleParamList;
+                break;
+            case FUNC_COS :
+                name = Tokens.T_COS;
+                parseList = singleParamList;
+                break;
+            case FUNC_TAN :
+                name = Tokens.T_TAN;
+                parseList = singleParamList;
+                break;
+            case FUNC_COT :
+                name = Tokens.T_COT;
+                parseList = singleParamList;
+                break;
+            case FUNC_SEC :
+                name = Tokens.T_SEC;
+                parseList = singleParamList;
+                break;
+            case FUNC_CSC :
+                name = Tokens.T_CSC;
+                parseList = singleParamList;
                 break;
 
             case FUNC_LOG10 :
@@ -509,31 +530,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ASIN :
             case FUNC_ATAN :
             case FUNC_ATAN2 :
-            case FUNC_CSC :
-                name = Tokens.T_CSC;
-                parseList = singleParamList;
-                break;
-            case FUNC_COS :
-                name = Tokens.T_COS;
-                parseList = singleParamList;
-                break;
-            case FUNC_COT :
-                name = Tokens.T_COT;
-                parseList = singleParamList;
-                break;
             case FUNC_DEGREES :
-            case FUNC_SIN :
-                name = Tokens.T_SIN;
-                parseList = singleParamList;
-                break;
-            case FUNC_SEC :
-                name = Tokens.T_SEC;
-                parseList = singleParamList;
-                break;
-            case FUNC_TAN :
-                name = Tokens.T_TAN;
-                parseList = singleParamList;
-                break;
             case FUNC_RADIANS :
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
@@ -595,6 +592,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public void setArguments(Expression[] nodes) {
 
         switch (funcType) {
@@ -635,6 +633,7 @@ public class FunctionCustom extends FunctionSQL {
         super.setArguments(nodes);
     }
 
+    @Override
     public Expression getFunctionExpression() {
 
         switch (funcType) {
@@ -657,6 +656,7 @@ public class FunctionCustom extends FunctionSQL {
         return super.getFunctionExpression();
     }
 
+    @Override
     Object getValue(Session session, Object[] data) {
 
         switch (funcType) {
@@ -1251,6 +1251,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1716,6 +1717,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public String getSQL() {
 
         switch (funcType) {
