@@ -1573,30 +1573,36 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         // -- 3 -- Test altering the source table
-        // 3.1 add column
-        try {
-            client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            assertTrue("Should be able to add column to a view source table.", false);
+        // This alter table test will alter the source table schema first, then test if hte view still
+        // has the correct content. Columns referenced by the views are now altered (we don't allow it).
+        // Our HSQL backend testing code does not support AdHoc DDL, disable this on HSQLBackend.
+        // This is fine because we don't use HSQL as reference in this test anyway.
+        if (! isHSQL()) {
+            // 3.1 add column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                assertTrue("Should be able to add column to a view source table.", false);
+            }
+            verifyViewOnJoinQueryResult(client);
+            // 3.2 drop column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                assertTrue("Should be able to drop column on a view source table.", false);
+            }
+            verifyViewOnJoinQueryResult(client);
+            // 3.3 alter column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                assertTrue("Should be able to alter column in a view source table.", false);
+            }
+            verifyViewOnJoinQueryResult(client);
         }
-        verifyViewOnJoinQueryResult(client);
-        // 3.2 drop column
-        try {
-            client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            assertTrue("Should be able to drop column on a view source table.", false);
-        }
-        verifyViewOnJoinQueryResult(client);
-        // 3.3 alter column
-        try {
-            client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            assertTrue("Should be able to alter column in a view source table.", false);
-        }
-        verifyViewOnJoinQueryResult(client);
 
         // -- 4 -- Test deleting the data from the source tables.
         Collections.shuffle(dataList1);
