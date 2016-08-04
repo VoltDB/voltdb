@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -37,6 +38,7 @@ import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 /**
  * The repair log stores messages received from a partition initiator (leader) in case
@@ -56,6 +58,10 @@ public class RepairLog
     // transactions it should never have seen
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
+
+    // Truncation point
+    long m_truncationHandle = Long.MIN_VALUE;
+    final List<TransactionCommitInterest> m_txnCommitInterests = new ArrayList<>();
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -144,7 +150,9 @@ public class RepairLog
         // wipe out the SP portion of the existing log. This promotion
         // action always happens after repair is completed.
         if (m_isLeader) {
-            truncate(Long.MAX_VALUE, IS_SP);
+            if (!m_logSP.isEmpty()) {
+                truncate(m_logSP.getLast().getHandle(), IS_SP);
+            }
         }
     }
 
@@ -210,6 +218,10 @@ public class RepairLog
                tmLog.warn("" + who + ": msg: " + il);
             }
         }
+        else if (msg instanceof RepairLogTruncationMessage) {
+            final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
+            truncate(truncateMsg.getHandle(), IS_SP);
+        }
     }
 
     // trim unnecessary log messages.
@@ -223,6 +235,12 @@ public class RepairLog
         Deque<RepairLog.Item> deq = null;
         if (isSP) {
             deq = m_logSP;
+            if (m_truncationHandle < handle) {
+                m_truncationHandle = handle;
+                for (TransactionCommitInterest interest : m_txnCommitInterests) {
+                    interest.transactionCommitted(m_truncationHandle);
+                }
+            }
         }
         else {
             deq = m_logMP;
@@ -305,5 +323,10 @@ public class RepairLog
             responses.add(response);
         }
         return responses;
+    }
+
+    public void registerTransactionCommitInterest(TransactionCommitInterest interest)
+    {
+        m_txnCommitInterests.add(interest);
     }
 }

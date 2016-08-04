@@ -53,6 +53,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -110,9 +111,15 @@ public class TestWindowedFunctions extends PlannerTestCase {
      *        ORDER BY column, always distinguishable by its "DESC" direction.
      **/
     private void validateWindowedFunctionPlan(String windowedQuery, int nSorts, int descSortIndex, int numPartitionExprs) {
-        AbstractPlanNode node = compile(windowedQuery);
+        // Sometimes we get multi-fragment nodes when we
+        // expect single fragment nodes.  Keeping all the fragments
+        // helps to diagnose the problem.
+        List<AbstractPlanNode> nodes = compileToFragments(windowedQuery);
+        assertEquals(1, nodes.size());
+
+        AbstractPlanNode node = nodes.get(0);
         // The plan should look like:
-        // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
+        // SendNode -> ProjectionPlanNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
         // We also do some sanity checking on the PartitionPlan node.
         // First dissect the plan.
         assertTrue(node instanceof SendPlanNode);
@@ -199,13 +206,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // The following variants exercise resolving columns to subquery result columns.
         // At one point in development, this would only work by disabling ALPHA.A as a possible resolution.
         // It got a mysterious "Mismatched columns A in subquery" error.
-         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateQueryWithSubquery(windowedQuery);
-         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateQueryWithSubquery(windowedQuery);
-         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateQueryWithSubquery(windowedQuery);
-         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateQueryWithSubquery(windowedQuery);
     }
 
@@ -238,6 +245,65 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
     }
 
+    public void testRankWithPartitions() {
+        String windowedQuery;
+        // Validate a plan with a rank expression with one partitioned column in the partition by list.
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) R FROM AAA_PA;";
+        validatePartitionedQuery(windowedQuery, false);
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) R FROM AAA_PA ORDER BY A, B, C, R;";
+        validatePartitionedQuery(windowedQuery, true);
+        // Validate a plan with a rank expression with one partitioned column in the order by list.
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY B ORDER BY A) R FROM AAA_PA;";
+        validatePartitionedQuery(windowedQuery, false);
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY B ORDER BY A) R FROM AAA_PA ORDER BY A, B, C, R;";
+        validatePartitionedQuery(windowedQuery, true);
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A, C ORDER BY B) R FROM AAA_PA";
+        validatePartitionedQuery(windowedQuery, false);
+
+        // Validate plan with a rank expression with one partitioned column and one non-partitioned
+        // column in the partition by list.
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY A, C ORDER BY B) R FROM AAA_PA;";
+        validatePartitionedQuery(windowedQuery, false);
+        // The same as the previous two tests, but swap the partition by columns.
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY C, A ORDER BY B) R FROM AAA_PA;";
+        validatePartitionedQuery(windowedQuery, false);
+        windowedQuery = "SELECT A, B, C, RANK() OVER (PARTITION BY C, A ORDER BY B) R FROM AAA_PA ORDER BY A, B, C, R;";
+        validatePartitionedQuery(windowedQuery, true);
+        // Test that we can read from a partitioned table, but the windowed
+        // partition by is not a partition column.
+        windowedQuery = "Select A, B, C, Rank() Over (Partition By C Order By B) ARANK From AAA_STRING_PA;";
+        validatePartitionedQuery(windowedQuery, false);
+    }
+
+    private void validatePartitionedQuery(String query, boolean hasStatementOrderBy) {
+        List<AbstractPlanNode> nodes = compileToFragments(query);
+        assertEquals(2, nodes.size());
+        AbstractPlanNode child = nodes.get(0);
+
+        // Validate the coordinator fragment.
+        assertTrue(child instanceof SendPlanNode);
+        child = child.getChild(0);
+        assertTrue(child instanceof ProjectionPlanNode);
+        if (hasStatementOrderBy) {
+            child = child.getChild(0);
+            assertTrue(child instanceof OrderByPlanNode);
+        }
+        child = child.getChild(0);
+        assertTrue(child instanceof PartitionByPlanNode);
+        child = child.getChild(0);
+        assertTrue(child instanceof OrderByPlanNode);
+        child = child.getChild(0);
+        assertTrue(child instanceof ReceivePlanNode);
+        assertEquals(0, child.getChildCount());
+
+        // Get the distributed fragment.
+        child = nodes.get(1);
+        assertTrue(child instanceof SendPlanNode);
+        child = child.getChild(0);
+        assertTrue(child instanceof SeqScanPlanNode);
+        assertEquals(0, child.getChildCount());
+    }
+
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both windowed operations and GROUP BY is not supported.");
@@ -266,7 +332,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(true, TestWindowedFunctions.class.getResource("testwindowingfunctions-ddl.sql"), "testwindowfunctions");
+        setupSchema(true, TestWindowedFunctions.class.getResource("testplans-windowingfunctions-ddl.sql"), "testwindowfunctions");
     }
 
     @Override

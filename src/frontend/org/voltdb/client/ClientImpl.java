@@ -77,7 +77,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * network thread pool doesn't block when queuing procedures from
      * a callback.
      */
-    private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
+    private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<>();
 
     private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
 
@@ -102,6 +102,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
+                config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
                 config.m_subject);
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
