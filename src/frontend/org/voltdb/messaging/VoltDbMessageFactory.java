@@ -46,6 +46,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte MP_REPLAY_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 20;
     final public static byte SNAPSHOT_CHECK_REQUEST_ID = VOLTCORE_MESSAGE_ID_MAX + 21;
     final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
+    final public static byte IV2_REPAIR_LOG_TRUNCATION = VOLTCORE_MESSAGE_ID_MAX + 23;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -124,6 +125,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case SNAPSHOT_CHECK_RESPONSE_ID:
             message = new SnapshotCheckResponseMessage();
+            break;
+        case IV2_REPAIR_LOG_TRUNCATION:
+            message = new RepairLogTruncationMessage();
             break;
         default:
             message = null;
