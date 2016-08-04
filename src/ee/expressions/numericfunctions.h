@@ -257,11 +257,8 @@ template<> inline NValue NValue::callUnary<FUNC_COT>() const {
     NValue retval(VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double tanDouble = std::tan(inputValue);
-    throwDataExceptionIfInfiniteOrNaN(tanDouble, "function COT");
-    if (tanDouble == 0) {
-        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
-    }
     double resultDouble = 1 / tanDouble;
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function COT");
     retval.getDouble() = resultDouble;
     return retval;
 }
@@ -274,11 +271,9 @@ template<> inline NValue NValue::callUnary<FUNC_CSC>() const {
     NValue retval(VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double sinDouble = std::sin(inputValue);
-    throwDataExceptionIfInfiniteOrNaN(sinDouble, "function CSC");
-    if (sinDouble == 0) {
-        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
-    }
     double resultDouble = 1 / sinDouble;
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function CSC");
+
     retval.getDouble() = resultDouble;
     return retval;
 }
@@ -291,11 +286,8 @@ template<> inline NValue NValue::callUnary<FUNC_SEC>() const {
     NValue retval(VALUE_TYPE_DOUBLE);
     double inputValue = castAsDoubleAndGetValue();
     double cosDouble = std::cos(inputValue);
-    throwDataExceptionIfInfiniteOrNaN(cosDouble, "function SEC");
-    if (cosDouble == 0) {
-        throw SQLException(SQLException::data_exception_division_by_zero, "infinite");
-    }
     double resultDouble = 1 / cosDouble;
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function SEC");
     retval.getDouble() = resultDouble;
     return retval;
 }
