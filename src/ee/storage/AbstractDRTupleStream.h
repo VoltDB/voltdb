@@ -121,7 +121,8 @@ protected:
     size_t m_txnRowCount;
 
 private:
-    virtual void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) = 0;
+    // return true if stream state was switched from close to open
+    virtual bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) = 0;
 };
 
 class DRTupleStreamDisableGuard {
