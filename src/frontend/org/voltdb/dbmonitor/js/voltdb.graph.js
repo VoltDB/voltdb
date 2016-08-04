@@ -1061,36 +1061,54 @@
 
             if(localStorage.memoryDetailsMin != undefined)
                 memoryDetailsArrMin = JSON.parse(localStorage.memoryDetailsMin)
+            else {
+                memoryDetailsArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormatForMemory(dataMemMin))
+                memoryDetailsArrMin = JSON.parse(memoryDetailsArrMin)
+            }
+
 
             if(localStorage.memoryDetails != undefined)
                 memoryDetailsArr = JSON.parse(localStorage.memoryDetails)
+            else {
+                memoryDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormatForMemory(dataMem))
+                memoryDetailsArr = JSON.parse(memoryDetailsArr)
+            }
 
             if(localStorage.memoryDetailsDay != undefined)
                 memoryDetailsArrDay = JSON.parse(localStorage.memoryDetailsDay)
+            else {
+                memoryDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormatForMemory(dataMemDay))
+                memoryDetailsArrDay = JSON.parse(memoryDetailsArrDay)
+            }
 
             if(monitor.memFirstData){
+                if(memoryDetailsArr.length != 0)
+                    dataMem = []
                 for(var i = 0; i< memoryDetailsArr.length; i++){
                     sliceFirstData(monitor.memData, dataView.Seconds);
-                    monitor.memData.push({"x": new Date(memoryDetailsArr[i].timestamp),
+                    dataMem.push({"x": new Date(memoryDetailsArr[i].timestamp),
                         "y": memoryDetailsArr[i].physicalMemory
                     })
                 }
+
+                if(memoryDetailsArrMin.length != 0)
+                    dataMemMin = []
                 for(var j = 0; j< memoryDetailsArrMin.length; j++){
                     sliceFirstData(monitor.memDataMin, dataView.Minutes);
-                    monitor.memDataMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
+                    dataMemMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
                         "y": memoryDetailsArrMin[j].physicalMemory
                     })
                 }
+
+                if(memoryDetailsArrDay.length != 0)
+                    dataMemDay = []
                 for(var k = 0; k< memoryDetailsArrDay.length; k++){
                     sliceFirstData(monitor.memDataDay, dataView.Days);
-                    monitor.memDataDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
+                    dataMemDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
                         "y": memoryDetailsArrDay[k].physicalMemory
                     })
                 }
             }
-
-
-
 
             if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
                 return;
@@ -1221,7 +1239,6 @@
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
-
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
                 if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
                     calculatedValue = 0;
@@ -1263,6 +1280,7 @@
             }
             else{
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
+
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
@@ -1282,11 +1300,33 @@
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
                     tpsMinCount = 0;
                 }
-                transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 }, MonitorGraphUI.timeUnit.sec  )
 
-                if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                    datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                    MonitorGraphUI.Monitors.tpsData = datatrans;
+                if (monitor.tpsFirstData){
+                    if(localStorage.transDetails == undefined){
+                        datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": null });
+                        MonitorGraphUI.Monitors.tpsData = datatrans;
+                    }
+                    else{
+                        if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                            datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
+                            transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y }, MonitorGraphUI.timeUnit.sec  )
+                            MonitorGraphUI.Monitors.tpsData = datatrans;
+                        }
+                    }
+                }
+                else{
+                    if(localStorage.transDetails == undefined){
+                        datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
+                        MonitorGraphUI.Monitors.tpsData = datatrans;
+                    }
+                    else{
+                        var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
+                        if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                            datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
+                            transDetailsArr = MonitorGraphUI.saveLocalStorage(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue }, MonitorGraphUI.timeUnit.sec  )
+                            MonitorGraphUI.Monitors.tpsData = datatrans;
+                        }
+                    }
                 }
                 monitor.tpsFirstData = false;
             }
@@ -1946,6 +1986,14 @@
             var requiredFormat = []
             for(var i = 0; i < cmdLogData.length; i++){
                 requiredFormat.push({"timestamp": cmdLogData[i].x, "outstandingTxn": cmdLogData[i].y})
+            }
+            return requiredFormat;
+        }
+
+        this.convertDataFormatForMemory = function(memoryData){
+            var requiredFormat = []
+            for(var i = 0; i < memoryData.length; i++){
+                requiredFormat.push({"timestamp": memoryData[i].x, "physicalMemory": memoryData[i].y})
             }
             return requiredFormat;
         }
