@@ -44,9 +44,7 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
     if (m_target->isPersistentTableEmpty()) {
-        /* If there is no group by column and the target table is still empty
-         * even after catching up with pre-existing source tuples, we should initialize the
-         * target table with a row of default values.
+        /* If there is no group by column, a special initialization is required.
          * COUNT() functions should have value 0, other aggregation functions should have value NULL.
          * See ENG-7872
          */
