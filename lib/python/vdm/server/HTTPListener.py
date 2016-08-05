@@ -1349,9 +1349,9 @@ class StartServerAPI(MethodView):
             response = server.start_server(server_id, pause, False, is_blocking)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
-                return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
+                return make_response(jsonify({'status': 500, 'statusString': resp_json['statusString']}), 500)
             else:
-                return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
+                return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}), 200)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),

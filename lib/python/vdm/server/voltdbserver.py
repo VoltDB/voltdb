@@ -123,6 +123,8 @@ class VoltDatabase:
                 return create_response('Server details not found for id: %u' % server_id, 404)
 
         # Now start each server
+        server_unreachable = False
+        error_msg = ''
         failed = False
         server_status = {}
         action = 'start'
@@ -138,15 +140,22 @@ class VoltDatabase:
                 if response.status_code != requests.codes.ok:
                     failed = True
 
-                server_status[curr['hostname']] = json.loads(response.text)['statusString']
+                db_status = json.loads(response.text)['statusString']
+                server_status[curr['hostname']] = db_status
             except Exception, err:
+                if 'ConnectionError' in str(err):
+                    error_msg = "Could not connect to the server " + curr['hostname'] + ". " \
+                                "Please ensure that all servers are reachable."
+                    server_unreachable = True
+                    break
                 failed = True
                 print traceback.format_exc()
                 server_status[curr['hostname']] = str(err)
-
-        if failed:
+        if server_unreachable:
+            return make_response(jsonify({'status': 500, 'statusString': error_msg}), 500)
+        elif failed:
             url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
-                  (curr['hostname'], HTTPListener.__PORT__, self.database_id)
+                  (HTTPListener.__IP__, HTTPListener.__PORT__, self.database_id)
             response = requests.get(url)
             return make_response(jsonify({'status': 200, 'statusString': response.text}), 200)
         else:
@@ -181,6 +190,8 @@ class VoltDatabase:
             response = requests.put(url)
             return create_response(json.loads(response.text)['statusString'], response.status_code)
         except Exception, err:
+            if 'ConnectionError' in str(err):
+               err = "Server " + server['hostname'] + " is currently unreachable."
             print traceback.format_exc()
             return create_response(str(err), 500)
 
