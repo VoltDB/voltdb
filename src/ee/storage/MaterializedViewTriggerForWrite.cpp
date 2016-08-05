@@ -43,11 +43,22 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
     setupMinMaxRecalculation(mvInfo->indexForMinMax(), mvInfo->fallbackQueryStmts());
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
-        while (iterator.next(scannedTuple)) {
-            processTupleInsert(scannedTuple, false);
+    if (m_target->isPersistentTableEmpty()) {
+        /* If there is no group by column and the target table is still empty
+         * even after catching up with pre-existing source tuples, we should initialize the
+         * target table with a row of default values.
+         * COUNT() functions should have value 0, other aggregation functions should have value NULL.
+         * See ENG-7872
+         */
+        if (m_groupByColumnCount == 0) {
+            initializeTupleHavingNoGroupBy();
+        }
+        if ( ! srcTable->isPersistentTableEmpty()) {
+            TableTuple scannedTuple(srcTable->schema());
+            TableIterator &iterator = srcTable->iterator();
+            while (iterator.next(scannedTuple)) {
+                processTupleInsert(scannedTuple, false);
+            }
         }
     }
 }
