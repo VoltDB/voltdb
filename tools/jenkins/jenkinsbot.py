@@ -86,9 +86,9 @@ INNER JOIN `junit-builds` AS jr
 # Test On Master - See if test is also failing on master and how recently.
 TOM_QUERY = ("""
     SELECT MAX(tf.build) AS 'Most recent failure on master',
-           MAX(jr.build) AS 'Most recent build of master'
+           MAX(jr.build) AS 'Most recent build on master'
       FROM `junit-test-failures` AS tf
-RIGHT JOIN `junit-builds` AS jr
+INNER JOIN `junit-builds` AS jr
         ON NOT tf.status='FIXED' AND
            jr.name=tf.job AND
            tf.name=%(test)s AND
@@ -166,7 +166,7 @@ class JenkinsBot(object):
              'Most recent failure on master:\n\t*test-on-master* <job> <testname> (ex. testname: org.voltdb.iv2'
              '..)\n',
              'All failures for a job:\n\t*all-failures* <job>\n',
-             'Display this help:\n\t*help*\n'
+             'Display this help:\n\t*help*\n',
              'For any <job>, you can specify *"pro"* or *"com"* for the master jobs\n',
              'Examples: test-leaderboard pro 860, days com 14, now=days pro 1\n']
         self.logger = self.setup_logging()
@@ -245,6 +245,7 @@ class JenkinsBot(object):
                     else:
                         (query, params, filename) = self.parse_text(text, channel, user)
                         if query and params and filename:
+                            self.post_message(channel, 'Please wait..')
                             self.query_and_response(query, params, [channel], filename)
                         elif query and params:
                             self.query([channel], query, params, insert=True)
@@ -318,8 +319,8 @@ class JenkinsBot(object):
             query = AA_QUERY
             params = {
                 'slack_user_id': user,
-                'command': command,
-                'alias': alias
+                'command': command.strip(),
+                'alias': alias.strip()
             }
             filename = ''
         elif 'test-on-master' in text:
@@ -398,7 +399,7 @@ class JenkinsBot(object):
         except MySQLError:
             self.logger.exception('Either could not connect to database or execution error')
             for channel in channels:
-                self.post_message(channel, 'Something went wrong with the query.')
+                self.post_message(channel, 'Something went wrong with the command.')
         except:
             self.logger.exception('Something unexpected went wrong')
 
@@ -545,7 +546,7 @@ class JenkinsBot(object):
         table = self.query(channels, query, params)
         self.response([table], channels, filename, vertical, edit)
 
-    def create_bug_issue(self, channel, summary, description, component, version, label,
+    def create_bug_issue(self, channel, summary, description, component, version, labels,
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
         """
         Creates a bug issue on Jira
@@ -554,7 +555,7 @@ class JenkinsBot(object):
         :param description: Description field
         :param component: Component bug affects
         :param version: Version this bug affects
-        :param label: Label to attach to the issue
+        :param labels: Labels to attach to the issue
         :param user: User to report bug as
         :param passwd: Password
         :param project: Jira project
@@ -583,7 +584,7 @@ class JenkinsBot(object):
             'issuetype': {
                 'name': 'Bug'
             },
-            'labels': [label]
+            'labels': labels
         }
 
         jira_component = None
@@ -620,6 +621,13 @@ class JenkinsBot(object):
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
+    help_text = """
+            usage: jenkinsbot <listen|master|core|system>
+                   listen - bring jenkinsbot online (do not use if already running)
+                   master - post the master branch junit leaderboard on Slack
+                   core - post the core extended junit leaderboard on Slack
+                   system - post the master systems test leaderboard on Slack
+            """
     if jenkinsbot.connect_to_slack() and len(sys.argv) == 2:
         if sys.argv[1] == 'listen':
             jenkinsbot.listen()
@@ -653,3 +661,7 @@ if __name__ == '__main__':
                 'systems-master-past30days.txt',
                 vertical=True
             )
+        else:
+            print help_text
+    else:
+        print help_text

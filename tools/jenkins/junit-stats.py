@@ -254,7 +254,8 @@ class Stats(object):
                 summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
                 description = error_url + '\n' + error_report['errorStackTrace']
                 # TODO get a current version instead of using V6.6
-                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', 'V6.6', 'junit-consistent-failure')
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', 'V6.6', ['junit-consistent-failure',
+                                            'automatic'])
         except:
             logging.exception('Error with creating issue')
 
