@@ -26,7 +26,7 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 
 public abstract class PBDSegment {
-    
+
     /**
      * Represents a reader for a segment. Multiple readers may be active
      * at any point in time, reading from different locations in the segment.
@@ -34,25 +34,25 @@ public abstract class PBDSegment {
     public interface PBDSegmentReader {
         /**
          * Are there any more entries to read from this segment for this reader
-         * 
+         *
          * @return true if there are still more entries to be read. False otherwise.
          * @throws IOException if the reader was closed or on any error trying to read from the segment file.
          */
         public boolean hasMoreEntries() throws IOException;
-        
+
         /**
-         * Have all the entries in this segment been read by this reader and 
+         * Have all the entries in this segment been read by this reader and
          * acknowledged as ready for discarding.
-         * 
+         *
          * @return true if all entries have been read and discarded by this reader. False otherwise.
          * @throws IOException if the reader was closed
          */
-        public boolean isEmpty() throws IOException;
-        
+        public boolean allReadAndDiscarded() throws IOException;
+
         /**
          * Read the next entry from the segment for this reader.
          * Returns null if all entries in this segment were already read by this reader.
-         * 
+         *
          * @param factory
          * @return BBContainer with the bytes read
          * @throws IOException
@@ -67,30 +67,35 @@ public abstract class PBDSegment {
          * for this reader.
          */
         public int uncompressedBytesToRead();
-        
+
         /**
          * Returns the current read offset for this reader in this segment.
          */
         public long readOffset();
-        
+
         /**
          * Entry that this reader will read next.
          * @return
          */
         public int readIndex();
 
-        
         /**
          * Rewinds the read offset for this reader by the specified number of bytes.
          */
         public void rewindReadOffset(int byBytes);
-        
+
         /**
-         * Close this reader and release any resources used.
+         * Close this reader and release any resources.
+         * <code>getReader</code> will still return this reader until the segment is closed.
          */
-        public void close();
+        public void close() throws IOException;
+
+        /**
+         * Has this reader been closed.
+         */
+        public boolean isClosed();
     }
-    
+
     private static final String TRUNCATOR_CURSOR = "__truncator__";
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
@@ -127,9 +132,13 @@ public abstract class PBDSegment {
     abstract boolean isOpenForReading(String cursorId);
 
     abstract PBDSegmentReader openForRead(String cursorId) throws IOException;
-    
+
+    /**
+     * Returns the reader opened for the given cursor id.
+     * This may return a closed reader if the reader has already finished reading this segment.
+     */
     abstract PBDSegmentReader getReader(String cursorId);
-    
+
     /**
      * @param forWrite    Open the file in read/write mode
      * @param emptyFile   true to overwrite the header with 0 entries, essentially emptying the file
@@ -148,8 +157,6 @@ public abstract class PBDSegment {
     abstract void sync() throws IOException;
 
     abstract boolean hasAllFinishedReading() throws IOException;
-
-    abstract boolean isSegmentEmpty() throws IOException;
 
     abstract boolean offer(DBBPool.BBContainer cont, boolean compress) throws IOException;
 

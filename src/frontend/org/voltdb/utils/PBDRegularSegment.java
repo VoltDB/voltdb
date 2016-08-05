@@ -41,6 +41,7 @@ public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private Map<String, SegmentReader> m_readCursors = new HashMap<>();
+    private Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
     //ID of this segment
     private final Long m_index;
@@ -101,19 +102,14 @@ public class PBDRegularSegment extends PBDSegment {
             m_numOfEntries = 0;
             m_size = 0;
         }
-        if (wasClosed) close();
+        if (wasClosed) closeReadersAndFile();
         return m_numOfEntries;
     }
 
     @Override
     public boolean isBeingPolled()
     {
-        for (SegmentReader reader : m_readCursors.values()) {
-            if (reader.m_objectReadIndex != 0) {
-                return true;
-            }
-        }
-        return false;
+        return !m_readCursors.isEmpty();
     }
 
     @Override
@@ -135,10 +131,11 @@ public class PBDRegularSegment extends PBDSegment {
         m_readCursors.put(cursorId, reader);
         return reader;
     }
-    
+
     @Override
     public PBDSegmentReader getReader(String cursorId) {
-        return m_readCursors.get(cursorId);
+        PBDSegmentReader reader = m_closedCursors.get(cursorId);
+        return (reader == null) ? m_readCursors.get(cursorId) : reader;
     }
 
     @Override
@@ -223,13 +220,15 @@ public class PBDRegularSegment extends PBDSegment {
 
     @Override
     public void close() throws IOException {
-        Map<String, PBDSegmentReader> copy = new HashMap<>(m_readCursors);
-        for (PBDSegmentReader segmentReader : copy.values()) {
-            segmentReader.close();
-        }
+        m_closedCursors.clear();
+        closeReadersAndFile();
+    }
+
+    private void closeReadersAndFile() throws IOException {
+        m_readCursors.clear();
         try {
-            if (m_fc != null) {
-                m_fc.close();
+            if (m_ras != null) {
+                m_ras.close();
             }
         } finally {
             m_ras = null;
@@ -254,23 +253,8 @@ public class PBDRegularSegment extends PBDSegment {
 
         if (m_readCursors.size() == 0) return false;
 
-        for (String cid : m_readCursors.keySet()) {
-            SegmentReader reader = m_readCursors.get(cid);
+        for (SegmentReader reader : m_readCursors.values()) {
             if (reader.m_objectReadIndex < m_numOfEntries) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    @Override
-    public boolean isSegmentEmpty() throws IOException {
-        if (m_closed) throw new IOException("Segment closed");
-
-        for (String cid : m_readCursors.keySet()) {
-            SegmentReader reader = m_readCursors.get(cid);
-            if (reader.m_discardCount < m_numOfEntries) {
                 return false;
             }
         }
@@ -389,24 +373,17 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
-        public boolean hasMoreEntries() throws IOException
-        {
-            if (m_closed) throw new IOException("Reader closed");
-
+        public boolean hasMoreEntries() throws IOException {
             return m_objectReadIndex < m_numOfEntries;
         }
 
         @Override
-        public boolean isEmpty() throws IOException
-        {
-            if (m_closed) throw new IOException("Reader closed");
-            
+        public boolean allReadAndDiscarded() throws IOException {
             return m_discardCount == m_numOfEntries;
         }
 
         @Override
-        public BBContainer poll(OutputContainerFactory factory) throws IOException
-        {
+        public BBContainer poll(OutputContainerFactory factory) throws IOException {
             if (m_closed) throw new IOException("Reader closed");
 
             if (!hasMoreEntries()) {
@@ -493,36 +470,40 @@ public class PBDRegularSegment extends PBDSegment {
         }
 
         @Override
-        public int uncompressedBytesToRead()
-        {
+        public int uncompressedBytesToRead() {
             if (m_closed) throw new RuntimeException("Reader closed");
-            
+
             return m_size - m_bytesRead;
         }
 
         @Override
-        public long readOffset()
-        {
+        public long readOffset() {
             return m_readOffset;
         }
 
         @Override
-        public int readIndex()
-        {
+        public int readIndex() {
             return m_objectReadIndex;
         }
 
         @Override
-        public void rewindReadOffset(int byBytes)
-        {
+        public void rewindReadOffset(int byBytes) {
             m_readOffset -= byBytes;
         }
 
         @Override
-        public void close()
-        {
+        public void close() throws IOException {
             m_closed = true;
             m_readCursors.remove(m_cursorId);
+            m_closedCursors.put(m_cursorId, this);
+            if (m_readCursors.isEmpty()) {
+                closeReadersAndFile();
+            }
+        }
+
+        @Override
+        public boolean isClosed() {
+            return m_closed == true;
         }
     }
 }
