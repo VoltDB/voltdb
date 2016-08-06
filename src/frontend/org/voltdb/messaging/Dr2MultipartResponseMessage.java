@@ -18,67 +18,39 @@
 package org.voltdb.messaging;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.VoltTable;
+import org.voltdb.ClientResponseImpl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
-    private byte m_status = 0;
-    private VoltTable[] m_results = new VoltTable[0];
-    private byte m_appStatus = Byte.MIN_VALUE;
     private int m_producerPartitionId;
+    private ClientResponseImpl m_response;
 
     Dr2MultipartResponseMessage() {
         super();
     }
 
-    public Dr2MultipartResponseMessage(int producerPartitionId, byte status, byte appStatus, VoltTable[] results)  {
+    public Dr2MultipartResponseMessage(int producerPartitionId, ClientResponseImpl response)  {
         m_producerPartitionId = producerPartitionId;
-        m_status = status;
-        m_appStatus = appStatus;
-        m_results = results;
-    }
-
-    public byte getStatus() {
-        return m_status;
-    }
-
-    public VoltTable[] getResults() {
-        return m_results;
-    }
-
-    public byte getAppStatus() {
-        return m_appStatus;
+        m_response = response;
     }
 
     public int getProducerPartitionId() {
         return m_producerPartitionId;
     }
 
+    public ClientResponseImpl getResponse() {
+        return m_response;
+    }
+
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         if (buf.remaining() > 0) {
             m_producerPartitionId = buf.getInt();
-            m_status = buf.get();
-            m_appStatus = buf.get();
-            int tableCount = buf.getInt();
-            if (tableCount < 0) {
-                throw new IOException("Table count is negative: " + tableCount);
-            }
-            m_results = new VoltTable[tableCount];
-            for (int i = 0; i < tableCount; i++) {
-                int tableSize = buf.getInt();
-                final int originalLimit = buf.limit();
-                buf.limit(buf.position() + tableSize);
-                final ByteBuffer slice = buf.slice();
-                buf.position(buf.position() + tableSize);
-                buf.limit(originalLimit);
-                m_results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(slice, false);
-            }
-
+            m_response = new ClientResponseImpl();
+            m_response.initFromBuffer(buf);
         }
     }
 
@@ -87,12 +59,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_RESPONSE_ID);
 
         buf.putInt(m_producerPartitionId);
-        buf.put(m_status);
-        buf.put(m_appStatus);
-        buf.putInt(m_results.length);
-        for (VoltTable vt : m_results) {
-            vt.flattenToBuffer(buf);
-        }
+        m_response.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -101,15 +68,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     @Override
     public int getSerializedSize() {
         int size = super.getSerializedSize();
-
-        size += 4
-             + 1
-             + 1
-             + 4;
-        for (VoltTable vt: m_results) {
-            size += vt.getSerializedSize();
-        }
-
+        size += (4 + m_response.getSerializedSize());
         return size;
     }
 }
