@@ -324,7 +324,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
+bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
 {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -335,6 +335,7 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
                 );
     }
 
+    bool switchedToOpen = false;
     if (!m_opened) {
         ++m_openSequenceNumber;
 
@@ -344,8 +345,10 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
         else {
             openTransactionCommon(spHandle, uniqueId);
         }
+        switchedToOpen = true;
     }
     assert(m_opened);
+    return switchedToOpen;
 }
 
 void DRTupleStream::writeRowTuple(TableTuple& tuple,

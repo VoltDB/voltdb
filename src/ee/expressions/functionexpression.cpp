@@ -400,6 +400,24 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_IS_VALID_TIMESTAMP:
             ret = new UnaryFunctionExpression<FUNC_VOLT_IS_VALID_TIMESTAMP>((*arguments)[0]);
             break;
+       case FUNC_SIN:
+            ret = new UnaryFunctionExpression<FUNC_SIN>((*arguments)[0]);
+            break;
+       case FUNC_COS:
+            ret = new UnaryFunctionExpression<FUNC_COS>((*arguments)[0]);
+            break;
+       case FUNC_TAN:
+            ret = new UnaryFunctionExpression<FUNC_TAN>((*arguments)[0]);
+            break;
+       case FUNC_COT:
+            ret = new UnaryFunctionExpression<FUNC_COT>((*arguments)[0]);
+            break;
+       case FUNC_CSC:
+            ret = new UnaryFunctionExpression<FUNC_CSC>((*arguments)[0]);
+            break;
+       case FUNC_SEC:
+            ret = new UnaryFunctionExpression<FUNC_SEC>((*arguments)[0]);
+            break;
         default:
             return NULL;
         }

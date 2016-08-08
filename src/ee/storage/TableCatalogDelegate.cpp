@@ -507,7 +507,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
     // leaves any dependent materialized view tables untouched/intact
     // (technically, temporarily out of synch with the shrinking table).
     // But the normal "insertPersistentTuple" used here on the new table tries to populate any dependent
-    // serialized views.
+    // materialized views.
     // Rather than empty the surviving view tables, and transfer them to the new table to be re-populated "retail",
     // transfer them "wholesale" post-migration.
 
