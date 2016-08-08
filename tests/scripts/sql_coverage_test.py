@@ -104,7 +104,8 @@ def print_elapsed_seconds(message_end="", prev_time=-1,
     print_seconds(diff_time, message_end, message_begin)
     return diff_time
 
-def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
+def run_once(name, command, statements_path, results_path,
+             submit_verbosely, testConfigKit, precision):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -182,7 +183,10 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
             break
         if client.response.tables:
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
-            table = normalize(client.response.tables[0], statement["SQL"])
+            if precision:
+                table = normalize(client.response.tables[0], statement["SQL"], precision)
+            else:
+                table = normalize(client.response.tables[0], statement["SQL"])
             if len(client.response.tables) > 1:
                 print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] , "?"
         # else:
@@ -225,12 +229,9 @@ def get_max_mismatches(comparison_database, suite_name):
         if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
               config_name == 'basic-compoundex-joins'):
             max_mismatches = 4620
-        # Known failures in the numeric-decimals and numeric-ints "extended"
-        # test suites (see ENG-10546)
+        # Known failures in the numeric-decimals "extended" test suite (see ENG-10546)
         elif config_name == 'numeric-decimals':
-            max_mismatches = 1180
-        elif config_name == 'numeric-ints':
-            max_mismatches = 2820
+            max_mismatches = 300
 
     return max_mismatches
 
@@ -241,9 +242,12 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
 
+    precision = 0
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
-        if not os.path.isabs(config[key]):
+        if key == "precision":
+            precision = int(config["precision"])
+        elif not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -322,7 +326,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     num_crashes = 0
     failed = False
     try:
-        if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
+        if run_once("jni", command, statements_path, jni_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
             print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors (crash?)."
             failed = True
     except:
@@ -345,7 +350,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
 
     failed = False
     try:
-        if run_once(comparison_database_lower, command, statements_path, cmpdb_path, submit_verbosely, testConfigKit) != 0:
+        if run_once(comparison_database_lower, command, statements_path, cmpdb_path,
+                    submit_verbosely, testConfigKit, precision) != 0:
             print >> sys.stderr, "Test with the " + comparison_database + " backend had errors (crash?)."
             failed = True
     except:
@@ -378,7 +384,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
                                   jni_path, output_dir, report_invalid, report_all, extraStats,
-                                  comparison_database, modified_sql_path)
+                                  comparison_database, modified_sql_path, max_mismatches)
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
