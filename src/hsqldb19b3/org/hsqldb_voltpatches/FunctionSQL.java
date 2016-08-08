@@ -634,7 +634,8 @@ public class FunctionSQL extends Expression {
 
             case FUNC_CURRENT_TIMESTAMP :
                 name            = Tokens.T_CURRENT_TIMESTAMP;
-                parseList       = optionalIntegerParamList;
+                parseList       = emptyParamList;
+                parseListAlt    = noParamList;
                 isValueFunction = true;
                 break;
 
