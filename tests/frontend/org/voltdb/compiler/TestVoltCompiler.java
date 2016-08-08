@@ -2143,7 +2143,7 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table foo(a integer, b float, c float);\n" +
               "create table foo2(a integer, b float, c float);\n" +
               "create view bar (a, b, total) as select a, b, count(*) as total from foo group by a, b;\n" +
-              "create view bar2 (a, b, total) as select foo.a, foo.b, count(*) as total, from foo join foo2 on foo.a = foo2.a group by foo.a, foo.b;\n" +
+              "create view bar2 (a, b, total) as select foo.a, foo.b, count(*) as total from foo join foo2 on foo.a = foo2.a group by foo.a, foo.b;\n" +
               "create index baridx on bar (a);\n" +
               "drop index baridx;\n" +
               "create index baridx on bar2(a);\n" +
