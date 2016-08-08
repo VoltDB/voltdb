@@ -1072,6 +1072,16 @@ table.tblPopup {
 	resize: none;
 }
 /****************Server Settings**********************/
+.modal-dialog.modal-dialog-center.modelServerDetails {
+    width: 34%;
+    margin: 0 auto;
+}
+
+.serverDetails {
+    border-bottom: 1px solid #ccc;
+    line-height: 28px;
+    margin: 0 -10px 0 -5px;
+}
 .serverTop {
 	background-color: #f5f6f6;
 	border-left: 1px solid #CCCCCC;
@@ -1725,6 +1735,15 @@ color: grey;
     position: relative;
     top: -12px;
     right: 6px;}
+
+ .grayDot {
+    background: url(../images/gray-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
  .btnStartServer , .btnStopServer{
     cursor: pointer
  }
@@ -1821,6 +1840,7 @@ ul.drList {
 .formServer input[type="text"], .formServer textarea {
 	width: 100%;
 }
+
 .modal .connectionSourceModel {
 	overflow: auto;
 	height: 450px;

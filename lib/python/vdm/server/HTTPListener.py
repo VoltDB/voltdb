@@ -1488,7 +1488,7 @@ class SyncVdmConfiguration(MethodView):
         except Exception, errs:
             print traceback.format_exc()
             return jsonify({'status': 'success', 'statusString': str(errs)})
-
+        Configuration.write_configuration_file()
         return jsonify({'status': '201', 'statusString': 'success'})
 
 
@@ -1609,6 +1609,7 @@ class StatusDatabaseAPI(MethodView):
         database = Global.DATABASES.get(database_id)
         has_stalled = False
         has_run = False
+        is_server_unreachable = False
         if not database:
             return make_response(jsonify({"status": 404, 'statusString': 'Not found'}), 404)
         else:
@@ -1620,21 +1621,23 @@ class StatusDatabaseAPI(MethodView):
                       (server['hostname'], __PORT__, database_id, server['id'])
                 try:
                     response = requests.get(url)
+                    if response.json()['serverStatus']['status'] == "stalled":
+                        has_stalled = True
+                    elif response.json()['serverStatus']['status'] == "running":
+                        has_run = True
+                    value = response.json()
+
+                    if 'status' in response.json():
+                        del value['status']
+                        del value['statusString']
+                    serverDetails.append({server['hostname']: value['serverStatus']})
                 except Exception, err:
-                    return jsonify({"status": 404, "statusString": "error"})
-
-                if response.json()['serverStatus']['status'] == "stalled":
-                    has_stalled = True
-                elif response.json()['serverStatus']['status'] == "running":
-                    has_run = True
-                value = response.json()
-
-                if 'status' in response.json():
-                    del value['status']
-                    del value['statusString']
-                serverDetails.append({server['hostname']: value['serverStatus']})
-
-            if has_run:
+                    #return jsonify({"status": 404, "statusString": "error"})
+                    serverDetails.append({server['hostname']: {'status': 'unreachable', 'details': 'Server is unreachable', 'isInitialized': False}})
+                    is_server_unreachable = True
+            if is_server_unreachable:
+                status = 'unreachable'
+            elif has_run:
                 status = 'running'
             elif has_stalled:
                 status = 'stalled'
@@ -1689,27 +1692,22 @@ class StatusDatabaseServerAPI(MethodView):
                     except:
                         pass
 
-                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
                     return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
-                                                                                          'details': success,
-                                                                                          'isInitialized': not isFreshStart
+                                                                                          'details': success
                                                                                           }})
                     success = ''
                     try:
                         success = Log.get_error_log_details()
                     except:
                         pass
-                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
                     voltProcess = voltdbserver.VoltDatabase(database_id)
                     if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
-                                                                                              'details': success,
-                                                                                              'isInitialized': not isFreshStart
+                                                                                              'details': success
                                                                                               }})
                     else:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
-                                                                                              'details': success,
-                                                                                              'isInitialized': not isFreshStart
+                                                                                              'details': success
                                                                                               }})
                 except:
                     voltProcess = voltdbserver.VoltDatabase(database_id)
@@ -1718,18 +1716,14 @@ class StatusDatabaseServerAPI(MethodView):
                         error = Log.get_error_log_details()
                     except:
                         pass
-                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
                     if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
-                                                                                              'details': error,
-                                                                                              'isInitialized': not isFreshStart
+                                                                                              'details': error
                                                                                               }})
                     else:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
-                                                                                              'details': error,
-                                                                                              'isInitialized': not isFreshStart
+                                                                                              'details': error
                                                                                               }})
-
 
 
 def main(runner, amodule, config_dir, data_dir, server):
