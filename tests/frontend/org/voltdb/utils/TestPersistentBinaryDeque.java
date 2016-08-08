@@ -116,8 +116,6 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 4);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
-
 
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -132,6 +130,7 @@ public class TestPersistentBinaryDeque {
 
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
     }
 
@@ -146,7 +145,6 @@ public class TestPersistentBinaryDeque {
         assertEquals(listing.size(), 1);
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
 
         listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 1);
@@ -164,6 +162,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
         for (long ii = 0; ii < 96; ii++) {
             BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             try {
@@ -196,7 +195,6 @@ public class TestPersistentBinaryDeque {
         m_pbd.close();
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-        reader = m_pbd.openForRead(CURSOR_ID);
 
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -232,6 +230,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer( DBBPool.wrapBB(getFilledBuffer(ii)) );
         }
 
+        reader = m_pbd.openForRead(CURSOR_ID);
         long actualSizeInBytes = 0;
         long reportedSizeInBytes = reader.sizeInBytes();
         long blocksFound = 0;
@@ -270,7 +269,6 @@ public class TestPersistentBinaryDeque {
         m_pbd.close();
 
         m_pbd = new PersistentBinaryDeque( TEST_NONCE, TEST_DIR, logger );
-        reader = m_pbd.openForRead(CURSOR_ID);
 
         TreeSet<String> listing = getSortedDirectoryListing();
         assertEquals(listing.size(), 5);
@@ -295,6 +293,7 @@ public class TestPersistentBinaryDeque {
             }
 
         });
+        reader = m_pbd.openForRead(CURSOR_ID);
         assertEquals(95420416, reader.sizeInBytes());
 
         listing = getSortedDirectoryListing();
@@ -350,7 +349,7 @@ public class TestPersistentBinaryDeque {
 
     @Test
     public void testCloseOldSegments() throws Exception {
-        System.out.println("Running testOfferMoreThanPoll");
+        System.out.println("Running testCloseOldSegments");
         BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
         assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
 
