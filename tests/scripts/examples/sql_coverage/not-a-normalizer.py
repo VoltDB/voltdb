@@ -46,4 +46,4 @@ def compare_results(suite, seed, statements_path, hsql_path, jni_path,
     return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
                                  output_dir, report_invalid, report_all, extra_stats,
                                  comparison_database, modified_sql_path, max_mismatches,
-                                 True)
+                                 cntonly=True)
