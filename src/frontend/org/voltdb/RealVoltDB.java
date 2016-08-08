@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -132,6 +133,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
@@ -156,7 +158,6 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.Properties;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -3801,7 +3802,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         System.out.println("exportNonce count: " + exportNonceCount);
 
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
-        int maxThreadsCount = 100;
+        int maxThreadsCount = Integer.parseInt(ShellTools.local_cmd("ulimit -u"));
 
         System.out.println("expThreadsCount: " + expThreadsCount);
 
