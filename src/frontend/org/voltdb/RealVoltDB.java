@@ -2879,6 +2879,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+//
+                checkThreadsSanity();
 
                 return Pair.of(m_catalogContext, csp);
             }
@@ -3641,6 +3643,60 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
+    }
+
+    private void checkThreadsSanity() {
+        int tableCount = m_catalogContext.tables.size();
+        int partitions = m_iv2Initiators.size() - 1;
+        int replicates = m_configuredReplicationFactor;
+        int importPartitions = ImportManager.getPartitionsCount();
+        int exportTableCount = ExportManager.getExportTablesCount();
+        int exportNonceCount = ExportManager.getConnCount();
+
+        System.out.println("partitions count: " + partitions);
+        System.out.println("importPartitions count: " + importPartitions);
+        System.out.println("exportTable count: " + exportTableCount);
+        System.out.println("exportNonce count: " + exportNonceCount);
+
+        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
+        int maxThreadsCount = 100;
+
+        System.out.println("expThreadsCount: " + expThreadsCount);
+
+        if (maxThreadsCount < expThreadsCount) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates \n", tableCount, partitions, replicates));
+            builder.append(String.format("with importer configuration of %d importer partitions \n", importPartitions));
+            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates \n", exportTableCount, partitions, replicates));
+            builder.append(String.format("The maximum number of threads to the system is %d", maxThreadsCount));
+            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB.");
+            consoleLog.warn(builder.toString());
+            System.out.println(maxThreadsCount + "::" + expThreadsCount);
+        }
+    }
+
+    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount) {
+        final int baseCount = 64;
+        // TODO: add DR count
+        return baseCount
+                + computeImporterThreads(importerPartitionCount)
+                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount);
+    }
+
+    private int computeImporterThreads(int importerPartitionCount) {
+        if (importerPartitionCount == 0) {
+            return 0;
+        }
+        int importerBaseCount = 6;
+        return importerBaseCount + importerPartitionCount;
+    }
+
+    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount) {
+        if (exportTableCount == 0) {
+            return 0;
+        }
+        int exporterBaseCount = 1;
+        return exporterBaseCount + partitionCount * exportTableCount + exportNonceCount;
     }
 
     @Override

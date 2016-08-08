@@ -86,6 +86,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         m_configs = builder.build();
     }
 
+    public final int getConfigsCount() {
+        return m_configs.size();
+    }
+
     /**
      * This method is used by the framework to indicate that the importers must be started now.
      * This implementation starts the required number of threads based on the number of resources
