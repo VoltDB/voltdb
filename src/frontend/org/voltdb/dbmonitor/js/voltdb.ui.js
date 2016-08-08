@@ -542,10 +542,8 @@ function downloadCSV(args,whichChart) {
             var filename_overlay = "Overlay-" + graphView + ".csv";
 
             downloadAll([
-                [filename_cmdLog, 'data:text/csv;charset=utf8,'+
-                              encodeURI(csvCmdLog)],
-                [filename_overlay, 'data:text/csv;charset=utf8,'+
-                              encodeURI(csvOverlay)],
+                [filename_cmdLog, csvCmdLog],
+                [filename_overlay, csvOverlay],
             ]);
     }
 
@@ -556,29 +554,18 @@ function downloadCSV(args,whichChart) {
         if (csv == null) return;
 
         filename = args.filename + "-" + graphView + ".csv";
-
-        if (!csv.match(/^data:text\/csv/i)) {
-            csv = 'data:text/csv;charset=utf-8,' + csv;
-        }
         data = encodeURI(csv);
 
-        link = document.createElement('a');
-        link.setAttribute('href', data);
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
+        var blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+        saveAs(blob, filename );
     }
 }
 
 function downloadAll(files){
     if(files.length == 0) return;
     file = files.pop();
-    var theAnchor = $('<a />')
-        .attr('href', file[1])
-        .attr('download',file[0]);
-    document.body.appendChild(theAnchor[0]);
-    theAnchor[0].click();
-    theAnchor.remove();
+    var blob = new Blob([file[1]], {type: "text/csv;charset=utf-8"});
+    saveAs(blob, file[0]);
     downloadAll(files);
 }
 
