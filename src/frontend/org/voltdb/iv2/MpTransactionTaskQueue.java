@@ -32,6 +32,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
 import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Provide an implementation of the TransactionTaskQueue specifically for the MPI.
@@ -52,10 +53,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpSitePool m_sitePool = null;
     private MpSitePool m_updateSitePool = null;
+    
+    private final Map<Integer, Long> m_partitionMastersHSIDs;
 
     MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
     {
         super(queue, initialTnxId);
+        m_partitionMastersHSIDs = Maps.newHashMap();
     }
 
     void setMpRoSitePool(MpSitePool sitePool)
@@ -185,17 +189,25 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             }
         }
     }
+    
+    void updatePartitionMasters(final Map<Integer, Long> partitionMasters) {
+    	m_partitionMastersHSIDs.clear();
+    	m_partitionMastersHSIDs.putAll(partitionMasters);
+    }
 
     private boolean hasReadSiteConflicts(TransactionTask task) {
         HashMultimap<Integer,Long> currentReadSitesCopy = HashMultimap.create(m_currentReadSites);
-        currentReadSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
-
+        if (task instanceof MpProcedureTask) {
+        	currentReadSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
+        }
         return !currentReadSitesCopy.isEmpty();
     }
 
     private boolean hasWriteSiteConflicts(TransactionTask task) {
         HashMultimap<Integer,Long> currentWriteSitesCopy = HashMultimap.create(m_currentWriteSites);
-        currentWriteSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
+        if (task instanceof MpProcedureTask) {
+        	currentWriteSitesCopy.keySet().retainAll(((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet());
+        }
 
         return !currentWriteSitesCopy.isEmpty();
     }
@@ -226,9 +238,18 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 if (!task.getTransactionState().isReadOnly()) {
 
                     m_currentWrites.put(task.getTxnId(), task);
-                    for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
-                        m_currentWriteSites.put(entry.getKey(), task.getTxnId());
+                    if (task instanceof MpProcedureTask) {
+                        for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
+                            m_currentWriteSites.put(entry.getKey(), task.getTxnId());
+                        }
+                    } 
+                    else {
+                    	// Reserve every partition
+                        for (Entry<Integer, Long> entry : m_partitionMastersHSIDs.entrySet()) {
+                            m_currentWriteSites.put(entry.getKey(), task.getTxnId());
+                        }
                     }
+
                     taskQueueOffer(task);
                     retval = true;
                 }
@@ -236,8 +257,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
                     assert(task.getTransactionState().isReadOnly());
                     m_currentReads.put(task.getTxnId(), task);
-                    for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
-                        m_currentReadSites.put(entry.getKey(), task.getTxnId());
+                    if (task instanceof MpProcedureTask) {
+                    	for (Entry<Integer, Long> entry : ((MpTransactionState) task.getTransactionState()).getMasterHSIds().entrySet()) {
+                    		m_currentReadSites.put(entry.getKey(), task.getTxnId());
+                    	}
+                    }
+                    else {
+                    	// Reserve every partition
+                    	for (Entry<Integer, Long> entry : m_partitionMastersHSIDs.entrySet()) {
+                    		m_currentReadSites.put(entry.getKey(), task.getTxnId());
+                    	}
                     }
                     taskQueueOffer(task);
                     retval = true;
@@ -265,7 +294,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         int offered = 0;
         if (m_currentReads.containsKey(txnId)) {
             TransactionTask task = m_currentReads.get(txnId);
-            Iterator<Integer> iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            Iterator<Integer> iter;
+            if (task instanceof MpProcedureTask) {
+            	iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            }
+            else {
+            	iter = m_partitionMastersHSIDs.keySet().iterator();
+            }
             while(iter.hasNext()) {
                 m_currentReadSites.remove(iter.next(),txnId);
             }
@@ -275,7 +310,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         else {
             assert(m_currentWrites.containsKey(txnId));
             TransactionTask task = m_currentWrites.get(txnId);
-            Iterator<Integer> iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            Iterator<Integer> iter;
+            if (task instanceof MpProcedureTask) {
+            	iter = ((MpTransactionState) task.getTransactionState()).getMasterHSIds().keySet().iterator();
+            }
+            else {
+            	iter = m_partitionMastersHSIDs.keySet().iterator();
+            }
             while(iter.hasNext()) {
                 m_currentWriteSites.remove(iter.next(),txnId);
             }
