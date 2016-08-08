@@ -340,40 +340,40 @@ public class TestDDLCompiler extends TestCase {
                 "GROUP BY D1 + D2, ABS(D3);",
 
                 // schema with indexes (should have no warnings)
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE INDEX T_TREE_1 ON T(D1);\n" +
-               "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
-               "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
-               "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
-               "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
-               "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);" +
-               "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
-               "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
-               "FROM T WHERE D1 > 3 " +
-               "GROUP BY D1 + D2, ABS(D3);",
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE INDEX T_TREE_1 ON T(D1);\n" +
+                "CREATE INDEX T_TREE_2 ON T(D1, D2);\n" +
+                "CREATE INDEX T_TREE_3 ON T(D1+D2, ABS(D3));\n" +
+                "CREATE INDEX T_TREE_4 ON T(D1, D2, D3);\n" +
+                "CREATE INDEX T_TREE_5 ON T(D1, D2, D3) WHERE D1 > 3;\n" +
+                "CREATE INDEX T_TREE_6 ON T(D1+D2, ABS(D3)) WHERE D1 > 3;\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);" +
+                "CREATE VIEW VT3 (V_D1, V_D2, V_D3, CNT, MIN_VAL1_VAL2, MAX_ABS_VAL3) " +
+                "AS SELECT D1, D2, D3, COUNT(*), MIN(VAL1 + VAL2), MAX(ABS(VAL3)) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT4 (V_D1_D2, V_D3, CNT, MIN_VAL1, SUM_VAL2, MAX_VAL3) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*), MIN(VAL1), SUM(VAL2), MAX(VAL3) " +
+                "FROM T WHERE D1 > 3 " +
+                "GROUP BY D1 + D2, ABS(D3);",
 
-               // schema with no indexes and mat view with no min / max
-               "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-               "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
-               "AS SELECT D1, D2, D3, COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1, D2, D3;\n" +
-               "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
-               "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
-               "FROM T " +
-               "GROUP BY D1 + D2, ABS(D3);",
+                // schema with no indexes and mat view with no min / max
+                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE VIEW VT1 (V_D1, V_D2, V_D3, CNT) " +
+                "AS SELECT D1, D2, D3, COUNT(*) " +
+                "FROM T " +
+                "GROUP BY D1, D2, D3;\n" +
+                "CREATE VIEW VT2 (V_D1_D2, V_D3, CNT) " +
+                "AS SELECT D1 + D2, ABS(D3), COUNT(*) " +
+                "FROM T " +
+                "GROUP BY D1 + D2, ABS(D3);",
 
                 // schema with index but can not be used for mat view with min / max
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +

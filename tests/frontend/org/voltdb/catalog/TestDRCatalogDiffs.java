@@ -631,11 +631,16 @@ public class TestDRCatalogDiffs {
     public void testExtraViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());
@@ -645,11 +650,16 @@ public class TestDRCatalogDiffs {
     public void testMissingViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "DR TABLE T1;";
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;\n";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());
@@ -659,12 +669,18 @@ public class TestDRCatalogDiffs {
     public void testDifferentViewOnReplica() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
                 "CREATE VIEW foo (C1, C2, total) AS SELECT C1, C2, COUNT(*) FROM T1 WHERE C2 > 50 GROUP BY C1, C2;\n" +
-                "DR TABLE T1;";
+                "CREATE VIEW foo2 (C1, C2, total) AS SELECT T1.C1, T2.C2, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1, T2.C2;\n" +
+                "DR TABLE T1;\n" +
+                "DR TABLE T2;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
         assertTrue(diff.errors(), diff.supported());

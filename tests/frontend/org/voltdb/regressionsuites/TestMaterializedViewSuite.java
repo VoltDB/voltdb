@@ -1604,7 +1604,37 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
         }
 
-        // -- 4 -- Test deleting the data from the source tables.
+        // -- 4 -- Test defining view after the data is loaded.
+        if (! isHSQL()) {
+            try {
+                client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                assertTrue("Should be able to drop a view.", false);
+            }
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, SUMAMT, MINUNIT, MAXUNIT, ITEMCOUNT) AS " +
+                    "SELECT " +
+                        "CUSTOMERS.NAME, " +
+                        "ORDERS.ORDER_ID, " +
+                        "COUNT(*), " +
+                        "SUM(PRODUCTS.PRICE * ORDERITEMS.QTY), " +
+                        "MIN(PRODUCTS.PRICE), " +
+                        "MAX(PRODUCTS.PRICE), " +
+                        "COUNT(ORDERITEMS.PID) " +
+                    "FROM CUSTOMERS JOIN ORDERS ON CUSTOMERS.CUSTOMER_ID = ORDERS.CUSTOMER_ID " +
+                                   "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
+                                   "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
+                    "GROUP BY CUSTOMERS.NAME, ORDERS.ORDER_ID;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                assertTrue("Should be able to create a view.", false);
+            }
+            verifyViewOnJoinQueryResult(client);
+        }
+
+        // -- 5 -- Test deleting the data from the source tables.
         Collections.shuffle(dataList1);
         System.out.println("Now testing deleting data from the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
