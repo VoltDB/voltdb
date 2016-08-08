@@ -1578,6 +1578,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // Our HSQL backend testing code does not support AdHoc DDL, disable this on HSQLBackend.
         // This is fine because we don't use HSQL as reference in this test anyway.
         if (! isHSQL()) {
+            System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
                 client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
@@ -1606,6 +1607,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         // -- 4 -- Test defining view after the data is loaded.
         if (! isHSQL()) {
+            System.out.println("Now testing view data catching-up.");
             try {
                 client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
             } catch (ProcCallException pce) {
