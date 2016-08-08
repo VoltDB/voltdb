@@ -63,6 +63,7 @@ create table EMPLOYEE (
 primary key (ID));
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -99,6 +100,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -199,6 +201,7 @@ C1
 drop procedure InsertEmployee;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       

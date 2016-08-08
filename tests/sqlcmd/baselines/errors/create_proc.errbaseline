@@ -18,7 +18,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE:
 	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
-	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
+	at org.voltdb.iv2.MpSite.run(MpSite.java:#)
 	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
 	at java.lang.Thread.run(Thread.java:#)
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged
@@ -64,7 +64,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE:
 	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
-	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
+	at org.voltdb.iv2.MpSite.run(MpSite.java:#)
 	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
 	at java.lang.Thread.run(Thread.java:#)
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged

@@ -8,6 +8,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -51,6 +52,7 @@ Command succeeded.
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -81,6 +83,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -151,6 +154,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -199,6 +203,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -255,6 +260,7 @@ Command succeeded.
 drop procedure Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -312,6 +318,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
@@ -368,6 +375,7 @@ Command succeeded.
 drop procedure Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@AdHoc_NP                 	varchar, varchar
 @Explain                  	varchar
 @ExplainProc              	varchar
 @GC                       
