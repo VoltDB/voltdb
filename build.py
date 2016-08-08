@@ -212,12 +212,12 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  indexref.cpp
- materializedviewhandler.cpp
+ materializedviewhandlerinfo.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
  table.cpp
- viewtrigger.cpp
+ tableref.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -355,6 +355,7 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
  persistenttable.cpp

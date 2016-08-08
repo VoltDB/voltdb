@@ -40,6 +40,7 @@ import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
 
 import com.google_voltpatches.common.base.Supplier;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -289,6 +290,10 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof RejoinMessage) {
             m_joinProducer.deliver((RejoinMessage) message);
+            return;
+        }
+        else if (message instanceof RepairLogTruncationMessage) {
+            m_repairLog.deliver(message);
             return;
         }
         m_repairLog.deliver(message);

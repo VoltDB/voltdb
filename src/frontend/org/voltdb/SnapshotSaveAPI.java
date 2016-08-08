@@ -54,6 +54,7 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -106,7 +107,7 @@ public class SnapshotSaveAPI
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
-            final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
+            final String file_path, final String pathType, final String file_nonce, final SnapshotFormat format, final byte block,
             final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
@@ -176,6 +177,7 @@ public class SnapshotSaveAPI
                             remoteDataCenterLastIds);
                     createSetupIv2(
                             file_path,
+                            pathType,
                             file_nonce,
                             format,
                             multiPartTxnId,
@@ -379,6 +381,7 @@ public class SnapshotSaveAPI
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static ZKUtil.StringCallback createSnapshotCompletionNode(String path,
+                                                                     String pathType,
                                                                      String nonce,
                                                                      long txnId,
                                                                      boolean isTruncation,
@@ -395,8 +398,9 @@ public class SnapshotSaveAPI
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("didSucceed").value(false);
             stringer.key("hostCount").value(-1);
-            stringer.key("path").value(path);
-            stringer.key("nonce").value(nonce);
+            stringer.key(SnapshotUtil.JSON_PATH).value(path);
+            stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType);
+            stringer.key(SnapshotUtil.JSON_NONCE).value(nonce);
             stringer.key("truncReqId").value(truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
@@ -473,7 +477,7 @@ public class SnapshotSaveAPI
     }
 
     private void createSetupIv2(
-            final String file_path, final String file_nonce, SnapshotFormat format,
+            String file_path, final String pathType, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -498,7 +502,9 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
+        file_path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), file_path);
+
+        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,
                 tracker, hashinatorData, timestamp);
         m_deferredSetupFuture =

@@ -23,7 +23,6 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.utils.PlatformProperties;
@@ -43,7 +42,7 @@ public class ResourceUsageMonitor implements Runnable
     private int m_resourceCheckInterval;
     private DiskResourceChecker m_diskLimitConfig;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings, PathsType pathsConfig)
+    public ResourceUsageMonitor(SystemSettingsType systemSettings)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
@@ -59,7 +58,7 @@ public class ResourceUsageMonitor implements Runnable
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
-        m_diskLimitConfig = new DiskResourceChecker(systemSettings, pathsConfig);
+        m_diskLimitConfig = new DiskResourceChecker(systemSettings);
     }
 
     public boolean hasResourceLimitsConfigured()

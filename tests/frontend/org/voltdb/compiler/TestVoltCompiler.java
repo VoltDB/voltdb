@@ -431,8 +431,6 @@ public class TestVoltCompiler extends TestCase {
                     get("database").getSnapshotschedule().get("default");
             assertEquals(32, schedule.getFrequencyvalue());
             assertEquals("m", schedule.getFrequencyunit());
-            //Will be empty because the deployment file initialization is what sets this value
-            assertEquals("/tmp", schedule.getPath());
             assertEquals("woobar", schedule.getPrefix());
         } finally {
             final File jar = new File("/tmp/snapshot_settings_test.jar");
@@ -2468,28 +2466,46 @@ public class TestVoltCompiler extends TestCase {
         tableDDL = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                    "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                    "CREATE TABLE T3 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n";
-        // 0. Test final guard (to be removed after the feature is done.)
-        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
-                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" has 2 sources. Only one source table is allowed.");
-        // 1. Test INNER JOIN
-        // 1.1 Test one join
+        // 1. Test INNER JOIN:
+        // 1.1 Test one join:
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1.a, count(*), sum(T2.b) FROM T1 LEFT JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
-        // 1.2 Test multiple joins
+        // 1.2 Test multiple joins:
         viewDDL = "CREATE VIEW V (aint, bint, cnt, sumint) AS \n" +
                   "SELECT T1.a, T2.a, count(*), sum(T3.b) FROM T1 JOIN T2 ON T1.a=T2.a RIGHT JOIN T3 on T2.a=T3.a GROUP BY T1.a, T2.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
-        // 2. Test self-join
+        // 2. Test self-join:
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
                                                "materialized view does not support self-join.");
-        // 3. Test table join subquery.
+        // 3. Test table join subquery:
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2) T2 ON T1.a=T2.a GROUP BY T1.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+
+        // 4. Test view cannot be defined on other views:
+        viewDDL = "CREATE TABLE t(id INTEGER NOT NULL, num INTEGER, wage INTEGER);\n" +
+                  "CREATE VIEW my_view1 (num, total, sumwage) " +
+                  "AS SELECT num, count(*), sum(wage) FROM t GROUP BY num; \n" +
+
+                  "CREATE VIEW my_view2 (num, total, sumwage) " +
+                  "AS SELECT t.num, count(*), sum(t.wage) FROM my_view1 JOIN t ON t.num=my_view1.num GROUP BY t.num; ";
+        checkDDLErrorMessage(viewDDL, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+
+        // 5. Test view defined on non-plannable join query (partitioned table):
+        viewDDL = "PARTITION TABLE T1 ON COLUMN a;\n" +
+                  "PARTITION TABLE T2 ON COLUMN a;\n" +
+                  "CREATE VIEW v2 (a, cnt, sumb) AS \n" +
+                  "SELECT t1.a, count(*), sum(t2.b) FROM t1 JOIN t2 ON true GROUP BY t1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+
+        // 6. Test view defined on joined tables where some source tables are streamed table.
+        viewDDL = "EXPORT TABLE T2;\n" +
+                  "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T2) as its source.");
     }
 
     public void testDDLCompilerMatView()
@@ -2506,12 +2522,6 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from t where id in (select id from t) group by num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
-
-        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
-                "create table t2(id integer not null, num integer, wage integer);\n" +
-                "create view my_view1 (id, num, total) " +
-                "as select t1.id, t2.num, count(*) from t1 join t2 on t1.id = t2.id group by t1.id, t2.num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" has 2 sources. Only one source table is allowed.");
 
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
@@ -2583,7 +2593,7 @@ public class TestVoltCompiler extends TestCase {
 
         // count(*) is needed in ddl
         errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
-        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+        ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage from t group by id, wage;" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);

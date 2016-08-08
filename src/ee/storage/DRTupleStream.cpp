@@ -324,7 +324,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
+bool DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
 {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -335,6 +335,7 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
                 );
     }
 
+    bool switchedToOpen = false;
     if (!m_opened) {
         ++m_openSequenceNumber;
 
@@ -344,8 +345,10 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
         else {
             openTransactionCommon(spHandle, uniqueId);
         }
+        switchedToOpen = true;
     }
     assert(m_opened);
+    return switchedToOpen;
 }
 
 void DRTupleStream::writeRowTuple(TableTuple& tuple,
@@ -657,7 +660,10 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     // Override start sequence number
     stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
-        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
+        bool isMp = (flagList[ii] == TXN_PAR_HASH_MULTI && partitionKeyValueList[ii] != -1) ||
+                    flagList[ii] == TXN_PAR_HASH_SPECIAL ||
+                    (flagList[ii] == TXN_PAR_HASH_SINGLE && partitionKeyValueList[ii] == -1);
+        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, isMp ? 16383 : partitionId);
         tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
 
         if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {

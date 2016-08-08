@@ -26,12 +26,14 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.DoubleFunction;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -1488,7 +1490,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         assertEquals(results.length, resultValues.length);
 
-        Map<String, Integer> valueBag = new HashMap<String, Integer>();
+        Map<String, Integer> valueBag = new HashMap<>();
         int kk = 0;
         for (FunctionTestCase result : results) {
             double expected = resultValues[kk++];
@@ -1544,40 +1546,42 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
         }
 
-        results = whereFunctionRun(client, fname, filters, expectedFormat);
+        if (filters != null) {
+            results = whereFunctionRun(client, fname, filters, expectedFormat);
 
-        assertEquals(results.length, COLUMNCOUNT*filters.size());
-        // If filters represents all the values in resultValues,
-        // the filtered counts should total to resultValues.length.
-        int coveringCount = resultValues.length;
-        //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
-        for (FunctionTestCase result : results) {
-            if (result.m_result == 0.0) {
-                // complain("NONMATCHING filter " + result.m_case + " " + result.m_filter);
-                continue;
+            assertEquals(results.length, COLUMNCOUNT*filters.size());
+            // If filters represents all the values in resultValues,
+            // the filtered counts should total to resultValues.length.
+            int coveringCount = resultValues.length;
+            //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+            for (FunctionTestCase result : results) {
+                if (result.m_result == 0.0) {
+                    // complain("NONMATCHING filter " + result.m_case + " " + result.m_filter);
+                    continue;
+                }
+                Integer count = valueBag.get(String.format(formatForFuzziness, result.m_filter));
+                if (count == null) {
+                    complain("Function " + fname + " got unexpected result " + result.m_filter + ".");
+                }
+                assertNotNull(count);
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+                if (count < result.m_result) {
+                    complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+                }
+                assertTrue(count >= result.m_result);
+                valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
+                coveringCount -= (int)result.m_result;
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
             }
-            Integer count = valueBag.get(String.format(formatForFuzziness, result.m_filter));
-            if (count == null) {
-                complain("Function " + fname + " got unexpected result " + result.m_filter + ".");
+            for (Entry<String, Integer> entry : valueBag.entrySet()) {
+                int count = entry.getValue();
+                if (count != 0) {
+                    complain("Function " + fname + " expected result " + entry.getKey() + " lacks " + count + " matches.");
+                }
+                assertEquals(0, count);
             }
-            assertNotNull(count);
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
-            if (count < result.m_result) {
-                complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
-            }
-            assertTrue(count >= result.m_result);
-            valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
-            coveringCount -= (int)result.m_result;
-            //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+            assertEquals(0, coveringCount);
         }
-        for (Entry<String, Integer> entry : valueBag.entrySet()) {
-            int count = entry.getValue();
-            if (count != 0) {
-                complain("Function " + fname + " expected result " + entry.getKey() + " lacks " + count + " matches.");
-            }
-            assertEquals(0, count);
-        }
-        assertEquals(0, coveringCount);
 
         System.out.println("ENDING test of " + fname);
     }
@@ -1597,13 +1601,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestSqrt();
         subtestNaturalLog();
         subtestNaturalLog10();
+        subtestTrig();
     }
 
     public void subtestCeiling() throws Exception
     {
         String fname = "CEILING";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             // Believe it or not, "negative 0" results were causing problems.
             resultValues[kk] = normalizeZero(Math.ceil(values[kk]));
@@ -1619,7 +1624,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         String fname = "EXP";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.exp(values[kk]);
             filters.add(resultValues[kk]);
@@ -1634,7 +1639,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         String fname = "FLOOR";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.floor(values[kk]);
             filters.add(resultValues[kk]);
@@ -1650,7 +1655,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String fname = "POWERX7";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.pow(values[kk], 7.0);
             filters.add(resultValues[kk]);
@@ -1665,7 +1670,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String fname = "POWERX07";
         final double[] resultValues = new double[nonnegnonzeros.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.pow(nonnegnonzeros[kk], 0.7);
             filters.add(resultValues[kk]);
@@ -1680,7 +1685,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String fname = "POWER7X";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.pow(7.0, values[kk]);
             filters.add(resultValues[kk]);
@@ -1695,7 +1700,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String fname = "POWER07X";
         final double[] resultValues = new double[values.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.pow(0.7, values[kk]);
             filters.add(resultValues[kk]);
@@ -1710,7 +1715,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String fname = "SQRT";
         final double[] resultValues = new double[nonnegs.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.sqrt(nonnegs[kk]);
             filters.add(resultValues[kk]);
@@ -1721,11 +1726,55 @@ public class TestFunctionsSuite extends RegressionSuite {
         functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
+    private void subtestTrig() throws Exception
+    {
+        final boolean monotonic = false;
+        final boolean ascending = false;
+        final String expectedFormat = "DOUBLE";
+        final Set<Double> filters = null;
+
+        Map<String, DoubleFunction<Double>> funcInfo = new HashMap<>();
+        funcInfo.put("SIN", x -> Math.sin(x));
+        funcInfo.put("COS", x -> Math.cos(x));
+        funcInfo.put("TAN", x -> Math.tan(x));
+        funcInfo.put("COT", x -> 1.0 / Math.tan(x));
+        funcInfo.put("SEC", x -> 1.0 / Math.cos(x));
+        funcInfo.put("CSC", x -> 1.0 / Math.sin(x));
+
+        double[] valuesCopy = Arrays.copyOf(values, values.length);
+        for (Entry<String, DoubleFunction<Double>> entry : funcInfo.entrySet()) {
+            final String fname = entry.getKey();
+            final double[] resultValues = new double[valuesCopy.length];
+            for (int kk = 0; kk < resultValues.length; ++kk) {
+                resultValues[kk] = entry.getValue().apply(valuesCopy[kk]);
+                if (Double.isInfinite(resultValues[kk])) {
+                    // The EE throws an exception when a nonfinite would be produced.
+                    valuesCopy[kk] += 1;
+                    resultValues[kk] = entry.getValue().apply(valuesCopy[kk]);
+                    assert(Double.isFinite(resultValues[kk]));
+                }
+            }
+            functionTest(fname, valuesCopy, resultValues, filters, monotonic, ascending, expectedFormat);
+        }
+
+        if (!isHSQL()) {
+            // Also verify that trig functions that produce non-finites throw an exception
+            String[] stmts = {
+                    "select cot(0.0) from number_types",
+                    "select csc(0.0) from number_types"
+            };
+
+            for (String stmt : stmts) {
+                verifyStmtFails(getClient(), stmt, "Invalid result value");
+            }
+        }
+    }
+
     public void subtestNaturalLog() throws Exception
     {
         final String[] fname = {"LOG", "LN"};
         final double[] resultValues = new double[nonnegnonzeros.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.log(nonnegnonzeros[kk]);
             filters.add(resultValues[kk]);
@@ -1779,7 +1828,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         final String[] fname = {"LOG10"};
         final double[] resultValues = new double[nonnegnonzeros.length];
-        final Set<Double> filters = new HashSet<Double>();
+        final Set<Double> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = Math.log10(nonnegnonzeros[kk]);
             filters.add(resultValues[kk]);
@@ -1954,8 +2003,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("STARTING test of numeric CAST");
         final double[] rawData = values;
         final double[] resultIntValues = new double[values.length];
-        final Set<Double> intFilters = new HashSet<Double>();
-        final Set<Double> rawFilters = new HashSet<Double>();
+        final Set<Double> intFilters = new HashSet<>();
+        final Set<Double> rawFilters = new HashSet<>();
         for (int kk = 0; kk < resultIntValues.length; ++kk) {
             resultIntValues[kk] = (int)values[kk];
             intFilters.add(resultIntValues[kk]);
@@ -1982,7 +2031,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
             assertEquals(results.length, values.length);
 
-            Map<String, Integer> valueBag = new HashMap<String, Integer>();
+            Map<String, Integer> valueBag = new HashMap<>();
             int kk = 0;
             for (FunctionTestCase result : results) {
                 double expected = resultValues[kk++];
@@ -2116,7 +2165,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     private void subtestVarCharCasts(Client client) throws Exception
     {
         final String[] resultValues = new String[values.length];
-        final Set<String> filters = new HashSet<String>();
+        final Set<String> filters = new HashSet<>();
         for (int kk = 0; kk < resultValues.length; ++kk) {
             resultValues[kk] = "" + values[kk];
             filters.add(resultValues[kk]);
@@ -2127,7 +2176,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         results = displayVarCharCastRun(client, values.length / COLUMNCOUNT);
         assertEquals(results.length, values.length);
 
-        Map<String, Integer> valueBag = new HashMap<String, Integer>();
+        Map<String, Integer> valueBag = new HashMap<>();
         int kk = 0;
         for (FunctionVarCharTestCase result : results) {
             String expected = resultValues[kk++];
@@ -3739,6 +3788,13 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_SQRT_BIGINT",   "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
         project.addStmtProcedure("WHERE_SQRT_FLOAT",    "select count(*) from NUMBER_TYPES where SQRT(FLOATNUM) = ?");
         project.addStmtProcedure("WHERE_SQRT_DECIMAL",  "select count(*) from NUMBER_TYPES where SQRT(DECIMALNUM) = ?");
+
+        project.addStmtProcedure("DISPLAY_SIN", "select SIN(INTEGERNUM), SIN(TINYNUM), SIN(SMALLNUM), SIN(BIGNUM), SIN(FLOATNUM), SIN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_COS", "select COS(INTEGERNUM), COS(TINYNUM), COS(SMALLNUM), COS(BIGNUM), COS(FLOATNUM), COS(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_TAN", "select TAN(INTEGERNUM), TAN(TINYNUM), TAN(SMALLNUM), TAN(BIGNUM), TAN(FLOATNUM), TAN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_COT", "select COT(INTEGERNUM), COT(TINYNUM), COT(SMALLNUM), COT(BIGNUM), COT(FLOATNUM), COT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_SEC", "select SEC(INTEGERNUM), SEC(TINYNUM), SEC(SMALLNUM), SEC(BIGNUM), SEC(FLOATNUM), SEC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("DISPLAY_CSC", "select CSC(INTEGERNUM), CSC(TINYNUM), CSC(SMALLNUM), CSC(BIGNUM), CSC(FLOATNUM), CSC(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
         project.addStmtProcedure("DISPLAY_LN", "select LN(INTEGERNUM), LN(TINYNUM), LN(SMALLNUM), LN(BIGNUM), LN(FLOATNUM), LN(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 

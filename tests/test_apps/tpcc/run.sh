@@ -2,73 +2,68 @@
 
 APPNAME="tpcc"
 
-# find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb 2> /dev/null)" ]; then
+# find voltdb binaries (customized from examples to be one level deeper)
+if [ -e ../../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
+elif [ -n "$(which voltdb 2> /dev/null)" ]; then
+    # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../../bin"
-fi
-# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
-if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
-    VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
-elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib"
-    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
-else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+    echo "Unable to find VoltDB installation."
+    echo "Please add VoltDB's bin directory to your path."
+    exit -1
 fi
 
-CLASSPATH=$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-} 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
+# call script to set up paths, including
+# java classpaths and binary paths
+source $VOLTDB_BIN/voltenv
+
+# leader host for startup purposes only
+# (once running, all nodes are the same -- no leaders)
+STARTUPLEADERHOST="localhost"
+# list of cluster nodes separated by commas in host:[port] format
+SERVERS="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf voltdbroot log $APPNAME.jar src/com/*.class src/com/procedures/*.class
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
-        src/com/*.java \
-        src/com/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    # compile java source
+    javac -classpath $APPCLASSPATH src/com/procedures/*.java src/com/*.java
+    # build procedure and client jars
+    jar cf $APPNAME-procs.jar -C src com/Constants.class -C src com/procedures
+    jar cf $APPNAME-client.jar -C src com
+    # remove compiled .class files
+    rm -rf src/com/procedures/*.class src/com/*.class
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e $APPNAME-procs.jar ] || [ ! -e $APPNAME-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    # note: "create --force" will delete any existing data
+    voltdb create --force -H $STARTUPLEADERHOST
+}
+
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
 function client() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj com.MyTPCC \
+    jars-ifneeded
+    java -classpath $APPNAME-client.jar:$APPCLASSPATH com.MyTPCC \
         --servers=localhost \
         --duration=180 \
         --warehouses=256 \
@@ -76,10 +71,14 @@ function client() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client}"
+    echo "Usage: ./run.sh {clean|jars|server|init|client}"
 }
 
-# Run the target passed as the first arg on the command line
+# Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+if [ $# -eq 0 ]; then server; exit; fi
+for arg in "$@"
+do
+    echo "${0}: Performing $arg..."
+    $arg
+done

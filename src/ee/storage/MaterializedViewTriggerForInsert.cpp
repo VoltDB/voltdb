@@ -63,15 +63,6 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
 
     allocateBackedTuples();
 
-    /* If there is no group by column and the target table is still empty
-     * even after catching up with pre-existing source tuples, we should initialize the
-     * target table with a row of default values.
-     * COUNT() functions should have value 0, other aggregation functions should have value NULL.
-     * See ENG-7872
-     */
-    if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
-        initializeTupleHavingNoGroupBy();
-    }
     VOLT_TRACE("Finished MaterializedViewTriggerForInsert initialization...");
 }
 
