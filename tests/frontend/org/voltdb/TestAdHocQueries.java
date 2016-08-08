@@ -32,6 +32,9 @@ import java.util.List;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.junit.AfterClass;
 import org.junit.Test;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -321,6 +324,20 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println("Ending testSP");
         }
     }
+    
+    /**
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws JSONException 
+     */
+    private void runAllAdHocNPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException, JSONException {
+    	VoltTable result;
+        String query = String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d OR PARTVAL = %d;", hashableA, hashableB);
+        String jsonParts = String.format("{\"Type\":\"BIGINT\",\"Keys\":[{\"Key\":\"%d\"},{\"Key\":\"%d\"}]}", hashableA, hashableB);
+        result = m_client.callProcedure("@AdHoc_NP", query, jsonParts).getResults()[0];
+        assertEquals(2, result.getRowCount());
+    }
 
     /**
      * @param query
@@ -337,9 +354,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
     public int runQueryTest(String query, int hashable, int spPartialSoFar, int expected, int validatingSPresult)
             throws IOException, NoConnectionsException, ProcCallException {
         VoltTable result;
-
-        result = m_client.callProcedure("@AdHoc_NP", query).getResults()[0];
-        assertEquals(expected, result.getRowCount());
 
         result = m_client.callProcedure("@AdHoc", query).getResults()[0];
         //System.out.println(result.toString());
