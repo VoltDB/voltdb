@@ -561,28 +561,23 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         this.NativeConnection.saveStatistics(stats, file);
     }
 
-    @Override
     public void setSchema(String schema) throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
     public String getSchema() throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
     public void abort(Executor executor) throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
     public void setNetworkTimeout(Executor executor, int milliseconds)
             throws SQLException {
         throw SQLError.noSupport();
     }
 
-    @Override
     public int getNetworkTimeout() throws SQLException {
         throw SQLError.noSupport();
     }
