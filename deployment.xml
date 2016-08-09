@@ -1,0 +1,41 @@
+<deployment>
+	<!-- <import>
+ 		<configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">localhost:9092</property>
+            <property name="topics">test1R1P5</property>
+            <property name="groupid">D1</property>
+            <property name="procedure">T1.insert</property>
+        </configuration>
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">localhost:9092</property>
+            <property name="topics">test1R1P7</property>
+            <property name="groupid">D2</property>
+            <property name="procedure">T2.insert</property>
+        </configuration>
+	</import> -->
+	<!-- <export>
+		<configuration enabled="true" target="T_log" type="file">
+			<property name="type">csv</property>
+			<property name="nonce">log</property>
+		</configuration>
+		<configuration enabled="true" target="log" type="file">
+			<property name="type">csv</property>
+			<property name="nonce">log</property>
+		</configuration>
+		<configuration enabled="true" target="T3_log" type="file">
+			<property name="type">csv</property>
+			<property name="nonce">T3_log</property>
+		</configuration>
+		<configuration enabled="true" target="T4_log" type="file">
+			<property name="type">csv</property>
+			<property name="nonce">T4_log</property>
+		</configuration>
+	</export> -->
+	<cluster hostcount="1" kfactor="0"/>
+    <security enabled="true"/>
+    <users>
+        <user name="operator" roles="administrator" password="password"/>
+        <user name="developer" roles="administrator" password="password"/>
+        <user name="jamie" roles="user" password="lannister"/>
+    </users>
+</deployment>
