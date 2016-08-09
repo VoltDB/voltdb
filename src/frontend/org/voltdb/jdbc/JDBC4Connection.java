@@ -387,7 +387,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException
     {
         if ((resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE || resultSetType == ResultSet.TYPE_FORWARD_ONLY) &&
-        		resultSetConcurrency == ResultSet.CONCUR_READ_ONLY) {
+                resultSetConcurrency == ResultSet.CONCUR_READ_ONLY) {
             return prepareStatement(sql);
         }
         checkClosed();
@@ -562,28 +562,28 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     }
 
     @Override
-	public void setSchema(String schema) throws SQLException {
+    public void setSchema(String schema) throws SQLException {
         throw SQLError.noSupport();
     }
 
     @Override
-	public String getSchema() throws SQLException {
+    public String getSchema() throws SQLException {
         throw SQLError.noSupport();
     }
 
     @Override
-	public void abort(Executor executor) throws SQLException {
+    public void abort(Executor executor) throws SQLException {
         throw SQLError.noSupport();
     }
 
     @Override
-	public void setNetworkTimeout(Executor executor, int milliseconds)
+    public void setNetworkTimeout(Executor executor, int milliseconds)
             throws SQLException {
         throw SQLError.noSupport();
     }
 
     @Override
-	public int getNetworkTimeout() throws SQLException {
+    public int getNetworkTimeout() throws SQLException {
         throw SQLError.noSupport();
     }
 
