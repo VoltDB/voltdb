@@ -556,7 +556,7 @@ function downloadCSV(args,whichChart) {
         filename = args.filename + "-" + graphView + ".csv";
         data = encodeURI(csv);
 
-        var blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+        var blob = new Blob([csv], {type: "text/csv;"});
         saveAs(blob, filename );
     }
 }
@@ -564,7 +564,7 @@ function downloadCSV(args,whichChart) {
 function downloadAll(files){
     if(files.length == 0) return;
     file = files.pop();
-    var blob = new Blob([file[1]], {type: "text/csv;charset=utf-8"});
+    var blob = new Blob([file[1]], {type: "text/csv;"});
     saveAs(blob, file[0]);
     downloadAll(files);
 }
