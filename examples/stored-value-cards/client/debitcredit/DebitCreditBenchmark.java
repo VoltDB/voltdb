@@ -1,6 +1,47 @@
 /* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB Inc. are licensed under the following
+ * terms and conditions:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *//* This file is part of VoltDB.
  * Copyright (C) 2008-2015 VoltDB Inc.
- * 
+ *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
@@ -102,7 +143,7 @@ public class DebitCreditBenchmark {
 
         @Option(desc = "Percentage of transactions that are transfers")
         int transferpct = 1;
-        
+
         @Option(desc = "Type of transfer transaction to run (stored procedure SP, Ad Hoc MP, or Ad Hoc NP)")
         String type = "SP";
 
@@ -110,11 +151,11 @@ public class DebitCreditBenchmark {
         }
 
         public static CardsConfig getConfig(String classname, String[] args) {
-        	CardsConfig config = new CardsConfig();
+            CardsConfig config = new CardsConfig();
             config.parse(classname, args);
             return config;
         }
-        
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -138,7 +179,7 @@ public class DebitCreditBenchmark {
             }
         }
     }
-    
+
     /**
      * Callback to handle the response to a stored procedure call.
      *
@@ -147,7 +188,7 @@ public class DebitCreditBenchmark {
         private static Multiset<String> stats = ConcurrentHashMultiset.create();
         String procedureName;
         long maxErrors;
-        
+
         public static int count( String procedureName, String event ){
             return stats.add(procedureName + event, 1);
         }
@@ -155,7 +196,7 @@ public class DebitCreditBenchmark {
         public static int getCount( String procedureName, String event ){
             return stats.count(procedureName + event);
         }
-        
+
         public static void printProcedureResults(String procedureName) {
             System.out.println("  " + procedureName);
             System.out.println("        calls: " + getCount(procedureName,"call"));
@@ -163,7 +204,7 @@ public class DebitCreditBenchmark {
             System.out.println("    rollbacks: " + getCount(procedureName,"rollback"));
         }
 
-        public CardCallback(String procedure, long maxErrors) { 
+        public CardCallback(String procedure, long maxErrors) {
             super();
             this.procedureName = procedure;
             this.maxErrors = maxErrors;
@@ -172,7 +213,7 @@ public class DebitCreditBenchmark {
         public CardCallback(String procedure) {
             this(procedure, 5l);
     }
-        
+
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             count(procedureName,"call");
@@ -294,7 +335,7 @@ public class DebitCreditBenchmark {
                 stats.getInvocationAborts(), stats.getInvocationErrors());
 
         // cast to stats.getAverageLatency from long to double
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", 
+        System.out.printf("Avg/95%% Latency %.2f/%dms\n",
                           (double)stats.getAverageLatency(),
                           stats.kPercentileLatency(0.95));
 
@@ -328,11 +369,11 @@ public class DebitCreditBenchmark {
         // cast stats.getAverageInternalLatency from long to double
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", (double)stats.getAverageInternalLatency());
         //System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
-        
+
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" Transaction Results");
         System.out.println(HORIZONTAL_RULE);
-        
+
         CardCallback.printProcedureResults("CARD_ACCOUNT.insert");
         CardCallback.printProcedureResults("Authorize");
         CardCallback.printProcedureResults("Redeem");
@@ -369,7 +410,7 @@ public class DebitCreditBenchmark {
                                  );
             if (i % 50000 == 0)
                 System.out.println("  " + i);
-            
+
         }
         System.out.println("  " + config.cardcount);
     }
@@ -404,7 +445,7 @@ public class DebitCreditBenchmark {
             String pan2 = Integer.toString(id2);
 
             if (config.type.equals("SP")) {
-            	client.callProcedure(new CardCallback("Transfer",10000),
+                client.callProcedure(new CardCallback("Transfer",10000),
                                  "Transfer",
                                  pan1,
                                  pan2,
@@ -413,48 +454,48 @@ public class DebitCreditBenchmark {
                                  );
             }
             else {
-                                 
-            	// An approximation of the transfer transaction using an adhoc NP transaction
-            	double amount = 5;
-            	Date txnTime = new Date();
-            	String sql = "";
-            	sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan1);
-            	sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan2);
-            	sql += String.format("UPDATE card_account SET " +
+
+                // An approximation of the transfer transaction using an adhoc NP transaction
+                double amount = 5;
+                Date txnTime = new Date();
+                String sql = "";
+                sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan1);
+                sql += String.format("SELECT * FROM card_account WHERE pan = '%s';",pan2);
+                sql += String.format("UPDATE card_account SET " +
                     " balance = balance + %f," +
                     " available_balance = available_balance + %f," +
                     " last_activity = NOW" +
                     " WHERE pan = '%s';", -amount, -amount, pan1);
-            	sql += String.format("UPDATE card_account SET " +
+                sql += String.format("UPDATE card_account SET " +
                     " balance = balance + %f," +
                     " available_balance = available_balance + %f," +
                     " last_activity = NOW" +
                     " WHERE pan = '%s';", amount, amount, pan2);
-            	sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
-            		pan1,
+                sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
+                    pan1,
                     "TRANSFER",
                     "D",
                     -amount);
-            	sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
-            		pan2,
+                sql += String.format("INSERT INTO card_activity VALUES ('%s',NOW,'%s','%s',%f);",
+                    pan2,
                     "TRANSFER",
                     "C",
                     amount);
-            	if (config.type.equals("MP")) {
+                if (config.type.equals("MP")) {
                     client.callProcedure(new CardCallback("Transfer",10000),
                             "@AdHoc",
                             sql
                             );
-            	}
-            	else {
-            		assert (config.type.equals("NP"));
-            		String jsonKeys = String.format("{\"Type\":\"VARCHAR\",\"Keys\":[{\"Key\":\"'%s'\"},{\"Key\":\"'%s'\"}]}", pan1, pan2);
+                }
+                else {
+                    assert (config.type.equals("NP"));
+                    String jsonKeys = String.format("{\"Type\":\"VARCHAR\",\"Keys\":[{\"Key\":\"'%s'\"},{\"Key\":\"'%s'\"}]}", pan1, pan2);
                     client.callProcedure(new CardCallback("Transfer",10000),
                             "@AdHoc_NP",
                             sql,
                             jsonKeys
                             );
-            	}
+                }
             }
         }
     }

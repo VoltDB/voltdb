@@ -324,15 +324,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println("Ending testSP");
         }
     }
-    
+
     /**
      * @throws ProcCallException
      * @throws IOException
      * @throws NoConnectionsException
-     * @throws JSONException 
+     * @throws JSONException
      */
     private void runAllAdHocNPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException, JSONException {
-    	VoltTable result;
+        VoltTable result;
         String query = String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d OR PARTVAL = %d;", hashableA, hashableB);
         String jsonParts = String.format("{\"Type\":\"BIGINT\",\"Keys\":[{\"Key\":\"%d\"},{\"Key\":\"%d\"}]}", hashableA, hashableB);
         result = m_client.callProcedure("@AdHoc_NP", query, jsonParts).getResults()[0];

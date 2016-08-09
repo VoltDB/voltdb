@@ -48,8 +48,8 @@ public class TestMpTransactionTaskQueue extends TestCase
 {
     MpProcedureTask makeTransactionTask(long txnid, boolean readOnly, Map<Integer, Long> sitemap)
     {
-    	StoredProcedureInvocation invocation = mock(StoredProcedureInvocation.class);
-    	when(invocation.getProcName()).thenReturn("");
+        StoredProcedureInvocation invocation = mock(StoredProcedureInvocation.class);
+        when(invocation.getProcName()).thenReturn("");
         MpTransactionState state = mock(MpTransactionState.class);
         when(state.isReadOnly()).thenReturn(readOnly);
         when(state.getMasterHSIds()).thenReturn(sitemap);
