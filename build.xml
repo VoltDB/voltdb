@@ -827,6 +827,7 @@ DISTRIBUTION
     <exec dir='examples/metrocard' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/nbbo' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/positionkeeper' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/stored-value-cards' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -927,6 +928,7 @@ DISTRIBUTION
             <include name="examples/metrocard/run.sh"/>
             <include name="examples/nbbo/run.sh"/>
             <include name="examples/positionkeeper/run.sh"/>
+            <include name="examples/stored-value-cards/run.sh"/>
             <include name="examples/uniquedevices/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
@@ -1085,6 +1087,7 @@ CLEANING
   <exec dir='examples/metrocard' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/nbbo' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/positionkeeper' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/stored-value-cards' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -2294,6 +2297,8 @@ TEST CASES
     <samplecheck app="nbbo" />
     <echo>checking positionkeeper</echo>
     <samplecheck app="positionkeeper" />
+    <echo>checking stored-value-cards</echo>
+    <samplecheck app="stored-value-cards" />
     <echo>checking uniquedevices</echo>
     <samplecheck app="uniquedevices" />
     <echo>checking voltkv</echo>
