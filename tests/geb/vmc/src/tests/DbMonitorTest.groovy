@@ -1201,7 +1201,7 @@ class DbMonitorTest extends TestBase {
     }
 
     //for server ram
-    def "check min value in server ram days"(){
+    def checkMinValueInServerRamDays(){
         int count = 0
 
         when:
@@ -1265,18 +1265,22 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server ram days"(){
+    def CheckMaxValueInServerRamDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){ page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Days")
+
             if(graphView.text().equals("")) {
                 break
             }
         }
+
+
         count = 0
         then:
         String stringMax = ""
@@ -1300,7 +1304,14 @@ class DbMonitorTest extends TestBase {
             }
         }
 
-        String monthMax = page.changeToMonth(stringMax)
+//        waitFor(waitTime){ page.chooseGraphView("Minutes")}
+//
+//        waitFor(waitTime){ page.chooseGraphView("Days")}
+//
+//        stringMax = page.serverrammax.text()
+//        stringMin = page.serverrammin.text()
+
+        String monthMax = waitFor(waitTime){page.changeToMonth(stringMax)}
         String monthMin = page.changeToMonth(stringMin)
 
         String dateMax = page.changeToDate(stringMax)
@@ -1585,10 +1596,11 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster latency days"(){
+    def checkMaxValueInClusterLatencyDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2246,11 +2258,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster Partition Idle graph with respect to minutes"(){
+    def CheckMinValueInClusterPartitionIdlegraphWithRespecttoMinutes(){
         int count = 0
 
         when:
         // This loop is used to gain time.
+        waitFor(10){page.chooseGraphView("Days")}
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Minutes")
@@ -2332,11 +2345,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster Partition Idle graph with respect to days"(){
+    def checkMinValueInClusterPartitionIdleGraphWithRespectToDays(){
         int count = 0
 
         when:
         // This loop is used to gain time.
+        waitFor(waitTime){ page.chooseGraphView("Minutes")}
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Days")
@@ -2396,10 +2410,11 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster Partition Idle graph with respect to days"(){
+    def checkMaxValueInClusterPartitionIdlegraphWithRespecttoDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
