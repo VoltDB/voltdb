@@ -3796,15 +3796,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         int exportTableCount = ExportManager.getExportTablesCount();
         int exportNonceCount = ExportManager.getConnCount();
 
-        System.out.println("partitions count: " + partitions);
-        System.out.println("importPartitions count: " + importPartitions);
-        System.out.println("exportTable count: " + exportTableCount);
-        System.out.println("exportNonce count: " + exportNonceCount);
-
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
-        int maxThreadsCount = Integer.parseInt(ShellTools.local_cmd("ulimit -u"));
-
-        System.out.println("expThreadsCount: " + expThreadsCount);
+        String[] command = {"sh", "-c" ,"ulimit -u"};
+        String cmd_rst = ShellTools.local_cmd(command);
+        int maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
 
         if (maxThreadsCount < expThreadsCount) {
             StringBuilder builder = new StringBuilder();
@@ -3814,7 +3809,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             builder.append(String.format("The maximum number of threads to the system is %d", maxThreadsCount));
             builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB.");
             consoleLog.warn(builder.toString());
-            System.out.println(maxThreadsCount + "::" + expThreadsCount);
         }
     }
 
