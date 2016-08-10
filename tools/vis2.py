@@ -13,7 +13,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
 import matplotlib
-
 matplotlib.use('Agg')
 from matplotlib.colors import rgb2hex
 import matplotlib.pyplot as plt
@@ -214,13 +213,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
 
     toc = dict()
     branches_sort = sorted(plot_data.keys())
-    try:
-        # may not have a master branch for this chart
+
+    if 'master' in branches_sort:
         branches_sort.remove('master')
-    except:
+        branches_master_first = ['master'] + branches_sort
+    else:
+        branches_master_first = branches_sort
         print "WARN: has no master: %s" % title
-        return
-    branches_master_first = ['master'] + branches_sort
 
     # loop thru branches, 'master' is first
     bn = 0
@@ -256,24 +255,29 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             # plot the series
             pl.plot(u[0], u[1], bdata.seriescolor, bdata.seriesmarker, bdata.branch, '-')
 
+            # master is processed first, but set this up in case there is no master data for a chart
+            master = analyze[-1]  # remember master
+
+            MOVING_AVERAGE_DAYS = 10
+
+            (ma, ama, mstd, mastd) = moving_average(bdata.ydata, MOVING_AVERAGE_DAYS)
+
+            if len(ma) > MOVING_AVERAGE_DAYS:
+                pl.plot(bdata.xdata, ma, bdata.seriescolor, None, None, ":")
+
             if b == 'master':
-
-                master = analyze[-1]  # remember master
-
                 # if we have enough data compute moving average and moving std dev
                 # std is std of data correspoinding to each ma window
                 # nb. std is used only in the charts for the 2-sigma line
                 # ama is mean of moving average population
                 # mstd is std of moving average all values
 
-                (ma, ama, mstd, mastd) = moving_average(bdata.ydata, 10)
 
-                if len(ma) >= 10:
+                if len(ma) >= MOVING_AVERAGE_DAYS:
 
                     bdata.update(ma=ma, ama=ama, mstd=mstd, mastd=mastd)
 
                     # plot the moving average
-                    pl.plot(bdata.xdata, bdata.ma, bdata.seriescolor, None, None, ":")
 
                     # see if the series should be flagged out of spec
                     failed = 0
@@ -372,7 +376,6 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
 
             else:
                 # branches comparing to master (no moving average component)
-
                 if master.ama is not NaN:
                     pctmadiff = (master.ama - bdata.ydata[
                         last]) / master.ama * 100. * polarity  # pct diff last vs ma mean
@@ -402,7 +405,6 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
 
     pl.close()
     return toc
-
 
 def generate_index_file(filenames, branches):
     row = """
