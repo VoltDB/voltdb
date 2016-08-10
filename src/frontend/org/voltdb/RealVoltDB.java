@@ -2384,12 +2384,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-<<<<<<< HEAD
                 || managedPathsWithFiles(m_config, readDepl.deployment).isEmpty();
-=======
-                || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
->>>>>>> release-6.5.x
-
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
                 .versionChecker(m_versionChecker)
