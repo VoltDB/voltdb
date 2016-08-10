@@ -604,6 +604,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
+        runnable.setTaskDescription("closeAndDelete");
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -632,6 +633,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         //This is a setup task when stashed tasks are run this is run first.
+        runnable.setTaskDescription("truncateExportToTxnId");
         return stashOrSubmitTask(runnable, false, true);
     }
 
@@ -658,6 +660,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 new SyncRunnable(nofsync).run();
             }
         };
+
+        runnable.setTaskDescription("sync");
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -678,6 +682,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
+        runnable.setTaskDescription("close");
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -706,6 +711,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
+        runnable.setTaskDescription("poll");
         stashOrSubmitTask(runnable, true, false);
         return fut;
     }
@@ -813,6 +819,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             };
+            runnable.setTaskDescription("discard");
             stashOrSubmitTask(runnable, true, false);
         }
     }
@@ -875,6 +882,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
+        runnable.setTaskDescription("ack");
         stashOrSubmitTask(runnable, true, false);
     }
 
@@ -940,6 +948,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
+        runnable.setTaskDescription("acceptMastership");
         stashOrSubmitTask(runnable, true, false);
     }
 
@@ -970,6 +979,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (m_queuedActions.size() > 50) {
                         exportLog.error("Queue for export source for generation " + m_generation +
                                 " is going beyond 50. Not queueing anymore events");
+
+                        //what is in the queue?
+                        StringBuilder builder = new StringBuilder();
+
+                        builder.append("Actions are quuened up to: " + m_queuedActions + " for generation "  + m_generation + " tasks:\n");
+                        for (RunnableWithES queuedR : m_queuedActions) {
+                            builder.append(queuedR.getTaskDescription() + "\n");
+                         }
+
+                        exportLog.error(builder.toString());
+
                         return Futures.immediateFuture(null);
                     }
                     if (setupTask) {
@@ -1029,6 +1049,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private abstract class RunnableWithES implements Runnable {
+
+        private String m_taskDescription;
+
         private ListeningExecutorService m_executorService;
 
         public void setExecutorService(ListeningExecutorService executorService) {
@@ -1037,6 +1060,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         public ListeningExecutorService getLocalExecutorService() {
             return m_executorService;
+        }
+
+        public String getTaskDescription() {
+            return m_taskDescription;
+        }
+
+        public void setTaskDescription(String m_taskDescription) {
+            this.m_taskDescription = m_taskDescription;
         }
     }
 }
