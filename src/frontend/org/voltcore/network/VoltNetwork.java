@@ -547,4 +547,10 @@ class VoltNetwork implements Runnable, IOStatsIntf
     int numPorts() {
         return m_numPorts.get();
     }
+
+    public Set<Connection> getConnections() {
+        Set<Connection> conns = new HashSet<>();
+        conns.addAll(m_ports);
+        return conns;
+    }
 }
