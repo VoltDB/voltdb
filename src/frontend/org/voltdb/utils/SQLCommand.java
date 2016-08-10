@@ -384,6 +384,18 @@ public class SQLCommand
             return true;
         }
 
+        String echoArgs = SQLParser.parseEchoStatement(line);
+        if (echoArgs != null) {
+            System.out.println(echoArgs);
+            return true;
+        }
+
+        String echoErrorArgs = SQLParser.parseEchoErrorStatement(line);
+        if (echoErrorArgs != null) {
+            System.err.println(echoErrorArgs);
+            return true;
+        }
+
         // It wasn't a locally-interpreted directive.
         return false;
     }
