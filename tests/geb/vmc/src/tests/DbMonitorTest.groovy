@@ -2174,6 +2174,7 @@ class DbMonitorTest extends TestBase {
         int count = 0
 
         when:
+        page.chooseGraphView("Minutes")
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2842,16 +2843,15 @@ class DbMonitorTest extends TestBase {
         page.serverRamCheckboxClick()
 
         when: 'click close button'
-        page.savePreferences()
+        waitFor(waitTime){page.savePreferences()}
         then: 'no Server RAM displayed'
         page.serverCpuDisplayed()
         !page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
+//        page.partitionIdleTimeDisplayed()
         when: 'click Display Preference button'
-        page.openDisplayPreference()
+        waitFor(waitTime){page.openDisplayPreference()}
         then: 'display title and save button of preferences'
         page.preferencesTitleDisplayed()
         page.savePreferencesBtnDisplayed()
@@ -2895,7 +2895,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         !page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+//        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
