@@ -126,8 +126,8 @@ public class AsyncCompilerAgentHelper
                     return retval;
                 }
                 catch (Throwable t) {
-                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " +
-                        t.toString();
+                    retval.errorMsg = "Unexpected condition applying DDL statements to " +
+                        "original catalog: " + t.toString();
                     compilerLog.error(retval.errorMsg);
                     return retval;
                 }
@@ -251,7 +251,7 @@ public class AsyncCompilerAgentHelper
         catch (Exception e) {
             String msg = "Unexpected error in adhoc or catalog update: " + e.getClass() + ", " +
                 e.getMessage();
-            compilerLog.warn(msg, e);
+            compilerLog.error(msg, e);
             retval.encodedDiffCommands = null;
             retval.errorMsg = msg;
         }

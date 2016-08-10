@@ -24,7 +24,6 @@ import java.util.Map;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
@@ -36,6 +35,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -182,12 +182,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         }
 
         for (AdHocPlannedStatement statement : statements) {
-            if (!statement.core.wasPlannedAgainstHash(ctx.getCatalogHash())) {
-                @SuppressWarnings("deprecation")
-                String msg = String.format("AdHoc transaction %d wasn't planned " +
-                        "against the current catalog version. Statement: %s",
-                        DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
-                        new String(statement.sql, Constants.UTF8ENCODING));
+            byte[] catalogHash = ctx.getCatalogContext().getCatalogHash();
+            if (!statement.core.wasPlannedAgainstHash(catalogHash)) {
+                String msg = "AdHoc transaction " + m_runner.getTransactionId() +
+                        " was planned against the past catalog version (" +
+                        statement.core.obsoleteCatalogHashTokenForMessage() +
+                        ") and wasn't planned against the current catalog version (" +
+                        Encoder.hexEncode(catalogHash).substring(0, 10) +
+                        "). Statement: " + new String(statement.sql, Constants.UTF8ENCODING);
                 throw new VoltAbortException(msg);
             }
 

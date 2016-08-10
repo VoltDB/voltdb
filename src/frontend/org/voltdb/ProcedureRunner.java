@@ -233,7 +233,7 @@ public class ProcedureRunner {
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
      */
-    long getTransactionId() {
+    public long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
@@ -510,20 +510,20 @@ public class ProcedureRunner {
                 log.warn("Unable to check partitioning of transaction " + txnState.m_spHandle, e);
             }
             return false;
-        } else {
-            if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
-                // MP txn misrouted to SPI, possible to happen during catalog update
-                throw new ExpectedProcedureException("Multi-partition procedure routed to single-partition initiator");
-            }
-
-            // For n-partition transactions, we need to rehash the partitioning values and check
-            // if they still hash to the assigned partitions.
-            //
-            // Note that when n-partition transaction runs, it's run on the MPI site, so calling
-            // m_site.getCorrespondingPartitionId() will return the MPI's partition ID. We need
-            // another way of getting what partitions were assigned to this transaction.
-            return true;
         }
+
+        if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
+            // MP txn misrouted to SPI, possible to happen during catalog update
+            throw new ExpectedProcedureException("Multi-partition procedure routed to single-partition initiator");
+        }
+
+        // For n-partition transactions, we need to rehash the partitioning values and check
+        // if they still hash to the assigned partitions.
+        //
+        // Note that when n-partition transaction runs, it's run on the MPI site, so calling
+        // m_site.getCorrespondingPartitionId() will return the MPI's partition ID. We need
+        // another way of getting what partitions were assigned to this transaction.
+        return true;
     }
 
     public void setupTransaction(TransactionState txnState) {
@@ -847,7 +847,13 @@ public class ProcedureRunner {
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt,
             Class <?> argClass, int argInd, VoltType expectedType) {
-        if (argClass.isArray()) {
+        Class<?> argClassToCheck = argClass;
+        VoltType argType = VoltType.INVALID;
+        boolean isArray = false;
+
+        // Argument to param for IN list will come in as array of arguments. The varbinary can also appear
+        // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
+        if (argClassToCheck.isArray()) {
             // The statement parameter model doesn't currently support a
             // general concept of an array-typed parameter. Instead, it
             // defines certain special VoltTypes that are implicitly
@@ -858,13 +864,21 @@ public class ProcedureRunner {
             // INLIST_OF_STRING parameters accept String[] arguments,
             // INLIST_OF_BIGINT parameters accept integer-typed array
             // arguments like long[], Long[], int[], Integer[], etc.
-            if (expectedType.acceptsArray(argClass)) {
+            if (expectedType.acceptsArray(argClassToCheck)) {
                 return;
+            }
+            argType = VoltType.typeFromClass(argClassToCheck.getComponentType());
+            if (argType == VoltType.TINYINT) {
+                // Array of tiny int is usually intended as the
+                // non-Array varbinary type.
+                argType = VoltType.VARBINARY;
+            }
+            else {
+                isArray = true;
             }
         }
         else {
-            VoltType argType = VoltType.typeFromClass(argClass);
-
+            argType = VoltType.typeFromClass(argClassToCheck);
             if (argType == expectedType) {
                 return;
             }
@@ -904,14 +918,16 @@ public class ProcedureRunner {
             // beyond string.
         }
 
-        String argTypeName = argClass.getSimpleName();
         String preferredType = expectedType.getMostCompatibleJavaTypeName();
 
         throw new VoltTypeException("Procedure " + m_procedureName +
-                ": Incompatible parameter type: can not convert type '"+ argTypeName +
-                "' to '"+ expectedType.getName() + "' for arg " + argInd +
-                " for SQL stmt: " + stmt.getText() + "." +
-                " Try explicitly using a " + preferredType + " parameter.");
+                    ": Incompatible parameter type: can not convert type '" + argType.getName() +
+                    (isArray ? "[]" : "") +
+                    " (" + argClass.getSimpleName() +
+                    ")' to '" + expectedType.getName() + "' for arg " + argInd +
+                    " for SQL stmt: " + stmt.getText() + ". " +
+                    stmt.paramTypesExplained() +
+                    " Try explicitly using a " + preferredType + " compatible parameter.");
     }
 
     private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
@@ -922,7 +938,9 @@ public class ProcedureRunner {
         if (inArgs.length != numParamTypes) {
             throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
-                    " where " + numParamTypes + " was expected for statement " + stmt.getText());
+                    " where " + numParamTypes +
+                    " was expected for statement " + stmt.getText() +
+                    ". " + stmt.paramTypesExplained());
         }
 
         for (int ii = 0; ii < numParamTypes; ii++) {

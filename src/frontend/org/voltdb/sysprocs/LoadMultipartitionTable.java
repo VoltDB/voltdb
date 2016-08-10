@@ -69,7 +69,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
 
         if (fragmentId == SysProcFragmentId.PF_distribute) {
-            assert context.getCluster().getTypeName() != null;
             assert context.getDatabase().getTypeName() != null;
             assert params != null;
             assert params.toArray() != null;
@@ -86,7 +85,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 // voltLoadTable is void. Assume success or exception.
                 DeprecatedProcedureAPIAccess.voltLoadTable(
                                     this,
-                                    context.getCluster().getTypeName(),
+                                    context.getCatalogContext().cluster.getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
                                     toInsert, false, false);

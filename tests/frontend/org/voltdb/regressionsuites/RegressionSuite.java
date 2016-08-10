@@ -995,8 +995,10 @@ public class RegressionSuite extends TestCase {
         }
         catch (ProcCallException pce) {
             String msg = pce.getMessage();
-            String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
-                    expectedPattern + "\", but instead it threw an exception containing \"" + msg + "\".";
+            String diagnostic =
+                    "Expected the exception from " + what + " to match pattern \n\"" +
+                    expectedPattern + "\",\n" +
+                    "but instead the exception contained \n\"" + msg + "\".";
             Pattern pattern = Pattern.compile(expectedPattern, Pattern.MULTILINE);
             assertTrue(diagnostic, pattern.matcher(msg).find());
             return;

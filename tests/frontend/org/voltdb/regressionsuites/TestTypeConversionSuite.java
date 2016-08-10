@@ -204,6 +204,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 }
                 else {
                     String typeTriedByInsert = m_javaTypeNamePatternForInsertTest[fromType];
+                    String sqlTypeTriedByInsert = m_tableColTypeVal[fromType].name();
 
                     // type conversion not allowed
                     if (typeToTest == VoltType.TIMESTAMP &&
@@ -219,9 +220,10 @@ public class TestTypeConversionSuite extends RegressionSuite {
                                     + m_tableColTypeVal[toType].getName();
                     }
                     else {
-                        errorMsg = "Incompatible parameter type: can not convert type '"
-                                + typeTriedByInsert +
-                                "' to '" + m_tableColTypeVal[toType].getName() +
+                        errorMsg = "Incompatible parameter type: can not convert type '" +
+                                sqlTypeTriedByInsert + " \\(" +
+                                 typeTriedByInsert +
+                                "\\)' to '" + m_tableColTypeVal[toType].getName() +
                                 "' for arg " + toType + " for SQL stmt";
                     }
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
@@ -237,9 +239,11 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 // Test that array arguments are not typically compatible
                 // with parameters passed into column comparisons.
                 String typeTriedByCompare = m_javaTypeNamePatternForInListTest[fromType];
-                errorMsg = "Incompatible parameter type: can not convert type '"
-                        + typeTriedByCompare +
-                        "' to '" + m_tableColTypeVal[toType].getName() +
+                String sqlTypeTriedByCompare = m_tableColTypeVal[fromType].name();
+                errorMsg = "Incompatible parameter type: can not convert type '" +
+                        sqlTypeTriedByCompare + "\\[\\] \\(" +
+                        typeTriedByCompare +
+                        "\\)' to '" + m_tableColTypeVal[toType].getName() +
                         "' for arg 0 for SQL stmt";
                 verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
                                 ProcToTestTypeConversion.TestFailingArrayTypeCompare,
@@ -258,6 +262,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
         for (int fromType = 1; fromType < m_tableColTypeVal.length; ++fromType) {
             boolean[] supportedForFromType = m_typeConversionMatrixInList[fromType];
             String typeTriedByInListQuery = m_javaTypeNamePatternForInListTest[fromType];
+            String sqlTypeTriedByInListQuery = m_tableColTypeVal[fromType].name();
             typeToTest = m_tableColTypeVal[fromType];
             for (int toType = 0; toType < m_tableColTypeVal.length; ++toType) {
                 VoltType inListType = m_tableColInListTypeVal[toType];
@@ -280,9 +285,10 @@ public class TestTypeConversionSuite extends RegressionSuite {
                         // compiler as tested in a statement compiler test, not here.
                         continue;
                     }
-                    errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeTriedByInListQuery +
-                            "' to '" + inListType.getName() +
+                    errorMsg = "Incompatible parameter type: can not convert type '" +
+                            sqlTypeTriedByInListQuery + "\\[\\] \\(" +
+                            typeTriedByInListQuery +
+                            "\\)' to '" + inListType.getName() +
                             "' for arg 0 for SQL stmt";
 
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
@@ -293,14 +299,16 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 // Test that non-array arguments are not allowed for IN LIST params.
                 String typeExpectedToFailInListQuery =
                         m_javaTypeNamePatternForInListFailureTest[fromType];
+                String sqlTypeTriedForInList = m_tableColTypeVal[fromType].name();
                 if (typeExpectedToFailInListQuery.endsWith("]") &&
                         inListType == VoltType.INLIST_OF_BIGINT) {
                     errorMsg = "rhs of IN expression is of a non-list type varbinary";
                 }
                 else {
-                    errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeExpectedToFailInListQuery +
-                            "' to '" + inListType.getName() +
+                    errorMsg = "Incompatible parameter type: can not convert type '" +
+                            sqlTypeTriedForInList + " \\(" +
+                            typeExpectedToFailInListQuery +
+                            "\\)' to '" + inListType.getName() +
                             "' for arg 0 for SQL stmt";
                 }
                 verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
