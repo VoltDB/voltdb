@@ -376,7 +376,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         StringBuilder sb = new StringBuilder();
         sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
-        sb.append("producerPartitionId").append(m_producerPartitionId).append(" ");
+        sb.append("from P").append(m_producerPartitionId).append(" ");
         for (Range<Long> entry : m_map.asRanges()) {
             sb.append("[").append(DRLogSegmentId.getDebugStringFromDRId(start(entry))).append(", ")
               .append(DRLogSegmentId.getDebugStringFromDRId(end(entry))).append("] ");
