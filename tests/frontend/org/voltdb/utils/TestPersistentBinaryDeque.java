@@ -330,6 +330,37 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testReaderIsEmpty() throws Exception {
+        System.out.println("Running testReaderIsEmpty");
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        assertTrue(reader.isEmpty());
+        assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+        assertTrue(reader.isEmpty());
+
+        m_pbd.offer(defaultContainer());
+        assertFalse(reader.isEmpty());
+
+        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        retval.discard();
+        assertTrue(reader.isEmpty());
+
+        // more than one segment
+        for (int i = 0; i < 48; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertFalse(reader.isEmpty());
+        for (int i = 0; i < 48; i++) {
+            retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+            if (i<47) {
+                assertFalse(reader.isEmpty());
+            } else {
+                assertTrue(reader.isEmpty());
+            }
+        }
+    }
+
+    @Test
     public void testOfferThenPoll() throws Exception {
         System.out.println("Running testOfferThanPoll");
         BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);

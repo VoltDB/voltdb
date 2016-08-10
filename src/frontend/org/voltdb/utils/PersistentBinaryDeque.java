@@ -103,7 +103,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 assertions();
 
                 moveToValidSegment();
-
                 PBDSegmentReader segmentReader = m_segment.getReader(m_cursorId);
                 if (segmentReader == null) {
                     segmentReader = m_segment.openForRead(m_cursorId);
@@ -116,7 +115,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
                     segmentReader.close();
                     m_segment = m_segments.higherEntry(m_segment.segmentId()).getValue();
-                    segmentReader = m_segment.openForRead(m_cursorId);
+                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
+                    segmentReader = m_segment.getReader(m_cursorId);
+                    if (segmentReader == null) segmentReader = m_segment.openForRead(m_cursorId);
                 }
                 BBContainer retcont = segmentReader.poll(ocf);
 
@@ -187,7 +188,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 PBDSegment currSegment = m_segment;
                 if (m_segment.isOpenForReading(m_cursorId)) { //this reader has started reading from curr segment.
                     // Check if there are more to read.
-                    if (m_segment.getReader(m_cursorId).hasMoreEntries()) return true;
+                    if (m_segment.getReader(m_cursorId).hasMoreEntries()) return false;
 
                     Map.Entry<Long, PBDSegment> entry = m_segments.higherEntry(currSegment.segmentId());
                     currSegment = (entry==null) ? null : entry.getValue();
@@ -701,8 +702,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             if (cursor.m_segment != null && (cursor.m_segment.segmentId() >= segment.segmentId())) {
                 PBDSegmentReader segmentReader = segment.getReader(cursor.m_cursorId);
                 if (cursor.m_segment.segmentId() == segment.segmentId()) { // reading this segment now
-                    if (segmentReader == null)
-                        segmentReader = segment.openForRead(cursor.m_cursorId);
+                    if (segmentReader == null) segmentReader = segment.openForRead(cursor.m_cursorId);
                 }
 
                 if (segmentReader != null) { // if it is null, this reader probably started past this segment

@@ -120,7 +120,7 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public PBDSegmentReader openForRead(String cursorId) throws IOException
     {
-        if (m_readCursors.containsKey(cursorId)) {
+        if (m_readCursors.containsKey(cursorId) || m_closedCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }
 
