@@ -138,6 +138,9 @@ public class KafkaImportBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Number of streams and topics we're importing.")
+        int streams = 0; // zero indicates old single topic/single stream test
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -239,7 +242,7 @@ public class KafkaImportBenchmark {
                 long count = 0;
 
                 if (!config.useexport) {
-                    count = MatchChecks.getImportTableRowCount(config.alltypes, client); // imported count
+                    count = MatchChecks.getImportTableRowCount(config.alltypes, client, config.streams); // imported count
                 } else {
                     count = MatchChecks.getImportRowCount(client); // deleted count
                 }
@@ -339,7 +342,7 @@ public class KafkaImportBenchmark {
             e.printStackTrace();
         }
         try {
-            count = MatchChecks.getImportTableRowCount(false, client); // imported count
+            count = MatchChecks.getImportTableRowCount(false, client, config.streams); // imported count
         } catch (Exception e) {
             e.printStackTrace();
         }
