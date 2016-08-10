@@ -13,7 +13,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
 import matplotlib
-
 matplotlib.use('Agg')
 from matplotlib.colors import rgb2hex
 import matplotlib.pyplot as plt
@@ -214,13 +213,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
 
     toc = dict()
     branches_sort = sorted(plot_data.keys())
-    try:
-        # may not have a master branch for this chart
+
+    if 'master' in branches_sort:
         branches_sort.remove('master')
-    except:
+        branches_master_first = ['master'] + branches_sort
+    else:
+        branches_master_first = branches_sort
         print "WARN: has no master: %s" % title
-        return
-    branches_master_first = ['master'] + branches_sort
 
     # loop thru branches, 'master' is first
     bn = 0
