@@ -610,7 +610,7 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
-    def "check if Max Rows is clickable"() {
+    def checkIfMaxRowsIsClickable() {
         String before = ""
         String after  = ""
 
@@ -716,18 +716,32 @@ class DbMonitorTest extends TestBase {
 
     // stored procedure ascending descending
 
-        def "check if stored procedure is clickable"() {
+    def CheckIfStoredProcedureIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click stored procedure'
-            try {
-                page.tableInAscendingOrder()
-                before = "ascending"
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-                before = "descending"
-            }
-            waitFor(30) { page.clickStoredProcedure() }
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedure checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedure'
+        page.storedProceduresCheckboxClick()
+
+        try {
+            page.tableInAscendingOrder()
+            before = "ascending"
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            before = "descending"
+        }
+        waitFor(30) { page.clickStoredProcedure() }
         then: 'check if table is in ascending'
             try {
                 page.tableInAscendingOrder()
@@ -770,7 +784,22 @@ class DbMonitorTest extends TestBase {
 
 
 
-    def "Check Data in Stored Procedures"() {
+    def CheckDataInStoredProcedures() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedure checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedure'
+        page.storedProceduresCheckboxClick()
+
         when:
         page.storedProceduresTableDisplayed()
         then:
@@ -2548,8 +2577,6 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
-
     def checkIfMinLatencyIsClickable() {
         String before = ""
         String after  = ""
@@ -2564,10 +2591,10 @@ class DbMonitorTest extends TestBase {
         page.savePreferencesBtnDisplayed()
         page.popupCloseDisplayed()
 
-        when: 'Latency checkbox is displayed'
-        page.clusterLatencyDisplayed()
-        then: 'Add Latency'
-        page.clusterLatencyCheckboxClick()
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
 
         when: 'click close button'
         page.savePreferences()
@@ -2596,14 +2623,29 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
-
-    def "check if Max Latency is clickable"() {
+    def checkIfMaxLatencyIsClickable() {
         String before = ""
         String after  = ""
 
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
 
-        when: 'click max latency'
-        page.clickMaxLatency()
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(10){page.clickMaxLatency()}
         then: 'check if min rows is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2624,12 +2666,29 @@ class DbMonitorTest extends TestBase {
             assert false
     }
 
-    def "check if Avg Latency is clickable"() {
+    def CheckIfAvgLatencyIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click avg latency'
-        page.clickAvgLatency()
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(15){page.clickAvgLatency()}
         then: 'check if avg rows is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2650,12 +2709,29 @@ class DbMonitorTest extends TestBase {
             assert false
     }
 
-    def "check if Time of Execution is clickable"() {
+    def CheckIfTimeOfExecutionIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click time of execution'
-        page.clickTimeOfExecution()
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(20){page.clickTimeOfExecution()}
         then: 'check if type is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
