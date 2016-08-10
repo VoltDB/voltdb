@@ -729,8 +729,7 @@ public class Inits {
                 }
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
-                if (cl == null) return;
-
+                if (cl == null || !cl.getEnabled()) return;
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,

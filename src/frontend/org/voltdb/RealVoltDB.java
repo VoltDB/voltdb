@@ -301,6 +301,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
+    private boolean m_isBare = false;
 
     @Override
     public boolean isRunningWithOldVerbs() {
@@ -1778,7 +1779,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (IOException|RuntimeException e) {
             VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
         }
-
     }
 
     private void stageInitializedMarker(Configuration config) {
@@ -1816,8 +1816,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return !p.isDirectory() || !"log".equals(p.getName());
             }
         });
-        for (File c: allButLog) {
-            MiscUtils.deleteRecursively(c);
+        if (allButLog != null) {
+            for (File c: allButLog) {
+                MiscUtils.deleteRecursively(c);
+            }
         }
     }
 
@@ -2361,6 +2363,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    @Override
+    public boolean isBare() {
+        return m_isBare;
+    }
+    void setBare(boolean flag) {
+        m_isBare = flag;
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -2371,6 +2381,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || managedPathsWithFiles(m_config, readDepl.deployment).isEmpty();
+        setBare(bareAtStartup);
 
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)

@@ -55,7 +55,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.compiler.deploymentfile.PathsType;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -699,7 +698,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 if (!configCFH.equals(optCFH)) {
-                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment");
+                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment, You specified: " + optCFH);
                     referToDocAndExit();
                 }
             } else {
@@ -770,7 +769,7 @@ public class VoltDB {
                 hostLog.fatal(msg);
             }
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE));
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
             // require deployment file location
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
@@ -1203,8 +1202,16 @@ public class VoltDB {
      *
      * @return A reference to the underlying VoltDBInterface object.
      */
-    public static VoltDBInterface instance() {
+    public static synchronized VoltDBInterface instance() {
+        if (singleton == null) {
+            singleton = new RealVoltDB();
+        }
         return singleton;
+    }
+
+    //Used by tests that init in process cluster and start in process.
+    public static synchronized void resetInstance() {
+        singleton = null;
     }
 
     /**
