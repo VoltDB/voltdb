@@ -346,6 +346,14 @@ struct IntsKey
         }
     }
 
+    IntsKey(const TableTuple *tuple,
+            const void * refAddr,
+            const std::vector<int> &indices,
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *keySchema) {
+        assert(false);
+    }
+
     // actual location of data
     uint64_t data[keySize];
 };
@@ -459,6 +467,9 @@ struct GenericKey
         }
     }
 
+    GenericKey(const TableTuple *tuple, const void * refAddr, const std::vector<int> &indices,
+               const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) { assert(false); }
+
     // actual location of data, extends past the end.
     char data[keySize];
 };
@@ -512,6 +523,16 @@ struct GenericPersistentKey : public GenericKey<keySize>
             // XXX: Could this ever somehow interact badly with a COW context?
             keyTuple.setNValueAllocateForObjectCopies(ii, indexedValue, NULL);
         }
+    }
+
+    GenericPersistentKey(const TableTuple *tuple, const void *refAddr, const std::vector<int> &notUsedIndices,
+                         const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema)
+        // Not bothering to delegate to the full-blown GenericKey constructor,
+        // since in some ways the special case processing here is simpler.
+        : GenericKey<keySize>()
+        , m_keySchema(keySchema)
+    {
+        assert(false);
     }
 
     // Both copy constructor and assignment operator are apparently required by CompactingMap.
@@ -708,6 +729,21 @@ struct TupleKey
         m_keyTupleSchema = tuple->getSchema();
     }
 
+    // Set a key from a table-schema tuple.
+    TupleKey(const TableTuple *tuple, const void * refAddr, const std::vector<int> &indices,
+             const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *unused_keySchema) {
+        assert(tuple);
+        assert(indices.size() > 0);
+        m_columnIndices = &indices;
+        if (indexed_expressions.size() != 0) {
+            m_indexedExprs = &indexed_expressions;
+        } else {
+            m_indexedExprs = NULL;
+        }
+        m_keyTuple = tuple->address();
+        m_keyTupleSchema = tuple->getSchema();
+    }
+
     // Return a table tuple that is valid for comparison
     TableTuple getTupleForComparison() const {
         return TableTuple(static_cast<char*>(const_cast<void*>(m_keyTuple)), m_keyTupleSchema);
@@ -777,24 +813,36 @@ static inline int comparePointer(const void *lhs, const void *rhs) {
 
 template <typename KeyType> struct ComparatorWithPointer;
 
+template <typename KeyType> struct ComparatorWithAltPointer;
+
 template <typename KeyType>
 struct KeyWithPointer : public KeyType {
     typedef ComparatorWithPointer<KeyType> KeyComparator;
     friend struct ComparatorWithPointer<KeyType>;
 
-    KeyWithPointer() : KeyType(), m_keyTuple(NULL) {}
+    KeyWithPointer() : KeyType(), m_keyTuple(NULL), m_keyAddr(NULL) {}
 
-    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple), m_keyTuple(NULL) {}
+    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple), m_keyTuple(NULL), m_keyAddr(NULL) {}
 
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *keySchema)
         : KeyType(tuple, indices, indexed_expressions, keySchema) {
         m_keyTuple = tuple->address();
+        m_keyAddr = tuple->address();
+    }
+
+    KeyWithPointer(const TableTuple *tuple, const void *refAddr, const std::vector<int> &indices,
+                   const std::vector<AbstractExpression*> &indexed_expressions,
+                   const TupleSchema *keySchema)
+        : KeyType(tuple, indices, indexed_expressions, keySchema) {
+        m_keyTuple = tuple->address();
+        m_keyAddr = refAddr;
     }
 
     static inline bool keyDependsOnTupleAddress() { return true; }
 
+    const void * const& getPointer() const { return m_keyAddr; }
     const void * const& getValue() const { return m_keyTuple;}
     void setValue(const void * const &value) { m_keyTuple = value; }
     const void *setPointerValue(const void *value) {
@@ -805,6 +853,7 @@ struct KeyWithPointer : public KeyType {
 
 private:
     const void* m_keyTuple;
+    const void* m_keyAddr;
 };
 
 template <>
@@ -812,15 +861,26 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
     typedef ComparatorWithPointer<TupleKey> KeyComparator;
     friend struct ComparatorWithPointer<TupleKey>;
 
-    KeyWithPointer() : TupleKey() {}
+    KeyWithPointer() : TupleKey(), m_keyAddr(NULL) {}
 
-    KeyWithPointer(const TableTuple *tuple) : TupleKey(tuple) {}
+    KeyWithPointer(const TableTuple *tuple) : TupleKey(tuple) {
+        m_keyAddr = tuple->address();
+    }
 
     KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
                    const std::vector<AbstractExpression*> &indexed_expressions,
                    const TupleSchema *unused_keySchema)
-        : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
+        : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {
+        m_keyAddr = tuple->address();
+    }
 
+    KeyWithPointer(const TableTuple *tuple, const void * refAddr, const std::vector<int> &indices,
+                   const std::vector<AbstractExpression*> &indexed_expressions,
+                   const TupleSchema *keySchema)
+        : TupleKey(tuple, indices, indexed_expressions, keySchema) {
+        m_keyAddr = refAddr;
+    }
+    const void * const& getPointer() const { return m_keyAddr; }
     const void * const& getValue() const { return m_keyTuple; }
     void setValue(const void * const &value) { m_keyTuple = value; }
     const void *setPointerValue(const void * &value) {
@@ -828,6 +888,8 @@ struct KeyWithPointer<TupleKey> : public TupleKey {
         m_keyTuple = value;
         return rv;
     }
+private:
+    const void* m_keyAddr;
 };
 
 template <typename KeyType>
@@ -837,7 +899,7 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
         int rv = KeyType::KeyComparator::operator()(lhs, rhs);
-        return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
+        return rv == 0 ? comparePointer(lhs.m_keyAddr, rhs.m_keyAddr) : rv;
     }
 };
 

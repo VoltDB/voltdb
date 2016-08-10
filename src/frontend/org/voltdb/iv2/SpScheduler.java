@@ -722,7 +722,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         m_quietUntil =
                 System.currentTimeMillis() +
-                        (5) + ((long)(m_random.nextDouble() * 15));
+                (5) + ((long)(m_random.nextDouble() * 15));
     }
 
     // Pass a response through the duplicate counters.

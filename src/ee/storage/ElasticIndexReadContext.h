@@ -40,7 +40,8 @@ class ElasticIndexReadContext : public TableStreamerContext
 {
 
     friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
-                                              TableStreamType, const std::vector<std::string>&);
+                                              TableStreamType, const std::vector<std::string>&,
+                                              std::string indexName);
 
 public:
 

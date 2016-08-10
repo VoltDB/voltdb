@@ -34,6 +34,7 @@ class TableTuple;
 class TupleSerializer;
 class PersistentTable;
 class PersistentTableSurgeon;
+struct IndexCursor;
 
 /**
  * Abstract class that provides the interface for all table streamer contexts.
@@ -98,15 +99,18 @@ public:
 
     virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) {return false;}
 
+    virtual bool adjustCursors(int type, IndexCursor *cursor) {return false;}
+
     /**
      * Optional tuple insert handler.
      */
     virtual bool notifyTupleInsert(TableTuple &tuple) {return false;}
 
     /**
-     * Optional tuple update handler.
+     * Optional tuple update handlers.
      */
     virtual bool notifyTupleUpdate(TableTuple &tuple) {return false;}
+    virtual bool notifyTuplePostUpdate(TableTuple &tuple) {return false;}
 
     /**
      * Optional tuple delete handler.

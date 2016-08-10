@@ -19,13 +19,8 @@ package org.voltdb.sysprocs;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -35,12 +30,9 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
-import org.voltdb.SiteProcedureConnection;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
-import org.voltdb.TableStreamer;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
@@ -183,11 +175,18 @@ public class ReadOnlySlow extends VoltSystemProcedure {
             JSONArray planNodes = obj.getJSONArray("PLAN_NODES");
             for (int i = 0; i < planNodes.length(); i++) {
                 JSONObject planNode = planNodes.getJSONObject(i);
-                if (((String) planNode.getString("PLAN_NODE_TYPE")).equals("SEQSCAN")
+                if (((String) planNode.getString("PLAN_NODE_TYPE")).equals("INDEXSCAN")
+                        && planNode.has("SUSPENDABLE") && planNode.getBoolean("SUSPENDABLE")) {
+                    String indexName = planNode.getString("TARGET_INDEX_NAME");
+                    String tableName = planNode.getString("TARGET_TABLE_NAME");
+                    int tableId = CatalogUtil.getTableIdFromName(ctx.getDatabase(),tableName);
+                    ctx.activateCopyOnWriteContext(tableId, indexName, TableStreamType.COPY_ON_WRITE_INDEX);
+                }
+                else if (((String) planNode.getString("PLAN_NODE_TYPE")).equals("SEQSCAN")
                         && planNode.has("SUSPENDABLE") && planNode.getBoolean("SUSPENDABLE")) {
                     String name = planNode.getString("TARGET_TABLE_NAME");
                     int tableId = CatalogUtil.getTableIdFromName(ctx.getDatabase(),name);
-                    ctx.activateCopyOnWriteContext(tableId, TableStreamType.COPY_ON_WRITE_SCAN);
+                    ctx.activateCopyOnWriteContext(tableId, "", TableStreamType.COPY_ON_WRITE_SCAN);
                 }
             }
         } catch (JSONException e) {

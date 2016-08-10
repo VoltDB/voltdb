@@ -55,17 +55,15 @@ import org.voltdb.utils.CatalogUtil;
 
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
-    public enum Members {
-        TARGET_INDEX_NAME,
-        END_EXPRESSION,
-        SEARCHKEY_EXPRESSIONS,
-        INITIAL_EXPRESSION,
-        SKIP_NULL_PREDICATE,
-        KEY_ITERATE,
-        LOOKUP_TYPE,
-        PURPOSE,
-        SORT_DIRECTION;
-    }
+    private final static String TARGET_INDEX_NAME = "TARGET_INDEX_NAME";
+    private final static String END_EXPRESSION = "END_EXPRESSION";
+    private final static String SEARCHKEY_EXPRESSIONS = "SEARCHKEY_EXPRESSIONS";
+    private final static String INITIAL_EXPRESSION = "INITIAL_EXPRESSION";
+    private final static String SKIP_NULL_PREDICATE = "SKIP_NULL_PREDICATE";
+    private final static String KEY_ITERATE = "KEY_ITERATE";
+    private final static String LOOKUP_TYPE = "LOOKUP_TYPE";
+    private final static String PURPOSE = "PURPOSE";
+    private final static String SORT_DIRECTION = "SORT_DIRECTION";
 
     /**
      * Attributes
@@ -708,14 +706,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        stringer.key(LOOKUP_TYPE).value(m_lookupType.toString());
+        stringer.key(SORT_DIRECTION).value(m_sortDirection.toString());
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
-            stringer.key(Members.PURPOSE.name()).value(m_purpose);
+            stringer.key(PURPOSE).value(m_purpose);
         }
-        stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
+        stringer.key(TARGET_INDEX_NAME).value(m_targetIndexName);
         if (m_searchkeyExpressions.size() > 0) {
-            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
+            stringer.key(SEARCHKEY_EXPRESSIONS).array();
             for (AbstractExpression ae : m_searchkeyExpressions) {
                 assert (ae instanceof JSONString);
                 stringer.value(ae);
@@ -723,15 +721,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             stringer.endArray();
         }
         if (m_endExpression != null) {
-            stringer.key(Members.END_EXPRESSION.name());
+            stringer.key(END_EXPRESSION);
             stringer.value(m_endExpression);
         }
         if (m_initialExpression != null) {
-            stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
+            stringer.key(INITIAL_EXPRESSION).value(m_initialExpression);
         }
 
         if (m_skip_null_predicate != null) {
-            stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
+            stringer.key(SKIP_NULL_PREDICATE).value(m_skip_null_predicate);
         }
     }
 
@@ -739,20 +737,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
-        m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        m_purpose = jobj.has(Members.PURPOSE.name()) ?
-                jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
-        m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+        m_lookupType = IndexLookupType.get( jobj.getString( LOOKUP_TYPE ) );
+        m_sortDirection = SortDirectionType.get( jobj.getString( SORT_DIRECTION ) );
+        m_purpose = jobj.has(PURPOSE) ?
+                jobj.getInt(PURPOSE) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
+        m_targetIndexName = jobj.getString(TARGET_INDEX_NAME);
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         //load end_expression
-        m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
+        m_endExpression = AbstractExpression.fromJSONChild(jobj, END_EXPRESSION, m_tableScan);
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, INITIAL_EXPRESSION, m_tableScan);
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
-                Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
-        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
+                SEARCHKEY_EXPRESSIONS, m_tableScan);
+        m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, SKIP_NULL_PREDICATE, m_tableScan);
     }
 
     @Override

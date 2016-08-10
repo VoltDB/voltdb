@@ -807,6 +807,10 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTuplePostUpdate(targetTupleToUpdate);
+    }
+
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
@@ -1269,7 +1273,8 @@ template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput
 bool PersistentTable::activateCopyOnWriteContext(
     TableStreamType cowType,
     int32_t partitionId,
-    CatalogId tableId) {
+    CatalogId tableId,
+    std::string indexName) {
     /*
      * Allow multiple stream types for the same partition by holding onto the
      * TableStreamer object. TableStreamer enforces which multiple stream type
@@ -1281,11 +1286,11 @@ bool PersistentTable::activateCopyOnWriteContext(
     }
     std::vector<std::string> predicateStrings;
     FullTupleSerializer serializer;
-    return m_tableStreamer->activateStream(m_surgeon, serializer, cowType, predicateStrings);
+    return m_tableStreamer->activateStream(m_surgeon, serializer, cowType, predicateStrings, indexName);
 }
 
-void PersistentTable::deactivateCopyOnWriteContext() {
-    m_tableStreamer->deactivateStream(TABLE_STREAM_COPY_ON_WRITE_SCAN);
+void PersistentTable::deactivateCopyOnWriteContext(TableStreamType cowType) {
+    m_tableStreamer->deactivateStream(cowType);
 }
 
 /** Prepare table for streaming from serialized data. */
@@ -1319,7 +1324,7 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings);
+    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings, "");
 }
 
 /**
@@ -1341,7 +1346,8 @@ bool PersistentTable::activateWithCustomStreamer(TupleSerializer &tupleSerialize
         success = m_tableStreamer->activateStream(m_surgeon,
                                                   tupleSerializer,
                                                   streamType,
-                                                  predicateStrings);
+                                                  predicateStrings,
+                                                  "");
     }
     return success;
 }

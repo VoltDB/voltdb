@@ -78,9 +78,17 @@ public:
         : AbstractExecutor(engine, abstractNode)
         , m_projector()
         , m_searchKeyBackingStore(NULL)
+        , m_suspendable(false)
+        , m_tupleLimitForSuspendableFragments(1)
         , m_aggExec(NULL)
     {}
     ~IndexScanExecutor();
+
+    inline bool getNextTupleInScan(IndexLookupType lookupType,
+            TableTuple* tuple,
+            TableIndex* index,
+            IndexCursor* cursor,
+            int activeNumOfSearchKeys);
 
     /** This is a helper function to get the "next tuple" during an
      *   index scan, called by p_execute of both this class and
@@ -111,8 +119,8 @@ private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+    virtual bool p_isSuspendable() { return m_suspendable; }
     void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
-
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -139,6 +147,9 @@ private:
     boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
+
+    bool m_suspendable;
+    int m_tupleLimitForSuspendableFragments;
 
     AggregateExecutorBase* m_aggExec;
 };

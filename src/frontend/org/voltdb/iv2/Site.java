@@ -393,9 +393,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateCopyOnWriteContext(final int tableId, TableStreamType type)
+        public boolean activateCopyOnWriteContext(final int tableId, String indexName, TableStreamType type)
         {
-            return m_ee.activateCopyOnWriteContext(tableId, type);
+            return m_ee.activateCopyOnWriteContext(tableId, indexName, type);
         }
 
         @Override

@@ -28,6 +28,7 @@ namespace voltdb
     class TupleSerializer;
     class TupleOutputStreamProcessor;
     class PersistentTableSurgeon;
+    struct IndexCursor;
 
     /**
      * Defines the interface for table streaming.
@@ -45,7 +46,8 @@ namespace voltdb
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                     TupleSerializer &serializer,
                                     TableStreamType streamType,
-                                    const std::vector<std::string> &predicateStrings) = 0;
+                                    const std::vector<std::string> &predicateStrings,
+                                    std::string indexName) = 0;
 
         /**
          * Deactivate streaming
@@ -76,6 +78,8 @@ namespace voltdb
 
         virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) = 0;
 
+        virtual bool adjustCursors(int type, IndexCursor *cursor) = 0;
+
         /**
          * Tuple insert hook.
          * Return true if it was handled by the COW context.
@@ -87,6 +91,12 @@ namespace voltdb
          * Return true if it was handled by the COW context.
          */
         virtual bool notifyTupleUpdate(TableTuple &tuple) = 0;
+
+        /**
+         * Tuple update hook.
+         * Return true if it was handled by the COW context.
+         */
+        virtual bool notifyTuplePostUpdate(TableTuple &tuple) = 0;
 
         /**
          * Tuple delete hook.

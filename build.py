@@ -346,6 +346,7 @@ CTX.INPUT['storage'] = """
  CompatibleDRTupleStream.cpp
  ConstraintFailureException.cpp
  constraintutil.cpp
+ IndexCopyOnWriteContext.cpp
  ScanCopyOnWriteContext.cpp
  CopyOnWriteIterator.cpp
  DRTupleStream.cpp

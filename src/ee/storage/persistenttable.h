@@ -67,6 +67,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ScanCopyOnWriteContext.h"
+#include "storage/IndexCopyOnWriteContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -255,6 +256,11 @@ public:
         m_tableStreamer->cleanupTuple(tuple, false);
     }
 
+    void adjustCursors(int type, IndexCursor *cursor) {
+        // XXX For multiple CoW contexts, need to differentiate between CoWs
+        m_tableStreamer->adjustCursors(type, cursor);
+    }
+
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
@@ -387,9 +393,10 @@ public:
      */
     bool activateCopyOnWriteContext(TableStreamType cowType,
                         int32_t partitionId,
-                        CatalogId tableId);
+                        CatalogId tableId,
+                        std::string indexName);
 
-    void deactivateCopyOnWriteContext();
+    void deactivateCopyOnWriteContext(TableStreamType cowType);
 
     /**
      * Prepare table for streaming from serialized data.

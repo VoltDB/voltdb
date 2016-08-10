@@ -453,7 +453,7 @@ public:
             ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());
         }
         if (type == LRR) {
-            m_table->deactivateCopyOnWriteContext();
+            m_table->deactivateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN);
         }
     }
 

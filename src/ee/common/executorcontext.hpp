@@ -121,7 +121,7 @@ class ExecutorContext {
         assert(m_subqueryContextMap.empty());
     }
 
-    void restorePausedTables(int subqueryId, int pausedExecutorId, TempTable * tempTable);
+    void restoreSuspendedExecutor(int subqueryId, int pausedExecutorId, TempTable * tempTable);
 
     void loadState(SavedContext &savedContext);
 

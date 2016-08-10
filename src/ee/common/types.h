@@ -386,6 +386,7 @@ enum TableStreamType {
 
     // Copy on write stream types
     TABLE_STREAM_COPY_ON_WRITE_SCAN,
+    TABLE_STREAM_COPY_ON_WRITE_INDEX,
 
     // Materialize previously-captured index.
     TABLE_STREAM_ELASTIC_INDEX_READ,

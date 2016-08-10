@@ -339,7 +339,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         bool activateCopyOnWriteContext(
                 const CatalogId tableId,
-                const TableStreamType cowType);
+                const TableStreamType cowType,
+                std::string indexName);
 
         /**
          * Activate a table stream of the specified type for the specified table.

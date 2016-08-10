@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SCANCOPYONWRITECONTEXT_H_
-#define SCANCOPYONWRITECONTEXT_H_
+#ifndef INDEXCOPYONWRITECONTEXT_H_
+#define INDEXCOPYONWRITECONTEXT_H_
 
 #include <string>
 #include <vector>
@@ -25,6 +25,7 @@
 #include "common/tabletuple.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
+#include "indexes/tableindex.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -34,8 +35,10 @@ class TupleIterator;
 class TempTable;
 class PersistentTableSurgeon;
 class PersistentTable;
+class TableIndex;
+class IndexCursor;
 
-class ScanCopyOnWriteContext : public TableStreamerContext {
+class IndexCopyOnWriteContext : public TableStreamerContext {
 
     friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
                                               TableStreamType, const std::vector<std::string>&,
@@ -46,12 +49,13 @@ public:
      * Construct a copy on write context for the specified table that will
      * serialize tuples using the provided serializer.
      */
-    ScanCopyOnWriteContext(PersistentTable &table,
+    IndexCopyOnWriteContext(PersistentTable &table,
                        PersistentTableSurgeon &surgeon,
-                        int32_t partitionId,
+                       TableIndex &index,
+                       int32_t partitionId,
                        int64_t totalTuples);
 
-    virtual ~ScanCopyOnWriteContext();
+    virtual ~IndexCopyOnWriteContext();
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
@@ -67,16 +71,22 @@ public:
      */
     virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
+
     virtual ActivationReturnCode handleReactivation(TableStreamType streamType) {
         return ACTIVATION_SUCCEEDED;
     }
+
+    /**
+     * Rediscover cursor positions
+     */
+    virtual bool adjustCursors(int type, IndexCursor *cursor);
 
     /**
      * Do surgery
      */
     virtual bool advanceIterator(TableTuple &tuple);
 
-    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple);
+    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) {return true;}
 
     virtual bool cleanup();
 
@@ -96,54 +106,64 @@ public:
      * Optional tuple update handler.
      */
     virtual bool notifyTupleUpdate(TableTuple &tuple);
+    virtual bool notifyTuplePostUpdate(TableTuple &tuple);
 
     /**
      * Optional tuple delete handler.
      */
     virtual bool notifyTupleDelete(TableTuple &tuple);
 
-    bool isTableScanFinished() {
-        return m_finishedTableScan;
-    }
-
-    int64_t getTuplesRemaining() {
-        return m_tuplesRemaining;
+    bool isTableIndexFinished() {
+        return m_finished;
     }
 
 private:
 
+    void debug();
+
     /**
-     * Temp table for copies of tuples that were dirtied.
+     * Temp table for copies of tuples that were dirtied or deleted.
      */
     boost::scoped_ptr<TempTable> m_backedUpTuples;
+
+    /**
+     * Table we are maintaining a COW context for, and its surgeon
+     * Index we are maintaining a COW context for
+     */
+    PersistentTable &m_table;
+    PersistentTableSurgeon &m_surgeon;
+    TableIndex &m_index;
+
+    /**
+     * Structures to track inserted and deleted keys
+     */
+    TableIndex *m_indexInserts;
+    TableIndex *m_indexDeletes;
+
+    IndexCursor m_indexCursor;
+    IndexCursor m_deletesCursor;
+
+    TableTuple m_lastIndexTuple;
+    TableTuple m_lastDeletesTuple;
+    const void* m_lastDeletesTupleAddr;
 
     /**
      * Memory pool for string allocations
      */
     Pool m_pool;
 
-    /**
-     * Iterator over the table via a CopyOnWriteIterator or an iterator over
-     *  temp table used to stored backed up tuples
-     */
-    boost::scoped_ptr<TupleIterator> m_iterator;
 
-    TableTuple m_tuple;
+    bool m_finished;
 
-    bool m_finishedTableScan;
+    IndexLookupType m_indexLookupType;
 
-    int64_t m_totalTuples;
-    int64_t m_tuplesRemaining;
-    int64_t m_blocksCompacted;
-    int64_t m_serializationBatches;
     int64_t m_inserts;
     int64_t m_deletes;
     int64_t m_updates;
 
-    void checkRemainingTuples(const std::string &label);
 
 };
 
 }
 
-#endif /* SCANCOPYONWRITECONTEXT_H_ */
+#endif /* INDEXCOPYONWRITECONTEXT_H_ */

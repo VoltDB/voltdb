@@ -74,6 +74,13 @@ class CompactingTreeUniqueIndex : public TableIndex
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
+    void addEntryNegativeDeltaDo(const TableTuple *tuple, const void* address)
+    {
+        ++m_inserts;
+        assert(m_scheme.negativeDelta);
+        m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+    }
+
     void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
     {
         ++m_inserts;
@@ -127,6 +134,28 @@ class CompactingTreeUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
+    TableTuple currentValue(IndexCursor& cursor) const
+    {
+        TableTuple retval(getTupleSchema());
+        MapIterator &mapIter = castToIter(cursor);
+        if (! mapIter.isEnd()) {
+            retval.move(const_cast<void*>(mapIter.value()));
+        }
+
+        return retval;
+    }
+
+
+    TableTuple currentValueAtKey(IndexCursor& cursor) const
+    {
+        return cursor.m_match;
+    }
+
+    const void* currentKey(IndexCursor& cursor) const
+    {
+        return NULL;
+    }
+
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
         cursor.m_forward = true;
@@ -143,7 +172,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
     {
-        cursor.m_forward = true;
+        //cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
 
@@ -153,6 +182,12 @@ class CompactingTreeUniqueIndex : public TableIndex
         }
         cursor.m_match.move(const_cast<void*>(mapIter.value()));
         return true;
+    }
+
+
+    bool moveToKeyByTupleAddr(const TableTuple *persistentTuple, const void *addr, IndexCursor& cursor) const
+    {
+        return moveToKeyByTuple(persistentTuple, cursor);
     }
 
     void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const
@@ -185,6 +220,33 @@ class CompactingTreeUniqueIndex : public TableIndex
             cursor.m_forward = false;
             mapIter.movePrev();
         }
+    }
+
+    bool moveToGreaterThanKeyByTuple(const TableTuple *persistentTuple, IndexCursor& cursor) const
+    {
+        cursor.m_forward = true;
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.upperBound(KeyType(setKeyFromTuple(persistentTuple)));
+
+        return mapIter.isEnd();
+    }
+
+    bool moveToLessThanKeyByTuple(const TableTuple *persistentTuple, IndexCursor& cursor) const
+    {
+        cursor.m_forward = true;
+        MapIterator &mapIter = castToIter(cursor);
+
+        mapIter = m_entries.lowerBound(setKeyFromTuple(persistentTuple));
+
+        // find prev entry
+        if (mapIter.isEnd()) {
+            moveToEnd(false, cursor);
+        } else {
+            cursor.m_forward = false;
+            mapIter.movePrev();
+        }
+
+        return mapIter.isEnd();
     }
 
     // only be called after moveToGreaterThanKey() for LTE case
@@ -328,6 +390,33 @@ class CompactingTreeUniqueIndex : public TableIndex
         return m_entries.rankAsc(mapIter.key());
     }
 
+    int compare(const TableTuple *searchKey, IndexCursor& cursor) const {
+        if (searchKey->isNullTuple()) {
+            return 1;
+        }
+        const KeyType tmpKey(setKeyFromTuple(searchKey));
+        MapIterator mapIter = castToIter(cursor);
+        if (mapIter.isEnd()) {
+            return -1;
+        }
+        int cmp = m_cmp(tmpKey, mapIter.key());
+        return cmp;
+    }
+
+    int compare(const TableTuple *key1, const TableTuple *key2) const {
+        if (key1->isNullTuple() && key2->isNullTuple()) {
+            return 0;
+        }
+        if (key1->isNullTuple()) {
+            return 1;
+        }
+        if (key2->isNullTuple()) {
+            return -1;
+        }
+        int cmp = m_cmp(setKeyFromTuple(key1), setKeyFromTuple(key2));
+        return cmp;
+    }
+
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const
@@ -369,6 +458,12 @@ class CompactingTreeUniqueIndex : public TableIndex
     const KeyType setKeyFromTuple(const TableTuple *tuple) const
     {
         KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
+        return result;
+    }
+
+    const KeyType setKeyFromCopyTuple(const TableTuple *tuple, const void * refAddr) const
+    {
+        KeyType result(tuple, refAddr, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
         return result;
     }
 

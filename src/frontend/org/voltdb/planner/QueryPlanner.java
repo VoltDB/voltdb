@@ -443,6 +443,7 @@ public class QueryPlanner {
                 bestPlan.setHighVolume(true);
                 sendNode.setHighVolume(true);
                 makeLeafSeqScansSuspendable(bestPlan.rootPlanGraph);
+                makeLeafIndexScansSuspendable(bestPlan.rootPlanGraph);
             }
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
@@ -512,6 +513,16 @@ public class QueryPlanner {
         for (AbstractPlanNode node : scanNodes) {
             if (node.getParentCount() == 0) {
                 ((SeqScanPlanNode)node).setPausable(true, m_cluster.getLongreadstuplecount());
+            }
+        }
+    }
+
+    public static void makeLeafIndexScansSuspendable(AbstractPlanNode root) {
+        ArrayList<AbstractPlanNode> scanNodes = root.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        for (AbstractPlanNode node : scanNodes) {
+            // TODO Make a scan node suspendable if it ingests a persistent table
+            if (node.getParentCount() == 0) {
+                ((IndexScanPlanNode)node).setPausable(true, m_cluster.getLongreadstuplecount());
             }
         }
     }

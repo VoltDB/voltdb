@@ -507,7 +507,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
     public abstract boolean activateCopyOnWriteContext(final int tableId,
-            TableStreamType type);
+            String indexName, TableStreamType type);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
@@ -951,10 +951,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Active a table stream of the specified type for a table.
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
+     * @param indexName Name of the index to scan
      * @param type type of copy on write context to activate
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateCopyOnWriteContext(long pointer, int tableId, int type);
+    protected native boolean nativeActivateCopyOnWriteContext(long pointer, int tableId, byte[] indexName, int type);
 
     /**
      * Active a table stream of the specified type for a table.

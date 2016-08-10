@@ -178,7 +178,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWriteContext(int tableId, TableStreamType type) {
+    public boolean activateCopyOnWriteContext(int tableId, String indexName, TableStreamType type) {
         return false;
     }
 

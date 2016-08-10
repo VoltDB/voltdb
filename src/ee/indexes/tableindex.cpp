@@ -72,13 +72,15 @@ TableIndexScheme::TableIndexScheme(
       countable(a_countable),
       expressionsAsText(a_expressionsAsText),
       predicateAsText(a_predicateAsText),
-      tupleSchema(a_tupleSchema)
+      tupleSchema(a_tupleSchema),
+      negativeDelta(false)
     {
         if (predicate != NULL)
         {
             // Collect predicate column indicies
             ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
         }
+
     }
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
@@ -171,6 +173,15 @@ void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
         return;
     }
     addEntryDo(tuple, conflictTuple);
+}
+
+void TableIndex::addEntryNegativeDelta(const TableTuple *tuple, const void * address)
+{
+    if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
+        // Tuple fails the predicate. Do not add it.
+        return;
+    }
+    addEntryNegativeDeltaDo(tuple, address);
 }
 
 bool TableIndex::deleteEntry(const TableTuple *tuple)

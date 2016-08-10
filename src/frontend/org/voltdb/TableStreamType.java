@@ -38,6 +38,7 @@ public enum TableStreamType {
      * Copy on write contexts
      */
     COPY_ON_WRITE_SCAN,
+    COPY_ON_WRITE_INDEX,
     /*
      * An elastic index read stream materializes the index created by ELASTIC_INDEX
      * using the SNAPSHOT streaming mechanism.

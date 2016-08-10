@@ -284,7 +284,7 @@ bool SeqScanExecutor::getNextTupleInScan(TableIterator& iterator, Table* input_t
         success = p_input_table->advanceCOWIterator(tuple);
         if (!success) {
             // Clean out this stream -- assumes we only read each table once
-            p_input_table->deactivateCopyOnWriteContext();
+            p_input_table->deactivateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN);
         }
     } else {
         success = iterator.next(tuple);

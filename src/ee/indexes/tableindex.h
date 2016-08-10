@@ -110,7 +110,8 @@ struct TableIndexScheme {
       countable(a_countable),
       expressionsAsText(),
       predicateAsText(),
-      tupleSchema(a_tupleSchema)
+      tupleSchema(a_tupleSchema),
+      negativeDelta(false)
     {
     }
 
@@ -125,7 +126,8 @@ struct TableIndexScheme {
       countable(other.countable),
       expressionsAsText(other.expressionsAsText),
       predicateAsText(other.predicateAsText),
-      tupleSchema(other.tupleSchema)
+      tupleSchema(other.tupleSchema),
+      negativeDelta(other.negativeDelta)
     {}
 
     TableIndexScheme& operator=(const TableIndexScheme& other)
@@ -141,6 +143,7 @@ struct TableIndexScheme {
         expressionsAsText = other.expressionsAsText;
         predicateAsText = other.predicateAsText;
         tupleSchema = other.tupleSchema;
+        negativeDelta = other.negativeDelta;
         return *this;
     }
 
@@ -162,6 +165,7 @@ struct TableIndexScheme {
     std::string expressionsAsText;
     std::string predicateAsText;
     const TupleSchema *tupleSchema;
+    bool negativeDelta;
 };
 
 struct IndexCursor {
@@ -171,6 +175,14 @@ public:
     {
         memset(m_keyIter, 0, sizeof(m_keyIter));
         memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
+    }
+
+    IndexCursor(const IndexCursor &cursor) :
+        m_forward(cursor.m_forward),
+        m_match(cursor.m_match)
+    {
+        memcpy(m_keyIter, cursor.m_keyIter, sizeof(m_keyIter));
+        memcpy(m_keyEndIter, cursor.m_keyEndIter, sizeof(m_keyIter));
     }
 
     ~IndexCursor() {
@@ -221,6 +233,8 @@ public:
      * adds passed value as an index entry linked to given tuple
      */
     void addEntry(const TableTuple *tuple, TableTuple *conflictTuple);
+
+    void addEntryNegativeDelta(const TableTuple *tuple, const void* address);
 
     /**
      * removes the index entry linked to given value (and tuple
@@ -309,6 +323,21 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
+    virtual bool moveToKeyByTupleAddr(const TableTuple *persistentTuple, const void *addr, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyByTupleAddr which has no implementation");
+    };
+
+    virtual bool moveToGreaterThanKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKeyByTuple which has no implementation");
+    }
+
+    virtual bool moveToLessThanKeyByTuple(const TableTuple *persistentTuple, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToLessThanKeyByTuple which has no implementation");
+    }
+
     virtual bool moveToCoveringCell(const TableTuple* searchKey,
                                     IndexCursor &cursor) const
     {
@@ -335,6 +364,33 @@ public:
     {
         throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
     }
+
+    /**
+     * sets the tuple to point the entry found by
+     * moveToKeyOrGreater().
+     *
+     * @return true if any entry to return, false if reached the end
+     * of this index.
+     */
+    virtual TableTuple currentValue(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method currentValue which has no implementation");
+    };
+
+    virtual TableTuple currentValueAtKey(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method currentValueAtKey which has no implementation");
+    };
+
+    /**
+     * sets the tuple to point to the key found by this cursor
+     *
+     * @return key if any entry to return, null if reached the end of this index
+     */
+    virtual const void* currentKey(IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method currentKey which has no implementation");
+    };
 
     /**
      * sets the tuple to point the entry found by
@@ -450,6 +506,25 @@ public:
     }
 
 
+    /**
+     * Compares a search key with the key at which this cursor is pointing
+     * Return 0 if equal, -1 if search key is less than the cursor, 1 if search key is greater than the cursor
+     */
+    virtual int compare(const TableTuple *searchKey, IndexCursor& cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method compare which has no implementation");
+    }
+
+    /**
+     * Compares two keys
+     * returns -1/0/1
+     * if key1 </=/> key2
+     */
+    virtual int compare(const TableTuple *key1, const TableTuple *key2) const
+    {
+        throwFatalException("Invoked TableIndex virtual method compare which has no implementation");
+    }
+
     virtual size_t getSize() const = 0;
 
     // Return the amount of memory we think is allocated for this
@@ -486,6 +561,11 @@ public:
     const std::string& getName() const
     {
         return m_scheme.name;
+    }
+
+    const TableIndexScheme getScheme() const
+    {
+        return m_scheme;
     }
 
     void rename(std::string name) {
@@ -550,6 +630,11 @@ protected:
                                          const TableTuple &originalTuple) = 0;
     virtual bool existsDo(const TableTuple* values) const = 0;
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
+
+
+    virtual void addEntryNegativeDeltaDo(const TableTuple *tuple, const void * address){
+        throwFatalException("Invoked addEntryNegativeDeltaDo virtual method compare which has no implementation");
+    }
 
 private:
 

@@ -141,6 +141,10 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    // Determine whether this is suspendable
+    m_suspendable = m_node->isSuspendable();
+    m_tupleLimitForSuspendableFragments = m_node->getTupleSuspendLimit();
+
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
     return true;
@@ -168,6 +172,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
+
+    bool yield = false;
+    int tupleCounter = 0;
 
     //
     // INLINE LIMIT
@@ -214,127 +221,128 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // SEARCH KEY
     //
-    bool earlyReturnForSearchKeyOutOfRange = false;
+    if (m_isFirstPass) {
+        bool earlyReturnForSearchKeyOutOfRange = false;
 
-    searchKey.setAllNulls();
-    VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
+        searchKey.setAllNulls();
+        VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
 
-    for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
-        if (candidateValue.isNull()) {
-            // when any part of the search key is NULL, the result is false when it compares to anything.
-            // do early return optimization, our index comparator may not handle null comparison correctly.
-            earlyReturnForSearchKeyOutOfRange = true;
-            break;
-        }
-
-        try {
-            searchKey.setNValue(ctr, candidateValue);
-        }
-        catch (const SQLException &e) {
-            // This next bit of logic handles underflow, overflow and search key length
-            // exceeding variable length column size (variable lenght mismatch) when
-            // setting up the search keys.
-            // e.g. TINYINT > 200 or INT <= 6000000000
-            // VarChar(3 bytes) < "abcd" or VarChar(3) > "abbd"
-
-            // re-throw if not an overflow, underflow or variable length mismatch
-            // currently, it's expected to always be an overflow or underflow
-            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
-                throw e;
-            }
-
-            // handle the case where this is a comparison, rather than equality match
-            // comparison is the only place where the executor might return matching tuples
-            // e.g. TINYINT < 1000 should return all values
-            if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
-
-                if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                        // gt or gte when key overflows returns nothing except inline agg
-                        earlyReturnForSearchKeyOutOfRange = true;
-                        break;
-                    }
-                    else {
-                        // for overflow on reverse scan, we need to
-                        // do a forward scan to find the correct start
-                        // point, which is exactly what LTE would do.
-                        // so, set the lookupType to LTE and the missing
-                        // searchkey will be handled by extra post filters
-                        localLookupType = INDEX_LOOKUP_TYPE_LTE;
-                    }
-                }
-                if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                        // lt or lte when key underflows returns nothing except inline agg
-                        earlyReturnForSearchKeyOutOfRange = true;
-                        break;
-                    }
-                    else {
-                        // don't allow GTE because it breaks null handling
-                        localLookupType = INDEX_LOOKUP_TYPE_GT;
-                    }
-                }
-                if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
-                    // shrink the search key and add the updated key to search key table tuple
-                    searchKey.shrinkAndSetNValue(ctr, candidateValue);
-                    // search will be performed on shrinked key, so update lookup operation
-                    // to account for it
-                    switch (localLookupType) {
-                        case INDEX_LOOKUP_TYPE_LT:
-                        case INDEX_LOOKUP_TYPE_LTE:
-                            localLookupType = INDEX_LOOKUP_TYPE_LTE;
-                            break;
-                        case INDEX_LOOKUP_TYPE_GT:
-                        case INDEX_LOOKUP_TYPE_GTE:
-                            localLookupType = INDEX_LOOKUP_TYPE_GT;
-                            break;
-                        default:
-                            assert(!"IndexScanExecutor::p_execute - can't index on not equals");
-                            return false;
-                    }
-                }
-
-                // if here, means all tuples with the previous searchkey
-                // columns need to be scanned. Note, if only one column,
-                // then all tuples will be scanned. Only exception to this
-                // case is setting of search key in search tuple was due
-                // to search key length exceeding the search column length
-                // of variable length type
-                if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
-                    // for variable length mismatch error, the needed search key to perform the search
-                    // has been generated and added to the search tuple. So no need to decrement
-                    // activeNumOfSearchKeys
-                    activeNumOfSearchKeys--;
-                }
-                if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                    localSortDirection = SORT_DIRECTION_TYPE_ASC;
-                }
-            }
-            // if a EQ comparison is out of range, then return no tuples
-            else {
+        for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+            NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
+            if (candidateValue.isNull()) {
+                // when any part of the search key is NULL, the result is false when it compares to anything.
+                // do early return optimization, our index comparator may not handle null comparison correctly.
                 earlyReturnForSearchKeyOutOfRange = true;
                 break;
             }
-            break;
+
+            try {
+                searchKey.setNValue(ctr, candidateValue);
+            }
+            catch (const SQLException &e) {
+                // This next bit of logic handles underflow, overflow and search key length
+                // exceeding variable length column size (variable lenght mismatch) when
+                // setting up the search keys.
+                // e.g. TINYINT > 200 or INT <= 6000000000
+                // VarChar(3 bytes) < "abcd" or VarChar(3) > "abbd"
+
+                // re-throw if not an overflow, underflow or variable length mismatch
+                // currently, it's expected to always be an overflow or underflow
+                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
+                    throw e;
+                }
+
+                // handle the case where this is a comparison, rather than equality match
+                // comparison is the only place where the executor might return matching tuples
+                // e.g. TINYINT < 1000 should return all values
+                if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
+                        (ctr == (activeNumOfSearchKeys - 1))) {
+
+                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                        if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                                (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+
+                            // gt or gte when key overflows returns nothing except inline agg
+                            earlyReturnForSearchKeyOutOfRange = true;
+                            break;
+                        }
+                        else {
+                            // for overflow on reverse scan, we need to
+                            // do a forward scan to find the correct start
+                            // point, which is exactly what LTE would do.
+                            // so, set the lookupType to LTE and the missing
+                            // searchkey will be handled by extra post filters
+                            localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                        }
+                    }
+                    if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                        if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                                (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                            // lt or lte when key underflows returns nothing except inline agg
+                            earlyReturnForSearchKeyOutOfRange = true;
+                            break;
+                        }
+                        else {
+                            // don't allow GTE because it breaks null handling
+                            localLookupType = INDEX_LOOKUP_TYPE_GT;
+                        }
+                    }
+                    if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
+                        // shrink the search key and add the updated key to search key table tuple
+                        searchKey.shrinkAndSetNValue(ctr, candidateValue);
+                        // search will be performed on shrinked key, so update lookup operation
+                        // to account for it
+                        switch (localLookupType) {
+                            case INDEX_LOOKUP_TYPE_LT:
+                            case INDEX_LOOKUP_TYPE_LTE:
+                                localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                                break;
+                            case INDEX_LOOKUP_TYPE_GT:
+                            case INDEX_LOOKUP_TYPE_GTE:
+                                localLookupType = INDEX_LOOKUP_TYPE_GT;
+                                break;
+                            default:
+                                assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                                return false;
+                        }
+                    }
+
+                    // if here, means all tuples with the previous searchkey
+                    // columns need to be scanned. Note, if only one column,
+                    // then all tuples will be scanned. Only exception to this
+                    // case is setting of search key in search tuple was due
+                    // to search key length exceeding the search column length
+                    // of variable length type
+                    if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
+                        // for variable length mismatch error, the needed search key to perform the search
+                        // has been generated and added to the search tuple. So no need to decrement
+                        // activeNumOfSearchKeys
+                        activeNumOfSearchKeys--;
+                    }
+                    if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+                        localSortDirection = SORT_DIRECTION_TYPE_ASC;
+                    }
+                }
+                // if a EQ comparison is out of range, then return no tuples
+                else {
+                    earlyReturnForSearchKeyOutOfRange = true;
+                    break;
+                }
+                break;
+            }
         }
-    }
 
-    if (earlyReturnForSearchKeyOutOfRange) {
-        if (m_aggExec != NULL) {
-            m_aggExec->p_execute_finish();
+        if (earlyReturnForSearchKeyOutOfRange) {
+            if (m_aggExec != NULL) {
+                m_aggExec->p_execute_finish();
+            }
+            return true;
         }
-        return true;
+
+        assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
+        VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
     }
-
-    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
-
     //
     // END EXPRESSION
     //
@@ -372,61 +380,68 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
 
     TableTuple tuple;
-    if (activeNumOfSearchKeys > 0) {
-        VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
+    if (m_isFirstPass || !m_suspendable) {
+        if (activeNumOfSearchKeys > 0) {
+            VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                    localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
 
-        if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            tableIndex->moveToKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-            tableIndex->moveToLessThanKey(&searchKey, indexCursor);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
-            // find the entry whose key is greater than search key,
-            // do a forward scan using initialExpr to find the correct
-            // start point to do reverse scan
-            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
-            if (isEnd) {
-                tableIndex->moveToEnd(false, indexCursor);
+            if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+                tableIndex->moveToKey(&searchKey, indexCursor);
             }
-            else {
-                while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
-                    pmp.countdownProgress();
-                    if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
-                        // just passed the first failed entry, so move 2 backward
-                        tableIndex->moveToBeforePriorEntry(indexCursor);
-                        break;
-                    }
-                }
-                if (tuple.isNullTuple()) {
+            else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+                tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
+            }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
+            }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
+                tableIndex->moveToLessThanKey(&searchKey, indexCursor);
+            }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
+                // find the entry whose key is greater than search key,
+                // do a forward scan using initialExpr to find the correct
+                // start point to do reverse scan
+                bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
+                if (isEnd) {
                     tableIndex->moveToEnd(false, indexCursor);
                 }
+                else {
+                    while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
+                        pmp.countdownProgress();
+                        if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
+                            // just passed the first failed entry, so move 2 backward
+                            tableIndex->moveToBeforePriorEntry(indexCursor);
+                            break;
+                        }
+                    }
+                    if (tuple.isNullTuple()) {
+                        tableIndex->moveToEnd(false, indexCursor);
+                    }
+                }
+            }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+                tableIndex->moveToCoveringCell(&searchKey, indexCursor);
+            }
+            else {
+                return false;
             }
         }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
-            tableIndex->moveToCoveringCell(&searchKey, indexCursor);
-        }
         else {
-            return false;
+            bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+            tableIndex->moveToEnd(toStartActually, indexCursor);
         }
     }
-    else {
-        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor);
+    if (m_suspendable) {
+        // This fragment was or may be suspended. Update the CoW cursors
+        targetTable->adjustCursors(localLookupType, &indexCursor);
     }
 
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while (postfilter.isUnderLimit() &&
-           getNextTuple(localLookupType,
+    while (!yield &&
+            postfilter.isUnderLimit() &&
+           getNextTupleInScan(localLookupType,
                         &tuple,
                         tableIndex,
                         &indexCursor,
@@ -469,16 +484,42 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             }
             pmp.countdownProgress();
         }
+
+        tupleCounter++;
+        if (m_suspendable && tupleCounter >= m_tupleLimitForSuspendableFragments) {
+            yield = true;
+        }
     }
 
-    if (m_aggExec != NULL) {
+    if (!yield && m_aggExec != NULL) {
         m_aggExec->p_execute_finish();
     }
 
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
-    return true;
+    return !yield;
 }
+
+inline bool IndexScanExecutor::getNextTupleInScan(IndexLookupType lookupType,
+             TableTuple* tuple,
+             TableIndex* index,
+             IndexCursor* cursor,
+             int activeNumOfSearchKeys) {
+    bool success = false;
+    if (m_suspendable) {
+        // read from CoW
+        PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+        success = targetTable->advanceCOWIterator(*tuple);
+        if (!success) {
+            targetTable->deactivateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_INDEX);
+        }
+   }
+   else {
+       success = getNextTuple(lookupType, tuple, index, cursor, activeNumOfSearchKeys);
+   }
+   return success;
+}
+
 
 void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
     if (m_aggExec != NULL) {

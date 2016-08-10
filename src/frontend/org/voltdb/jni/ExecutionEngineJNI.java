@@ -500,8 +500,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWriteContext(int tableId, TableStreamType type) {
-        return nativeActivateCopyOnWriteContext(pointer, tableId, type.ordinal());
+    public boolean activateCopyOnWriteContext(int tableId, String indexName, TableStreamType type) {
+        return nativeActivateCopyOnWriteContext(pointer, tableId, getStringBytes(indexName), type.ordinal());
     }
 
     @Override

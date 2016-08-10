@@ -116,7 +116,7 @@ class TempTable : public Table {
      * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
      * before they are dirtied
      */
-    void insertTempTupleDeepCopy(const TableTuple &source, Pool *pool);
+    TableTuple insertTempTupleDeepCopy(const TableTuple &source, Pool *pool);
 
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
@@ -167,7 +167,7 @@ class TempTable : public Table {
     std::vector<TBPtr> m_data;
 };
 
-inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
+inline TableTuple TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
@@ -181,6 +181,7 @@ inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *p
     //
     target.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
     target.setActiveTrue();
+    return target;
 }
 
 inline void TempTable::insertTempTuple(TableTuple &source) {

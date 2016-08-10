@@ -73,7 +73,8 @@ TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSur
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TupleSerializer &serializer,
                                    TableStreamType streamType,
-                                   const std::vector<std::string> &predicateStrings)
+                                   const std::vector<std::string> &predicateStrings,
+                                   std::string indexName)
 {
     bool failed = false;
     bool found = false;
@@ -99,7 +100,11 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
             switch (streamType) {
                 case TABLE_STREAM_COPY_ON_WRITE_SCAN:
                     context.reset(
-                        new ScanCopyOnWriteContext(m_table, surgeon, m_partitionId, m_table.activeTupleCount()));
+                            new ScanCopyOnWriteContext(m_table, surgeon, m_partitionId, m_table.activeTupleCount()));
+                    break;
+                case TABLE_STREAM_COPY_ON_WRITE_INDEX:
+                    context.reset(
+                        new IndexCopyOnWriteContext(m_table, surgeon, *surgeon.getTable().index(indexName), m_partitionId, m_table.activeTupleCount()));
                     break;
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.

@@ -157,6 +157,7 @@ int ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& exec
             }
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
+            // XXX What if executor does have a fail mode that returns false, even if it is suspendable?
             if (!executor->execute(*m_staticParams)) {
                 if (executor->isSuspendable()) {
                     // If this is paused, save all context info, including ctr
@@ -210,9 +211,10 @@ Table * ExecutorContext::getLastTable(const std::vector<AbstractExecutor*>& exec
     return executorList[ttl-1]->getPlanNode()->getOutputTable();
 }
 
-void ExecutorContext::restorePausedTables(int subqueryId, int pausedExecutorId, TempTable * tempTable) {
+void ExecutorContext::restoreSuspendedExecutor(int subqueryId, int suspendedExecutorId, TempTable * tempTable) {
     std::vector<AbstractExecutor*> executors = getExecutors(subqueryId);
-    executors[pausedExecutorId]->setOutputTempTable(tempTable);
+    executors[suspendedExecutorId]->setOutputTempTable(tempTable);
+    executors[suspendedExecutorId]->setFirstPass(false);
 }
 
 void ExecutorContext::loadState(SavedContext &savedContext) {

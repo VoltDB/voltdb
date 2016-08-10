@@ -118,6 +118,10 @@ class AbstractExecutor {
         return m_tmpOutputTable;
     }
 
+    void setFirstPass(bool isFirstPass) {
+        m_isFirstPass = isFirstPass;
+    }
+
     // Compares two tuples based on the provided sets of expressions and sort directions
     struct TupleComparer
     {
@@ -137,6 +141,7 @@ class AbstractExecutor {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
         m_engine = engine;
+        m_isFirstPass = true;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -173,6 +178,9 @@ class AbstractExecutor {
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
+
+    // used to determine whether a suspendable executor is on its first or later pass
+    bool m_isFirstPass;
 
 };
 

@@ -40,6 +40,7 @@ namespace voltdb
 class PersistentTable;
 class PersistentTableSurgeon;
 class TupleOutputStreamProcessor;
+struct IndexCursor;
 
 class TableStreamer : public TableStreamerInterface
 {
@@ -64,7 +65,8 @@ public:
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
                                 TupleSerializer &serializer,
                                 TableStreamType streamType,
-                                const std::vector<std::string> &predicateStrings);
+                                const std::vector<std::string> &predicateStrings,
+                                std::string indexName);
 
     /**
      * Deactivate a stream
@@ -111,6 +113,23 @@ public:
     }
 
     /**
+     * Fine-grained cursor adjustment hook.
+     * Return true if it was handled by the COW context.
+     */
+    virtual bool adjustCursors(int type, IndexCursor *cursor) {
+        bool handled = false;
+        //* debug */ std::cout << "TableStreamer::adjustCursors" << std::endl;
+        // If any stream handles the notification, it's "handled".
+        // Only one COW should execute
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            assert(!handled);
+            handled = streamPtr->m_context->adjustCursors(type, cursor) || handled;
+        }
+        return handled;
+    }
+
+    /**
      * Tuple insert hook.
      * Return true if it was handled by the COW context.
      */
@@ -134,6 +153,20 @@ public:
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
             handled = streamPtr->m_context->notifyTupleUpdate(tuple) || handled;
+        }
+        return handled;
+    }
+
+    /**
+     * Tuple update hook.
+     * Return true if it was handled by the COW context.
+     */
+    virtual bool notifyTuplePostUpdate(TableTuple &tuple) {
+        bool handled = false;
+        // If any context handles the notification, it's "handled".
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled = streamPtr->m_context->notifyTuplePostUpdate(tuple) || handled;
         }
         return handled;
     }

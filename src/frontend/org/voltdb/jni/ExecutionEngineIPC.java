@@ -1212,10 +1212,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public boolean activateCopyOnWriteContext(
             int tableId,
-            TableStreamType type) {
+            String indexName,
+        TableStreamType type) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
+        m_data.putInt((short)indexName.length());
+        m_data.put(indexName.getBytes(Charsets.UTF_8));
         m_data.putInt(type.ordinal());
 
         try {
