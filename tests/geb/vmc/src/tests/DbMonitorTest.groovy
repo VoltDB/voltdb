@@ -50,36 +50,36 @@ class DbMonitorTest extends TestBase {
 
                 ///Check all unchecked UserPreferences
 
-                expect: 'Display Preference button exists'
-                page.displayPreferenceDisplayed()
-
-                when: 'click Display Preference button'
-                page.openDisplayPreference()
-                then: 'display title and save button of preferences'
-                page.preferencesTitleDisplayed()
-                page.savePreferencesBtnDisplayed()
-                page.popupCloseDisplayed()
-
-                when: 'Stored Procedures checkbox is displayed'
-                page.storedProceduresCheckboxDisplayed()
-                page.dataTablesCheckboxDisplayed()
-                page.partitionIdleTimeCheckboxDisplayed()
-               // page.clusterTransactionsCheckboxDisplayed()
-                //page.clusterLatencyCheckboxDisplayed()
-
-
-                then: 'Add all the preferences'
-                page.storedProceduresCheckboxClick()
-                //page.dataTablesCheckboxClick()
-                page.partitionIdleTimeCheckboxClick()
-              //  page.clusterTransactionsCheckboxClick()
-               // page.clusterLatencyCheckboxClick()
-
-
-                when: 'click close button'
-                page.savePreferences()
-                then: 'no Stored Procedures displayed'
-                page.storedProceduresDisplayed()
+//                expect: 'Display Preference button exists'
+//                page.displayPreferenceDisplayed()
+//
+//                when: 'click Display Preference button'
+//                page.openDisplayPreference()
+//                then: 'display title and save button of preferences'
+//                page.preferencesTitleDisplayed()
+//                page.savePreferencesBtnDisplayed()
+//                page.popupCloseDisplayed()
+//
+//                when: 'Stored Procedures checkbox is displayed'
+//                page.storedProceduresCheckboxDisplayed()
+//                page.dataTablesCheckboxDisplayed()
+//                page.partitionIdleTimeCheckboxDisplayed()
+//               // page.clusterTransactionsCheckboxDisplayed()
+//                //page.clusterLatencyCheckboxDisplayed()
+//
+//
+//                then: 'Add all the preferences'
+//                page.storedProceduresCheckboxClick()
+//                //page.dataTablesCheckboxClick()
+//                page.partitionIdleTimeCheckboxClick()
+//              //  page.clusterTransactionsCheckboxClick()
+//               // page.clusterLatencyCheckboxClick()
+//
+//
+//                when: 'click close button'
+//                page.savePreferences()
+//                then: 'no Stored Procedures displayed'
+//                page.storedProceduresDisplayed()
 
 
                 break
@@ -2550,14 +2550,31 @@ class DbMonitorTest extends TestBase {
 
 
 
-    def "check if Min Latency is clickable"() {
+    def checkIfMinLatencyIsClickable() {
         String before = ""
         String after  = ""
 
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
 
-        when: 'click min latency'
-           println("Stored Procedure table is  displayed")
-           page.clickMinLatency()
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Latency checkbox is displayed'
+        page.clusterLatencyDisplayed()
+        then: 'Add Latency'
+        page.clusterLatencyCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(10){
+        println("Stored Procedure table is  displayed")
+        page.clickMinLatency()}
 
         then: 'check if max rows is in ascending'
             if (page.tableInAscendingOrder())
