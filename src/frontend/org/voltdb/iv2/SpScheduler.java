@@ -52,6 +52,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -383,6 +384,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof CompleteTransactionMessage) {
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
+        else if (message instanceof CompleteTransactionResponseMessage) {
+            handleCompleteTransactionResponseMessage((CompleteTransactionResponseMessage) message);
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
@@ -1011,10 +1015,30 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // now, fix that later.
         if (txn != null)
         {
+            final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
+            boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!shortcutRead || isSysproc)) {
+                DuplicateCounter counter;
+                counter = new DuplicateCounter(msg.getCoordinatorHSId(),
+                                               msg.getTxnId(),
+                                               m_replicaHSIds,
+                                               msg);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle()), counter);
+            }
+
             Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, msg, m_drGateway);
+                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
+        }
+    }
+
+    public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
+    {
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle()));
+
+        if (txn != null) {
             // If this is a restart, then we need to leave the transaction state around
             if (!msg.isRestart()) {
                 m_outstandingTxns.remove(msg.getTxnId());
@@ -1029,15 +1053,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // before previous SPs are finished. This could happen when the
                 // MP we are completing is either a one-shot read MP or it
                 // didn't send any fragment to this partition.
-                //
-                // It is also possible to receive a CompleteTransactionMessage
-                // before the fragment runs, e.g. an early abort could happen if
-                // another partition failed its fragment before this partition
-                // even starts running the fragment. In this case, we don't want
-                // to update the truncation handle until after we run the
-                // fragment. Checking the doneness of the transaction state
-                // achieves this.
-                if (m_isLeader && txn.isDone()) {
+                boolean duplicateCounterDone = true;
+                if (counter != null) {
+                    duplicateCounterDone = counter.offer(msg) == DuplicateCounter.DONE;
+                }
+                if (m_isLeader && duplicateCounterDone) {
+                    assert txn.isDone();
                     setRepairLogTruncationHandle(txn.m_spHandle);
                 }
             }
@@ -1222,8 +1243,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void setRepairLogTruncationHandle(long newHandle)
     {
         assert newHandle >= m_repairLogTruncationHandle;
-        m_repairLogTruncationHandle = newHandle;
-        scheduleRepairLogTruncateMsg();
+        if (newHandle > m_repairLogTruncationHandle) {
+            m_repairLogTruncationHandle = newHandle;
+            scheduleRepairLogTruncateMsg();
+        }
     }
 
     /**
