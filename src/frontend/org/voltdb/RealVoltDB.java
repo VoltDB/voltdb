@@ -179,13 +179,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "<!-- This file is an auto-generated default deployment configuration. -->",
         "<deployment>",
         "    <cluster hostcount=\"1\" />",
-        /* this is where paths would be added at line 4 (starting from 0) */
         "    <httpd enabled=\"true\">",
         "        <jsonapi enabled=\"true\" />",
         "    </httpd>",
         "</deployment>"
     };
-    private static final int insertPathsAtLine = 4;
 
     private final Properties m_pathList = new Properties();
 
@@ -379,7 +377,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigDirectory(Configuration config) {
-        return getConfigDirectory(m_config.m_voltdbRoot);
+        return getConfigDirectory(config.m_voltdbRoot);
     }
 
     private File getConfigDirectory(File voltdbroot) {
@@ -2248,12 +2246,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * is PROBE then the value in configs m_voltdbRoot must match the deployment one
              */
             File optrootFH = config.m_voltdbRoot;
-            File dplrootFH = CatalogUtil.getVoltDbRoot(deployment.getPaths());
+            // use the voltdbroot in paths instead if it is present
+            String pathrootFN = m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
+            if (pathrootFN != null && !pathrootFN.trim().isEmpty()) {
+                optrootFH = new File(pathrootFN);
+            }
+            File dplrootFH = new File(deployment.getPaths().getVoltdbroot().getPath());
             if (config.m_startAction.isLegacy()) {
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
                     config.m_voltdbRoot = dplrootFH;
                 }
-            } else if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
+            } else if ((pathrootFN == null || pathrootFN.trim().isEmpty())
+                    && !optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile()))
+            {
                 if (config.m_startAction == StartAction.PROBE) {
                     String msg = "VoltDB root specified on the command line \"" + optrootFH
                             + "\" is different from the one specified at initialization \""
