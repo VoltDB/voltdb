@@ -968,8 +968,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (m_queuedActions.size() > 50) {
 
                         StringBuilder builder = new StringBuilder();
-                        builder.append("Export task queue is filled up to: " + m_queuedActions.size() + ", beyond 50. Not queueing anymore events for generation "
-                               + m_generation + ". The queue contains the following tasks:\n");
+                        builder.append("Export task queue is filled up to: " + m_queuedActions.size());
+                        builder.append(". Not queueing anymore events beyond 50 for generation " + m_generation);
+                        builder.append(" and table " + m_tableName + ". The queue contains the following tasks:\n");
                         for (RunnableWithES queuedR : m_queuedActions) {
                             builder.append(queuedR.getTaskName() + "\t");
                          }
