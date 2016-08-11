@@ -32,7 +32,7 @@ public interface ClusterSettings extends Settings {
 
     // property keys
     public final static String HOST_COUNT = "org.voltdb.cluster.hostcount";
-    public final static String CANGAMANGA = "dummy.cangamanga";
+    public final static String CANGAMANGA = "dumy.cangamanga";
 
     @Key(HOST_COUNT)
     @DefaultValue("1")

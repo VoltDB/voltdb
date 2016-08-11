@@ -714,14 +714,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // 1) properties from command line options
             // 2) properties from the cluster.properties files
             // 3) properties from the deployment file
-            Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();
+
             // this reads the file config/cluster.properties
-            Map<String, String> fromPropertyFile = ClusterSettings.create().asMap();
+            ClusterSettings fromPropertyFile = ClusterSettings.create();
+            // handle case we recover clusters that were elastically expanded
+            if (m_config.m_startAction.doesRecover()) {
+                m_config.m_hostCount = fromPropertyFile.hostcount();
+            }
+            Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();
             Map<String, String> fromDeploymentFile = CatalogUtil.
                     asClusterSettingsMap(readDepl.deployment);
 
             ClusterSettings clusterSettings = ClusterSettings.create(
-                    fromCommandLine, fromPropertyFile, fromDeploymentFile);
+                    fromCommandLine, fromPropertyFile.asMap(), fromDeploymentFile);
 
             // persist the merged settings
             clusterSettings.store();
@@ -3134,7 +3139,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     hostLog.error(e);
                     throw e;
                 }
-                hostLog.info("STEBUG clusterSettings update winner for version " + (expectedVersionId + 1));
             } else if (stamp[0] != expectedVersionId+1) {
                 String msg = "Failed to update cluster setting to version " + (expectedVersionId + 1)
                         + ", from current version " + stamp[0] + ". Reloading from Zookeeper";
