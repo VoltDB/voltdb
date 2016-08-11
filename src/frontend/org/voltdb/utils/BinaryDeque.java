@@ -110,7 +110,7 @@ public interface BinaryDeque {
          * Read and return the object at the current read position of this reader.
          * The entry will be removed once all active readers have read the entry.
          * @param ocf
-         * @return
+         * @return BBContainer with the bytes read. Null if there is nothing left to read.
          * @throws IOException
          */
         public BBContainer poll(OutputContainerFactory ocf) throws IOException;

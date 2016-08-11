@@ -23,6 +23,8 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 
@@ -38,6 +40,7 @@ public class TestPBDMultipleReaders {
 
     private final static VoltLogger logger = new VoltLogger("EXPORT");
 
+    private static final int s_segmentFillCount = 47;
     private PersistentBinaryDeque m_pbd;
 
     private class PBDReader {
@@ -51,7 +54,7 @@ public class TestPBDMultipleReaders {
         }
 
         public int readToEndOfSegment() throws Exception {
-            int end = (m_totalRead/47 + 1) * 47;
+            int end = (m_totalRead/s_segmentFillCount + 1) * s_segmentFillCount;
             boolean done = false;
             int numRead = 0;
             for (int i=m_totalRead; i<end && !done; i++) {
@@ -136,12 +139,35 @@ public class TestPBDMultipleReaders {
     }
 
     @Test
+    public void testOpenReaders() throws Exception {
+        String cursorId = "reader";
+        BinaryDequeReader reader1 = m_pbd.openForRead(cursorId);
+        BinaryDequeReader reader2 = m_pbd.openForRead(cursorId);
+        BinaryDequeReader another = m_pbd.openForRead("another");
+        assertTrue(reader1==reader2);
+        assertFalse(reader1==another);
+
+        int numBuffers = 50;
+        for (int i=0; i<numBuffers; i++) {
+            m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)) );
+        }
+
+        for (int j=0; j<numBuffers; j++) {
+            BBContainer bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            bbC.discard();
+        }
+        assertTrue(reader1.isEmpty());
+        assertTrue(reader2.isEmpty());
+        assertFalse(another.isEmpty());
+    }
+
+    @Test
     public void testSegmentClosingWriterOnly() throws Exception {
         // Initially no readers and nothing written. Open segments must be 1
         assertEquals(1, m_pbd.numOpenSegments());
 
         for (int i=0; i<3; i++) {
-            for (int j=0; j<47; j++) {
+            for (int j=0; j<s_segmentFillCount; j++) {
                 m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)) );
             }
             assertEquals(1, m_pbd.numOpenSegments());
@@ -154,7 +180,7 @@ public class TestPBDMultipleReaders {
         BinaryDequeReader reader = m_pbd.openForRead("reader0");
 
         for (int i=0; i<3; i++) {
-            for (int j=0; j<47; j++) {
+            for (int j=0; j<s_segmentFillCount; j++) {
                 m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)) );
                 BBContainer bbC = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
                 bbC.discard();
@@ -169,7 +195,7 @@ public class TestPBDMultipleReaders {
 
         int numSegments = 3;
         for (int i=0; i<numSegments; i++) {
-            for (int j=0; j<47; j++) {
+            for (int j=0; j<s_segmentFillCount; j++) {
                 m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)) );
             }
             assertEquals(1, m_pbd.numOpenSegments());
@@ -197,7 +223,7 @@ public class TestPBDMultipleReaders {
 
         int numSegments = 5;
         for (int i=0; i<numSegments; i++) {
-            for (int j=0; j<47; j++) {
+            for (int j=0; j<s_segmentFillCount; j++) {
                 m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(j)) );
             }
             assertEquals(1, m_pbd.numOpenSegments());
@@ -247,7 +273,7 @@ public class TestPBDMultipleReaders {
         }
 
         // read the last segment
-        for (int j=0; j<47; j++) {
+        for (int j=0; j<s_segmentFillCount; j++) {
             bbC = reader0.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
             bbC.discard();
             bbC = reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);

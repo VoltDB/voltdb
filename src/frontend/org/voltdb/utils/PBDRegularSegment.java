@@ -23,6 +23,8 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -40,8 +42,8 @@ import java.util.Map;
 public class PBDRegularSegment extends PBDSegment {
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
-    private Map<String, SegmentReader> m_readCursors = new HashMap<>();
-    private Map<String, SegmentReader> m_closedCursors = new HashMap<>();
+    private final Map<String, SegmentReader> m_readCursors = new HashMap<>();
+    private final Map<String, SegmentReader> m_closedCursors = new HashMap<>();
 
     //ID of this segment
     private final Long m_index;
@@ -74,10 +76,7 @@ public class PBDRegularSegment extends PBDSegment {
     {
         m_syncedSinceLastEdit = false;
         for (SegmentReader reader : m_readCursors.values()) {
-            reader.m_objectReadIndex = 0;
-            reader.m_bytesRead = 0;
-            reader.m_readOffset = SEGMENT_HEADER_BYTES;
-            reader.m_discardCount = 0;
+            reader.resetReader();
         }
         if (m_tmpHeaderBuf != null) {
             m_tmpHeaderBuf.discard();
@@ -120,6 +119,7 @@ public class PBDRegularSegment extends PBDSegment {
     @Override
     public PBDSegmentReader openForRead(String cursorId) throws IOException
     {
+        Preconditions.checkNotNull(cursorId, "Reader id must be non-null");
         if (m_readCursors.containsKey(cursorId) || m_closedCursors.containsKey(cursorId)) {
             throw new IOException("Segment is already open for reading for cursor " + cursorId);
         }
@@ -369,7 +369,15 @@ public class PBDRegularSegment extends PBDSegment {
         private boolean m_closed = false;
 
         public SegmentReader(String cursorId) {
+            assert(cursorId != null);
             m_cursorId = cursorId;
+        }
+
+        private void resetReader() {
+            m_objectReadIndex = 0;
+            m_bytesRead = 0;
+            m_readOffset = SEGMENT_HEADER_BYTES;
+            m_discardCount = 0;
         }
 
         @Override
@@ -392,7 +400,6 @@ public class PBDRegularSegment extends PBDSegment {
 
             final long writePos = m_fc.position();
             m_fc.position(m_readOffset);
-            m_objectReadIndex++;
 
             try {
                 //Get the length and size prefix and then read the object
@@ -446,6 +453,7 @@ public class PBDRegularSegment extends PBDSegment {
                 }
 
                 m_bytesRead += uncompressedLen;
+                m_objectReadIndex++;
 
                 return new DBBPool.BBContainer(retcont.b()) {
                     private boolean m_discarded = false;
@@ -503,7 +511,7 @@ public class PBDRegularSegment extends PBDSegment {
 
         @Override
         public boolean isClosed() {
-            return m_closed == true;
+            return m_closed;
         }
     }
 }
