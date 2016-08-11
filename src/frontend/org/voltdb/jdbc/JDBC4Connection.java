@@ -386,8 +386,10 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException
     {
-        if (resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE && resultSetConcurrency == ResultSet.CONCUR_READ_ONLY)
+        if ((resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE || resultSetType == ResultSet.TYPE_FORWARD_ONLY) &&
+                resultSetConcurrency == ResultSet.CONCUR_READ_ONLY) {
             return prepareStatement(sql);
+        }
         checkClosed();
         throw SQLError.noSupport();
     }

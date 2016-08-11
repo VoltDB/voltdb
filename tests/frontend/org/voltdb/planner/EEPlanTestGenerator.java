@@ -43,12 +43,12 @@
 
 package org.voltdb.planner;
 
-public class TestPlansEEGenerators extends PlannerTestCase {
+public class EEPlanTestGenerator extends PlannerTestCase {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
     @Override
     protected void setUp() throws Exception {
 
-        setupSchema(TestPlansEEGenerators.class.getResource(DDL_FILENAME),
+        setupSchema(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                     "testplanseegenerator",
                     false);
     }
@@ -92,7 +92,7 @@ public class TestPlansEEGenerators extends PlannerTestCase {
                                                     { 3,  20,  202},
                                                     { 3,  30,  301}});
         DBConfig db = new DBConfig(getClass(),
-                                   TestPlansEEGenerators.class.getResource(DDL_FILENAME),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                    getCatalogString(),
                                    AAAConfig,
                                    BBBConfig);
@@ -172,6 +172,10 @@ public class TestPlansEEGenerators extends PlannerTestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
+    }
+
+    public static void main(String args[]) {
+        org.junit.runner.JUnitCore.runClasses(EEPlanTestGenerator.class);
     }
 
 }

@@ -52,7 +52,6 @@ public class VoltZK {
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
     public static final String rejoinLock = "/db/rejoin_lock";
-    public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
