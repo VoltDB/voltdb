@@ -240,6 +240,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         for (DuplicateCounterKey key : doneCounters) {
             DuplicateCounter counter = m_duplicateCounters.remove(key);
             VoltMessage resp = counter.getLastResponse();
+            setRepairLogTruncationHandle(key.m_spHandle);
             if (resp != null) {
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
