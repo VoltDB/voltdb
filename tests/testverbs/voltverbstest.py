@@ -3,6 +3,7 @@ import random
 import re
 import subprocess
 import sys
+import unittest
 from optparse import OptionParser
 
 random.seed()
@@ -90,7 +91,6 @@ volt_opts = {'create': [admin,
                          replication,
                          zookeeper,
                          deployment,
-                         force,
                          placementgroup,
                          host,
                          licensefile,
@@ -138,7 +138,6 @@ volt_opts = {'create': [admin,
                        zookeeper,
                        hostcount,
                        voltdbroot,
-                       force,
                        placementgroup,
                        mesh,
                        licensefile,
@@ -155,6 +154,14 @@ volt_opts_mandatory = {'create': [],
                        }
 
 volt_opts_negative = [unknown]
+# additional output cli
+volt_verbs_output = {'create': ' [ CATALOG ]',
+                     'recover': '',
+                     'rejoin': '',
+                     'add': '',
+                     'init': '',
+                     'start': ''
+                     }
 
 # some verbs will generate default opts to java command line
 volt_opst_default = {
@@ -171,10 +178,29 @@ ignore = "^(Exec:|Run:) (?P<java_path>.+?)(java) (?P<java_opts>.+?) (-classpath)
 ignore_re = re.compile(ignore, re.X | re.M)
 
 
+class TestsContainer(unittest.TestCase):
+    longMessage = True
+
+
+def make_test_function(haddiff, description):
+    def test(self):
+        self.assertFalse(haddiff, description)
+
+    return test
+
+
+def run_unit_test(verb, opts, expected_opts, reportout, expectedOut=None, expectedErr=None):
+    stdout, stderr = run_voltcli(verb, opts)
+    haddiff, description = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
+                                          expectedOut, expectedErr)
+    setattr(TestsContainer, 'test: {0}'.format(verb + " " + " ".join(opts)), make_test_function(haddiff, description))
+    return haddiff
+
+
 def do_main():
     parser = OptionParser()
     parser.add_option("-o", "--report_file", dest="report_file",
-                      default="./verbtest.report",
+                      default="./voltverbstest.report",
                       help="report output file")
     (options, args) = parser.parse_args()
 
@@ -190,37 +216,30 @@ def do_main():
                 continue
 
             # generate the test cases
-            ## generate simplest config
+            ## generate minimal config
             opts, expected_opts = gen_config(volt_opts_mandatory[verb], volt_opts[verb], 0,
                                              volt_opst_default[verb].copy())
-            stdout, stderr = run_voltcli(verb, opts)
-            haddiffs = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout) or haddiffs
+            haddiffs = run_unit_test(verb, opts, expected_opts, reportout) or haddiffs
 
             ## generate config that contain a single opt
             for opt in volt_opts[verb]:
                 opts, expected_opts = gen_config(volt_opts_mandatory[verb] + [opt], [], 0,
                                                  volt_opst_default[verb].copy())
-                stdout, stderr = run_voltcli(verb, opts)
-                haddiffs = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts,
-                                          reportout) or haddiffs
+                haddiffs = run_unit_test(verb, opts, expected_opts, reportout) or haddiffs
 
             ## generate config contain random opts
             opts, expected_opts = gen_config(volt_opts_mandatory[verb], volt_opts[verb],
                                              random.randint(0, len(volt_opts[verb])), volt_opst_default[verb].copy())
-            stdout, stderr = run_voltcli(verb, opts)
-            haddiffs = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout) or haddiffs
+            haddiffs = run_unit_test(verb, opts, expected_opts, reportout) or haddiffs
 
             ## generate config contain negative opts
-            opts, _ = gen_config(volt_opts_mandatory[verb], volt_opts_negative, 1)
+            opts, expected_opts = gen_config(volt_opts_mandatory[verb], volt_opts_negative, 1)
             stdout, stderr = run_voltcli(verb, opts)
-            haddiffs = compare_result(stdout, stderr, volt_verbs_mapping[verb], expected_opts, reportout,
-                                    expectedOut="""Usage: voltdb {} [ OPTIONS ... ]
+            haddiffs = run_unit_test(verb, opts, expected_opts, reportout,
+                                     expectedOut="""Usage: voltdb {} [ OPTIONS ... ]{}\n\nvoltdb: error: no such option: --{}\n""".
+                                     format(verb, volt_verbs_output[verb], volt_opts_negative[0].pyname)) or haddiffs
 
-                                                   voltdb: error: no such option: --{}""".
-                                      format(verb, volt_opts_negative[0].pyname)) or haddiffs
-
-
-
+        unittest.main(verbosity=2)
     finally:
         print "Summary report written to file://" + os.path.abspath(options.report_file)
         if haddiffs:
@@ -242,34 +261,39 @@ def run_voltcli(verb, opts, cmd=['../../bin/voltdb'], mode=['--dry-run'], enviro
 
 def compare_result(stdout, stderr, verb, opts, repotout, expectedOut=None, expectedErr=None):
     output_str = sanitize(stdout).strip()
+    description = "Generate java command line:\n" + output_str + "\nTest Succeed!"
     if expectedOut or expectedErr:
         haddiff = False
         if stdout != expectedOut:
             haddiff = True
-            repotout.write("Generate stdout:\n" + stdout + "\n")
-            repotout.write("Doest not match expected:\n" + expectedOut + "\n")
+            description = "Generate stdout:\n" + stdout + "\n" + "doest not match expected:\n" + expectedOut + "\n"
+            repotout.write(description)
         if stderr != expectedErr:
             haddiff = True
-            repotout.write("Generate stderr:\n" + stderr + "\n")
-            repotout.write("Doest not match expected:\n" + expectedErr + "\n")
-        return haddiff
+            description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\n"
+            repotout.write(description)
+        return haddiff, description
 
     # match the verbs
     if output_str.find(verb) != 0:
-        repotout.write("Generate java command line:\n" + output_str + "\n")
-        repotout.write("Does not contain expected verb:\n" + verb + "\n")
-        return True
+        description = "Generate java command line:\n" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\n"
+        repotout.write(description)
+        return True, description
 
     # match the opts
     output_tokens = output_str.lstrip(verb).split()
     expected_tokens = []
-    [expected_tokens.extend([k, v]) for k, v in opts.items()]
+    for k, v in opts.items():
+        if v:
+            expected_tokens.extend([k, v])
+        else:
+            expected_tokens.append(k)
     if set(output_tokens) != set(expected_tokens):
-        repotout.write("Generate java command line:\n" + output_str + "\n")
-        repotout.write("Does not match expected options:\n" + " ".join(expected_tokens) + "\n")
-        return True
+        description = "Generate java command line:\n" + output_str + "\n" + "does not match expected options:\n" + " ".join(
+            expected_tokens) + "\n"
+        return True, description
 
-    return False
+    return False, description
 
 
 def sanitize_replace(match):
