@@ -98,6 +98,8 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
+    private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
+
     static List<Integer> importProgress = new ArrayList<Integer>();
 
     static InsertExport exportProc;
@@ -421,6 +423,16 @@ public class KafkaImportBenchmark {
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
+
+        // in case of pause / resume tweak, let it drain longer
+        int trial = 3;
+        while ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows))) {
+            Thread.sleep(PAUSE_WAIT * 1000);
+            importStatValues = MatchChecks.getImportValues(client);
+            mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
+            importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
+            importRowCount = MatchChecks.getImportRowCount(client);
+        }
 
         // some counts that might help debugging....
         log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
