@@ -999,7 +999,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
-            msg = new CompleteTransactionMessage(message);
+            msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             if (!msg.isForReplay()) advanceTxnEgo();
@@ -1063,6 +1063,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     setRepairLogTruncationHandle(txn.m_spHandle);
                 }
             }
+        }
+
+        // The CompleteTransactionResponseMessage ends at the SPI. It is not
+        // sent to the MPI because it doesn't care about it.
+        //
+        // The SPI uses this response message to track if all replicas have
+        // committed the transaction.
+        if (!m_isLeader) {
+            m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
 

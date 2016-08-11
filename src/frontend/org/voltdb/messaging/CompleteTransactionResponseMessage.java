@@ -27,6 +27,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 {
     long m_txnId;
     long m_spHandle;
+    long m_spiHSId;
     boolean m_isRestart;
     boolean m_isRecovering = false;
 
@@ -40,6 +41,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_txnId = msg.getTxnId();
         m_spHandle = msg.getSpHandle();
         m_isRestart = msg.isRestart();
+        m_spiHSId = msg.getCoordinatorHSId();
     }
 
     public long getTxnId()
@@ -50,6 +52,11 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public long getSpHandle()
     {
         return m_spHandle;
+    }
+
+    public long getSPIHSId()
+    {
+        return m_spiHSId;
     }
 
     public boolean isRestart()
@@ -71,7 +78,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 1 + 1;
+        msgsize += 8 + 8 + 8 + 1 + 1;
         return msgsize;
     }
 
@@ -81,6 +88,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
         buf.putLong(m_txnId);
         buf.putLong(m_spHandle);
+        buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
         assert(buf.capacity() == buf.position());
@@ -92,6 +100,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     {
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
+        m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
         assert(buf.capacity() == buf.position());
@@ -106,6 +115,8 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" SPHANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(" SPI ");
+        sb.append(CoreUtils.hsIdToString(m_spiHSId));
         sb.append(" ISRESTART: ");
         sb.append(m_isRestart);
         sb.append(" RECOVERING ");
