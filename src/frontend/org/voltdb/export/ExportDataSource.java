@@ -966,15 +966,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // Bound the queue. It shouldn't get to this high value.
                     // Log an error so that we know if it does get to the high value.
                     if (m_queuedActions.size() > 50) {
-                        exportLog.error("Queue for export source for generation " + m_generation +
-                                " is going beyond 50. Not queueing anymore events");
 
-                        //what is in the queue?
                         StringBuilder builder = new StringBuilder();
-
-                        builder.append("Actions are quuened up to: " + m_queuedActions + " for generation "  + m_generation + " tasks:\n");
+                        builder.append("Export task queue is filled up to: " + m_queuedActions.size() + ", beyond 50. Not queueing anymore events for generation "
+                               + m_generation + ". The queue contains the following tasks:\n");
                         for (RunnableWithES queuedR : m_queuedActions) {
-                            builder.append(queuedR.getTaskName() + "\n");
+                            builder.append(queuedR.getTaskName() + "\t");
                          }
 
                         exportLog.error(builder.toString());
