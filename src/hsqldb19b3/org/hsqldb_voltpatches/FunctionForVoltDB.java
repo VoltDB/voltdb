@@ -82,13 +82,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
-            m_name = name;
-            m_type = type;
-            m_id = id;
-            m_typeParameter = typeParameter;
-            m_paramTypes = paramTypes;
-            m_paramParseList = paramParseList;
-            m_paramParseListAlt = null;
+            this(name, type, id, typeParameter, paramTypes, paramParseList, null);
         }
 
         private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList, short[] paramParseListAlt) {
