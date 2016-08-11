@@ -3437,10 +3437,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
         m_statusTracker.setNodeState(NodeState.UP);

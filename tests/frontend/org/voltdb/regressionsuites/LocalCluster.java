@@ -957,6 +957,12 @@ public class LocalCluster implements VoltServerConfig {
                     cmdln.leader(":" + portNoToRejoin);
                     cmdln.enableAdd(true);
                 }
+            } else {
+                if (m_cmdLines.size() > 0) {
+                    int portNoToRejoin = m_cmdLines.get(0).internalPort();
+                    cmdln.leader(":" + portNoToRejoin);
+                    cmdln.enableAdd(true);
+                }
             }
 
             // If local directories are being cleared
@@ -1044,7 +1050,7 @@ public class LocalCluster implements VoltServerConfig {
             ptf = new PipeToFile(
                     fileName,
                     proc.getInputStream(),
-                    startAction == StartAction.JOIN ? PipeToFile.m_joinToken : PipeToFile.m_initToken,
+                    PipeToFile.m_initToken,
                     false,
                     proc);
             m_pipes.add(ptf);
@@ -1249,7 +1255,7 @@ public class LocalCluster implements VoltServerConfig {
                     "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".rejoined.txt",
                     proc.getInputStream(),
-                    startAction == StartAction.JOIN ? PipeToFile.m_joinToken : PipeToFile.m_initToken,
+                    PipeToFile.m_initToken,
                     true, proc);
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
