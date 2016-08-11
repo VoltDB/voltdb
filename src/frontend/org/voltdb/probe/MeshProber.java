@@ -786,7 +786,7 @@ public class MeshProber implements JoinAcceptor {
         }
 
         public Builder hostCount(int hostCount) {
-            m_hostCountSupplier = Suppliers.ofInstance(new Integer(hostCount));
+            m_hostCountSupplier = Suppliers.ofInstance(hostCount);
             return this;
         }
 
@@ -811,6 +811,9 @@ public class MeshProber implements JoinAcceptor {
         }
 
         public MeshProber build() {
+            if (m_hostCountSupplier == null && m_coordinators != null) {
+                m_hostCountSupplier = Suppliers.ofInstance(m_coordinators.size());
+            }
             return new MeshProber(
                     m_coordinators,
                     m_versionChecker,
