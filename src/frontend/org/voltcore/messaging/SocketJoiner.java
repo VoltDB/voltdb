@@ -599,7 +599,11 @@ public class SocketJoiner {
                 try {
                     socket = SocketChannel.open(coordIp);
                 }
-                catch (java.net.ConnectException e) {
+                catch (java.net.ConnectException
+                      |java.nio.channels.UnresolvedAddressException
+                      |java.net.NoRouteToHostException
+                      |java.net.PortUnreachableException e)
+                {
                     if (mode == ConnectStrategy.PROBE) {
                         return;
                     }

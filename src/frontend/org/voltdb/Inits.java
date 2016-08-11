@@ -394,6 +394,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
+                        m_rvdb.m_clusterSettings,
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now

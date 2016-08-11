@@ -96,7 +96,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -378,6 +377,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
                     false, uniqueId, spHandle);
+        }
+
+        @Override
+        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        {
+            return Site.this.updateSettings(context, csp);
         }
 
         @Override
@@ -1448,6 +1453,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
         }
 
+        return true;
+    }
+
+    /**
+     * Update the system settings
+     * @param context catalog context
+     * @param csp catalog specific planner
+     * @return true if it succeeds
+     */
+    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
+        m_context = context;
+        // here you could bring the timeout settings
+        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
         return true;
     }
 

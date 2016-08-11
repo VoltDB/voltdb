@@ -133,10 +133,12 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -1111,6 +1113,21 @@ public abstract class CatalogUtil {
         }
     }
 
+    public final static Map<String, String> asClusterSettingsMap(DeploymentType depl) {
+        return ImmutableMap.<String,String>builder()
+                .put(ClusterSettings.HOST_COUNT, Integer.toString(depl.getCluster().getHostcount()))
+                .put(ClusterSettings.CANGAMANGA, Integer.toString(depl.getSystemsettings().getQuery().getTimeout()))
+                .build();
+    }
+
+    public final static ClusterSettings asClusterSettings(String deploymentURL) {
+        return asClusterSettings(parseDeployment(deploymentURL));
+    }
+
+    public final static ClusterSettings asClusterSettings(DeploymentType depl) {
+        return ClusterSettings.create(asClusterSettingsMap(depl));
+    }
+
     /**
      * Set cluster info in the catalog.
      * @param leader The leader hostname
@@ -1131,7 +1148,6 @@ public abstract class CatalogUtil {
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");
-            catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog

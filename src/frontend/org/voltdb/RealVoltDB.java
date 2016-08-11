@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -134,6 +135,9 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.ClusterSettingsRef;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
@@ -149,14 +153,15 @@ import org.voltdb.utils.VoltSampler;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.Properties;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -192,6 +197,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
+    // Cluster settings reference and supplier
+    final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
     static final String m_defaultVersionString = "6.6";
     // by default set the version to only be compatible with itself
@@ -367,12 +374,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private LatencyHistogramStats m_latencyHistogramStats;
 
-    private File getConfigLogDirectory() {
-        return getConfigLogDirectory(m_config);
+    private File getConfigDirectory() {
+        return getConfigDirectory(m_config);
     }
 
-    private File getConfigLogDirectory(Configuration config) {
-        return new VoltFile(config.m_voltdbRoot, VoltDB.CONFIG_DIR);
+    private File getConfigDirectory(Configuration config) {
+        return getConfigDirectory(m_config.m_voltdbRoot);
+    }
+
+    private File getConfigDirectory(File voltdbroot) {
+        return new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
     }
 
     private File getConfigLogDeployment() {
@@ -380,7 +391,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigLogDeployment(Configuration config) {
-        return new VoltFile(getConfigLogDirectory(config), "deployment.xml");
+        return new VoltFile(getConfigDirectory(config), "deployment.xml");
     }
 
     @Override
@@ -524,8 +535,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        if (!MiscUtils.isPro()) {
+            return nonEmptyPaths.build();
+        }
         PathsType paths = deployment.getPaths();
-        String voltDbRoot = paths.getVoltdbroot().getPath();
+        String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
         if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
             nonEmptyPaths.add(path);
@@ -598,9 +612,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
-                    for (String path: pathsWithRecoverableArtifacts(readDepl.deployment)) {
-                        MiscUtils.deleteRecursively(new VoltFile(path));
-                    }
+                    initForceDeleteFiles(config, readDepl.deployment);
                 }
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
@@ -697,6 +709,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_buildStringOverrideForTest != null) {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
+            // Prime cluster settings from configuration parameters
+            // evaluate properties with the following sources in terms of priority
+            // 1) properties from command line options
+            // 2) properties from the cluster.properties files
+            // 3) properties from the deployment file
+            Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();
+            // this reads the file config/cluster.properties
+            Map<String, String> fromPropertyFile = ClusterSettings.create().asMap();
+            Map<String, String> fromDeploymentFile = CatalogUtil.
+                    asClusterSettingsMap(readDepl.deployment);
+
+            ClusterSettings clusterSettings = ClusterSettings.create(
+                    fromCommandLine, fromPropertyFile, fromDeploymentFile);
+
+            // persist the merged settings
+            clusterSettings.store();
+
+            m_clusterSettings.set(clusterSettings, 1);
 
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
@@ -1228,7 +1258,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                            Cartographer.class,
                                                            BalancePartitionsStatistics.class,
                                                            String.class,
-                                                           int.class);
+                                                           int.class,
+                                                           Supplier.class);
                     m_elasticJoinService =
                         (ElasticJoinService) constructor.newInstance(
                                 m_messenger,
@@ -1236,7 +1267,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 m_cartographer,
                                 rebalanceStats,
                                 VoltDB.instance().getCommandLogSnapshotPath(),
-                                m_catalogContext.getDeployment().getCluster().getKfactor());
+                                m_catalogContext.getDeployment().getCluster().getKfactor(),
+                                m_clusterSettings);
                     m_elasticJoinService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
@@ -1403,7 +1435,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         private void logConfigInfo() {
             hostLog.info("Logging config info");
 
-            File configInfoDir = getConfigLogDirectory();
+            File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
 
             File configInfo = new File(configInfoDir, "config.json");
@@ -1470,7 +1502,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         private void logCatalogAndDeployment() {
 
-            File configInfoDir = getConfigLogDirectory();
+            File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
 
             try {
@@ -1483,7 +1515,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         private void logDeployment() {
-            File configInfoDir = getConfigLogDirectory();
+            File configInfoDir = getConfigDirectory();
             configInfoDir.mkdirs();
 
             try {
@@ -1722,7 +1754,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
         // create the config subdirectory
-        File confDH = getConfigLogDirectory(config);
+        File confDH = getConfigDirectory(config);
         if (!confDH.exists() && !confDH.mkdirs()) {
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
             return;
@@ -1779,6 +1811,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
         }
 
+        // Save cluster settings properties derived from the deployment file
+        config.asClusterSettingsMap();
+        ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
+
     }
 
     private void stageInitializedMarker(Configuration config) {
@@ -1818,6 +1854,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         });
         for (File c: allButLog) {
             MiscUtils.deleteRecursively(c);
+        }
+    }
+
+    private void initForceDeleteFiles(Configuration config, DeploymentType depl) {
+        if (!config.m_forceVoltdbCreate) {
+            return;
+        }
+        File vroot = config.m_voltdbRoot;
+        Set<String> paths = ImmutableSet.<String>builder()
+                .add(depl.getPaths().getCommandlog().getPath())
+                .add(depl.getPaths().getCommandlogsnapshot().getPath())
+                .add(depl.getPaths().getSnapshots().getPath())
+                .add(depl.getPaths().getExportoverflow().getPath())
+                .add(depl.getPaths().getDroverflow().getPath())
+                .build();
+        for (String path: paths) {
+            File f = new File(path);
+            f = f.isAbsolute() ? f : new File(vroot, path);
+            if (f.isDirectory()) {
+                for (File remove: f.listFiles()) {
+                    MiscUtils.deleteRecursively(remove);
+                }
+            } else {
+                f.delete();
+            }
         }
     }
 
@@ -2039,6 +2100,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
                             catalog,
+                            m_clusterSettings,
                             new byte[] {},
                             null,
                             deploymentBytes,
@@ -2370,7 +2432,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                || managedPathsWithFiles(m_config, readDepl.deployment).isEmpty();
+                || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
+
+        final Supplier<Integer> hostCountSupplier = new Supplier<Integer>() {
+            @Override
+            public Integer get() {
+                return m_clusterSettings.get().hostcount();
+            }
+        };
 
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
@@ -2379,7 +2448,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .startAction(m_config.m_startAction)
                 .bare(bareAtStartup)
                 .configHash(CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes))
-                .hostCount(m_config.m_hostCount)
+                .hostCountSupplier(hostCountSupplier)
                 .kfactor(readDepl.deployment.getCluster().getKfactor())
                 .paused(m_config.m_isPaused)
                 .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
@@ -2438,6 +2507,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
                     "Please check your command line and start action and try again.", false, null);
         }
+        // load or store settings form/to zookeeper
+        if (determination.startAction.doesJoin()) {
+            m_clusterSettings.load(m_messenger.getZK());
+            m_clusterSettings.get().store();
+        } else if (m_myHostId == 0) {
+            m_clusterSettings.store(m_messenger.getZK());
+        }
+
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
     }
@@ -3038,6 +3115,38 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //Set state back to UP
             m_statusTracker.setNodeState(NodeState.UP);
         }
+    }
+
+    @Override
+    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(
+            ClusterSettings settings, final int expectedVersionId)
+    {
+        CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+        synchronized(m_catalogUpdateLock) {
+            int stamp [] = new int[]{0};
+            ClusterSettings expect = m_clusterSettings.get(stamp);
+            if (   stamp[0] == expectedVersionId
+                && m_clusterSettings.compareAndSet(expect, settings, stamp[0], expectedVersionId+1)
+            ) {
+                try {
+                    settings.store();
+                } catch (SettingsException e) {
+                    hostLog.error(e);
+                    throw e;
+                }
+                hostLog.info("STEBUG clusterSettings update winner for version " + (expectedVersionId + 1));
+            } else if (stamp[0] != expectedVersionId+1) {
+                String msg = "Failed to update cluster setting to version " + (expectedVersionId + 1)
+                        + ", from current version " + stamp[0] + ". Reloading from Zookeeper";
+                hostLog.warn(msg);
+                m_clusterSettings.load(m_messenger.getZK());
+            }
+            if (m_MPI != null) {
+                m_MPI.updateSettings(m_catalogContext, csp);
+            }
+            // good place to set deadhost timeout once we make it a config
+        }
+        return Pair.of(m_catalogContext, csp);
     }
 
     @Override

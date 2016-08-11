@@ -21,7 +21,6 @@ begin Cluster                      "A set of connected hosts running one or more
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
-  int hostcount                   "The number of hosts in the cluster"
   int kfactor                     "The required k-safety factor"
   int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"

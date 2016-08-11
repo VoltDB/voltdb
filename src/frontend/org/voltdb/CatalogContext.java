@@ -35,9 +35,12 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+
+import com.google_voltpatches.common.base.Supplier;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -87,10 +90,14 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
+    // cluster settings
+    private final Supplier<ClusterSettings> m_clusterSettings;
+
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
+            Supplier<ClusterSettings> settings,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
@@ -99,17 +106,14 @@ public class CatalogContext {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
-        assert(catalog != null);
         if (catalog == null) {
-            throw new RuntimeException("Can't create CatalogContext with null catalog.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
         }
 
-        assert(deploymentBytes != null);
         if (deploymentBytes == null) {
-            throw new RuntimeException("Can't create CatalogContext with null deployment bytes.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null deployment bytes.");
         }
 
-        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
@@ -128,7 +132,11 @@ public class CatalogContext {
             }
         }
         else {
-            throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null catalog bytes.");
+        }
+
+        if (settings == null) {
+            throw new IllegalArgumentException("Cant't create CatalogContent with null cluster settings");
         }
 
         this.catalog = catalog;
@@ -137,6 +145,8 @@ public class CatalogContext {
         procedures = database.getProcedures();
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
+
+        this.m_clusterSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
@@ -161,6 +171,10 @@ public class CatalogContext {
 
     public Cluster getCluster() {
         return cluster;
+    }
+
+    public ClusterSettings getClusterSettings() {
+        return m_clusterSettings.get();
     }
 
     public CatalogContext update(
@@ -196,6 +210,7 @@ public class CatalogContext {
                     txnId,
                     uniqueId,
                     newCatalog,
+                    this.m_clusterSettings,
                     bytes,
                     catalogBytesHash,
                     depbytes,
@@ -294,7 +309,7 @@ public class CatalogContext {
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
-        int hostCount = deployment.getHostcount();
+        int hostCount = m_clusterSettings.get().hostcount();
         int sitesPerHost = deployment.getSitesperhost();
         int kFactor = deployment.getKfactor();
         logLines.put("deployment1",

@@ -18,6 +18,9 @@
 package org.voltdb;
 
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -85,8 +88,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 public final class InvocationDispatcher {
 
@@ -393,6 +394,8 @@ public final class InvocationDispatcher {
             }
             else if ("@UpdateClasses".equals(task.procName)) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
+            } else if ("@UpdateSettings".equals(task.procName)) {
+                return dispatchUpdateSettings(catProc, task, handler, ccxn);
             }
             else if ("@SnapshotSave".equals(task.procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
@@ -947,6 +950,24 @@ public final class InvocationDispatcher {
         }
 
         // This only happens on one node so we don't need to pick a leader.
+        createTransaction(
+                handler.connectionId(),
+                task,
+                sysProc.getReadonly(),
+                sysProc.getSinglepartition(),
+                sysProc.getEverysite(),
+                0,//No partition needed for multi-part
+                task.getSerializedSize(),
+                System.nanoTime());
+
+        return null;
+    }
+
+    private final ClientResponseImpl dispatchUpdateSettings(Procedure sysProc,
+            StoredProcedureInvocation task,
+            InvocationClientHandler handler,
+            Connection ccxn)
+    {
         createTransaction(
                 handler.connectionId(),
                 task,
