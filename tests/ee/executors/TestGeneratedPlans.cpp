@@ -43,7 +43,7 @@
 /******************************************************************************************
  *
  * NOTA BENE: This file is automagically generated from the source class named
- *                org.voltdb.planner.TestPlansEEGenerators.
+ *                org.voltdb.planner.EEPlanTestGenerator.
  *            Please do not edit it unless you abandon all hope of regenerating it.
  *
  ******************************************************************************************/
@@ -572,9 +572,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV httpdportno 0\n"
     "set $PREV jsonapi false\n"
     "set $PREV networkpartition false\n"
-    "set $PREV voltRoot \"\"\n"
-    "set $PREV exportOverflow \"\"\n"
-    "set $PREV drOverflow \"\"\n"
     "set $PREV adminport 0\n"
     "set $PREV adminstartup false\n"
     "set $PREV heartbeatTimeout 0\n"
@@ -619,7 +616,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"A\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
@@ -631,7 +627,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"B\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
@@ -643,7 +638,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"C\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
@@ -663,7 +657,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"A\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
@@ -675,7 +668,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"B\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
@@ -687,7 +679,6 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV name \"C\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
-    "set $PREV matview null\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
     "set $PREV inbytes false\n"
