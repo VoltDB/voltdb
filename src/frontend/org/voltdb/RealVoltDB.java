@@ -751,6 +751,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
+                setMode(OperationMode.PAUSED);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
