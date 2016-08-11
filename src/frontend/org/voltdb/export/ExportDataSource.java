@@ -17,8 +17,6 @@
 
 package org.voltdb.export;
 
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -591,7 +589,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
             @Override
             public void run() {
                 try {
@@ -603,8 +601,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-
-        runnable.setTaskDescription("closeAndDelete");
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -613,7 +609,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("truncateExportToTxnId") {
             @Override
             public void run() {
                 try {
@@ -633,7 +629,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         //This is a setup task when stashed tasks are run this is run first.
-        runnable.setTaskDescription("truncateExportToTxnId");
         return stashOrSubmitTask(runnable, false, true);
     }
 
@@ -654,14 +649,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> sync(final boolean nofsync) {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("sync") {
             @Override
             public void run() {
                 new SyncRunnable(nofsync).run();
             }
         };
 
-        runnable.setTaskDescription("sync");
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -669,7 +663,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_closed = true;
         //If we are waiting at this allow to break out when close comes in.
         m_allowAcceptingMastership.release();
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("close") {
             @Override
             public void run() {
                 try {
@@ -682,13 +676,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        runnable.setTaskDescription("close");
         return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("poll") {
             @Override
             public void run() {
                 try {
@@ -711,7 +704,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        runnable.setTaskDescription("poll");
         stashOrSubmitTask(runnable, true, false);
         return fut;
     }
@@ -800,7 +792,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void discard() {
             checkDoubleFree();
-            RunnableWithES runnable = new RunnableWithES() {
+            RunnableWithES runnable = new RunnableWithES("discard") {
                 @Override
                 public void run() {
                     try {
@@ -819,7 +811,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             };
-            runnable.setTaskDescription("discard");
             stashOrSubmitTask(runnable, true, false);
         }
     }
@@ -867,7 +858,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         //In replicated only master will be doing this.
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("ack") {
             @Override
             public void run() {
                 try {
@@ -882,7 +873,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        runnable.setTaskDescription("ack");
         stashOrSubmitTask(runnable, true, false);
     }
 
@@ -935,7 +925,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
         m_mastershipAccepted = true;
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("acceptMastership") {
             @Override
             public void run() {
                 try {
@@ -948,7 +938,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        runnable.setTaskDescription("acceptMastership");
         stashOrSubmitTask(runnable, true, false);
     }
 
@@ -985,7 +974,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                         builder.append("Actions are quuened up to: " + m_queuedActions + " for generation "  + m_generation + " tasks:\n");
                         for (RunnableWithES queuedR : m_queuedActions) {
-                            builder.append(queuedR.getTaskDescription() + "\n");
+                            builder.append(queuedR.getTaskName() + "\n");
                          }
 
                         exportLog.error(builder.toString());
@@ -1050,10 +1039,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private abstract class RunnableWithES implements Runnable {
 
-        private String m_taskDescription;
+        private final String m_taskName;
 
         private ListeningExecutorService m_executorService;
 
+        public RunnableWithES(String taskName){
+            m_taskName = taskName;
+        }
         public void setExecutorService(ListeningExecutorService executorService) {
             m_executorService = executorService;
         }
@@ -1062,12 +1054,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return m_executorService;
         }
 
-        public String getTaskDescription() {
-            return m_taskDescription;
-        }
-
-        public void setTaskDescription(String m_taskDescription) {
-            this.m_taskDescription = m_taskDescription;
+        public String getTaskName() {
+            return m_taskName;
         }
     }
 }
