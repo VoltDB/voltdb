@@ -728,14 +728,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                                                  JSONObject               jobj) throws JSONException {
         if (jobj.has(AbstractExpression.SortMembers.SORT_COLUMNS.name())) {
             sortExpressions.clear();
-            sortDirections.clear();
+            if (sortDirections != null) {
+                sortDirections.clear();
+            }
             JSONArray jarray = jobj.getJSONArray(SortMembers.SORT_COLUMNS.name());
             int size = jarray.length();
             for (int ii = 0; ii < size; ii += 1) {
                 JSONObject tempObj = jarray.getJSONObject(ii);
-                sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION.name()) );
-                if (sortDirections != null && tempObj.has(SortMembers.SORT_DIRECTION.name())) {
-                    sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
+                if (sortDirections != null) {
+                    sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION.name()) );
+                    if (sortDirections != null && tempObj.has(SortMembers.SORT_DIRECTION.name())) {
+                        sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
+                    }
                 }
             }
         }
