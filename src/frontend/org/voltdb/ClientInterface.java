@@ -95,8 +95,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltdb.utils.LogKeys;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1582,10 +1580,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_notifier.start();
 
         m_isAcceptingConnections.compareAndSet(false, true);
-        Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-
     }
 
     public boolean isAcceptingConnections() {
