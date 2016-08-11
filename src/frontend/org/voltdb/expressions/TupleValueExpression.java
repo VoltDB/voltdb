@@ -17,6 +17,8 @@
 
 package org.voltdb.expressions;
 
+import java.util.Set;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -40,7 +42,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     protected int m_columnIndex = -1;
     protected String m_tableName = null;
-    protected String m_tableAlias = null;
+    private String m_tableAlias = null;
     protected String m_columnName = null;
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
@@ -98,12 +100,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         this(tableName, tableAlias, columnName, columnAlias, -1, -1);
     }
 
-    public TupleValueExpression(String tableName,
-                                String columnName,
-                                int columnIndex) {
-        this(tableName, null, columnName, null, columnIndex, -1);
-    }
-
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
     }
@@ -114,8 +110,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_hasAggregate;
     }
 
-    public void setHasAggregate(boolean m_hasAggregate) {
-        this.m_hasAggregate = m_hasAggregate;
+    public void setHasAggregate(boolean hasAggregate) {
+        m_hasAggregate = hasAggregate;
     }
 
     @Override
@@ -250,14 +246,16 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_origStmtId;
     }
 
-    public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
-        setValueType(SchemaColumnType);
-        setValueSize(size);
-        m_inBytes = bytes;
+    public void setTypeSizeAndInBytes(AbstractExpression source) {
+        setValueType(source.getValueType());
+        setValueSize(source.getValueSize());
+        setInBytes(source.getInBytes());
     }
 
-    public void setTypeSizeBytes(int columnType, int size, boolean bytes) {
-        setTypeSizeBytes(VoltType.get((byte)columnType), size, bytes);
+    public void setTypeSizeAndInBytes(Column column) {
+        setValueType(VoltType.get((byte)column.getType()));
+        setValueSize(column.getSize());
+        setInBytes(column.getInbytes());
     }
 
     @Override
@@ -339,6 +337,15 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
+    /**
+     * Recursively walk an expression and return a list of all its
+     * contained tuple value expressions' table aliases.
+     */
+    @Override
+    public void findTVEAliases(Set<String> aliases) {
+        aliases.add((m_tableAlias == null) ? m_tableName : m_tableAlias);
+    }
+
     @Override
     public void resolveForTable(Table table) {
         assert(table != null);
@@ -351,21 +358,22 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
 
-        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
+        setTypeSizeAndInBytes(column);
     }
 
     /**
      * Given an input schema, resolve the TVE
      * expressions.
      */
-    public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
-        int index = inputSchema.getIndexOfTve(this);
-        if (getValueType() == null && index != -1) {
-            // In case of sub-queries the TVE may not have its value type and size
-            // resolved yet. Try to resolve it now
-            SchemaColumn inputColumn = inputSchema.getColumns().get(index);
-            setTypeSizeBytes(inputColumn.getType(), inputColumn.getSize(),
-                    inputColumn.getExpression().getInBytes());
+    public int resolveColumnIndexUsingSchema(NodeSchema inputSchema) {
+        int index = inputSchema.setIndexOfTVE(this);
+        if (index != -1) {
+            if (getValueType() == null) {
+                // In case of sub-queries the TVE may not have its value type and size
+                // resolved yet. Try to resolve it now
+                SchemaColumn inputColumn = inputSchema.getColumns().get(index);
+                setTypeSizeAndInBytes(inputColumn.getExpression());
+            }
         }
         return index;
     }
@@ -376,27 +384,11 @@ public class TupleValueExpression extends AbstractValueExpression {
     public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         AbstractExpression retval = expr.getLeft();
-        if (isOperandDependentOnTable(retval, tableAlias)) {
+        if (retval.containsMatchingTVE(tableAlias)) {
             retval = expr.getRight();
-            assert( ! isOperandDependentOnTable(retval, tableAlias));
+            assert( ! retval.containsMatchingTVE(tableAlias));
         }
         return retval;
-    }
-
-    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
-    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
-    // depend on tables.
-    public static boolean isOperandDependentOnTable(AbstractExpression expr, String tableAlias) {
-        assert(tableAlias != null);
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (tableAlias.equals(tve.getTableAlias()))
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

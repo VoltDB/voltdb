@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -81,7 +82,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         m_scalarExprType = m_valueType;
         if (m_subquery.getOutputSchema().size() == 1) {
             // potential scalar sub-query
-            m_scalarExprType = m_subquery.getOutputSchema().get(0).getType();
+            m_scalarExprType = m_subquery.getOutputSchema().get(0).getExpression().getValueType();
         }
     }
 
@@ -274,4 +275,33 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     public String calculateContentDeterminismMessage() {
         return m_subquery.calculateContentDeterminismMessage();
     }
+
+    /**
+     * Wrap a ScalarValueExpression around this subquery expression as needed.
+     * A ScalarValueExpression must be a top-level expression, or a child of a
+     * comparison, an EXISTS operator, or a scalar value expression.
+     * @return a new ScalarValueExpression or this
+     */
+    @Override
+    public AbstractExpression wrapScalarSubqueries(AbstractExpression parentExpr) {
+        if (parentExpr != null) {
+            if (parentExpr instanceof ComparisonExpression ||
+                    parentExpr instanceof ScalarValueExpression ||
+                    parentExpr.getExpressionType() == ExpressionType.OPERATOR_EXISTS) {
+                return this;
+            }
+        }
+
+        if (getSubqueryScan().getOutputSchema().size() != 1) {
+            throw new PlanningErrorException("Scalar subquery can have only one output column");
+        }
+        changeToScalarExprType();
+
+        ScalarValueExpression scalarExpr = new ScalarValueExpression();
+        scalarExpr.setLeft(this);
+        scalarExpr.setValueType(getValueType());
+        scalarExpr.setValueSize(getValueSize());
+        return scalarExpr;
+    }
+
 }

@@ -926,7 +926,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testHavingClause() throws IOException, ProcCallException {
-        System.out.println("test Having clause...");
+        System.out.println("Test Having clause...");
         loadData(false);
 
         Client client = this.getClient();
@@ -977,13 +977,43 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1, 60, 8, 20} };
             validateTableOfLongs(vt, expected);
 
-            // Test Having with COUNT(*)
+            // Test COUNT(*) with HAVING
+            /*// enable to debug
+            System.err.println("Explaining: " +
+                    client.callProcedure("@Explain",
+                            "SELECT count(*) from " + tb +
+                            " HAVING count(*) > 60;").getResults()[0]);
+
+            System.err.println("Explaining w/ other agg: " +
+                    client.callProcedure("@Explain",
+                            "SELECT count(*) from " + tb +
+                            " HAVING MAX(wage) > 60;").getResults()[0]);
+            */
+
             cr = client.callProcedure("@AdHoc", "SELECT count(*) from " + tb +
-                    " HAVING count(*) > 60 " +
-                    " ORDER BY 1 DESC;");
+                    " HAVING count(*) > 60;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
+            //* enable to debug */ System.err.println(vt);
             assertTrue(vt.getRowCount() == 0);
+
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) from " + tb +
+                    " HAVING count(*) < 60;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            //* enable to debug */ System.err.println(vt);
+            expected = new long[][] {{5}};
+            validateTableOfLongs(vt, expected);
+
+            // Try a HAVING clause that would break if the HAVING is
+            // not deferred to post-coordination.
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) from " + tb +
+                    " HAVING count(*) = 5;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            //* enable to debug */ System.err.println(vt);
+            expected = new long[][] {{5}};
+            validateTableOfLongs(vt, expected);
 
             // Test Having with AVG
             cr = client.callProcedure("@AdHoc", "SELECT AVG(wage) from " + tb +
@@ -1107,7 +1137,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void orderbyColumnsNotInDisplayList() throws IOException, ProcCallException {
-        System.out.println("Test testOrderbyColumnsNotInDisplayList...");
+        System.out.println("Test OrderbyColumnsNotInDisplayList...");
         loadData(true);
         Client client = this.getClient();
 
@@ -1123,7 +1153,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             sql = "SELECT count(wage), sum(id)  from " + tb +
                     " GROUP BY abs(dept) ORDER BY abs(dept) ";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.err.println(vt);
+            //* enable to debug */ System.err.println(vt);
             validateTableOfLongs(vt, new long[][] { {3, 6}, {4, 22} });
 
             sql = "SELECT count(wage), sum(id), avg(wage)  from " + tb +
@@ -1139,7 +1169,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             sql = "SELECT COUNT(*) as tag, sum(wage) from " + tb +
                     " GROUP BY dept ORDER BY abs(dept) DESC";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.err.println(vt);
+            //* enable to debug */ System.err.println(vt);
             validateTableOfLongs(vt, new long[][] { {4, 140}, {3, 60}});
         }
     }

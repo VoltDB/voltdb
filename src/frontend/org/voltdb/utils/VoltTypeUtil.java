@@ -157,22 +157,19 @@ public abstract class VoltTypeUtil {
         }
         // Check for NULL first, if either type is NULL the output is always NULL
         // XXX do we need to actually check for all NULL_foo types here?
-        else if (left == VoltType.NULL || right == VoltType.NULL)
-        {
+        else if (left == VoltType.NULL || right == VoltType.NULL) {
             return VoltType.NULL;
         }
         //
         // No mixing of strings and numbers
         //
         else if ((left == VoltType.STRING && right != VoltType.STRING) ||
-                (left != VoltType.STRING && right == VoltType.STRING))
-        {
+                (left != VoltType.STRING && right == VoltType.STRING)) {
             throw new VoltTypeException(String.format(VoltTypeCastErrorMessage, left, right));
         }
         // No mixing of numbers and non-numbers
         else if ((left.isNumber() && !right.isNumber()) ||
-                 (right.isNumber() && !left.isNumber()))
-        {
+                 (right.isNumber() && !left.isNumber())) {
             throw new VoltTypeException(String.format(VoltTypeCastErrorMessage, left, right));
         }
         //
@@ -194,8 +191,7 @@ public abstract class VoltTypeUtil {
             //
             // If any one of the types is the current cast type, we'll use that
             //
-            if (left == cast_type || right == cast_type)
-            {
+            if (left == cast_type || right == cast_type) {
                 return cast_type;
             }
         }
@@ -203,8 +199,7 @@ public abstract class VoltTypeUtil {
         // If we have INT types smaller than BIGINT
         // promote the output up to BIGINT
         if ((left == VoltType.INTEGER || left == VoltType.SMALLINT || left == VoltType.TINYINT) &&
-                (right == VoltType.INTEGER || right == VoltType.SMALLINT || right == VoltType.TINYINT))
-        {
+                (right == VoltType.INTEGER || right == VoltType.SMALLINT || right == VoltType.TINYINT)) {
             return VoltType.BIGINT;
         }
 

@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -26,8 +25,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -99,17 +96,14 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         List<TupleValueExpression> output_tves =
             new ArrayList<>();
         int i = 0;
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
             col.setDifferentiator(i);
-            output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            output_tves.addAll(col.getExpression().findAllTupleValueSubexpressions());
             ++i;
         }
         // and update their indexes against the table schema
-        for (TupleValueExpression tve : output_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
-            tve.setColumnIndex(index);
+        for (TupleValueExpression tve : output_tves) {
+            tve.resolveColumnIndexUsingSchema(inputSchema);
         }
         // DON'T RE-SORT HERE
     }
@@ -125,37 +119,33 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // to replace any aggregate expressions in the display columns
         // with a tuple value expression that matches what we're going
         // to generate out of the aggregate node
-        NodeSchema new_schema = new NodeSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        List<SchemaColumn> columns = m_outputSchema.getColumns();
+        NodeSchema new_schema = new NodeSchema(columns.size());
+        for (SchemaColumn col : columns) {
+            SchemaColumn colCopy = null;
             if (col.getExpression().getExpressionType().isAggregateExpression()) {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
                                                          col.getTableAlias(),
                                                          col.getColumnName(),
                                                          col.getColumnAlias());
-                if (agg_col == null)
-                {
+                if (agg_col == null) {
                     throw new RuntimeException("Unable to find matching " +
                                                "input column for projection: " +
                                                col.toString());
                 }
-                new_schema.addColumn(col.copyAndReplaceWithTVE());
+                colCopy = col.copyAndReplaceWithTVE();
             }
-            else
-            {
-                new_schema.addColumn(col.clone());
+            else  {
+                colCopy = col.clone();
             }
+            new_schema.addColumn(colCopy);
         }
         m_outputSchema = new_schema;
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
+        generateOutputSchemaForSubqueries(db);
     }
 
     @Override

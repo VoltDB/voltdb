@@ -38,6 +38,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractExpression.SubexprFinderPredicate;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -96,7 +97,7 @@ public abstract class AbstractParsedStmt {
 
     public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<>();
 
-    protected ArrayList<AbstractExpression> m_aggregationList = null;
+    protected ArrayList<AggregateExpression> m_aggregationList = null;
 
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
@@ -305,7 +306,7 @@ public abstract class AbstractParsedStmt {
         // If there were any subquery expressions appearing in a scalar context,
         // we must wrap them in ScalarValueExpressions to avoid wrong answers.
         // See ENG-8226.
-        expr = ExpressionUtil.wrapScalarSubqueries(expr);
+        expr = expr.wrapScalarSubqueries(null);
         return expr;
     }
 
@@ -322,7 +323,7 @@ public abstract class AbstractParsedStmt {
         // If there were any subquery expressions appearing in a scalar context,
         // we must wrap them in ScalarValueExpressions to avoid wrong answers.
         // See ENG-8226.
-        expr = ExpressionUtil.wrapScalarSubqueries(expr);
+        expr = expr.wrapScalarSubqueries(null);
         return expr;
     }
 
@@ -343,10 +344,11 @@ public abstract class AbstractParsedStmt {
             retval = parseOperationExpression(exprNode);
         }
         else if (elementName.equals("aggregation")) {
-            retval = parseAggregationExpression(exprNode);
+            AggregateExpression agg = parseAggregationExpression(exprNode);
+            retval = agg;
             if (m_aggregationList != null) {
                 ExpressionUtil.finalizeValueTypes(retval);
-                m_aggregationList.add(retval);
+                m_aggregationList.add(agg);
             }
         }
         else if (elementName.equals("function")) {
@@ -584,8 +586,7 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
-        String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
-        String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
+        String alias = WINDOWED_AGGREGATE_COLUMN_NAME;
         if (exprNode.attributes.containsKey("alias")) {
             alias = exprNode.attributes.get("alias");
         }
@@ -599,8 +600,8 @@ public abstract class AbstractParsedStmt {
         int offset = m_windowedExpressions.size();
         m_windowedExpressions.add(rankExpr);
         TupleValueExpression tve = new TupleValueExpression(TEMP_TABLE_NAME, TEMP_TABLE_NAME,
-                                                            alias,           alias);
-        tve.setColumnIndex(offset);
+                                                            alias,           alias,
+                                                            offset);
         tve.setValueType(rankExpr.getValueType());
         tve.setValueSize(rankExpr.getValueSize());
         rankExpr.setDisplayListExpression(tve);
@@ -835,7 +836,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
+            Collection<TupleValueExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -958,16 +959,21 @@ public abstract class AbstractParsedStmt {
         if (expr instanceof AggregateExpression) {
             int paramIdx = NEXT_PARAMETER_ID++;
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+            assert(m_parentStmt != null);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
-            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-            assert(m_parentStmt != null);
-            for (TupleValueExpression tve : tves) {
-                int origId = tve.getOrigStmtId();
-                if (m_stmtId != origId && m_parentStmt.m_stmtId != origId) {
-                    throw new PlanningErrorException(
-                            "Subqueries do not support aggregation of parent statement columns");
+            SubexprFinderPredicate hasHigherOrigin = new SubexprFinderPredicate() {
+                @Override
+                public boolean matches(AbstractExpression expr) {
+                    TupleValueExpression tve = (TupleValueExpression)expr;
+                    int origId = tve.getOrigStmtId();
+                    return m_stmtId != origId && m_parentStmt.m_stmtId != origId;
                 }
+            };
+            if (expr.hasAnyMatchingSubexpressionOfClass(TupleValueExpression.class,
+                   hasHigherOrigin)) {
+                throw new PlanningErrorException(
+                        "Subqueries do not support aggregation of parent statement columns");
             }
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
@@ -995,8 +1001,7 @@ public abstract class AbstractParsedStmt {
      * @return
      */
 
-    private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode)
-    {
+    private AggregateExpression parseAggregationExpression(VoltXMLElement exprNode) {
         String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
 
@@ -1022,8 +1027,7 @@ public abstract class AbstractParsedStmt {
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
         }
 
-        AggregateExpression expr = new AggregateExpression(exprType);
-        expr.setLeft(childExpr);
+        AggregateExpression expr = new AggregateExpression(exprType, childExpr);
 
         String node;
         if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
@@ -1295,7 +1299,8 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
-        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList);
+        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList,
+                m_tableList.size());
         return m_joinTree.getAllEquivalenceFilters();
     }
 
@@ -1570,8 +1575,7 @@ public abstract class AbstractParsedStmt {
         // table aliases we will map table scans to expressions rather
         // than tables to expressions, and not confuse ourselves with
         // different instances of the same table in self joins.
-        HashMap<String, List<AbstractExpression> > baseTableAliases =
-                new HashMap< >();
+        HashMap<String, List<AbstractExpression> > baseTableAliases = new HashMap<>();
         for (ParsedColInfo col : orderByColumns()) {
             AbstractExpression expr = col.expression;
             //
@@ -1581,16 +1585,9 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
-            Set<String> baseTableNames = new HashSet<>();
-            for (AbstractExpression ae : baseTVEExpressions) {
-                assert(ae instanceof TupleValueExpression);
-                TupleValueExpression atve = (TupleValueExpression)ae;
-                String tableAlias = atve.getTableAlias();
-                assert(tableAlias != null);
-                baseTableNames.add(tableAlias);
-            }
-            if (baseTableNames.size() != 1) {
+            Set<String> foundTableAliases = new HashSet<>();
+            expr.findTVEAliases(foundTableAliases);
+            if (foundTableAliases.size() != 1) {
                 // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
@@ -1598,11 +1595,7 @@ public abstract class AbstractParsedStmt {
             // Everything in the baseTVEExpressions table is a column
             // in the same table and has the same alias. So just grab the first one.
             // All we really want is the alias.
-            AbstractExpression baseTVE = baseTVEExpressions.get(0);
-            String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
-            // This was tested above.  But the assert above may prove to be over cautious
-            // and disappear.
-            assert(nextTableAlias != null);
+            String nextTableAlias = foundTableAliases.iterator().next();
             List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
             if (perTable == null) {
                 perTable = new ArrayList<>();
@@ -1813,8 +1806,9 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        HashSet<AbstractExpression> exprs = new HashSet<>();
+    protected <T extends AbstractExpression> Set<T> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        HashSet<T> exprs = new HashSet<>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
             if (treeExpr != null) {
@@ -1840,7 +1834,7 @@ public abstract class AbstractParsedStmt {
         return !findSubquerySubexpressions().isEmpty();
     }
 
-    protected Set<AbstractExpression> findSubquerySubexpressions() {
+    protected Set<SelectSubqueryExpression> findSubquerySubexpressions() {
         return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
     }
 

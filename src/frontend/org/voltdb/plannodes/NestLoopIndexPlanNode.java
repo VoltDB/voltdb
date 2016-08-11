@@ -17,8 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -26,8 +24,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -44,8 +40,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // Important safety tip regarding this inlined
         // index scan and ITS inlined projection:
         // That projection is currently only used/usable as
@@ -74,27 +69,20 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         generateRealOutputSchema(db);
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
+        generateOutputSchemaForSubqueries(db);
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         IndexScanPlanNode inline_scan =
             (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
         assert (m_children.size() == 1 && inline_scan != null);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
-        if (limit != null)
-        {
+        if (limit != null) {
             // output schema of limit node has not been used
             limit.m_outputSchema = m_outputSchemaPreInlineAgg;
             limit.m_hasSignificantOutputSchema = false;
@@ -135,11 +123,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             int index;
             int tableIdx;
             if (i < outer_schema.size()) {
-                index = outer_schema.getIndexOfTve(tve);
+                index = outer_schema.setIndexOfTVE(tve);
                 tableIdx = 0; // 0 for outer table
             }
             else {
-                index = tve.resolveColumnIndexesUsingSchema(complete_schema_of_inner_table);
+                index = tve.resolveColumnIndexUsingSchema(complete_schema_of_inner_table);
                 tableIdx = 1;   // 1 for inner table
             }
 
@@ -147,8 +135,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 throw new RuntimeException("Unable to find index for column: " +
                                            col.toString());
             }
-
-            tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
         }
 

@@ -66,8 +66,6 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
@@ -2447,7 +2445,7 @@ public class DDLCompiler {
         assert(tableName != null);
         String msg = "Partial index \"" + indexName + "\" ";
 
-        // Make sure all column expressions refer the index table
+        // Make sure all column expressions refer to the index table
         List<VoltXMLElement> columnRefs= predicateXML.findChildrenRecursively("columnref");
         for (VoltXMLElement columnRef : columnRefs) {
             String columnRefTableName = columnRef.attributes.get("table");
@@ -2459,11 +2457,11 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
-        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        if (predicate.hasAggregateSubexpression()) {
             msg += "with aggregate expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }
-        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
+        if (predicate.hasSubquerySubexpression()) {
             msg += "with subquery expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }

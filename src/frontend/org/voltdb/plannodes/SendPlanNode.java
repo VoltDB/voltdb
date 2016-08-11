@@ -39,21 +39,19 @@ public class SendPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        AbstractPlanNode child = m_children.get(0);
+        child.resolveColumnIndexes();
+        NodeSchema input_schema = child.getOutputSchema();
         assert (input_schema.equalsOnlyNames(m_outputSchema));
 
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            tve.resolveColumnIndexUsingSchema(input_schema);
         }
         // output schema for SendPlanNode should not ever be changed
     }

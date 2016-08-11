@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -30,9 +29,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -250,16 +247,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
-    public void setOutputSchema(NodeSchema schema)
-    {
+    public void setOutputSchema(NodeSchema schema) {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
         m_hasSignificantOutputSchema = true;
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // aggregate's output schema is pre-determined
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
@@ -267,17 +262,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(m_hasSignificantOutputSchema);
         }
 
-        // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
+        generateOutputSchemaForSubqueries(db);
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Aggregates need to resolve indexes for the output schema but don't need
         // to reorder it.  Some of the outputs may be local aggregate columns and
         // won't have a TVE to resolve.
@@ -298,17 +287,16 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<TupleValueExpression> getExpressionsNeedingResolution() {
         List<TupleValueExpression> answer = new ArrayList<>();
         for (SchemaColumn col : m_outputSchema.getColumns()) {
-            answer.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            answer.addAll(col.getExpression().findAllTupleValueSubexpressions());
         }
         return answer;
     }
 
-    void resolveColumnIndexesUsingSchema(NodeSchema input_schema)
-    {
+    void resolveColumnIndexesUsingSchema(NodeSchema input_schema) {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves = getExpressionsNeedingResolution();
         for (TupleValueExpression tve : output_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
+            int index = tve.resolveColumnIndexUsingSchema(input_schema);
             if (index == -1) {
                 // check to see if this TVE is the aggregate output
                 if (!tve.getTableName().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
@@ -316,53 +304,37 @@ public class AggregatePlanNode extends AbstractPlanNode {
                                            tve.getColumnName());
                 }
             }
-            else {
-                tve.setColumnIndex(index);
-            }
         }
 
         // Aggregates also need to resolve indexes for aggregate inputs
-        // Find the proper index for the sort columns.  Not quite
-        // sure these should be TVEs in the long term.
-        List<TupleValueExpression> agg_tves =
-            new ArrayList<>();
-        for (AbstractExpression agg_exp : m_aggregateExpressions) {
-            agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
-        }
-        for (TupleValueExpression tve : agg_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+        // Find the proper index for the sort columns.
+        for (AbstractExpression aggArg : m_aggregateExpressions) {
+            if (aggArg == null) {
+                // COUNT(*) takes no argument.
+                continue;
+            }
+            for (TupleValueExpression tve : aggArg.findAllTupleValueSubexpressions()) {
+                tve.resolveColumnIndexUsingSchema(input_schema);
+            }
         }
 
         // Aggregates also need to resolve indexes for group_by inputs
-        List<TupleValueExpression> group_tves =
-            new ArrayList<>();
         for (AbstractExpression group_exp : m_groupByExpressions) {
-            group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
-        }
-        for (TupleValueExpression tve : group_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            for (TupleValueExpression tve : group_exp.findAllTupleValueSubexpressions()) {
+                tve.resolveColumnIndexUsingSchema(input_schema);
+            }
         }
 
         // Post filter also needs to resolve indexes.
-        List<TupleValueExpression> postFilter_tves =
-                ExpressionUtil.getTupleValueExpressions(m_postPredicate);
-        for (TupleValueExpression tve : postFilter_tves) {
-            int index = m_outputSchema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
+        if (m_postPredicate != null) {
+            List<TupleValueExpression> postFilterTves =
+                    m_postPredicate.findAllTupleValueSubexpressions();
+            for (TupleValueExpression tve : postFilterTves) {
+                m_outputSchema.setIndexOfTVE(tve);
+            }
         }
 
         resolveSubqueryColumnIndexes();
-    }
-
-    @Override
-    protected void resolveSubqueryColumnIndexes() {
-        // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
-        }
     }
 
     /**
@@ -376,25 +348,18 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public void addAggregate(ExpressionType aggType,
                              boolean isDistinct,
                              Integer aggOutputColumn,
-                             AbstractExpression aggInputExpr)
-    {
+                             AbstractExpression aggInputExpr) {
         m_aggregateTypes.add(aggType);
-        if (isDistinct)
-        {
-            m_aggregateDistinct.add(1);
-        }
-        else
-        {
-            m_aggregateDistinct.add(0);
-        }
+        m_aggregateDistinct.add(isDistinct ? 1 : 0);
         m_aggregateOutputColumns.add(aggOutputColumn);
         if (aggType.isNullary()) {
             assert(aggInputExpr == null);
-            m_aggregateExpressions.add(null);
-        } else {
-            assert(aggInputExpr != null);
-            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
         }
+        else {
+            assert(aggInputExpr != null);
+            aggInputExpr = (AbstractExpression) aggInputExpr.clone();
+        }
+        m_aggregateExpressions.add(aggInputExpr);
     }
 
     public void updateAggregate(
@@ -403,7 +368,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         // Create a new aggregate expression which we'll use to update the
         // output schema (whose exprs are TVEs).
-        AggregateExpression aggExpr = new AggregateExpression(aggType);
+        AggregateExpression aggExpr = new AggregateExpression(aggType, null);
         aggExpr.finalizeValueTypes();
 
         int outputSchemaIndex = m_aggregateOutputColumns.get(index);
@@ -569,7 +534,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_prePredicate != null) {
             collected.addAll(m_prePredicate.findAllSubexpressionsOfClass(aeClass));

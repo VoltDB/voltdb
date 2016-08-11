@@ -852,8 +852,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         for (int i = 0; i < scs.size(); ++i) {
             SchemaColumn col = scs.get(i);
             assertEquals(columns[i], col.getColumnName());
-            assertEquals(4, col.getSize());
-            assertEquals(VoltType.INTEGER, col.getType());
+            assertEquals(4, col.getExpression().getValueSize());
+            assertEquals(VoltType.INTEGER, col.getExpression().getValueType());
             assertTrue(col.getExpression() instanceof TupleValueExpression);
             assertTrue(((TupleValueExpression)col.getExpression()).getColumnIndex() != -1);
         }

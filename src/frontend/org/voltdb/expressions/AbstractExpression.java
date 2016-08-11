@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,7 +60,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
-    protected boolean m_inBytes = false;
+    private boolean m_inBytes = false;
     /*
      * We set this to non-null iff the expression has a non-deterministic
      * operation. The most common kind of non-deterministic operation is an
@@ -164,27 +165,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         AbstractExpression clone = null;
         try {
             clone = (AbstractExpression)super.clone();
-        } catch (CloneNotSupportedException e) {
+        }
+        catch (CloneNotSupportedException e) {
             // umpossible
             return null;
         }
-        clone.m_id = m_id;
-        clone.m_type = m_type;
-        clone.m_valueType = m_valueType;
-        clone.m_valueSize = m_valueSize;
-        clone.m_inBytes = m_inBytes;
-        if (m_left != null)
-        {
-            AbstractExpression left_clone = (AbstractExpression)m_left.clone();
-            clone.m_left = left_clone;
+        if (m_left != null) {
+            clone.m_left = (AbstractExpression)m_left.clone();
         }
-        if (m_right != null)
-        {
-            AbstractExpression right_clone = (AbstractExpression)m_right.clone();
-            clone.m_right = right_clone;
+        if (m_right != null) {
+            clone.m_right = (AbstractExpression)m_right.clone();
         }
         if (m_args != null) {
-            clone.m_args = new ArrayList<>();
+            clone.m_args = new ArrayList<>(m_args.size());
             for (AbstractExpression argument : m_args) {
                 clone.m_args.add((AbstractExpression) argument.clone());
             }
@@ -638,14 +631,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     /**
      * For TVEs, it is only serialized column index and table index. In order to match expression,
-     * there needs more information to revert back the table name, table alisa and column name.
-     * Without adding extra information, TVEs will only have column index and table index available.
-     *
-     *
-     */
-
-    /**
-     * For TVEs, it is only serialized column index and table index. In order to match expression,
      * there needs more information to revert back the table name, table alias and column name.
      * Without adding extra information, TVEs will only have column index and table index available.
      * This function is only used for various of plan nodes, except AbstractScanPlanNode.
@@ -808,12 +793,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias, col.columnName, col.alias, ii);
 
-            tve.setTypeSizeBytes(getValueType(), getValueSize(), getInBytes());
+            tve.setTypeSizeAndInBytes(this);
             if (this instanceof TupleValueExpression) {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
             }
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
-            if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
+            if (hasAggregateSubexpression()) {
                 tve.setHasAggregate(true);
             }
 
@@ -878,44 +863,162 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return
      */
     public AbstractExpression replaceAVG () {
-        if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
-            AbstractExpression child = getLeft();
-            AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
-            left.setLeft((AbstractExpression) child.clone());
-            AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
-            right.setLeft((AbstractExpression) child.clone());
-
-            return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, left, right);
-        }
-
-        AbstractExpression lnode = null, rnode = null;
-        ArrayList<AbstractExpression> newArgs = null;
         if (m_left != null) {
-            lnode = m_left.replaceAVG();
+            m_left = m_left.replaceAVG();
         }
         if (m_right != null) {
-            rnode = m_right.replaceAVG();
+            m_right = m_right.replaceAVG();
         }
-        boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<>();
+            int index = 0;
             for (AbstractExpression expr: m_args) {
                 AbstractExpression ex = expr.replaceAVG();
-                newArgs.add(ex);
                 if (ex != expr) {
-                    changed = true;
+                    m_args.set(index, ex);
                 }
+                ++index;
             }
         }
-        if (m_left != lnode || m_right != rnode || changed) {
-            AbstractExpression resExpr = (AbstractExpression) this.clone();
-            resExpr.setLeft(lnode);
-            resExpr.setRight(rnode);
-            resExpr.setArgs(newArgs);
-            return resExpr;
+        return this;
+    }
+
+    /**
+     * Recursively walk an expression and return a list of all its
+     * contained tuple value expressions' table aliases.
+     */
+    public void findTVEAliases(Set<String> aliases) {
+        // recursive calls
+        if (m_left != null) {
+            m_left.findTVEAliases(aliases);
+        }
+        if (m_right != null) {
+            m_right.findTVEAliases(aliases);
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.findTVEAliases(aliases);
+            }
+        }
+    }
+
+    /**
+     * Recursively walk an expression and determine whether it contains
+     * any tuple value expression referencing the given table aliases.
+     */
+    boolean containsMatchingTVE(String tableAlias) {
+        Set<String> aliases = new HashSet<>();
+        findTVEAliases(aliases);
+        for (String alias : aliases) {
+            if (alias.equals(tableAlias)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     *  A condition is null-rejected for a given table in the following cases:
+     *      If it is of the form A IS NOT NULL, where A is an attribute of any of the inner tables
+     *      If it is a predicate containing a reference to an inner table that evaluates to UNKNOWN
+     *          when one of its arguments is NULL
+     *      If it is a conjunction containing a null-rejected condition as a conjunct
+     *      If it is a disjunction of null-rejected conditions
+     *
+     * @param expr
+     * @param tableAlias
+     * @return
+     */
+    public boolean isNullRejectingExpression(final String tableAlias) {
+        ExpressionType exprType = getExpressionType();
+        if (exprType == ExpressionType.CONJUNCTION_AND) {
+            assert(m_left != null && m_right != null);
+            return m_left.isNullRejectingExpression(tableAlias) || m_right.isNullRejectingExpression(tableAlias);
+        }
+        if (exprType == ExpressionType.CONJUNCTION_OR) {
+            assert(m_left != null && m_right != null);
+            return m_left.isNullRejectingExpression(tableAlias) && m_right.isNullRejectingExpression(tableAlias);
+        }
+        if (exprType == ExpressionType.OPERATOR_NOT) {
+            assert(m_left != null);
+            // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"
+            // "NOT ( P or Q )" is as null-rejecting as "NOT P and NOT Q"
+            // Handling AND and OR expressions requires a "negated" flag to the recursion that tweaks
+            // (switches?) the handling of ANDs and ORs to enforce the above equivalences.
+            if (m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
+                return containsMatchingTVE(tableAlias);
+            }
+            if (m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
+                    m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
+                assert(m_left.m_left != null && m_left.m_right != null);
+                // Need to test for an existing child NOT and skip it.
+                // e.g. NOT (P AND NOT Q) --> (NOT P) OR NOT NOT Q --> (NOT P) OR Q
+                AbstractExpression tempLeft = null;
+                if (m_left.m_left.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+                    tempLeft = new OperatorExpression(ExpressionType.OPERATOR_NOT, m_left.m_left, null);
+                }
+                else {
+                    assert(m_left.m_left.m_left != null);
+                    tempLeft = m_left.m_left.m_left;
+                }
+                AbstractExpression tempRight = null;
+                if (m_left.m_right.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+                    tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, m_left.m_right, null);
+                }
+                else {
+                    assert(m_left.m_right.m_left != null);
+                    tempRight = m_left.m_right.m_left;
+                }
+                ExpressionType type = (m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND) ?
+                        ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
+                AbstractExpression tempExpr = new ConjunctionExpression(type, tempLeft, tempRight);
+                return tempExpr.isNullRejectingExpression(tableAlias);
+            }
+            if (m_left.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                // It's probably safe to assume that HSQL will have stripped out other double negatives,
+                // (like "NOT T.c IS NOT NULL"). Yet, we could also handle them here
+                assert(m_left.m_left != null);
+                return m_left.m_left.isNullRejectingExpression(tableAlias);
+            }
+            return m_left.isNullRejectingExpression(tableAlias);
+        }
+        if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
+            return false;
+        }
+        if (exprType == ExpressionType.OPERATOR_IS_NULL) {
+            // IS NOT NULL is NULL rejecting -- IS NULL is not
+            return false;
         }
 
-        return this;
+        // COALESCE expression is a sub-expression
+        // For example, COALESCE (C1, C2) > 0
+
+        SubexprFinderPredicate partOfACoalaesce = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                OperatorExpression coalesceExpr = (OperatorExpression)expr;
+                // This table is part of the COALESCE expression - it's not NULL-rejecting
+                return (coalesceExpr.getExpressionType() == ExpressionType.OPERATOR_ALTERNATIVE) &&
+                        coalesceExpr.containsMatchingTVE(tableAlias);
+            }
+        };
+
+        if (hasAnyMatchingSubexpressionOfClass(OperatorExpression.class, partOfACoalaesce)) {
+            return false;
+        }
+
+        // If we get here it means that the tableAlias is not part of any COALESCE expression.
+        // Still need to check the catch all case.
+
+        // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
+        // it contains a TVE with the matching table name then it is a NULL rejecting expression?
+        // Presently, yes, logical expressions are not expected to appear inside other
+        // generalized expressions, so since the handling of other kinds of expressions
+        // is pretty much "containsMatchingTVE". This fallback should be safe.
+        // The only planned developments that might contradict this restriction (AFAIK --paul)
+        // would be support for standard pseudo-functions that take logical condition arguments.
+        // These should probably be supported as special non-functions/operations for a number
+        // of reasons and may need special casing here.
+        return containsMatchingTVE(tableAlias);
     }
 
     /**
@@ -923,19 +1026,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param aeClass AbstractExpression-based class of instances to search for.
      * @return a list of contained expressions that are instances of the desired class
      */
-    public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<aeClass> collected = new ArrayList<>();
+    public <T extends AbstractExpression> List<T> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        List<T> collected = new ArrayList<>();
         findAllSubexpressionsOfClass_recurse(aeClass, collected);
         return collected;
     }
 
-    public <aeClass> void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
-            ArrayList<aeClass> collected) {
+    public <T extends AbstractExpression> void findAllSubexpressionsOfClass_recurse(
+            Class< ? extends AbstractExpression> aeClass,
+            List<T> collected) {
         if (aeClass.isInstance(this)) {
             // Suppress the expected warning for the "unchecked" cast.
             // The runtime isInstance check ensures that it is typesafe.
             @SuppressWarnings("unchecked")
-            aeClass e = (aeClass) this;
+            T e = (T) this;
             collected.add(e);
             // Don't return early, because in a few rare cases,
             // like when searching for function expressions,
@@ -960,7 +1065,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param aeClass expression class to search for
      * @return whether the expression or any contained expressions are of the desired type
      */
-    public boolean hasAnySubexpressionOfClass(Class< ? extends AbstractExpression> aeClass) {
+    protected boolean hasAnySubexpressionOfClass(Class< ? extends AbstractExpression> aeClass) {
         if (aeClass.isInstance(this)) {
             return true;
         }
@@ -986,6 +1091,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return hasAnySubexpressionOfClass(TupleValueExpression.class);
     }
 
+    public boolean hasAggregateSubexpression() {
+        return hasAnySubexpressionOfClass(AggregateExpression.class);
+    }
+
+    public boolean hasSubquerySubexpression() {
+        return hasAnySubexpressionOfClass(SelectSubqueryExpression.class);
+    }
+
+    public boolean hasParameterSubexpression() {
+        return hasAnySubexpressionOfClass(ParameterValueExpression.class);
+    }
+
     /**
      * A predicate class for searching expression trees,
      * to be used with hasAnySubexpressionWithPredicate, below.
@@ -995,33 +1112,143 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Searches the expression tree rooted at this for nodes for which "pred"
-     * evaluates to true.
-     * @param pred  Predicate object instantiated by caller
-     * @return      true if the predicate ever returns true, false otherwise
+     * Searches the expression tree rooted at this for any node of the
+     * specified class that also matches the specified condition.
+     * @param aeClass the expected AbstractExpression-based class of the matching
+     * instance
+     * @param condition a Predicate object instantiated by the caller
+     * @return true if the condition is true for any instance of the class in the
+     * AbstractExpression's tree
      */
-    public boolean hasAnySubexpressionWithPredicate(SubexprFinderPredicate pred) {
-        if (pred.matches(this)) {
+    public boolean hasAnyMatchingSubexpressionOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            SubexprFinderPredicate condition) {
+        if (aeClass.isInstance(this)) {
+            if (condition.matches(this)) {
+                return true;
+            }
+        }
+
+        if (m_left != null &&
+                m_left.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
             return true;
         }
 
-        if (m_left != null && m_left.hasAnySubexpressionWithPredicate(pred)) {
-            return true;
-        }
-
-        if (m_right != null && m_right.hasAnySubexpressionWithPredicate(pred)) {
+        if (m_right != null &&
+                m_right.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
             return true;
         }
 
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionWithPredicate(pred)) {
+                if (argument.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
                     return true;
                 }
             }
         }
-
         return false;
+    }
+
+    /* see ComparisonExpression override */
+    public boolean isColumnEquivalenceFilter() { return false; }
+
+    public List<ParameterValueExpression> findAllParameterSubexpressions() {
+        return findAllSubexpressionsOfClass(ParameterValueExpression.class);
+    }
+
+    public List<SelectSubqueryExpression> findAllSubquerySubexpressions() {
+        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
+    }
+
+    public List<TupleValueExpression> findAllTupleValueSubexpressions() {
+        return findAllSubexpressionsOfClass(TupleValueExpression.class);
+    }
+
+    public <T extends AbstractExpression> List<T> findAllTupleValueSubexpressions(
+            List<T> forReturnTypeOnly) {
+        return findAllSubexpressionsOfClass(TupleValueExpression.class);
+    }
+
+    /**
+     * This function will recursively find any function expression with ID functionId.
+     * If found, return true. Otherwise, return false.
+     *
+     * @param expr
+     * @param functionId
+     * @return
+     */
+    private boolean containsFunctionById(final int functionId) {
+        SubexprFinderPredicate matchingId = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                FunctionExpression funcExpr = (FunctionExpression)expr;
+                return funcExpr.hasFunctionId(functionId);
+            }
+        };
+        return hasAnyMatchingSubexpressionOfClass(FunctionExpression.class, matchingId);
+    }
+
+
+    private static final SubexprFinderPredicate TVE_AGG_PROXY_MATCHER = new SubexprFinderPredicate() {
+        @Override
+        public boolean matches(AbstractExpression expr) {
+            return ((TupleValueExpression)expr).hasAggregate();
+        }
+    };
+
+    public boolean hasAggregateProxyTVE() {
+        return hasAnyMatchingSubexpressionOfClass(
+                TupleValueExpression.class,
+                TVE_AGG_PROXY_MATCHER);
+    }
+
+    /**
+     * Return true if the given expression usable as part of an index or MV's
+     * group by and where clause expression.
+     * If false, put the tail of an error message in the string buffer. The
+     * string buffer will be initialized with the name of the index.
+     *
+     * @param expr The expression to check
+     * @param msg  The StringBuffer to pack with the error message tail.
+     * @return true iff the expression can be part of an index.
+     */
+    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
+        if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
+            msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
+            return false;
+        }
+        if (hasSubquerySubexpression()) {
+            // There may not be any of these in HSQL1.9.3b.  However, in
+            // HSQL2.3.2 subqueries are stored as expressions.  So, we may
+            // find some here.  We will keep it here for the moment.
+            msg.append(String.format("with subquery sources is not supported."));
+            return false;
+        }
+        if (hasAggregateSubexpression()) {
+            msg.append("with aggregate expression(s) is not supported.");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Return true if the all of the expressions in the list can be part of
+     * an index expression or in group by and where clause of MV.  As with
+     * validateExprForIndexesAndMVs for individual expression, the StringBuffer
+     * parameter, msg, contains the name of the index.  Error messages should
+     * be appended to it.
+     *
+     * @param checkList
+     * @param msg
+     * @return
+     */
+    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
+        for (AbstractExpression expr : checkList) {
+            if (!expr.validateExprForIndexesAndMVs(msg)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -1219,116 +1446,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Return true if the given expression usable as part of an index or MV's
-     * group by and where clause expression.
-     * If false, put the tail of an error message in the string buffer. The
-     * string buffer will be initialized with the name of the index.
-     *
-     * @param expr The expression to check
-     * @param msg  The StringBuffer to pack with the error message tail.
-     * @return true iff the expression can be part of an index.
-     */
-    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
-        if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
-            msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
-            return false;
-        }
-        if (hasSubquerySubexpression()) {
-            // There may not be any of these in HSQL1.9.3b.  However, in
-            // HSQL2.3.2 subqueries are stored as expressions.  So, we may
-            // find some here.  We will keep it here for the moment.
-            msg.append(String.format("with subquery sources is not supported."));
-            return false;
-        }
-        if (hasAggregateSubexpression()) {
-            msg.append("with aggregate expression(s) is not supported.");
-            return false;
-        }
-        return true;
-    }
-
-    public boolean hasSubquerySubexpression() {
-        return !findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty();
-    }
-
-    public boolean hasAggregateSubexpression() {
-        return !findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty();
-    }
-
-    public boolean hasParameterSubexpression() {
-        return !findAllSubexpressionsOfClass(ParameterValueExpression.class).isEmpty();
-    }
-
-    public boolean hasTupleValueSubexpression() {
-        return !findAllSubexpressionsOfClass(TupleValueExpression.class).isEmpty();
-    }
-
-    public List<AbstractExpression> findAllSubquerySubexpressions() {
-        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
-    }
-
-    public List<AbstractExpression> findAllAggregateSubexpressions() {
-        return findAllSubexpressionsOfClass(AggregateExpression.class);
-    }
-
-    public List<AbstractExpression> findAllParameterSubexpressions() {
-        return findAllSubexpressionsOfClass(ParameterValueExpression.class);
-    }
-
-    public List<AbstractExpression> findAllTupleValueSubexpressions() {
-        return findAllSubexpressionsOfClass(TupleValueExpression.class);
-    }
-
-    /**
-     * Return true if the all of the expressions in the list can be part of
-     * an index expression or in group by and where clause of MV.  As with
-     * validateExprForIndexesAndMVs for individual expression, the StringBuffer
-     * parameter, msg, contains the name of the index.  Error messages should
-     * be appended to it.
-     *
-     * @param checkList
-     * @param msg
-     * @return
-     */
-    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
-        for (AbstractExpression expr : checkList) {
-            if (!expr.validateExprForIndexesAndMVs(msg)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * This function will recursively find any function expression with ID functionId.
-     * If found, return true. Otherwise, return false.
-     *
-     * @param expr
-     * @param functionId
-     * @return
-     */
-    private boolean containsFunctionById(int functionId) {
-        if (this instanceof AbstractValueExpression) {
-            return false;
-        }
-
-        List<AbstractExpression> functionsList = findAllFunctionSubexpressions();
-        for (AbstractExpression funcExpr: functionsList) {
-            assert(funcExpr instanceof FunctionExpression);
-            if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private List<AbstractExpression> findAllFunctionSubexpressions() {
-        return findAllSubexpressionsOfClass(FunctionExpression.class);
-    }
-
-
-    /**
      * Returns true iff the expression is indexable.
      * If the expression is not indexable, expression information
      * gets populated in the msg string buffer passed in.
@@ -1367,4 +1484,46 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
+    /**
+     * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
+     * in a ScalarValueExpression if its parent is not one of:
+     * - comparison (=, !=, <, etc)
+     * - operator exists
+     * @param expr   - the expression that may contain subqueries that need to be wrapped
+     * @return the expression with subqueries wrapped where needed
+     */
+    public AbstractExpression wrapScalarSubqueries(AbstractExpression parentExpr) {
+
+        // Bottom-up recursion.  Proceed to the children first.
+        AbstractExpression leftChild = getLeft();
+        if (leftChild != null) {
+            AbstractExpression newLeft = leftChild.wrapScalarSubqueries(this);
+            if (newLeft != leftChild) {
+                setLeft(newLeft);
+            }
+        }
+
+        AbstractExpression rightChild = getRight();
+        if (rightChild != null) {
+            AbstractExpression newRight = rightChild.wrapScalarSubqueries(this);
+            if (newRight != rightChild) {
+                setRight(newRight);
+            }
+        }
+
+        // args may also contain subqueries.
+        List<AbstractExpression> args = getArgs();
+        if (args != null) {
+            for (int i = 0; i < args.size(); ++i) {
+                AbstractExpression arg = args.get(i);
+                AbstractExpression newArg = arg.wrapScalarSubqueries(this);
+                if (newArg != arg) {
+                    setArgAtIndex(i, newArg);
+                }
+            }
+        }
+        return this;
+    }
+
 }

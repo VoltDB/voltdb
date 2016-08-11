@@ -31,6 +31,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -182,10 +183,8 @@ public class PlanNodeTree implements JSONString {
         if (predicate == null) {
             return;
         }
-        List<AbstractExpression> subquerysExprs = predicate.findAllSubquerySubexpressions();
-        for (AbstractExpression expr : subquerysExprs) {
-            assert(expr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) expr;
+        List<SelectSubqueryExpression> subquerysExprs = predicate.findAllSubquerySubexpressions();
+        for (SelectSubqueryExpression subqueryExpr : subquerysExprs) {
             int subqueryId = subqueryExpr.getSubqueryId();
             int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
@@ -278,10 +277,8 @@ public class PlanNodeTree implements JSONString {
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
         assert(node != null);
-        Collection<AbstractExpression> subexprs = node.findAllSubquerySubexpressions();
-        for (AbstractExpression nextexpr : subexprs) {
-            assert(nextexpr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
+        Collection<AbstractSubqueryExpression> subexprs = node.findAllSubquerySubexpressions();
+        for (AbstractSubqueryExpression subqueryExpr : subexprs) {
             int stmtId = subqueryExpr.getSubqueryId();
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
             assert(!m_planNodesListMap.containsKey(stmtId));

@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
@@ -38,10 +39,22 @@ public class AccessPath {
     final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> otherExprs;
+    final ArrayList<AbstractExpression> joinExprs;
     final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
+
+    AccessPath() {
+        otherExprs = new ArrayList<>();
+        joinExprs = new ArrayList<>();
+    }
+
+    AccessPath(List<AbstractExpression> filterExprs, List<AbstractExpression> joinExprs2) {
+        otherExprs = (filterExprs == null) ? new ArrayList<>() :
+            new ArrayList<>(filterExprs);
+        joinExprs = (joinExprs2 == null) ? new ArrayList<>() :
+            new ArrayList<>(joinExprs2);
+    }
 
     @Override
     public String toString() {

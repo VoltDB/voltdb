@@ -76,20 +76,17 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         return true;
     }
 
-    protected void resolveColumnIndexes(NodeSchema outputSchema)
-    {
+    protected void resolveColumnIndexes(NodeSchema outputSchema) {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         assert (input_schema.equals(outputSchema));
-        for (SchemaColumn col : outputSchema.getColumns())
-        {
+        for (SchemaColumn col : outputSchema.getColumns()) {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            tve.resolveColumnIndexUsingSchema(input_schema);
         }
         // output schema for ReceivePlanNode should never be re-sorted
     }

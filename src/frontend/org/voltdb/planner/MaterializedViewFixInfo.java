@@ -130,11 +130,6 @@ public class MaterializedViewFixInfo {
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
         Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        NodeSchema inlineProjSchema = new NodeSchema();
-        for (SchemaColumn scol: scanColumns) {
-            inlineProjSchema.addColumn(scol);
-        }
-
         String mvTableAlias = getMVTableAlias();
 
         // Get the number of group-by columns.
@@ -162,13 +157,18 @@ public class MaterializedViewFixInfo {
             numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
         }
 
+        NodeSchema inlineProjSchema = new NodeSchema(scanColumns.size() + numOfGroupByColumns);
+        for (SchemaColumn scol: scanColumns) {
+            inlineProjSchema.addColumn(scol);
+        }
+
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
 
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setTypeSizeAndInBytes(mvCol);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
@@ -206,14 +206,15 @@ public class MaterializedViewFixInfo {
         m_reAggNode = new HashAggregatePlanNode();
         int outputColumnIndex = 0;
         // inlineProjSchema contains the group by columns, while aggSchema may do not.
-        NodeSchema aggSchema = new NodeSchema();
+        NodeSchema aggSchema = new NodeSchema(scanColumns.size());
 
         // Construct reAggregation node's aggregation and group by list.
         for (SchemaColumn scol: scanColumns) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());
-            } else {
+            }
+            else {
                 ExpressionType reAggType = mvColumnReAggType.get(scol.getColumnName());
                 assert(reAggType != null);
                 AbstractExpression agg_input_expr = scol.getExpression();
@@ -237,7 +238,7 @@ public class MaterializedViewFixInfo {
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
 
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setTypeSizeAndInBytes(mvCol);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
@@ -360,11 +361,10 @@ public class MaterializedViewFixInfo {
     }
 
 
-    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+    private boolean fromMVTableOnly(List<TupleValueExpression> tves) {
         String mvTableName = getMVTableName();
-        for (AbstractExpression tve: tves) {
-            assert(tve instanceof TupleValueExpression);
-            String tveTableName = ((TupleValueExpression)tve).getTableName();
+        for (TupleValueExpression tve: tves) {
+            String tveTableName = tve.getTableName();
             if (!mvTableName.equals(tveTableName)) {
                 return false;
             }
@@ -384,7 +384,7 @@ public class MaterializedViewFixInfo {
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
-            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> tves = expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 
@@ -401,7 +401,8 @@ public class MaterializedViewFixInfo {
             }
             if (canPushdown) {
                 remaningExprs.add(expr);
-            } else {
+            }
+            else {
                 aggPostExprs.add(expr);
             }
         }

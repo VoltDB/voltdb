@@ -99,21 +99,31 @@ public class BranchNode extends JoinNode {
     }
 
     @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList, int stmtScanCount) {
         JoinNode leftChild = getLeftNode();
         JoinNode rightChild = getRightNode();
-        leftChild.analyzeJoinExpressions(noneList);
-        rightChild.analyzeJoinExpressions(noneList);
+        leftChild.analyzeJoinExpressions(noneList, stmtScanCount);
+        rightChild.analyzeJoinExpressions(noneList, stmtScanCount);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        Collection<AbstractExpression> joinExprList = ExpressionUtil.uncombineConjunctions(getJoinExpression());
+        Collection<AbstractExpression> whereExprList = ExpressionUtil.uncombineConjunctions(getWhereExpression());
+
+        // Allocate max possible capacity -- ArrayList.grow is expensive.
+        List<AbstractExpression> joinList = new ArrayList<AbstractExpression>(
+                joinExprList.size() +
+                leftChild.m_joinInnerList.size() +
+                rightChild.m_joinInnerList.size());
+        List<AbstractExpression> whereList = new ArrayList<AbstractExpression>(
+                whereExprList.size() +
+                leftChild.m_whereInnerList.size() +
+                rightChild.m_whereInnerList.size());
 
         // Collect node's own join and where expressions
-        joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
-        whereList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
+        joinList.addAll(joinExprList);
+        whereList.addAll(whereExprList);
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
         if ( ! (leftChild instanceof BranchNode)) {
@@ -129,8 +139,8 @@ public class BranchNode extends JoinNode {
             rightChild.m_whereInnerList.clear();
         }
 
-        Collection<String> outerTables = leftChild.generateTableJoinOrder();
-        Collection<String> innerTables = rightChild.generateTableJoinOrder();
+        Collection<String> outerTables = leftChild.generateTableJoinOrder(stmtScanCount);
+        Collection<String> innerTables = rightChild.generateTableJoinOrder(stmtScanCount);
 
         // Classify join expressions into the following categories:
         // 1. The OUTER-only join conditions. If any are false for a given outer tuple,
@@ -146,8 +156,8 @@ public class BranchNode extends JoinNode {
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
         // for the currently supported two table joins but could change if number of tables > 2.
         // Constant Value Expression may fall into this category.
-        classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
-                m_joinInnerList, m_joinInnerOuterList, noneList);
+        classifyJoinExpressions(joinList, outerTables, innerTables, stmtScanCount,
+                m_joinOuterList, m_joinInnerList, m_joinInnerOuterList, noneList);
 
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
@@ -163,15 +173,15 @@ public class BranchNode extends JoinNode {
         // to preserve outer join semantic
         // 3. The two-sided expressions. Same as the inner only conditions.
         // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
-        classifyJoinExpressions(whereList, outerTables, innerTables,  m_whereOuterList,
-                m_whereInnerList, m_whereInnerOuterList, noneList);
+        classifyJoinExpressions(whereList, outerTables, innerTables, stmtScanCount,
+                m_whereOuterList, m_whereInnerList, m_whereInnerOuterList, noneList);
 
         // Apply implied transitive constant filter to where expressions
         applyTransitiveEquivalence(m_whereOuterList, m_whereInnerList, m_whereInnerOuterList);
 
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
-        pushDownExpressions(noneList);
+        pushDownExpressions(noneList, stmtScanCount);
 
         Iterator<AbstractExpression> iter = noneList.iterator();
         while (iter.hasNext()) {
@@ -203,7 +213,7 @@ public class BranchNode extends JoinNode {
      *  3. The WHERE expressions must be preserved for the FULL join type.
      * @param joinNode JoinNode
      */
-    protected void pushDownExpressions(List<AbstractExpression> noneList)
+    protected void pushDownExpressions(List<AbstractExpression> noneList, int stmtScanCount)
     {
         JoinType joinType = getJoinType();
         if (joinType == JoinType.FULL) {
@@ -211,27 +221,27 @@ public class BranchNode extends JoinNode {
         }
         JoinNode outerNode = getLeftNode();
         if (outerNode instanceof BranchNode) {
-            ((BranchNode)outerNode).pushDownExpressionsRecursively(m_whereOuterList, noneList);
+            ((BranchNode)outerNode).pushDownExpressionsRecursively(m_whereOuterList, noneList, stmtScanCount);
         }
         JoinNode innerNode = getRightNode();
         if (innerNode instanceof BranchNode && joinType == JoinType.INNER) {
-            ((BranchNode)innerNode).pushDownExpressionsRecursively(m_whereInnerList, noneList);
+            ((BranchNode)innerNode).pushDownExpressionsRecursively(m_whereInnerList, noneList, stmtScanCount);
         }
     }
 
     private void pushDownExpressionsRecursively(List<AbstractExpression> pushDownExprList,
-            List<AbstractExpression> noneList)
+            List<AbstractExpression> noneList, int stmtScanCount)
     {
         // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
         // WHERE expressions.
-        Collection<String> outerTables = getLeftNode().generateTableJoinOrder();
-        Collection<String> innerTables = getRightNode().generateTableJoinOrder();
-        classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
+        Collection<String> outerTables = getLeftNode().generateTableJoinOrder(stmtScanCount);
+        Collection<String> innerTables = getRightNode().generateTableJoinOrder(stmtScanCount);
+        classifyJoinExpressions(pushDownExprList, outerTables, innerTables, stmtScanCount,
                 m_whereOuterList, m_whereInnerList, m_whereInnerOuterList, noneList);
         // Remove them from the original list
         pushDownExprList.clear();
         // Descend to the inner child
-        pushDownExpressions(noneList);
+        pushDownExpressions(noneList, stmtScanCount);
     }
 
     @Override

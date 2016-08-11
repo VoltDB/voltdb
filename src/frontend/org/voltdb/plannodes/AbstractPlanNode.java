@@ -130,10 +130,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids
-        Collection<AbstractExpression> subqueries = findAllSubquerySubexpressions();
-        for (AbstractExpression expr : subqueries) {
-            assert(expr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+        Collection<AbstractSubqueryExpression> subqueries = findAllSubquerySubexpressions();
+        for (AbstractSubqueryExpression subquery : subqueries) {
             // overrideSubqueryNodeIds(newId) will get an NPE if the subquery
             // has not been planned, presumably the effect of hitting a bug
             // earlier in the planner. If that happens again, it MAY be useful
@@ -237,9 +235,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     protected void resolveSubqueryColumnIndexes() {
         // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
+        Collection<AbstractSubqueryExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractSubqueryExpression expr: exprs) {
+            expr.resolveColumnIndexes();
         }
     }
 
@@ -756,10 +754,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
     }
 
-    final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
-        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+    final public Collection<AbstractSubqueryExpression> findAllSubquerySubexpressions() {
+        Set<AbstractSubqueryExpression> collected = new HashSet<>();
         findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
         return collected;
+    }
+
+    protected void generateOutputSchemaForSubqueries(Database db) {
+        // Generate the output schema for subqueries
+        Collection<AbstractSubqueryExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractSubqueryExpression subqueryExpression : subqueryExpressions) {
+            subqueryExpression.generateOutputSchema(db);
+        }
     }
 
     /**
@@ -767,14 +773,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param type expression type to search for
      * @return a collection(set) of expressions that this node has
      */
-    final private Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
-        findAllExpressionsOfClass(aeClass, collected);
-        return collected;
-    }
+//    final private <T extends AbstractExpression> Collection<T> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+//        Set<T> collected = new HashSet<>();
+//        findAllExpressionsOfClass(aeClass, collected);
+//        return collected;
+//    }
 
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
-            Set<AbstractExpression> collected) {
+    protected <T extends AbstractExpression> void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!
@@ -965,7 +971,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public String toExplainPlanString() {
         StringBuilder sb = new StringBuilder();
         explainPlan_recurse(sb, "");
-        String fullExpalinString = sb.toString();
+        String fullExplainString = sb.toString();
         // Extract subqueries into a map to explain them separately. Each subquery is
         // surrounded by the 'Subquery_[SubqueryId]' tags. Example:
         // Subquery_1SEQUENTIAL SCAN of "R1"Subquery_1
@@ -973,7 +979,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", AbstractSubqueryExpression.SUBQUERY_TAG, AbstractSubqueryExpression.SUBQUERY_TAG),
                 Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<String, String>();
-        String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
+        String topStmt = extractExplainedSubquries(fullExplainString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
         for (Map.Entry<String, String> subquery : subqueries.entrySet()) {
             fullSb.append("\n").append(subquery.getKey()).append('\n').append(subquery.getValue());
@@ -1135,13 +1141,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray
 
         // load the output schema if it was marked significant.
-        if ( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ) {
-            m_outputSchema = new NodeSchema();
+        if ( !jobj.isNull(Members.OUTPUT_SCHEMA.name())) {
             m_hasSignificantOutputSchema = true;
             jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
             int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
+            m_outputSchema = new NodeSchema(size);
+            for (int i = 0; i < size; i++) {
+                m_outputSchema.addColumn(SchemaColumn.fromJSONObject(jarray.getJSONObject(i)));
             }
         }
     }

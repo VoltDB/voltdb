@@ -30,6 +30,10 @@ public class AggregateExpression extends AbstractExpression {
         super(type);
     }
 
+    public AggregateExpression(ExpressionType type, AbstractExpression childExpr) {
+        super(type, childExpr, null);
+    }
+
     public AggregateExpression() {
         //
         // This is needed for serialization
@@ -121,6 +125,24 @@ public class AggregateExpression extends AbstractExpression {
         }
         return type.symbol() + ( m_distinct ? " DISTINCT(" : "(" ) +
             m_left.explain(impliedTableName) + ")";
+    }
+
+    /**
+     * Replace avg expression with sum/count for optimization.
+     * @return
+     */
+    @Override
+    public AbstractExpression replaceAVG () {
+        if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+            AbstractExpression child = getLeft();
+            AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM, child);
+            AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT,
+                    (AbstractExpression) child.clone());
+
+            return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, left, right);
+        }
+        // Aggregates do not nest, so there is no need to recurse.
+        return this;
     }
 
 }

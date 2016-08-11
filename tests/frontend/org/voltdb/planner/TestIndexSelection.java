@@ -28,7 +28,6 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
@@ -743,7 +742,7 @@ public class TestIndexSelection extends PlannerTestCase {
         IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
         AbstractExpression pred = ipn.getPredicate();
         assertTrue(pred != null);
-        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(pred);
+        List<TupleValueExpression> tves = pred.findAllTupleValueSubexpressions();
         for (TupleValueExpression tve : tves) {
             boolean match = false;
             for (String column: columns) {
@@ -763,7 +762,7 @@ public class TestIndexSelection extends PlannerTestCase {
         IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
         AbstractExpression pred = ipn.getPredicate();
         assertTrue(pred != null);
-        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(pred);
+        List<TupleValueExpression> tves = pred.findAllTupleValueSubexpressions();
         for (TupleValueExpression tve : tves) {
             for (String column: columns) {
                 assertTrue(!tve.getColumnName().equals(column));

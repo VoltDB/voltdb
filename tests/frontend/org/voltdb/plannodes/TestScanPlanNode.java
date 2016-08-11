@@ -126,7 +126,7 @@ public class TestScanPlanNode extends TestCase
         // be the tuple address, the second one a parameter expression, next
         // will be a constant, and the other will be a more complex expression
         // that uses some TVEs.
-        NodeSchema proj_schema = new NodeSchema();
+        NodeSchema proj_schema = new NodeSchema(4);
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();
@@ -181,15 +181,12 @@ public class TestScanPlanNode extends TestCase
         dut.generateOutputSchema(m_voltdb.getDatabase());
         NodeSchema dut_schema = dut.getOutputSchema();
         System.out.println(dut_schema.toString());
-        for (int i = 0; i < cols.length; i++)
-        {
+        for (int i = 0; i < cols.length; i++) {
             SchemaColumn col = null;
-            if (i == 0)
-            {
+            if (i == 0) {
                 col = dut_schema.find("", "", cols[i], cols[i]);
             }
-            else
-            {
+            else {
                 col = dut_schema.find(TABLE1, TABLE1, cols[i], cols[i]);
             }
             assertNotNull(col);

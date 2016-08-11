@@ -66,7 +66,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void generateOutputSchema(Database db) {
         if (m_tableSchema == null) {
-            m_tableSchema = new NodeSchema();
+            m_tableSchema = new NodeSchema(m_columnList.size());
             int columnIdx = 1;
             for (AbstractExpression colExpr : m_columnList) {
                 assert(colExpr instanceof ParameterValueExpression);
@@ -75,8 +75,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
                 String columnName = "C" + Integer.toString(columnIdx);
                 TupleValueExpression tve = new TupleValueExpression(
                         m_targetTableName, m_targetTableAlias, columnName, columnName, columnIdx);
-
-                tve.setTypeSizeBytes(pve.getValueType(), pve.getValueSize(), pve.getInBytes());
+                tve.setTypeSizeAndInBytes(pve);
                 m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
                         m_targetTableAlias,
                         columnName,
@@ -96,8 +95,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+            tve.resolveColumnIndexUsingSchema(m_tableSchema);
         }
         m_outputSchema.sortByTveIndex();
     }

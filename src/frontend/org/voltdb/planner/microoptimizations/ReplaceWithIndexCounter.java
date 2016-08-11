@@ -17,11 +17,7 @@
 
 package org.voltdb.planner.microoptimizations;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.voltdb.catalog.Index;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -30,14 +26,11 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
-
     @Override
-    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
-    {
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan) {
         assert(plan != null);
 
         // depth first:
@@ -46,12 +39,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         //     Replace any qualifying AggregatePlanNode / AbstractScanPlanNode pair
         //     with an IndexCountPlanNode or TableCountPlanNode
 
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-
-        for (int i = 0; i < plan.getChildCount(); i++)
-            children.add(plan.getChild(i));
-
-        for (AbstractPlanNode child : children) {
+        for (int i = 0; i < plan.getChildCount(); i++) {
+            AbstractPlanNode child = plan.getChild(i);
             // TODO this will break when children feed multiple parents
             AbstractPlanNode newChild = recursivelyApply(child);
             // Do a graft into the (parent) plan only if a replacement for a child was found.
@@ -59,12 +48,14 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
                 continue;
             }
             boolean replaced = plan.replaceChild(child, newChild);
-            assert(true == replaced);
+            assert(replaced);
         }
 
         // check for an aggregation of the right form
-        if ((plan instanceof AggregatePlanNode) == false)
+        if ((plan instanceof AggregatePlanNode) == false) {
             return plan;
+        }
+
         assert(plan.getChildCount() == 1);
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
         // ENG-6131 fixed here.
@@ -82,24 +73,16 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
                 return plan;
             }
 
-            AbstractExpression postPredicate = aggplan.getPostPredicate();
-            if (postPredicate != null) {
-                List<AbstractExpression> aggList = postPredicate.findAllAggregateSubexpressions();
-
-                boolean allCountStar = true;
-                for (AbstractExpression expr: aggList) {
-                    if (expr.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
-                        allCountStar = false;
-                        break;
-                    }
-                }
-                if (allCountStar) {
-                    return plan;
-                }
+            if (aggplan.getPostPredicate() != null) {
+                // The table count EE executor does not handle a post-predicate
+                // (having clause), though it easily could be made to --
+                // this is probably not useful enough to optimize for.
+                return plan;
             }
 
             if (hasInlineLimit(aggplan)) {
-                // table count EE executor does not handle inline limit stuff
+                // The table count EE executor does not support an inline
+                // limit clause. This is not useful enough to optimize for.
                 return plan;
             }
 
@@ -157,15 +140,14 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         return countingPlan;
     }
 
-    public static boolean hasInlineLimit (AbstractPlanNode node) {
+    private static boolean hasInlineLimit(AbstractPlanNode node) {
         AbstractPlanNode inlineNode = node.getInlinePlanNode(PlanNodeType.LIMIT);
         if (inlineNode != null) {
             assert(inlineNode instanceof LimitPlanNode);
-
             // Table count with limit greater than 0 will not make a difference.
             // The better way is to check m_limit and return true ONLY for m_limit == 0.
-            // However, the parameterized plan make is more complicated.
-            // Be conservative about the silly query without wrong answers now.
+            // However, the parameterized plan complicates that.
+            // Be conservative about the silly query to prevent any wrong answer.
             return true;
         }
         return false;

@@ -48,7 +48,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
     String sql;
 
 
-    public void testLegancyTests()
+    public void testLegacyTests()
     {
         sql = "select a from t where a = ? and b < ?";
         checkReverseScan("COVER2_TREE", IndexLookupType.LT, 2, 1, 1, SortDirectionType.INVALID);
@@ -74,7 +74,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
 
     }
 
-    public void testLegancyTests_NonOptimizable()
+    public void testLegacyTests_NonOptimizable()
     {
         // ORDER BY ASC: do not do reverse scan optimization
         sql = "select a, b from t where a = ? and c = ? and b < ? order by b;";
@@ -479,7 +479,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
             SortDirectionType sortType, boolean needOrderby) {
 
         AbstractPlanNode pn = compile(sql);
-        System.out.println(pn.toExplainPlanString());
+        //*enable to debug*/ System.out.println(pn.toExplainPlanString());
 
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);
@@ -523,7 +523,7 @@ public class TestIndexReverseScan extends PlannerTestCase {
     private void checkForwardScan(String indexName, IndexLookupType lookupType,
             int searchKeys, int endKeys, int predicates, SortDirectionType sortType, boolean needOrderby) {
         AbstractPlanNode pn = compile(sql);
-        System.out.println(pn.toExplainPlanString());
+        //*enable to debug*/ System.out.println(pn.toExplainPlanString());
 
         assertTrue(pn instanceof SendPlanNode);
         pn = pn.getChild(0);

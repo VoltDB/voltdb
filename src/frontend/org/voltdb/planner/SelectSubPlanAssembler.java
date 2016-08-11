@@ -273,7 +273,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             // Analyze join and filter conditions
-            joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList,
+                    m_parsedStmt.m_tableList.size());
             // a query that is a little too quirky or complicated.
             if (!m_parsedStmt.m_noTableSelectionList.isEmpty()) {
                 throw new PlanningErrorException("Join with filters that do not depend on joined tables is not supported in VoltDB");
@@ -330,6 +331,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         generateAccessPaths(joinTree);
 
         List<JoinNode> nodes = joinTree.generateAllNodesJoinOrder();
+        for (JoinNode node : nodes) {
+            node.m_accessPathArray = node.m_accessPaths.toArray(new AccessPath[node.m_accessPaths.size()]);
+        }
         generateSubPlanForJoinNodeRecursively(joinTree, 0, nodes);
     }
 
@@ -391,15 +395,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         // WHERE Outer expressions must stay at the join node for the FULL joins
         // They will be added later as part of the WHERE predicate of the join node
+        List<AbstractExpression> filterExprs = null;
         if (joinType != JoinType.FULL) {
-            outerChildNode.m_accessPaths.addAll(
-                getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                        joinOuterList, parentNode.m_whereOuterList, null));
-        } else {
-            outerChildNode.m_accessPaths.addAll(
-                    getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                            joinOuterList, null, null));
+            filterExprs = parentNode.m_whereOuterList;
         }
+        outerChildNode.m_accessPaths.addAll(
+                    getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
+                            joinOuterList, filterExprs, null));
     }
 
     /**
@@ -431,19 +433,21 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
-        if (parentNode.getJoinType() != JoinType.FULL) {
-            innerChildNode.m_accessPaths.addAll(
-                    getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                            parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList, null));
-        } else {
+        List<AbstractExpression> filterExprs = null;
+        List<AbstractExpression> postExprs = null;
+        if (parentNode.getJoinType() == JoinType.FULL) {
             // For the FULL join type, the inner join expressions must stay at the join node and
             // not go down to the inner node as filters (as predicates for SeqScan nodes and/or
             // index expressions for Index Scan). The latter case (IndexScan) won't work for NLJ because
             // the inner join expression will effectively filter out inner tuple prior to the NLJ.
-            innerChildNode.m_accessPaths.addAll(
-                    getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                            parentNode.m_joinInnerOuterList, null, parentNode.m_joinInnerList));
+            postExprs = parentNode.m_joinInnerList;
         }
+        else {
+            filterExprs = parentNode.m_joinInnerList;
+        }
+        innerChildNode.m_accessPaths.addAll(
+                getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
+                        parentNode.m_joinInnerOuterList, filterExprs, postExprs));
 
         // If there are inner expressions AND inner-outer expressions, it could be that there
         // are indexed access paths that use elements of both in the indexing expressions,
@@ -481,7 +485,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 // too expensive/complicated to test here? (parentNode.m_leftNode has a replicated result?) &&
 
         if (mayNeedInnerSendReceive && ! parentNode.m_joinInnerOuterList.isEmpty()) {
-            List<AccessPath> innerOuterAccessPaths = new ArrayList<AccessPath>();
+            List<AccessPath> innerOuterAccessPaths =
+                    new ArrayList<AccessPath>(innerChildNode.m_accessPaths.size());
             for (AccessPath innerAccessPath : innerChildNode.m_accessPaths) {
                 if ((innerAccessPath.index != null) &&
                     hasInnerOuterIndexExpression(innerChildNode.getTableAlias(),
@@ -491,23 +496,25 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     innerOuterAccessPaths.add(innerAccessPath);
                 }
             }
-            Collection<AccessPath> nljAccessPaths;
-            if (parentNode.getJoinType() != JoinType.FULL) {
-                nljAccessPaths = getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                                                                null,
-                                                                parentNode.m_joinInnerList,
-                                                                parentNode.m_joinInnerOuterList);
-            } else {
+            filterExprs = null;
+            postExprs = null;
+            if (parentNode.getJoinType() == JoinType.FULL) {
                 // For FULL join type the inner join expressions must be part of the post predicate
                 // in order to stay at the join node and not be pushed down to the inner node
-                List<AbstractExpression> postExpressions = new ArrayList<>();
-                postExpressions.addAll(parentNode.m_joinInnerList);
-                postExpressions.addAll(parentNode.m_joinInnerOuterList);
-                nljAccessPaths = getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                                                                null,
-                                                                null,
-                                                                postExpressions);
+                postExprs = new ArrayList<>(parentNode.m_joinInnerList.size() +
+                        parentNode.m_joinInnerOuterList.size());
+                postExprs.addAll(parentNode.m_joinInnerList);
+                postExprs.addAll(parentNode.m_joinInnerOuterList);
             }
+            else {
+                filterExprs = parentNode.m_joinInnerList;
+                postExprs = parentNode.m_joinInnerOuterList;
+            }
+            Collection<AccessPath> nljAccessPaths =
+                    getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
+                            null,
+                            filterExprs,
+                            postExprs);
             innerChildNode.m_accessPaths.clear();
             innerChildNode.m_accessPaths.addAll(nljAccessPaths);
             innerChildNode.m_accessPaths.addAll(innerOuterAccessPaths);
@@ -523,10 +530,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param nodes The node list to iterate over.
      */
     private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode,
-                                                       int nextNode, List<JoinNode> nodes)
-    {
+                                                       int nextNode, List<JoinNode> nodes) {
         assert(nodes.size() > nextNode);
         JoinNode joinNode = nodes.get(nextNode);
+        // When an access path has been assigned to each node including the last,
+        // try to generate another plan.
         if (nodes.size() == nextNode + 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
@@ -538,7 +546,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
             return;
         }
-
+        // Otherwise, recurse, after associating one more node with each of its
+        // candidate access paths.
         for (AccessPath path : joinNode.m_accessPaths) {
             joinNode.m_currentAccessPath = path;
             generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
@@ -803,10 +812,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             List<AbstractExpression> otherExprs) {
         List<AbstractExpression> singleTVEExprs = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : exprs) {
-            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+            List<TupleValueExpression> tves = expr.findAllTupleValueSubexpressions();
             if (tves.size() == 1) {
                 singleTVEExprs.add(expr);
-            } else {
+            }
+            else {
                 otherExprs.add(expr);
             }
         }
@@ -815,8 +825,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * For a join node, determines whether any of the inner-outer expressions were used
-     * for an inner index access -- this requires joining with a NestLoopIndexJoin.
-     * These are detected as TVE references in the various clauses that drive the indexing
+     * for an inner index access -- this will limit the join to using a NestLoopIndexJoin.
+     * Check only TVE references in the various clauses that drive the indexing
      * -- as opposed to TVE references in post-filters that pose no problem with either
      * NLIJ or the more efficient (one-pass through the index) NestLoopJoin.
      *
@@ -824,7 +834,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param indexExprs - a list of expressions used in the indexing
      * @param initialExpr - a list of expressions used in the indexing
      * @param endExprs - a list of expressions used in the indexing
-     * @return true if at least one of the expression lists references a TVE.
+     * @return true if at least one of the expression lists references a non-inner TVE.
      */
     private static boolean hasInnerOuterIndexExpression(String innerTableAlias,
                                                  Collection<AbstractExpression> indexExprs,
@@ -837,9 +847,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         indexedExprs.addAll(endExprs);
         // Find an outer TVE by ignoring any TVEs based on the inner table.
         for (AbstractExpression indexed : indexedExprs) {
-            Collection<AbstractExpression> indexedTVEs = indexed.findAllTupleValueSubexpressions();
-            for (AbstractExpression indexedTVExpr : indexedTVEs) {
-                if ( ! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTableAlias)) {
+            Set<String> foundAliases = new HashSet<>();
+            indexed.findTVEAliases(foundAliases);
+            for (String foundAlias : foundAliases) {
+                if ( ! foundAlias.equals(innerTableAlias)) {
                     return true;
                 }
             }

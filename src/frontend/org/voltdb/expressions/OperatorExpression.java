@@ -36,10 +36,6 @@ import org.voltdb.utils.VoltTypeUtil;
  *   - alternative (unsupported?)
  */
 public class OperatorExpression extends AbstractExpression {
-    public OperatorExpression(ExpressionType type) {
-        super(type);
-    }
-
     public OperatorExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
     }

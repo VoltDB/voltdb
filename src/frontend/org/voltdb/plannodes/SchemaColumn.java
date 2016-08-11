@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -87,8 +86,7 @@ public class SchemaColumn
      * Clone a schema column
      */
     @Override
-    protected SchemaColumn clone()
-    {
+    protected SchemaColumn clone() {
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 m_expression, m_differentiator);
     }
@@ -117,7 +115,7 @@ public class SchemaColumn
             return false;
         }
 
-        return getDifferentiator() == sc.getDifferentiator();
+        return m_differentiator == sc.m_differentiator;
     }
 
     private int nullSafeStringCompareTo(String str1, String str2) {
@@ -197,16 +195,13 @@ public class SchemaColumn
     public SchemaColumn copyAndReplaceWithTVE()
     {
         TupleValueExpression new_exp = null;
-        if (m_expression instanceof TupleValueExpression)
-        {
+        if (m_expression instanceof TupleValueExpression) {
             new_exp = (TupleValueExpression) m_expression.clone();
         }
-        else
-        {
+        else {
             new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setTypeSizeBytes(m_expression.getValueType(), m_expression.getValueSize(),
-                    m_expression.getInBytes());
+            new_exp.setTypeSizeAndInBytes(m_expression);
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp, m_differentiator);
@@ -252,16 +247,6 @@ public class SchemaColumn
         return m_expression;
     }
 
-    public VoltType getType()
-    {
-        return m_expression.getValueType();
-    }
-
-    public int getSize()
-    {
-        return m_expression.getValueSize();
-    }
-
     /**
      * Return the differentiator that can distinguish columns with the same name.
      * This value is just the ordinal position of the SchemaColumn within its NodeSchema.
@@ -288,9 +273,7 @@ public class SchemaColumn
         sb.append("\tTable Alias: ").append(m_tableAlias).append("\n");
         sb.append("\tColumn Name: ").append(m_columnName).append("\n");
         sb.append("\tColumn Alias: ").append(m_columnAlias).append("\n");
-        sb.append("\tColumn Type: ").append(getType()).append("\n");
-        sb.append("\tColumn Size: ").append(getSize()).append("\n");
-        sb.append("\tDifferentiator: ").append(getDifferentiator()).append("\n");
+        sb.append("\tDifferentiator: ").append(m_differentiator).append("\n");
         sb.append("\tExpression: ").append(m_expression.toString()).append("\n");
         return sb.toString();
     }
@@ -304,8 +287,7 @@ public class SchemaColumn
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
         if (finalOutput) {
-            if (getColumnAlias() != null && !getColumnAlias().equals(""))
-            {
+            if (getColumnAlias() != null && !getColumnAlias().equals("")) {
                 stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
             }
             else if (getColumnName() != null) {

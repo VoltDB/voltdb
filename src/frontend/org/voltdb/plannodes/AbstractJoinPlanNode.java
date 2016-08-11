@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -27,7 +26,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
@@ -162,10 +160,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression expr : subqueryExpressions) {
-            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
-        }
+        generateOutputSchemaForSubqueries(db);
 
         // Join the schema together to form the output schema
         m_outputSchemaPreInlineAgg =
@@ -222,18 +217,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index;
             if (i < outer_schema.size()) {
-                index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+                index = tve.resolveColumnIndexUsingSchema(outer_schema);
             }
             else {
-                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
+                index = tve.resolveColumnIndexUsingSchema(inner_schema);
             }
-
             if (index == -1) {
                 throw new RuntimeException("Unable to find index for column: " +
                                                col.toString());
             }
-
-            tve.setColumnIndex(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],
@@ -325,16 +317,17 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_joinPredicate = AbstractExpression.fromJSONChild(jobj, Members.JOIN_PREDICATE.name());
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
 
-        if ( !jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name() ) ) {
-            m_outputSchemaPreInlineAgg = new NodeSchema();
-            m_hasSignificantOutputSchema = true;
-            JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
-            }
-        } else {
+        if (jobj.isNull(Members.OUTPUT_SCHEMA_PRE_AGG.name())) {
             m_outputSchemaPreInlineAgg = m_outputSchema;
+            return;
+        }
+
+        JSONArray jarray = jobj.getJSONArray(Members.OUTPUT_SCHEMA_PRE_AGG.name());
+        int size = jarray.length();
+        m_outputSchemaPreInlineAgg = new NodeSchema(size);
+        m_hasSignificantOutputSchema = true;
+        for (int i = 0; i < size; i++) {
+            m_outputSchemaPreInlineAgg.addColumn(SchemaColumn.fromJSONObject(jarray.getJSONObject(i)));
         }
     }
 
@@ -346,29 +339,29 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      * @param inner_schema
      */
     protected static void resolvePredicate(AbstractExpression expression,
-            NodeSchema outer_schema, NodeSchema inner_schema)
-    {
+            NodeSchema outer_schema, NodeSchema inner_schema) {
+        if (expression == null) {
+            return;
+        }
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(expression);
+                expression.findAllTupleValueSubexpressions();
         for (TupleValueExpression tve : predicate_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+            int index = tve.resolveColumnIndexUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1) {
-                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
+                index = tve.resolveColumnIndexUsingSchema(inner_schema);
                 if (index == -1) {
                     throw new RuntimeException("Unable to resolve column index for join TVE: " +
                                                tve.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
-            tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
         }
     }
 
     protected static void resolvePredicate(List<AbstractExpression> expressions,
-            NodeSchema outer_schema, NodeSchema inner_schema)
-    {
+            NodeSchema outer_schema, NodeSchema inner_schema) {
         for (AbstractExpression expr : expressions) {
             resolvePredicate(expr, outer_schema, inner_schema);
         }
@@ -388,7 +381,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_preJoinPredicate != null) {
             collected.addAll(m_preJoinPredicate.findAllSubexpressionsOfClass(aeClass));
@@ -410,9 +405,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     protected long discountEstimatedProcessedTupleCount(AbstractPlanNode childNode) {
         // Discount estimated processed tuple count for the outer child based on the number of
         // filter expressions this child has with a rapidly diminishing effect
-        // that ranges from a discount of 0.09 (ORETATION_EQAUL)
+        // that ranges from a discount of 0.09 (COMPARE_EQUAL)
         // or 0.045 (all other expression types) for one post filter to a max discount approaching
-        // 0.888... (=8/9) for many EQUALITY filters.
+        // 0.888... (=8/9) for many COMPARE_EQUAL filters.
         // The discount value is less than the partial index discount (0.1) to make sure
         // the index wins
         AbstractExpression predicate = null;

@@ -616,7 +616,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             fail("Query was expected to generate stack overflow error");
         }
         catch (Exception exception) {
-            System.out.println(exception.getMessage());
+            //* enable to debug */ System.out.println(exception.getMessage());
             String expectedMsg;
             expectedMsg = "Encountered stack overflow error. " +
                           "Try reducing the number of predicate expressions in the query.";

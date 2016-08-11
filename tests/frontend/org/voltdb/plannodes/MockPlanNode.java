@@ -34,8 +34,7 @@ public class MockPlanNode extends AbstractPlanNode
     String[] m_columnNames;
     boolean m_isOrderDeterministic = false;
 
-    MockPlanNode(String tableName, String[] columnNames)
-    {
+    MockPlanNode(String tableName, String[] columnNames) {
         super();
         m_nondeterminismDetail = "no ordering was asserted for Mock Plan Node";
         m_tableName = tableName;
@@ -43,12 +42,10 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
-        m_outputSchema = new NodeSchema();
+    public void generateOutputSchema(Database db) {
+        m_outputSchema = new NodeSchema(m_columnNames.length);
         m_hasSignificantOutputSchema = true;
-        for (int i = 0; i < m_columnNames.length; ++i)
-        {
+        for (int i = 0; i < m_columnNames.length; ++i) {
             TupleValueExpression tve = new TupleValueExpression(m_tableName,
                                                                 m_tableName,
                                                                 m_columnNames[i],
@@ -63,21 +60,13 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     @Override
-    public PlanNodeType getPlanNodeType()
-    {
-        return null;
-    }
+    public PlanNodeType getPlanNodeType() { return null; }
 
     @Override
-    public void resolveColumnIndexes()
-    {
-
-    }
+    public void resolveColumnIndexes() { }
 
     @Override
-    protected String explainPlanForNode(String indent) {
-        return "MOCK";
-    }
+    protected String explainPlanForNode(String indent) { return "MOCK"; }
 
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect

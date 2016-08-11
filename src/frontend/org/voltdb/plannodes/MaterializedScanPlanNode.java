@@ -65,8 +65,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
 
-        m_outputExpression.setTypeSizeBytes(m_tableData.getValueType(), m_tableData.getValueSize(),
-                m_tableData.getInBytes());
+        m_outputExpression.setTypeSizeAndInBytes(m_tableData);
     }
 
     public void setSortDirection(SortDirectionType direction) {
@@ -112,7 +111,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
         // fill in the table schema if we haven't already
         if (m_outputSchema == null) {
-            m_outputSchema = new NodeSchema();
+            m_outputSchema = new NodeSchema(1);
             // must produce a tuple value expression for the one column.
             m_outputSchema.addColumn(
                 new SchemaColumn(m_outputExpression.getTableName(),
@@ -157,7 +156,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         collected.addAll(m_tableData.findAllSubexpressionsOfClass(aeClass));
     }

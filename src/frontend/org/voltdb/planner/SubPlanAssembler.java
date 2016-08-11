@@ -32,6 +32,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractExpression.SubexprFinderPredicate;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -193,14 +194,7 @@ public abstract class SubPlanAssembler {
      * @return Naive access path
      */
     protected static AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
-        AccessPath naivePath = new AccessPath();
-
-        if (filterExprs != null) {
-            naivePath.otherExprs.addAll(filterExprs);
-        }
-        if (joinExprs != null) {
-            naivePath.joinExprs.addAll(joinExprs);
-        }
+        AccessPath naivePath = new AccessPath(filterExprs, joinExprs);
         return naivePath;
     }
 
@@ -456,7 +450,7 @@ public abstract class SubPlanAssembler {
                         // were based on constants and/or parameters.
                         for (AbstractExpression eq_comparator : retval.indexExprs) {
                             AbstractExpression otherExpr = eq_comparator.getRight();
-                            if (otherExpr.hasTupleValueSubexpression()) {
+                            if (otherExpr.hasTVE()) {
                                 // Can't index this IN LIST filter without some kind of three-way NLIJ,
                                 // so, add it to the post-filters.
                                 AbstractExpression in_list_comparator = inListExpr.getOriginalFilter();
@@ -705,11 +699,12 @@ public abstract class SubPlanAssembler {
                 // TODO: Implement an abstract isNullable() method on AbstractExpression and use
                 // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
                 if (startingBoundExpr == null) {
-                    AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
-                            new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
-                    newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
-                    newComparator.finalizeValueTypes();
-                    retval.otherExprs.add(newComparator);
+                    AbstractExpression newIsNull = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL,
+                            upperBoundComparator.getLeft(), null);
+                    AbstractExpression newNotNull = new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                            newIsNull, null);
+                    newNotNull.finalizeValueTypes();
+                    retval.otherExprs.add(newNotNull);
                 } else {
                     int lastIdx = retval.indexExprs.size() -1;
                     retval.indexExprs.remove(lastIdx);
@@ -1202,9 +1197,9 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasTupleValueSubexpression()) {
+                        if (otherExpr.hasTVE()) {
                             // This filter can not be used with the index, possibly due to interactions
-                            // wih IN LIST processing that would require a three-way NLIJ.
+                            // with IN LIST processing that would require a three-way NLIJ.
                             binding = null;
                             continue;
                         }
@@ -1248,7 +1243,7 @@ public abstract class SubPlanAssembler {
                         }
                     }
                     if (targetComparator == ExpressionType.COMPARE_IN) {
-                        if (otherExpr.hasTupleValueSubexpression()) {
+                        if (otherExpr.hasTVE()) {
                             // This is a fancy edge case where the expression could only be indexed
                             // if it:
                             // A) does not reference the indexed table and
@@ -1301,7 +1296,7 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasTupleValueSubexpression()) {
+                        if (otherExpr.hasTVE()) {
                             // This filter can not be used with the index, probably due to interactions
                             // with IN LIST processing of another key component that would require a
                             // three-way NLIJ to be injected.
@@ -1361,8 +1356,8 @@ public abstract class SubPlanAssembler {
         // Collect all TVEs from NULL-rejecting covering expressions
         Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
         for (AbstractExpression coveringExpr : coveringExprs) {
-            if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
-                coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
+            if (coveringExpr.isNullRejectingExpression(tableScan.getTableAlias())) {
+                coveringTves.addAll(coveringExpr.findAllTupleValueSubexpressions());
             }
         }
         // For each NOT NULL expression to cover extract the TVE expressions. If all of them are also part
@@ -1374,7 +1369,7 @@ public abstract class SubPlanAssembler {
                 assert(filter.getLeft() != null);
                 if (ExpressionType.OPERATOR_IS_NULL == filter.getLeft().getExpressionType()) {
                     assert(filter.getLeft().getLeft() != null);
-                    List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(filter.getLeft().getLeft());
+                    List<TupleValueExpression> tves = filter.getLeft().getLeft().findAllTupleValueSubexpressions();
                     if (coveringTves.containsAll(tves)) {
                         iter.remove();
                     }
@@ -1385,12 +1380,15 @@ public abstract class SubPlanAssembler {
     }
 
     private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
-                return true;
+        String tableAlias = tableScan.getTableAlias();
+        SubexprFinderPredicate withAlias = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                TupleValueExpression tve = (TupleValueExpression)expr;
+                return tableAlias.equals(tve.getTableAlias());
             }
-        }
-        return false;
+        };
+        return expr.hasAnyMatchingSubexpressionOfClass(TupleValueExpression.class, withAlias);
     }
 
     private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(StmtTableScan tableScan,

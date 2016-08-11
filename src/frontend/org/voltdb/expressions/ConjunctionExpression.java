@@ -21,19 +21,20 @@ import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
 public class ConjunctionExpression extends AbstractExpression {
-    public ConjunctionExpression(ExpressionType type) {
-        super(type);
-        setValueType(VoltType.BOOLEAN);
-    }
     public ConjunctionExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
+        assert(left != null);
+        assert(right != null);
         setValueType(VoltType.BOOLEAN);
+        setValueSize(m_valueType.getLengthInBytesForFixedTypes());
     }
     public ConjunctionExpression() {
         //
         // This is needed for serialization
         //
         super();
+        setValueType(VoltType.BOOLEAN);
+        setValueSize(m_valueType.getLengthInBytesForFixedTypes());
     }
 
     @Override
@@ -45,17 +46,8 @@ public class ConjunctionExpression extends AbstractExpression {
     public void finalizeValueTypes()
     {
         finalizeChildValueTypes();
-        //
-        // IMPORTANT:
-        // We are not handling the case where one of types is NULL. That is because we
-        // are only dealing with what the *output* type should be, not what the actual
-        // value is at execution time. There will need to be special handling code
-        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
-        // Therefore, it is safe to assume that the output is always going to be an
-        // integer (for booleans)
-        //
-        m_valueType = VoltType.BOOLEAN;
-        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        assert(m_valueType == VoltType.BOOLEAN);
+        assert(m_valueSize == m_valueType.getLengthInBytesForFixedTypes());
     }
 
     @Override

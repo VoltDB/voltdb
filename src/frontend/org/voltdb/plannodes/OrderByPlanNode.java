@@ -29,7 +29,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -120,8 +119,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            tve.resolveColumnIndexUsingSchema(input_schema);
         }
         m_outputSchema.sortByTveIndex();
 
@@ -129,19 +127,12 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     public void resolveSortIndexesUsingSchema(NodeSchema input_schema) {
-
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
-        for (AbstractExpression sort_exps : m_sortExpressions)
-        {
-            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
-        }
-        for (TupleValueExpression tve : sort_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+        for (AbstractExpression sortExp : m_sortExpressions) {
+            for (TupleValueExpression tve : sortExp.findAllTupleValueSubexpressions()) {
+                tve.resolveColumnIndexUsingSchema(input_schema);
+            }
         }
     }
 
@@ -186,7 +177,8 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         for (AbstractExpression ae : m_sortExpressions) {
             collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));

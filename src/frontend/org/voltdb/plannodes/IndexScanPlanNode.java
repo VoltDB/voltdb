@@ -43,6 +43,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -129,7 +130,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super(srcNode.m_targetTableName, srcNode.m_targetTableAlias);
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
-        m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        m_tableScanSchema = srcNode.m_tableScanSchema;
         m_differentiatorMap = new HashMap<>(srcNode.m_differentiatorMap);
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
@@ -188,7 +189,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(tableScan.getTableName(), tableScan.getTableAlias(),
                         col.getTypeName(), col.getTypeName());
-                tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
+                tve.setTypeSizeAndInBytes(col);
 
                 indexedExprs.add(tve);
             }
@@ -215,9 +216,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 e.printStackTrace();
                 assert(false);
             }
-            if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
+            if (indexPredicate.isNullRejectingExpression(tableScan.getTableAlias())) {
                 notNullTves = new HashSet<TupleValueExpression>();
-                notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
+                notNullTves.addAll(indexPredicate.findAllTupleValueSubexpressions());
             }
         }
 
@@ -515,27 +516,26 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
 
     @Override
-    public void resolveColumnIndexes()
-    {
-        // IndexScanPlanNode has TVEs that need index resolution in:
-        // m_searchkeyExpressions
-        // m_endExpression
-
-        // Collect all the TVEs in the end expression and search key expressions
+    public void resolveColumnIndexes() {
+        // Collect all the TVEs in the expression members and
+        // the expression list members.
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
-        for (AbstractExpression search_exp : m_searchkeyExpressions)
-        {
-            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
+        if (m_endExpression != null) {
+            index_tves.addAll(m_endExpression.findAllTupleValueSubexpressions());
+        }
+        if (m_initialExpression != null) {
+            index_tves.addAll(m_initialExpression.findAllTupleValueSubexpressions());
+        }
+        if (m_skip_null_predicate != null) {
+            index_tves.addAll(m_skip_null_predicate.findAllTupleValueSubexpressions());
+        }
+        for (AbstractExpression search_exp : m_searchkeyExpressions) {
+            index_tves.addAll(search_exp.findAllTupleValueSubexpressions());
         }
         // and update their indexes against the table schema
-        for (TupleValueExpression tve : index_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+        for (TupleValueExpression tve : index_tves) {
+            tve.resolveColumnIndexUsingSchema(m_tableSchema);
         }
         // now do the common scan node work
         super.resolveColumnIndexes();
@@ -763,7 +763,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // When there is no start key, count a range scan key for each ANDed end condition.
         if (keySize == 0 && m_endExpression != null) {
-            keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
+            keySize = ExpressionUtil.uncombineConjunctions(m_endExpression).size();
         }
 
         String usageInfo;
@@ -949,7 +949,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
             // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
             // bound plans in the cache
-            List<AbstractExpression> pves = expr.findAllParameterSubexpressions();
+            List<ParameterValueExpression> pves = expr.findAllParameterSubexpressions();
             m_bindings.addAll(pves);
         }
     }
@@ -982,7 +982,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_endExpression != null) {
             collected.addAll(m_endExpression.findAllSubexpressionsOfClass(aeClass));

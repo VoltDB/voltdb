@@ -40,7 +40,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
@@ -287,7 +286,8 @@ public class PlanAssembler {
             // Simplify the outer join if possible
             if (m_parsedSelect.m_joinTree instanceof BranchNode) {
                 if (! m_parsedSelect.hasJoinOrder()) {
-                    simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
+                    simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree,
+                            m_parsedSelect.m_tableList.size());
                 }
 
                 // Convert RIGHT joins to the LEFT ones
@@ -451,7 +451,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
+        Set<SelectSubqueryExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
                 m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
@@ -465,9 +465,7 @@ public class PlanAssembler {
                 // planner can reliably identify all cases of adequate and
                 // inadequate partition key join criteria across different
                 // levels of correlated subqueries.
-                for (AbstractExpression e: subqueryExprs) {
-                    assert(e instanceof SelectSubqueryExpression);
-                    SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
+                for (SelectSubqueryExpression subExpr: subqueryExprs) {
                     if (! subExpr.getSubqueryScan().getIsReplicated()) {
                         m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                         return null;
@@ -597,15 +595,10 @@ public class PlanAssembler {
      * @param subqueryExprs - list of subquery expressions
      * @return true if a best plan was generated for each subquery, false otherwise
      */
-    private boolean getBestCostPlanForExpressionSubQueries(Set<AbstractExpression> subqueryExprs) {
+    private boolean getBestCostPlanForExpressionSubQueries(Set<SelectSubqueryExpression> subqueryExprs) {
         int nextPlanId = m_planSelector.m_planId;
 
-        for (AbstractExpression expr : subqueryExprs) {
-            assert(expr instanceof SelectSubqueryExpression);
-            if (!(expr instanceof SelectSubqueryExpression)) {
-                continue; // DEAD CODE?
-            }
-            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
+        for (SelectSubqueryExpression subqueryExpr : subqueryExprs) {
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
@@ -1225,7 +1218,11 @@ public class PlanAssembler {
 
             ProjectionPlanNode projectionNode = new ProjectionPlanNode();
             AbstractExpression addressExpr = new TupleAddressExpression();
-            NodeSchema proj_schema = new NodeSchema();
+
+            NodeSchema proj_schema = new NodeSchema(
+                    needsOrderByNode ?
+                    m_parsedDelete.orderByColumns().size() + 1 :
+                    1);
             // This planner-created column is magic.
             proj_schema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
                                                    AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -1308,7 +1305,7 @@ public class PlanAssembler {
 
         ProjectionPlanNode projectionNode = new ProjectionPlanNode();
         TupleAddressExpression tae = new TupleAddressExpression();
-        NodeSchema proj_schema = new NodeSchema();
+        NodeSchema proj_schema = new NodeSchema(1 + m_parsedUpdate.columns.size());
         // This planner-generated column is magic.
         proj_schema.addColumn(new SchemaColumn(AbstractParsedStmt.TEMP_TABLE_NAME,
                                                AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -1523,12 +1520,13 @@ public class PlanAssembler {
             }
         }
 
+        int nColumns = m_parsedInsert.m_columns.size();
         NodeSchema matSchema = null;
         if (subquery == null) {
-            matSchema = new NodeSchema();
+            matSchema = new NodeSchema(nColumns);
         }
 
-        int[] fieldMap = new int[m_parsedInsert.m_columns.size()];
+        int[] fieldMap = new int[nColumns];
         int i = 0;
 
         // The insert statement's set of columns are contained in a LinkedHashMap,
@@ -1647,7 +1645,7 @@ public class PlanAssembler {
                     0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            NodeSchema count_schema = new NodeSchema();
+            NodeSchema count_schema = new NodeSchema(1);
             SchemaColumn col = new SchemaColumn(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -1687,7 +1685,7 @@ public class PlanAssembler {
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
         List<TupleValueExpression> allTves =  new ArrayList<>();
         for (SchemaColumn col : proj_schema.getColumns()) {
-            allTves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            allTves.addAll(col.getExpression().findAllTupleValueSubexpressions());
         }
 
         // Adjust the differentiator fields of TVEs, since they need to reflect
@@ -2220,8 +2218,9 @@ public class PlanAssembler {
             }
 
             int outputColumnIndex = 0;
-            NodeSchema agg_schema = new NodeSchema();
-            NodeSchema top_agg_schema = new NodeSchema();
+            int nAggs = m_parsedSelect.m_aggResultColumns.size();
+            NodeSchema agg_schema = new NodeSchema(nAggs);
+            NodeSchema top_agg_schema = new NodeSchema(nAggs);
 
             for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
@@ -2246,8 +2245,7 @@ public class PlanAssembler {
                             "",
                             col.alias,
                             outputColumnIndex);
-                    tve.setTypeSizeBytes(rootExpr.getValueType(), rootExpr.getValueSize(),
-                            rootExpr.getInBytes());
+                    tve.setTypeSizeAndInBytes(rootExpr);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
@@ -2328,11 +2326,10 @@ public class PlanAssembler {
                         }
                     } // end if we have a top agg node
                 }
-                else
-                {
+                else {
                     // All complex aggregations have been simplified, cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
                     // has already been broken down.
-                    assert(rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class) == false);
+                    assert(rootExpr.hasAggregateSubexpression() == false);
 
                     /*
                      * These columns are the pass through columns that are not being
@@ -2340,14 +2337,13 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
-                    AbstractExpression topExpr = null;
-                    if (col.groupBy) {
-                        topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
-                    } else {
-                        topExpr = col.expression;
-                    }
-                    top_schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, topExpr);
+                    schema_col = new SchemaColumn(col.tableName, col.tableAlias,
+                            col.columnName, col.alias, col.expression);
+                    AbstractExpression topExpr = col.groupBy ?
+                            m_parsedSelect.m_groupByExpressions.get(col.alias) :
+                            col.expression;
+                    top_schema_col = new SchemaColumn(col.tableName, col.tableAlias,
+                            col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);
@@ -2740,16 +2736,11 @@ public class PlanAssembler {
 
     private static boolean isOrderByAggregationValue(List<ParsedColInfo> orderBys) {
         for (ParsedColInfo col : orderBys) {
-            AbstractExpression rootExpr = col.expression;
             // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-            Collection<AbstractExpression> tves = rootExpr.findAllTupleValueSubexpressions();
-            for (AbstractExpression tve: tves) {
-                if  (((TupleValueExpression) tve).hasAggregate()) {
-                    return true;
-                }
+            if (col.expression.hasAggregateProxyTVE()) {
+                return true;
             }
         }
-
         return false;
     }
 
@@ -2895,8 +2886,10 @@ public class PlanAssembler {
      *          If expr rejects nulls introduced by n2 outer table, then
      *              - convert RIGHT OUTER n2 to an INNER join.
      *              - convert FULL OUTER n2 to LEFT OUTER join
+     * @param joinTree
+     * @param stmtScanCount
      */
-    private static void simplifyOuterJoin(BranchNode joinTree) {
+    private static void simplifyOuterJoin(BranchNode joinTree, int stmtScanCount) {
         assert(joinTree != null);
         List<AbstractExpression> exprs = new ArrayList<>();
         JoinNode leftNode = joinTree.getLeftNode();
@@ -2908,34 +2901,35 @@ public class PlanAssembler {
         if (rightNode.getWhereExpression() != null) {
             exprs.add(rightNode.getWhereExpression());
         }
-        simplifyOuterJoinRecursively(joinTree, exprs);
+        simplifyOuterJoinRecursively(joinTree, exprs, stmtScanCount);
     }
 
-    private static void simplifyOuterJoinRecursively(BranchNode joinNode, List<AbstractExpression> exprs) {
+    private static void simplifyOuterJoinRecursively(BranchNode joinNode,
+            List<AbstractExpression> exprs, int stmtScanCount) {
         assert (joinNode != null);
         JoinNode leftNode = joinNode.getLeftNode();
         JoinNode rightNode = joinNode.getRightNode();
         if (joinNode.getJoinType() == JoinType.LEFT) {
             // Get all the inner tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
-            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+            if (isNullRejecting(rightNode.generateTableJoinOrder(stmtScanCount), exprs)) {
                 joinNode.setJoinType(JoinType.INNER);
             }
         } else if (joinNode.getJoinType() == JoinType.RIGHT) {
             // Get all the outer tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
-            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+            if (isNullRejecting(leftNode.generateTableJoinOrder(stmtScanCount), exprs)) {
                 joinNode.setJoinType(JoinType.INNER);
             }
         } else if (joinNode.getJoinType() == JoinType.FULL) {
             // Get all the outer tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
-            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+            if (isNullRejecting(leftNode.generateTableJoinOrder(stmtScanCount), exprs)) {
                 joinNode.setJoinType(JoinType.LEFT);
             }
             // Get all the inner tables underneath this node and
             // see if the expression is NULL-rejecting for any of them
-            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+            if (isNullRejecting(rightNode.generateTableJoinOrder(stmtScanCount), exprs)) {
                 if (JoinType.FULL == joinNode.getJoinType()) {
                     joinNode.setJoinType(JoinType.RIGHT);
                 } else {
@@ -2989,10 +2983,10 @@ public class PlanAssembler {
                 assert(false);
         }
         if (leftNode instanceof BranchNode) {
-            simplifyOuterJoinRecursively((BranchNode)leftNode, leftNodeExprs);
+            simplifyOuterJoinRecursively((BranchNode)leftNode, leftNodeExprs, stmtScanCount);
         }
         if (rightNode instanceof BranchNode) {
-            simplifyOuterJoinRecursively((BranchNode)rightNode, rightNodeExprs);
+            simplifyOuterJoinRecursively((BranchNode)rightNode, rightNodeExprs, stmtScanCount);
         }
     }
 
@@ -3005,7 +2999,7 @@ public class PlanAssembler {
     private static boolean isNullRejecting(Collection<String> tableAliases, List<AbstractExpression> exprs) {
         for (AbstractExpression expr : exprs) {
             for (String tableAlias : tableAliases) {
-                if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                if (expr.isNullRejectingExpression(tableAlias)) {
                     // We are done at this level
                     return true;
                 }

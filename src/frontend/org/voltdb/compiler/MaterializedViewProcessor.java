@@ -884,7 +884,7 @@ public class MaterializedViewProcessor {
                     if (!encodedPredicate.isEmpty()) {
                         String predicate = Encoder.hexDecodeToString(encodedPredicate);
                         AbstractExpression matViewPredicate = AbstractExpression.fromJSONString(predicate, tableScan);
-                        coveringExprs.addAll(ExpressionUtil.uncombineAny(matViewPredicate));
+                        coveringExprs.addAll(ExpressionUtil.uncombineConjunctions(matViewPredicate));
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();

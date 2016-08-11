@@ -104,7 +104,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = isp.m_tableSchema;
-        m_tableScanSchema = isp.m_tableScanSchema.clone();
 
         m_targetIndexName = isp.m_targetIndexName;
 
@@ -490,7 +489,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    public <T extends AbstractExpression> void findAllExpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            Set<T> collected) {
         super.findAllExpressionsOfClass(aeClass, collected);
         if (m_skip_null_predicate != null) {
             collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));

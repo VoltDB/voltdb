@@ -41,11 +41,13 @@ public class ComparisonExpression extends AbstractExpression {
     public ComparisonExpression(ExpressionType type) {
         super(type);
         setValueType(VoltType.BOOLEAN);
+        setValueSize(m_valueType.getLengthInBytesForFixedTypes());
     }
 
     public ComparisonExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
         setValueType(VoltType.BOOLEAN);
+        setValueSize(m_valueType.getLengthInBytesForFixedTypes());
     }
 
     public ComparisonExpression() {
@@ -53,6 +55,8 @@ public class ComparisonExpression extends AbstractExpression {
         // This is needed for serialization
         //
         super();
+        setValueType(VoltType.BOOLEAN);
+        setValueSize(m_valueType.getLengthInBytesForFixedTypes());
     }
 
     public void setQuantifier(QuantifierType quantifier) {
@@ -84,7 +88,6 @@ public class ComparisonExpression extends AbstractExpression {
     @Override
     public Object clone() {
         ComparisonExpression clone = (ComparisonExpression) super.clone();
-        clone.m_quantifier = m_quantifier;
         return clone;
     }
 
@@ -104,6 +107,33 @@ public class ComparisonExpression extends AbstractExpression {
         if (m_quantifier != QuantifierType.NONE) {
             stringer.key(Members.QUANTIFIER.name()).value(m_quantifier.getValue());
         }
+    }
+
+    /**
+     * Does this expression meet the criteria for a column equivalence filter,
+     * as used in determining statement partitioning and allowable
+     * multi-partition joins.
+     * @return true if this is an equality between two TVEs or between a TVE and
+     * a runtime constant.
+     **/
+    @Override
+    public boolean isColumnEquivalenceFilter() {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return false;
+        }
+        AbstractExpression leftExpr = getLeft();
+        // Can't use an expression that is based on a column value but is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) &&
+                leftExpr.hasTVE()) {
+            return false;
+        }
+        AbstractExpression rightExpr = getRight();
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
+                rightExpr.hasTVE()) {
+            return false;
+        }
+        return true;
     }
 
     public static final Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
@@ -137,8 +167,8 @@ public class ComparisonExpression extends AbstractExpression {
         // Therefore, it is safe to assume that the output is always going to be an
         // integer (for booleans)
         //
-        m_valueType = VoltType.BOOLEAN;
-        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        assert(m_valueType == VoltType.BOOLEAN);
+        assert(m_valueSize == m_valueType.getLengthInBytesForFixedTypes());
     }
 
     /**
