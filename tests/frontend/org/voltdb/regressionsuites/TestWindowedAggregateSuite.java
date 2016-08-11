@@ -481,6 +481,28 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+    /*
+     * This test just makes sure that we can execute the @Explain
+     * sysproc on a windowed aggregate.  At one time this failed due to
+     * an NPE.  When deserializing a JSON string the resulting plan is not
+     * the same as the original plan.  We don't serialize sort orders
+     * for windowed aggregates.
+     */
+    public void testExplainPlan() throws Exception {
+        Client client = getClient();
+        String sql = "select rank() over ( partition by A, B order by C ) from T;";
+
+        ClientResponse cr;
+        try {
+            cr = client.callProcedure("@Explain", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            VoltTable vt = cr.getResults()[0];
+            assertTrue(true);
+        } catch (Exception ex) {
+            assertTrue("Exception on @Explain of windowed expression", false);
+        }
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
