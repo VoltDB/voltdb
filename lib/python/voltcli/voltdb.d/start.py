@@ -36,7 +36,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster', default=1),
         VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None),
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
-        VOLT.BooleanOption('-A', '--add', 'enableadd', 'allow cluster expansion', default = False),
+        VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
     ),
     description = 'Starts a database, which has been initialized.'
 )
