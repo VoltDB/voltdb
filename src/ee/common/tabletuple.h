@@ -773,7 +773,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                                                 std::vector<char*> &oldObjects, std::vector<char*> &newObjects)
 {
     assert(m_schema);
-    assert(m_schema == source.m_schema);
+    assert(m_schema->equals(source.m_schema));
     const int columnCount = m_schema->columnCount();
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
     /*
