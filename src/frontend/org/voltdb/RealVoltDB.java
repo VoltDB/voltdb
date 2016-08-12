@@ -1556,7 +1556,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         else if (!startAction.doesRejoin()) {
             int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
-            int hostcount = m_catalogContext.getDeployment().getCluster().getHostcount();
+            int hostcount = m_clusterSettings.get().hostcount();
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
             ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
             if (!clusterConfig.validate()) {
@@ -2110,7 +2110,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             deploymentBytes,
                             0);
 
-            return deployment.getCluster().getHostcount();
+            return m_clusterSettings.get().hostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

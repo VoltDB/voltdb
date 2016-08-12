@@ -423,7 +423,7 @@ public class Inits {
             if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
-                                               m_deployment.getCluster().getHostcount(),
+                                               m_rvdb.m_clusterSettings.get().hostcount(),
                                                m_rvdb.getReplicationRole()))
                 {
                     // validateLicense logs. Exit call is here for testability.
