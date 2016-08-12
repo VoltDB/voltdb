@@ -160,7 +160,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     }
 
     public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
@@ -190,7 +189,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     // NON-UNIQUE RANK SCAN TEST
     //
     public void testRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
