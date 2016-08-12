@@ -499,7 +499,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             VoltTable vt = cr.getResults()[0];
             assertTrue(true);
         } catch (Exception ex) {
-            assertTrue("Exception on @Explain of windowed expression", false);
+            fail("Exception on @Explain of windowed expression");
         }
     }
 
