@@ -35,7 +35,6 @@ import java.util.Calendar;
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 class DbMonitorTest extends TestBase {
-
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         int count = 0
@@ -248,7 +247,6 @@ class DbMonitorTest extends TestBase {
         waitFor(30) { header.banner.isDisplayed() }
     }
 
-
     def "header image exists" () {
         when:
         at DbMonitorPage
@@ -374,7 +372,6 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
     def "header username click and close" () {
         when:
         at DbMonitorPage
@@ -403,8 +400,7 @@ class DbMonitorTest extends TestBase {
         header.logoutPopupCancelButton.click()
     }
 
-
-   // LOGOUT TEST
+    // LOGOUT TEST
 
     def "logout button test close" ()  {
         when: 'click the Admin link (if needed)'
@@ -516,32 +512,40 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
-
-    def "Add a table in Tables and check it"() {
-
+    def addTableAndCheck() {
         String createQuery = page.getQueryToCreateTable()
-        String deleteQuery = page.getQueryToDeleteTable()
+        String deleteQuery = page.getQueryToDeleteTableOnly()
         String tablename = page.getTablename()
+        String deleteQuery1 = page.getQueryToDeleteTableAndView()
+        when:
+        println(createQuery)
+        println(deleteQuery)
+        then:
+        println(tablename)
+
 
         when: 'sql query tab is clicked'
         page.gotoSqlQuery()
         then: 'at sql query'
         at SqlQueryPage
+        report "hello1"
 
         when: 'set query in the box'
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
+        report "hello2"
 
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
         then: 'at DbMonitor Page'
         at DbMonitorPage
+        report "hello3"
 
         when:
         page.searchDatabaseTable(tablename)
         then:
+        report "hello4"
         waitFor(30) {
             !page.databaseTableCurrentPage.text().equals("0")
             !page.databaseTableTotalPage.text().equals("0")
@@ -562,6 +566,7 @@ class DbMonitorTest extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
+        report "delete"
 
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
@@ -571,6 +576,7 @@ class DbMonitorTest extends TestBase {
         when:
         page.searchDatabaseTable(tablename)
         then:
+        report "delete1"
         waitFor(30) {
             page.databaseTableCurrentPage.text().equals("0")
             page.databaseTableTotalPage.text().equals("0")
@@ -782,8 +788,6 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
-
-
     def CheckDataInStoredProcedures() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -843,7 +847,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-   // ALERT
+    // ALERT
 
     def "set alert and replace trigger alert"() {
         int count = 0
@@ -3217,7 +3221,7 @@ class DbMonitorTest extends TestBase {
     }
 
     /// Test cases relating to Graph end
-    def cleanupSpec() {
+    /*def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
@@ -3231,9 +3235,10 @@ class DbMonitorTest extends TestBase {
         page.openSqlQueryPage()
         then: 'should be on DB Monitor page'
         at SqlQueryPage
-        String deleteQuery = page.getQueryToDeleteTable()
+
+        String deleteQuery = page.getQueryToDeleteTableAndView()
         page.setQueryText(deleteQuery)
 
         page.runQuery()
-    }
+    }*/
 }

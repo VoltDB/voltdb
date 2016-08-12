@@ -9,6 +9,9 @@ CREATE TABLE voters (
 Drop view registrations_by_zipcode;
 DROP TABLE voters;
 
+#deleteOnly
+DROP TABLE voters;
+
 #name
 voters
 
