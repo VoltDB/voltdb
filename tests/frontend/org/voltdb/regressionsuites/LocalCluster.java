@@ -672,7 +672,7 @@ public class LocalCluster implements VoltServerConfig {
         printTiming(logtime, "Starting cluster at: " + System.currentTimeMillis());
 
         // clear any logs, export or snapshot data for this run
-        if (clearLocalDataDirectories) {
+        if (clearLocalDataDirectories && !isNewCli) {
             try {
                 m_subRoots.clear();
                 VoltFile.deleteAllSubRoots();
