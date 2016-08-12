@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
@@ -42,8 +43,6 @@ import org.hsqldb_voltpatches.types.IntervalSecondData;
 import org.hsqldb_voltpatches.types.IntervalType;
 import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.types.Type;
-
-import java.io.Serializable;
 
 /**
  * Implementation of SQL set functions (currently only aggregate functions).
@@ -380,7 +379,7 @@ public class SetFunction implements Serializable {
     static Type getType(int setType, Type type) {
 
         if (setType == OpTypes.COUNT) {
-            return Type.SQL_INTEGER;
+            return Type.SQL_BIGINT;
         }
 
         // A VoltDB extension to handle aggfnc(*) syntax errors.
@@ -590,8 +589,8 @@ public class SetFunction implements Serializable {
         }
 
         return sample ? (n == 1) ? null    // NULL (not NaN) is correct in this case
-                                 : new Double(vk / (double) (n - 1))
-                      : new Double(vk / (double) (n));
+                                 : new Double(vk / (n - 1))
+                      : new Double(vk / (n));
     }
 
     private Number getStdDev() {
@@ -601,8 +600,8 @@ public class SetFunction implements Serializable {
         }
 
         return sample ? (n == 1) ? null    // NULL (not NaN) is correct in this case
-                                 : new Double(Math.sqrt(vk / (double) (n - 1)))
-                      : new Double(Math.sqrt(vk / (double) (n)));
+                                 : new Double(Math.sqrt(vk / (n - 1)))
+                      : new Double(Math.sqrt(vk / (n)));
     }
 
     // end statistics support
