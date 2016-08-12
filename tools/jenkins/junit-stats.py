@@ -34,9 +34,10 @@ class Stats(object):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.cmdhelp = """
-        usage: junit-stats <job> <range>
-        ex: junit-stats branch-2-pro-junit-master 800-802
+        usage: junit-stats <job> <build_range>
+        ex: junit-stats branch-2-pro-junit-master 800-990
         ex: junit-stats branch-2-community-junit-master 550-550
+        You can also specify 'job' and 'build_range' environment variables
         """
         logging.basicConfig(stream=sys.stdout)
 
@@ -57,9 +58,9 @@ class Stats(object):
             logging.exception('Something unexpected went wrong.')
         return data
 
-    def build_history(self, job, build_range):
+    def get_build_data(self, job, build_range):
         """
-        Displays build history for a job. Can specify an inclusive build range.
+        Gets build data for a job. Can specify an inclusive build range.
         For every build specified on the job, saves the test results
         :param job: Full job name on Jenkins
         :param build_range: Build range that exists for the job on Jenkins, ie "700-713", "1804-1804"
@@ -228,12 +229,13 @@ class Stats(object):
         cursor.close()
         db.close()
 
+        if job != PRO and job != COMMUNITY:
+            return
+
         try:
             jenkinsbot = JenkinsBot()
             for issue in issues:
                 # Only report pro and community job
-                if job != PRO and job != COMMUNITY:
-                    continue
 
                 error_url = issue['url']
                 error_report = self.read_url(error_url + '/api/python')
@@ -253,9 +255,10 @@ class Stats(object):
                 failed_since = error_report['failedSince']
                 summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
                 description = error_url + '\n' + error_report['errorStackTrace']
-                # TODO get a current version instead of using V6.6
-                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', 'V6.6', ['junit-consistent-failure',
-                                            'automatic'])
+                current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
+                                                    'master/version.txt'))
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
+                                            ['junit-consistent-failure', 'automatic'])
         except:
             logging.exception('Error with creating issue')
 
@@ -273,4 +276,4 @@ if __name__ == '__main__':
     if len(args) > 2:
         build_range = args[2]
 
-    stats.build_history(job, build_range)
+    stats.get_build_data(job, build_range)

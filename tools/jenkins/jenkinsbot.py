@@ -27,6 +27,8 @@ MEMVALDEBUG = os.environ.get('memvaldebug', None)
 DEBUG = os.environ.get('debug', None)
 MEMVAL = os.environ.get('memval', None)
 FULLMEMCHECK = os.environ.get('fullmemcheck', None)
+MASTER_JOBS = [PRO, COMMUNITY, VDM]
+CORE_JOBS = [MEMVALDEBUG, DEBUG, MEMVAL, FULLMEMCHECK]
 
 # Channel to message in case something goes wrong
 ADMIN_CHANNEL = os.environ.get('admin', None)
@@ -42,6 +44,38 @@ JIRA_PASS = os.environ.get('jirapass', None)
 JIRA_PROJECT = os.environ.get('jiraproject', None)
 
 # Queries
+
+# System Leaderboard - Leaderboard for master system tests on apprunner.
+SL_QUERY = ("""
+  SELECT job_name AS 'Job name',
+         workload AS 'Workload',
+         fails AS 'Fails',
+         total AS 'Total',
+         fails/total*100. AS 'Fail %',
+         latest AS 'Latest'
+    FROM
+        (
+           SELECT job_name,
+                  workload,
+                  COUNT(*) AS fails,
+                  (
+                   SELECT COUNT(*)
+                     FROM `apprunnerfailures` AS run
+                    WHERE NOW() - INTERVAL 30 DAY <= run.datetime AND
+                          run.job_name=failure.job_name AND
+                          run.workload=failure.workload AND
+                          run.branch_name=failure.branch_name
+                  ) AS total,
+                  MAX(failure.datetime) AS latest
+            FROM `apprunnerfailures` AS failure
+            WHERE NOW() - INTERVAL 30 DAY <= datetime AND
+                  result='FAIL' AND
+                  failure.branch_name='master'
+         GROUP BY job_name,
+                  workload
+        ) AS intermediate
+GROUP BY 6 DESC
+""")
 
 # Tests since leaderboard - See all the tests that have been failing the most since a certain build and view them as
 # most frequently occurring.
@@ -98,18 +132,19 @@ AF_QUERY = ("""
 ORDER BY 2 DESC
 """)
 
-# See builds leaderboard - See the builds that are saved to the database and view them by most recent.
-SB_QUERY = ("""
+# Latest build - See the latest build for a job in the database.
+LB_QUERY = ("""
     SELECT name AS 'Job name',
-           stamp AS 'Ran',
+           stamp AS 'Latest run',
            url AS 'Build url',
-           build AS 'Build number',
-           fails AS 'Fails',
-           total AS 'Total',
-           percent AS 'Fail %'
+           build AS 'Build number'
       FROM `junit-builds`
-     WHERE name=%(job)s
-ORDER BY 2 DESC
+     WHERE stamp = (
+              SELECT MAX(jb.stamp)
+                FROM `junit-builds` AS jb
+               WHERE jb.name=%(job)s
+           ) AND
+           name=%(job)s
 """)
 
 # Recent failure - See if test is failing and how recently.
@@ -132,9 +167,9 @@ RS_QUERY = ("""
            build AS 'Latest build'
       FROM `junit-test-failures`
      WHERE stamp = (
-              select MAX(tf.stamp)
-                from `junit-test-failures` as tf
-               where tf.name=%(test)s AND
+              SELECT MAX(tf.stamp)
+                FROM `junit-test-failures` AS tf
+               WHERE tf.name=%(test)s AND
                      tf.job=%(job)s
            ) AND
            name=%(test)s AND
@@ -146,6 +181,13 @@ AA_QUERY = ("""
     INSERT INTO `jenkinsbot-user-aliases`
                 (slack_user_id, command, alias)
          VALUES (%(slack_user_id)s, %(command)s, %(alias)s)
+""")
+
+# Remove alias - Remove an alias for the user.
+RA_QUERY = ("""
+    DELETE FROM `jenkinsbot-user-aliases`
+          WHERE slack_user_id=%(slack_user_id)s AND
+                alias=%(alias)s
 """)
 
 # Get alias - Get the command for an alias for the user.
@@ -162,38 +204,6 @@ SA_QUERY = ("""
            command
       FROM `jenkinsbot-user-aliases`
      WHERE slack_user_id=%(slack_user_id)s
-""")
-
-# System Leaderboard - Leaderboard for master system tests on apprunner
-SL_QUERY = ("""
-  SELECT job_name AS 'Job name',
-         workload AS 'Workload',
-         fails AS 'Fails',
-         total AS 'Total',
-         fails/total*100. AS 'Fail %',
-         latest AS 'Latest'
-    FROM
-        (
-           SELECT job_name,
-                  workload,
-                  COUNT(*) AS fails,
-                  (
-                   SELECT COUNT(*)
-                     FROM `apprunnerfailures` AS run
-                    WHERE NOW() - INTERVAL 30 DAY <= run.datetime AND
-                          run.job_name=failure.job_name AND
-                          run.workload=failure.workload AND
-                          run.branch_name=failure.branch_name
-                  ) AS total,
-                  MAX(failure.datetime) AS latest
-            FROM `apprunnerfailures` AS failure
-            WHERE NOW() - INTERVAL 30 DAY <= datetime AND
-                  result='FAIL' AND
-                  failure.branch_name='master'
-         GROUP BY job_name,
-                  workload
-        ) AS intermediate
-GROUP BY 6 DESC
 """)
 
 
@@ -227,18 +237,21 @@ class WorkerThread(Thread):
                 params = None
                 filename = None
                 try:
-                    # TODO get insert option from parse_text rather than inferring it
                     (query, params, filename) = jenkins_bot.parse_text(text, channel, user)
                 except IndexError:
                     jenkins_bot.logger.exception('Incorrect number or formatting of arguments')
                     if channel:
                         jenkins_bot.post_message(channel, 'Incorrect number or formatting of arguments\n\n' +
                                                  jenkins_bot.help_text)
+                # TODO (Femi) get commit option from parse_text rather than inferring it based on filename
                 if query and params and filename:
                     jenkins_bot.post_message(channel, 'Please wait..')
                     jenkins_bot.query_and_response(query, params, [channel], filename)
                 elif query and params:
-                    jenkins_bot.query([channel], query, params, insert=True)
+                    jenkins_bot.query([channel], query, params, commit=True)
+        except KeyboardInterrupt:
+            # Propagate the keyboard interrupt from the worker thread that received the shut-down command
+            raise
         except:
             jenkins_bot.logger.exception('Something unexpected went wrong')
 
@@ -252,7 +265,7 @@ class WorkerThread(Thread):
         :return: true if bot can act on incoming data - There is incoming data, it is text data, it's not from a bot,
         the text isn't in a file, the channel isn't in #general, #random, #junit which jenkinsbot is part of
         """
-        # TODO rather than check all channels, just check if this is an direct message
+        # TODO (Femi) rather than check all channels, just check if this is an direct message
         return (self.incoming.get('text', None) is not None and self.incoming.get('bot_id', None) is None
                 and self.incoming.get('file', None) is None and self.incoming['channel'] != GENERAL_CHANNEL
                 and self.incoming['channel'] != RANDOM_CHANNEL and self.incoming['channel'] != JUNIT)
@@ -261,20 +274,21 @@ class WorkerThread(Thread):
 class JenkinsBot(object):
     def __init__(self):
         self.client = None
-        self.help_text = ''.join(
-            ['*help*\n',
-             'Alias a command:\n\tmy alias = *valid command*\n',
-             'See your aliases:\n\t*aliases*\n',
-             'See which tests are failing the most since this build:\n\t*tests-since* <job> <build #>\n',
-             'See which tests are failing in the past x days:\n\t*days* <job> <days>\n',
-             'Failing the most in this build range:\n\t*build-range* <job> <build #>-<build #>\n',
-             'Most recent failure of a non-passing test:\n\t*recent-failure* <job> <testname>'
-             ' (ex. testname: org.voltdb.iv2..)\n',
-             'Most recent status of a non-passing test:\n\t*recent-status* <job> <testname>\n',
-             'All failures for a job:\n\t*all-failures* <job>\n',
-             'Display this help:\n\t*help*\n',
-             'For <job>, you can specify *pro* or *com* for the respective junit master jobs\n',
-             'Examples: test-leaderboard pro 860, days com 14, now=days pro 1\n']
+        self.help_text = '\n'.join(
+            ['*Instructions:*',
+             'Alias a command:\n\tmy alias = valid command',
+             'Remove an alias:\n\t`unalias` my alias',
+             'See your aliases:\n\t`aliases`',
+             'See which tests are failing the most since this build:\n\t`tests-since` <job> <build #>',
+             'See which tests are failing in the past x days:\n\t`days` <job> <days>',
+             'Failing the most in this build range:\n\t`build-range` <job> <build #>-<build #>',
+             'Most recent failure of a non-passing test:\n\t`recent-failure` <job> <testname>'
+             ' (ex. testname: org.voltdb.iv2..)',
+             'Most recent status of a non-passing test:\n\t`recent-status` <job> <testname>',
+             'All failures for a job:\n\t`all-failures` <job>',
+             'Display this help:\n\t`help`',
+             'For <job>, you can specify *pro* or *com* for the respective junit master jobs',
+             'Examples: `tests-since pro 860`, `days com 14`, now = `days pro 1`']
         )
         self.logger = self.setup_logging()
 
@@ -282,7 +296,7 @@ class JenkinsBot(object):
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.DEBUG)
 
-        # Limit log file to 1GB, 1 rotation
+        # Limit log file to 1GB, no rotation
         handler = handlers.RotatingFileHandler('jenkinsbot.log', maxBytes=1 << 30)
         handler.setLevel(logging.DEBUG)
 
@@ -312,13 +326,6 @@ class JenkinsBot(object):
 
         return True
 
-    def shutdown(self):
-        """
-        Shuts down jenkinsbot.
-        Calls os._exit so all worker threads are killed whenever one of them calls this method.
-        """
-        os._exit(0)
-
     def listen(self):
         """
         Establishes session and responds to commands
@@ -326,12 +333,12 @@ class JenkinsBot(object):
 
         while True:
             try:
-                # Wait for and respond to incoming data that is: text, not from a bot, not a file.
-                # Could possibly loop through incoming to address each incoming messsage rather than using just
-                # incoming[0]
                 incoming = []
                 try:
                     incoming = list(self.client.rtm_read())
+                except KeyboardInterrupt:
+                    # Propagate the keyboard interrupt from the worker thread that received the shut-down command
+                    raise
                 except:
                     self.logger.exception('Could not read from Real Time Messaging. Connection may have been closed')
 
@@ -352,8 +359,8 @@ class JenkinsBot(object):
 
             except KeyboardInterrupt:
                 # Raised by a worker thread that calls thread.interrupt_main()
-                self.logger.info('Shuttind down due to "shut-down" command')
-                self.post_message(ADMIN_CHANNEL, 'Shutting down due to "shut-down" command')
+                self.logger.info('Shutting down due to "shut-down" command or Control C')
+                self.post_message(ADMIN_CHANNEL, 'Shutting down due to `shut-down` command or Control C')
                 return
 
     def parse_text(self, text, channel, user):
@@ -364,7 +371,7 @@ class JenkinsBot(object):
         :param user: The user who wrote the text
         :return: The query, parameters, and filename derived from the text
         """
-        # TODO replace with argparse or something similar
+        # TODO (Femi) replace with argparse or something similar
 
         query = ''
         params = {}
@@ -394,6 +401,17 @@ class JenkinsBot(object):
             params = {
                 'slack_user_id': user,
                 'command': command.strip(),
+                'alias': alias.strip()
+            }
+            return query, params, filename
+        elif 'unalias' in text:
+            args = text.split(' ')
+            if len(args) != 2:
+                return query, params, filename
+            alias = args[1]
+            query = RA_QUERY
+            params = {
+                'slack_user_id': user,
                 'alias': alias.strip()
             }
             return query, params, filename
@@ -461,18 +479,18 @@ class JenkinsBot(object):
             }
             filename = '%s-buildrange-%s-to-%s.txt' % (job, builds[0], builds[1])
         else:
-            self.post_message(channel, 'Couldn\'t parse: ' + text + '\nType "help" to see command usage')
+            self.post_message(channel, 'Couldn\'t parse: `' + text + '`\nType `help` to see command usage')
 
         return query, params, filename
 
-    def query(self, channels, query, params, is_retry=False, insert=False):
+    def query(self, channels, query, params, is_retry=False, commit=False):
         """
         Make a query and return a table
         :param channels: Channels this query is for
         :param query: Query to execute
         :param params: Parameters for the query
         :param is_retry: If this call of the query is a retry. Will not attempt to retry after calling.
-        :param insert: This query is an insert so the data needs to be committed
+        :param commit: This query is an insert or something else that needs to be committed
         :return: Tuple of (headers, rows) as results
         """
 
@@ -488,23 +506,25 @@ class JenkinsBot(object):
             cursor = database.cursor()
             cursor.execute(query, params)
 
-            if insert:
+            if commit:
                 database.commit()
             else:
-                headers = list(cursor.column_names)
+                headers = list(cursor.column_names)  # List of strings
                 rows = cursor.fetchall()  # List of tuples
                 table = (headers, rows)
 
         except MySQLError:
             self.logger.exception('Either could not connect to database or execution error')
             for channel in channels:
-                self.post_message(channel, 'Something went wrong with the command.')
+                self.post_message(channel, 'Something went wrong with getting database information.')
+                if query == AA_QUERY:
+                    self.post_message(channel, 'Are you sure this alias isn\t defined? Type `aliases` to see aliases.')
         except:
             self.logger.exception('Something unexpected went wrong')
 
             # Try to reconnect only once
             if self.connect_to_slack() and not is_retry:
-                table = self.query(query, params, True, insert=insert)
+                table = self.query(query, params, True, commit=commit)
         finally:
             if cursor is not None:
                 cursor.close()
@@ -519,12 +539,13 @@ class JenkinsBot(object):
         :param tables: List of (header, rows) tuples i.e. tables to construct leaderboards from
         :param channels: The channels to post this file to
         :param filename: The filename to respond with
-        :param vertical: whether a vertical version of the table should be included
-        :param edit: whether the row entries should be edited
+        :param vertical: Whether a vertical version of the table should be included
+        :param edit: Whether the row entries should be edited
+        :param log: Message prepended to the response
         """
 
         filecontent = ""
-        for table in tables:
+        for i, table in enumerate(tables):
             if len(table) != 2:
                 continue
             headers = table[0]
@@ -536,12 +557,18 @@ class JenkinsBot(object):
                 content = '\n\n*Vertical Leaderboard*:\n\n' + self.vertical_leaderboard(rows, headers)
 
             if edit:
+                # Generate ordinal numbers (1st, 2nd, 3rd..)
+                n = i + 1
+                suffix = {1: "st", 2: "nd", 3: "rd"}.get(n if (n < 20) else (n % 10), 'th')
+                log += '\n*Names in %d%s table might be shortened to fit on screen*' % (n, suffix)
                 # Do some specific edits.
                 self.edit_rows(rows)
 
             # Prepend leaderboard which might have edited rows.
             content = tabulate(rows, headers) + content
             filecontent = filecontent + content
+
+        filecontent = log + '\n\n' + filecontent
 
         self.client.api_call(
             'files.upload', channels=channels, content=filecontent, filetype='text', filename=filename
@@ -554,7 +581,7 @@ class JenkinsBot(object):
         :param rows: List of tuples representing the rows
         :return: A string representing the table vertically
         """
-        # TODO (Femi) encapsulate in Leaderboard class
+        # TODO (Femi) encapsulate in a Leaderboard class
         table = ''
         for i, row in enumerate(rows):
             rows[i] = list(row)
@@ -567,9 +594,9 @@ class JenkinsBot(object):
     def edit_rows(self, rows):
         """
         Edit the rows to fit on most screens.
-        :param rows: Rows to edit. This method is specific to L_QUERY
+        :param rows: Rows to edit. This method is specific to leaderboards.
         """
-        # TODO (Femi) encapsulate in Leaderboard class
+        # TODO (Femi) encapsulate in a Leaderboard class
         for i, row in enumerate(rows):
             rows[i] = list(row)
             rows[i][0] = rows[i][0].replace('branch-2-', '')
@@ -586,8 +613,8 @@ class JenkinsBot(object):
         :param days: Number of days to go back in query
         :return: A completed leaderboard query for the jobs and empty params
         """
-        # TODO (Femi) encapsulate in Leaderboard class
-        jobs_filter = map(lambda j: 'job=' + '"' + j + '"', jobs)
+        # TODO (Femi) encapsulate in a Leaderboard class
+        jobs_filter = map(lambda j: 'job="%s"' % j, jobs)
         job_params = ' OR '.join(jobs_filter)
         job_params = '(' + job_params + ')'
 
@@ -635,18 +662,48 @@ class JenkinsBot(object):
             'chat.postMessage', channel=channel, text=text, as_user=True
         )
 
-    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, add_log=False):
+    def get_log(self, jobs):
+        """
+        Get a log of Jenkins jobs. Logs to file and also returns a log message. Adds a query for each job. For now
+        only works for junit jobs.
+        :param jobs: List of job names
+        :return: Log message string
+        """
+        tables = []
+        for job in jobs:
+            tables.append(self.query([ADMIN_CHANNEL], LB_QUERY, {'job': job}))
+
+        log_message = ['Status of jobs:']
+        for table in tables:
+            if len(table) != 2:
+                continue
+            headers = table[0]
+            rows = table[1][0]
+            log = []
+            for field, value in zip(headers, rows):
+                log.append('%s: %s' % (field, value))
+            log_message.append(', '.join(log))
+
+        log = '\n'.join(log_message)
+        self.logger.info(log)
+        return log
+
+    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, jobs=None):
         """
         Perform a single query and response
         :param query: Query to run
-        :param params: Parameters for query.
+        :param params: Parameters for query
         :param channels: Channels to respond to
-        :param filename: filename for the post
-        :param vertical: whether a vertical version of the table should be included
-        :param edit: whether the row entries should be edited
+        :param filename: Filename for the post
+        :param vertical: Whether a vertical version of the table should be included
+        :param edit: Whether the row entries should be edited
+        :param jobs: Generate status logs for these jobs
         """
         table = self.query(channels, query, params)
-        self.response([table], channels, filename, vertical, edit)
+        log = ''
+        if jobs is not None:
+            log = self.get_log(jobs)
+        self.response([table], channels, filename, vertical, edit, log=log)
 
     def create_bug_issue(self, channel, summary, description, component, version, labels,
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
@@ -700,6 +757,9 @@ class JenkinsBot(object):
                 break
         if jira_component:
             issue_dict['components'] = [jira_component]
+        else:
+            # Components is still a required field
+            issue_dict['components'] = ['Core']
 
         jira_version = None
         versions = jira.project_versions(project)
@@ -712,9 +772,11 @@ class JenkinsBot(object):
                 break
         if jira_version:
             issue_dict['versions'] = [jira_version]
+        else:
+            # Versions is still a required field
+            issue_dict['versions'] = ['DEPLOY-Integration']
 
         new_issue = jira.create_issue(fields=issue_dict)
-
         self.logger.info('NEW: Reported issue with summary "' + summary + '"')
 
         if self.connect_to_slack():
@@ -737,26 +799,26 @@ if __name__ == '__main__':
         if sys.argv[1] == 'listen':
             jenkinsbot.listen()
         elif sys.argv[1] == 'master':
-            jobs = [PRO, COMMUNITY, VDM]
-            query = jenkinsbot.leaderboard_query(jobs, days=30)
+            query = jenkinsbot.leaderboard_query(MASTER_JOBS, days=30)
             jenkinsbot.query_and_response(
                 query,
                 (),
                 [ADMIN_CHANNEL],
                 'master-past30days.txt',
                 vertical=True,
-                edit=True
+                edit=True,
+                jobs=MASTER_JOBS
             )
         elif sys.argv[1] == 'core':
-            jobs = [MEMVALDEBUG, DEBUG, MEMVAL, FULLMEMCHECK]
-            query = jenkinsbot.leaderboard_query(jobs, days=7)
+            query = jenkinsbot.leaderboard_query(CORE_JOBS, days=7)
             jenkinsbot.query_and_response(
                 query,
                 (),
                 [ADMIN_CHANNEL],
-                'coreextended-past2days.txt',
+                'coreextended-past7days.txt',
                 vertical=True,
-                edit=True
+                edit=True,
+                jobs=CORE_JOBS
             )
         elif sys.argv[1] == 'system':
             jenkinsbot.query_and_response(
@@ -767,7 +829,7 @@ if __name__ == '__main__':
                 vertical=True
             )
         else:
-            print 'Command not found. Options: listen, core, system, master'
+            print 'Command %s not found' % sys.argv[1]
             print help_text
     else:
         print 'Incorrect number of arguments'
