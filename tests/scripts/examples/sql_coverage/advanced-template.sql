@@ -16,7 +16,6 @@
 -- {@fromtables = "_table"}
 -- {@optionalfn = "_numfun"}
 -- {@plus10 = " + 10"}
--- {@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 -- {@star = "*"}
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
@@ -157,27 +156,3 @@ SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype
 SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant@plus10)
 SELECT __[#numone]            Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate
-
--- Define expressions and clauses used to test RANK, below
-{_columnorexpr |= "_variable"}
-{_columnorexpr |= "@onefun(_variable[@comparabletype])@plus10"}
-{_orderbycolumnorexpr |= "_variable[#ord @rankorderbytype]"}
-{_orderbycolumnorexpr |= "@onefun(_variable[#ord @rankorderbytype])@plus10"}
-{@orderbyclause = "ORDER BY _orderbycolumnorexpr _sortorder"}
-
--- Test the RANK (Window / SQL Analytic) function
-SELECT               @star, RANK() OVER (PARTITION BY __[#ord]                                    @orderbyclause) RANK            FROM @fromtables Q42
--- TODO: uncomment these, once ENG-10972 is fixed:
-SELECT            __[#ord], RANK() OVER (PARTITION BY _variable[#part]                            @orderbyclause) RANK, __[#part] FROM @fromtables Q43
-SELECT __[#ord], __[#part], RANK() OVER (PARTITION BY _variable[#part]                            @orderbyclause) RANK            FROM @fromtables Q44
--- TODO: uncomment this, once ENG-10973 is fixed:
-SELECT       _columnorexpr, RANK() OVER (PARTITION BY _variable[#part]                            @orderbyclause) RANK            FROM @fromtables Q45
-SELECT                      RANK() OVER (PARTITION BY _columnorexpr                               @orderbyclause) RANK, @star     FROM @fromtables Q46
-SELECT               @star, RANK() OVER (PARTITION BY _columnorexpr, _columnorexpr                @orderbyclause) RANK            FROM @fromtables Q47
-SELECT                      RANK() OVER (PARTITION BY _columnorexpr, _columnorexpr, _columnorexpr @orderbyclause) RANK, @star     FROM @fromtables Q48
-
--- Test the RANK function used in a sub-query
--- TODO: uncomment these, once ENG-10953 is fixed:
-SELECT @star FROM (SELECT @star, RANK() OVER (PARTITION BY _columnorexpr                          @orderbyclause) SUBRANK         FROM @fromtables Q49) SUB
-SELECT               @star, RANK() OVER (PARTITION BY _variable[#part]                            @orderbyclause) RANK            FROM \
-             (SELECT @star, RANK() OVER (PARTITION BY _variable[#part]                            @orderbyclause) SUBRANK         FROM @fromtables Q50) SUB
