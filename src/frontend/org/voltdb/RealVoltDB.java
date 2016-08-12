@@ -713,6 +713,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // 2) properties from the cluster.properties files
             // 3) properties from the deployment file
 
+            // this initializes the property needed to read the configuration file
+            m_config.asClusterSettingsMap();
             // this reads the file config/cluster.properties
             ClusterSettings fromPropertyFile = ClusterSettings.create();
             // handle case we recover clusters that were elastically expanded
@@ -1817,7 +1819,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Save cluster settings properties derived from the deployment file
         config.asClusterSettingsMap();
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
-
     }
 
     private void stageInitializedMarker(Configuration config) {
