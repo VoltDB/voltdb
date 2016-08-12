@@ -446,7 +446,14 @@ function convertArrayOfObjectsToCSV(args) {
     return result;
 }
 
-function downloadCSV(args,whichChart) {
+function downloadCSV(event,args,whichChart) {
+    if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1 ||
+    navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
+        event.preventDefault()
+        event.stopPropagation()
+        return;
+    }
+
     var data, filename, link;
     var graphView = $("#graphView").val()
     var chartData = {}
@@ -542,8 +549,10 @@ function downloadCSV(args,whichChart) {
             var filename_overlay = "Overlay-" + graphView + ".csv";
 
             downloadAll([
-                [filename_cmdLog, csvCmdLog],
-                [filename_overlay, csvOverlay],
+                [filename_cmdLog, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvCmdLog)],
+                [filename_overlay, 'data:text/csv;charset=utf8,'+
+                              encodeURI(csvOverlay)],
             ]);
     }
 
@@ -554,18 +563,29 @@ function downloadCSV(args,whichChart) {
         if (csv == null) return;
 
         filename = args.filename + "-" + graphView + ".csv";
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
         data = encodeURI(csv);
 
-        var blob = new Blob([csv], {type: "text/csv;"});
-        saveAs(blob, filename );
+        link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
     }
 }
 
 function downloadAll(files){
     if(files.length == 0) return;
     file = files.pop();
-    var blob = new Blob([file[1]], {type: "text/csv;"});
-    saveAs(blob, file[0]);
+    var theAnchor = $('<a />')
+        .attr('href', file[1])
+        .attr('download',file[0]);
+    document.body.appendChild(theAnchor[0]);
+    theAnchor[0].click();
+    theAnchor.remove();
     downloadAll(files);
 }
 
@@ -665,6 +685,20 @@ var loadPage = function (serverName, portid) {
         }
     }, 5000);
 
+    showEnableDisableDownloadBtn()
+    function showEnableDisableDownloadBtn(){
+         if ((navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) ||
+         navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
+            $(".downloadCls").attr("src","css/resources/images/icon_download_disabled.png");
+            $(".downloadCls").attr("title","Download file feature is not supported in this browser.")
+            $(".downloadCls").css( 'cursor', 'default' );
+
+         } else {
+            $(".downloadCls").attr("src","css/resources/images/downloadBtn.png");
+            $(".downloadCls").attr("title","Download data as CSV")
+            $(".downloadCls").css( 'cursor', 'pointer' );
+         }
+    }
 
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {
