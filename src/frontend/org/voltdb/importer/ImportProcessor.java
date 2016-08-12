@@ -53,6 +53,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
+    private BundleWrapper m_wrapper;
 
     public ImportProcessor(
             int myHostId,
@@ -89,6 +90,10 @@ public class ImportProcessor implements ImportDataProcessor {
             m_importerTypeMgr.configure(props, formatterBuilder);
         }
 
+        public int getConfigsCount() {
+            return m_importerTypeMgr.getConfigsCount();
+        }
+
         public void stop() {
             try {
                 //Handler can be null for initial period if shutdown come quickly.
@@ -114,8 +119,8 @@ public class ImportProcessor implements ImportDataProcessor {
 
         FormatterBuilder formatterBuilder = config.getFormatterBuilder();
         try {
-            BundleWrapper wrapper = m_bundles.get(bundleJar);
-            if (wrapper == null) {
+            m_wrapper = m_bundles.get(bundleJar);
+            if (m_wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
 
                     Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
@@ -129,7 +134,7 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    wrapper = new BundleWrapper(o, bundle);
+                    m_wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
                     Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -138,20 +143,29 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                     wrapper = new BundleWrapper(reference.newInstance(), null);
+                    m_wrapper = new BundleWrapper(reference.newInstance(), null);
                 }
-                String name = wrapper.getImporterType();
+                String name = m_wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                m_bundlesByName.put(name, wrapper);
-                m_bundles.put(bundleJar, wrapper);
+                m_bundlesByName.put(name, m_wrapper);
+                m_bundles.put(bundleJar, m_wrapper);
             }
-            wrapper.configure(properties, formatterBuilder);
+            m_wrapper.configure(properties, formatterBuilder);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);
+        }
+    }
+
+    @Override
+    public int getPartitionsCount() {
+        if (m_wrapper != null) {
+            return m_wrapper.getConfigsCount();
+        } else {
+            return 0;
         }
     }
 

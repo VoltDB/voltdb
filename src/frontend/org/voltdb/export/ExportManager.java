@@ -133,6 +133,10 @@ public class ExportManager
 
     private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
+    private int m_exportTablesCount = 0;
+
+    private int m_connCount = 0;
+
     /*
      * Issue a permit when a generation is drained so that when we are truncating if a generation
      * is completely truncated we can wait for the on generation drained task to finish.
@@ -564,12 +568,14 @@ public class ExportManager
 
         // If the export source changes before the previous generation drains
         // then the outstanding exports will go to the new source when export resumes.
+        int tableCount = 0;
+        int connCount = 0;
         for (Connector conn : connectors) {
             // skip disabled connectors
             if (!conn.getEnabled() || conn.getTableinfo().isEmpty()) {
                 continue;
             }
-
+            connCount++;
             Properties properties = new Properties();
             Set<String> tables = new HashSet<>();
 
@@ -577,6 +583,7 @@ public class ExportManager
 
             for (ConnectorTableInfo ti : conn.getTableinfo()) {
                 tables.add(ti.getTable().getTypeName());
+                tableCount++;
             }
 
             if (conn.getConfig() != null) {
@@ -596,8 +603,17 @@ public class ExportManager
             Pair<Properties, Set<String>> connConfig = new Pair<>(properties, tables);
             config.put(targetName, connConfig);
         }
-
         m_processorConfig = config;
+        m_exportTablesCount = tableCount;
+        m_connCount = connCount;
+    }
+
+    public static int getExportTablesCount() {
+        return m_self.m_exportTablesCount;
+    }
+
+    public static int getConnCount() {
+        return m_self.m_connCount;
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
