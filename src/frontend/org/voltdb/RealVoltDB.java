@@ -62,6 +62,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.HashMultimap;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -790,17 +791,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            Map<Integer, String> hostGroups = null;
-
-            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
+            final int numberOfNodes;
+            if (!isRejoin && !m_joining) {
+                numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
+            } else {
+                numberOfNodes = m_messenger.getLiveHostIds().size();
+            }
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
             }
 
-            if (!isRejoin && !m_joining) {
-                hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
-            }
+            final Map<Integer, String> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
                 setMode(OperationMode.PAUSED);
@@ -909,19 +911,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
-                List<Integer> partitions = null;
+                List<Integer> partitions;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          clusterConfig.getSitesPerHost());
+                    partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
                                 m_configuredReplicationFactor + ".\n" +
                                 "No more nodes can join.", false, null);
                     }
-                }
-                else {
+                } else {
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                 }
@@ -1569,28 +1569,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                    JoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
+        int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
+        int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
         if (startAction == StartAction.JOIN) {
             assert(joinCoordinator != null);
             topo = joinCoordinator.getTopology();
         }
-        else if (!startAction.doesRejoin()) {
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
-            int hostcount = m_clusterSettings.get().hostcount();
-            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+        else {
+            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
+            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
+            int hostcount = liveHostIds.size();
             ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
-            topo = registerClusterConfig(clusterConfig, hostGroups);
-        }
-        else {
-            Stat stat = new Stat();
+
             try {
-                topo =
-                    new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), "UTF-8"));
+                topo = clusterConfig.getTopology(hostGroups, HashMultimap.create(), new HashMap<>());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);
             }
-            catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to get topology from ZK", true, e);
+
+            if (!startAction.doesRejoin()) {
+                topo = registerClusterConfig(topo);
             }
         }
         return topo;
@@ -1611,16 +1612,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return initiators;
     }
 
-    private JSONObject registerClusterConfig(ClusterConfig config, Map<Integer, String> hostGroups)
+    private JSONObject registerClusterConfig(JSONObject topo)
     {
         // First, race to write the topology to ZK using Highlander rules
         // (In the end, there can be only one)
-        JSONObject topo = null;
         try
         {
-            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
-            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
-            topo = config.getTopology(hostGroups);
             byte[] payload = topo.toString(4).getBytes("UTF-8");
             m_messenger.getZK().create(VoltZK.topology, payload,
                     Ids.OPEN_ACL_UNSAFE,
