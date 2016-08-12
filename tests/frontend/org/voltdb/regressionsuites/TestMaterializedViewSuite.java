@@ -1573,8 +1573,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         // -- 3 -- Test altering the source table
-        // This alter table test will alter the source table schema first, then test if hte view still
-        // has the correct content. Columns referenced by the views are now altered (we don't allow it).
+        // This alter table test will alter the source table schema first, then test if the view still
+        // has the correct content. Columns referenced by the views are not altered (we don't allow it).
         // Our HSQL backend testing code does not support AdHoc DDL, disable this on HSQLBackend.
         // This is fine because we don't use HSQL as reference in this test anyway.
         if (! isHSQL()) {
@@ -1584,7 +1584,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue("Should be able to add column to a view source table.", false);
+                fail("Should be able to add column to a view source table.");
             }
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
@@ -1592,7 +1592,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue("Should be able to drop column on a view source table.", false);
+                fail("Should be able to drop column on a view source table.");
             }
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
@@ -1600,7 +1600,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue("Should be able to alter column in a view source table.", false);
+                fail("Should be able to alter column in a view source table.");
             }
             verifyViewOnJoinQueryResult(client);
         }
@@ -1612,7 +1612,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue("Should be able to drop a view.", false);
+                fail("Should be able to drop a view.");
             }
             try {
                 client.callProcedure("@AdHoc",
@@ -1631,7 +1631,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                     "GROUP BY CUSTOMERS.NAME, ORDERS.ORDER_ID;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
-                assertTrue("Should be able to create a view.", false);
+                fail("Should be able to create a view.");
             }
             verifyViewOnJoinQueryResult(client);
         }
