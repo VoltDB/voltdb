@@ -1,14 +1,20 @@
--- Hack! Table t was found to be sometimes(?) lingering from unrelaed prior tests.
--- Keep it from polluting show procedure output.
+echo Hack! Table t was found to be sometimes(?) lingering from unrelated prior tests.
+echo     Drop it conditionally to keep it from polluting show procedure output.
 drop table t if exists;
 
+echo Expect a blank line output after this one.
+echo
+echo Things will not go well if this test is not starting with an empty class list.
 show classes;
 
--- Expect to fail because the jar has not been loaded yet.
+echoerror Start of error output.
+echoerror
+
+echoerror Expect to fail because the jar has not been loaded yet.
 create procedure from class sqlcmdtest.Trivial;
 show procedures;
 
--- Expect to fail as Trivial should have failed proc creation.
+echoerror Expect to fail as Trivial should have failed proc creation.
 exec Trivial;
 
 -- This succeeds in spite of how the jar has been sabotaged by dropping
@@ -25,8 +31,8 @@ show classes;
 
 exec Trivial;
 
--- Expect to fail because of failure to "redefine" the Trivial proc with its
--- underlying class removed. The error message could be better here.
+echoerror Expect to fail because of failure to "redefine" the Trivial proc with its
+echoerror     underlying class removed. The error message could be better here.
 remove classes sqlcmdtest.*;
 show classes;
 
@@ -37,7 +43,7 @@ drop procedure Trivial;
 -- expect to succeed.
 remove classes sqlcmdtest.*;
 
--- expect to fail now that class has been successfully removed
+echoerror Expect to fail now that class has been successfully removed
 create procedure from class sqlcmdtest.Trivial;
 
 list proc;
@@ -54,7 +60,7 @@ create procedure from class sqlcmdtest.Breakable0;
 show procedures;
 show classes;
 
--- Expect to fail because the jar has been sabotaged by dropping dependent classes
+echoerror Expect to fail because the jar has been sabotaged by dropping dependent classes
 exec Breakable0;
 
 -- Expect to succeed.
@@ -71,8 +77,8 @@ remove classes sqlcmdtest.*;
 
 show classes;
 
--- Expect to fail because the jar has been killed by dropping a statically
--- dependent class.
+echoerror Expect to fail because the jar has been killed by dropping a statically
+echoerror     dependent class.
 load classes sqlcmdtest-killed-procs.jar;
 show classes;
 
@@ -91,8 +97,11 @@ create procedure from class sqlcmdtest.Breakable0;
 show procedures;
 show classes;
 
--- Expect to fail because the jar has been sabotaged by dropping dependent classes
+echoerror Expect to fail because the jar has been sabotaged by dropping dependent classes
 exec Breakable0;
+
+echoerror
+echoerror End of error output.
 
 -- Expect to succeed.
 create procedure from class sqlcmdtest.Trivial;
