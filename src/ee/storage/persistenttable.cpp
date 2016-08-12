@@ -578,8 +578,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if ((m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target))
-            && (m_copyOnWriteContext == NULL || !m_copyOnWriteContext->notifyTupleInsert(target))) {
+    if ((m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target))) {
         target.setDirtyFalse();
     }
 
@@ -710,9 +709,6 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
-    }
-    if (m_copyOnWriteContext != NULL) {
-        m_copyOnWriteContext->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -952,8 +948,7 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target) {
     // notifyTupleDelete() defaults to returning true for all context types
     // other than CopyOnWriteContext.
     if (   (m_tableStreamer != NULL
-        && ! m_tableStreamer->notifyTupleDelete(target))
-            || (m_copyOnWriteContext != NULL && ! m_copyOnWriteContext->notifyTupleDelete(target))) {
+        && ! m_tableStreamer->notifyTupleDelete(target))) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
         // This "already pending delete" guard prevents any
@@ -1272,20 +1267,25 @@ template void PersistentTable::processLoadedTupleShared <FallbackSerializeOutput
 
 /** Prepare table for a long running read. */
 bool PersistentTable::activateCopyOnWriteContext(
-    CopyOnWriteType cowType,
+    TableStreamType cowType,
     int32_t partitionId,
     CatalogId tableId) {
-    if (m_copyOnWriteContext == NULL) {
-        m_copyOnWriteContext.reset(new ScanCopyOnWriteContext(*this, m_surgeon, activeTupleCount()));
-    } else {
-        return false;
+    /*
+     * Allow multiple stream types for the same partition by holding onto the
+     * TableStreamer object. TableStreamer enforces which multiple stream type
+     * combinations are allowed. Expect the partition ID not to change.
+     */
+    assert(m_tableStreamer == NULL || partitionId == m_tableStreamer->getPartitionID());
+    if (m_tableStreamer == NULL) {
+        m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
     }
-    m_copyOnWriteContext->handleActivation();
-    return true;
+    std::vector<std::string> predicateStrings;
+    FullTupleSerializer serializer;
+    return m_tableStreamer->activateStream(m_surgeon, serializer, cowType, predicateStrings);
 }
 
 void PersistentTable::deactivateCopyOnWriteContext() {
-    m_copyOnWriteContext.reset();
+    m_tableStreamer->deactivateStream(TABLE_STREAM_COPY_ON_WRITE_SCAN);
 }
 
 /** Prepare table for streaming from serialized data. */
@@ -1417,9 +1417,6 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         if (m_tableStreamer != NULL) {
             m_tableStreamer->notifyBlockWasCompactedAway(block);
-        }
-        if (m_copyOnWriteContext != NULL) {
-            m_copyOnWriteContext->notifyBlockWasCompactedAway(block);
         }
         return;
     }

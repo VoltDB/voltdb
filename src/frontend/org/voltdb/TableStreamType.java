@@ -34,6 +34,10 @@ public enum TableStreamType {
      * of a tuple index that supports elastic re-balancing for topology changes.
      */
     ELASTIC_INDEX,
+    /**
+     * Copy on write contexts
+     */
+    COPY_ON_WRITE_SCAN,
     /*
      * An elastic index read stream materializes the index created by ELASTIC_INDEX
      * using the SNAPSHOT streaming mechanism.

@@ -36,7 +36,7 @@ TableStreamerContext::TableStreamerContext(
     m_surgeon(surgeon),
     m_table(table),
     m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
-    m_serializer(serializer),
+    m_serializer(&serializer),
     m_partitionId(partitionId)
 {
     TableStreamerContext::updatePredicates(predicateStrings);
@@ -53,7 +53,20 @@ TableStreamerContext::TableStreamerContext(
     m_surgeon(surgeon),
     m_table(table),
     m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
-    m_serializer(serializer),
+    m_serializer(&serializer),
+    m_partitionId(partitionId)
+{}
+
+/**
+ * Constructor without predicates.
+ */
+TableStreamerContext::TableStreamerContext(
+        PersistentTable &table,
+        PersistentTableSurgeon &surgeon,
+        int32_t partitionId) :
+    m_surgeon(surgeon),
+    m_table(table),
+    m_maxTupleLength(0),
     m_partitionId(partitionId)
 {}
 

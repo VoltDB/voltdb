@@ -44,6 +44,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
     private static int initTableSize = 100;
     private int m_insertCount = 0;
     private int m_deleteCount = 0;
+    private int m_updateCount = 0;
     private int m_errorCount = 0;
     private static int m_primaryKeyId = 1;
     private volatile boolean m_receivedResponse = false;
@@ -60,6 +61,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         initTableSize = initTableSize + m_insertCount - m_deleteCount;
         m_insertCount = 0;
         m_deleteCount = 0;
+        m_updateCount = 0;
         m_receivedResponse = false;
         m_errorCount = 0;
     }
@@ -93,6 +95,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         String sql = "update " + tableName + " set " + tableName + ".col1 = " + m_random.nextInt()
             + "where " + tableName + ".id = " + availableKeys.get(tableName).get(keyIdx);
         client.callProcedure("@AdHoc", sql);
+        m_updateCount++;
     }
 
     private void doRandomInsert(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
@@ -199,9 +202,10 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         //System.out.println(initTableSize + " " + m_insertCount + " " + m_deleteCount);
         VoltTable vt = client.callProcedure("@AdHoc",sql).getResults()[0];
         assertEquals(initTableSize + m_insertCount - m_deleteCount,vt.getRowCount());
+        assertTrue(m_insertCount > 0 || m_deleteCount > 0 || m_updateCount > 0);
     }
 
-    public void subtest2ConcurrentReadError(Client client) throws IOException, ProcCallException {
+    public void subtest2ConcurrentReadError(Client client) throws IOException, ProcCallException, InterruptedException {
         System.out.println("subtest2ConcurrentReadError...");
         String sql;
         m_receivedResponse = false;
@@ -211,6 +215,7 @@ public class TestLongRunningReadQuery extends RegressionSuite {
         executeLRR(client,sql);
         while (!m_receivedResponse) {
             // Wait for LRR to finish
+            Thread.sleep(1000);
         }
         assertEquals(1, m_errorCount);
         VoltTable vt = client.callProcedure("@AdHoc",sql).getResults()[0];

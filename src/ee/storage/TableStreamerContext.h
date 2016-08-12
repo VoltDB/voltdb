@@ -79,10 +79,10 @@ public:
     }
 
     /**
-     * Mandatory streamMore() handler.
+     * Optional streamMore() handler.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
-                                     std::vector<int> &retPositions) = 0;
+                                     std::vector<int> &retPositions) {return 0;}
 
     /**
      * Optional deactivation handler.
@@ -90,6 +90,13 @@ public:
      *  Return true to keep it around and listening to updates. (default=false)
      */
     virtual bool handleDeactivation(TableStreamType streamType) {return false;}
+
+    /**
+     * Fine-grained access
+     */
+    virtual bool advanceIterator(TableTuple &tuple) {return false;}
+
+    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) {return false;}
 
     /**
      * Optional tuple insert handler.
@@ -147,7 +154,8 @@ public:
      */
     TupleSerializer &getSerializer()
     {
-        return m_serializer;
+        assert(m_serializer);
+        return *m_serializer;
     }
 
     /**
@@ -190,6 +198,13 @@ protected:
                          TupleSerializer &serializer);
 
     /**
+     * Constructor without predicates or serializer.
+     */
+    TableStreamerContext(PersistentTable &table,
+                         PersistentTableSurgeon &surgeon,
+                         int32_t partitionId);
+
+    /**
      * Predicate delete flags accessor.
      */
     std::vector<bool> &getPredicateDeleteFlags()
@@ -224,7 +239,7 @@ private:
     /**
      * Serializer for tuples
      */
-    TupleSerializer &m_serializer;
+    TupleSerializer *m_serializer;
 
     /**
      * Partition ID

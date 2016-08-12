@@ -339,7 +339,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         bool activateCopyOnWriteContext(
                 const CatalogId tableId,
-                const CopyOnWriteType cowType);
+                const TableStreamType cowType);
 
         /**
          * Activate a table stream of the specified type for the specified table.
@@ -483,7 +483,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void saveState();
         void loadState();
 
-        SavedContext* m_savedContext;
+        boost::scoped_ptr<SavedContext> m_savedContext;
 
         // -------------------------------------------------
         // Data Members

@@ -70,9 +70,9 @@ public:
 
     bool isEmptyScan() const { return m_isEmptyScan; }
 
-    bool isPauseable() const { return m_pauseable; }
+    bool isSuspendable() const { return m_suspendable; }
 
-    int getLimit() const { return m_limit; }
+    int getTupleSuspendLimit() const { return m_tupleLimitForSuspendableFragments; }
 
 protected:
     AbstractScanPlanNode() { }
@@ -96,9 +96,9 @@ protected:
     // True if this scan has a predicate that always evaluates to FALSE
     bool m_isEmptyScan;
     // True if this scan is part of a high volume query
-    bool m_pauseable;
+    bool m_suspendable;
     // Number of tuples to read before suspending execution
-    int m_limit;
+    int m_tupleLimitForSuspendableFragments;
 };
 
 } // namespace voltdb

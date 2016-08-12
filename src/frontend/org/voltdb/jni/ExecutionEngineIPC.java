@@ -31,7 +31,6 @@ import java.util.logging.Logger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
-import org.voltdb.CopyOnWriteType;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -1213,7 +1212,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public boolean activateCopyOnWriteContext(
             int tableId,
-            CopyOnWriteType type) {
+            TableStreamType type) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);

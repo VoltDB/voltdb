@@ -67,11 +67,48 @@ public:
                                 const std::vector<std::string> &predicateStrings);
 
     /**
+     * Deactivate a stream
+     */
+    virtual void deactivateStream(TableStreamType streamType);
+
+    /**
      * Continue streaming.
      */
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                                TableStreamType streamType,
                                std::vector<int> &retPositions);
+
+    /**
+     * Fine-grained control of streaming hook.
+     * Return true if it was handled by the COW context.
+     */
+    virtual bool advanceIterator(TableTuple &tuple) {
+        bool handled = false;
+        // If any stream handles the notification, it's "handled".
+        // Only one COW should execute
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            assert(!handled);
+            handled = streamPtr->m_context->advanceIterator(tuple) || handled;
+        }
+        return handled;
+    }
+
+    /**
+     * Fine-grained clean up hook.
+     * Return true if it was handled by the COW context.
+     */
+    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) {
+        bool handled = false;
+        // If any stream handles the notification, it's "handled".
+        // Only one COW should execute
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            assert(!handled);
+            handled = streamPtr->m_context->cleanupTuple(tuple, deleteTuple) || handled;
+        }
+        return handled;
+    }
 
     /**
      * Tuple insert hook.

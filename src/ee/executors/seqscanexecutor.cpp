@@ -104,9 +104,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // Inline aggregation can be serial, partial or hash
     m_aggExec = voltdb::getInlineAggregateExecutor(node);
 
-    m_highVolume = node->isPauseable();
+    m_suspendable = node->isSuspendable();
 
-    m_limit = node->getLimit();
+    m_tupleLimitForSuspendableFragments = node->getTupleSuspendLimit();
 
     return true;
 }
@@ -238,10 +238,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 }
                 pmp.countdownProgress();
             }
-            if(m_highVolume) {
+            if(m_suspendable) {
                 input_table->cleanupTuple(tuple);
                 // Suspend this executor if we've hit the tuple processing limit
-                if (ctr >= m_limit) {
+                if (ctr >= m_tupleLimitForSuspendableFragments) {
                     yield = true;
                 }
             }
@@ -278,7 +278,7 @@ void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tu
 
 bool SeqScanExecutor::getNextTupleInScan(TableIterator& iterator, Table* input_table, TableTuple& tuple) {
     bool success = false;
-    if (m_highVolume) {
+    if (m_suspendable) {
         assert(dynamic_cast<PersistentTable*>(input_table));
         PersistentTable* p_input_table = static_cast<PersistentTable*>(input_table);
         success = p_input_table->advanceCOWIterator(tuple);
@@ -289,7 +289,7 @@ bool SeqScanExecutor::getNextTupleInScan(TableIterator& iterator, Table* input_t
     } else {
         success = iterator.next(tuple);
     }
-    //* for debug */if (success) {
+    //* for debug */if (success && m_suspendable) {
     //* for debug */   std::cout << "Scanned tuple " << tuple.debugNoHeader() << std::endl;
     //* for debug */}
     return success;

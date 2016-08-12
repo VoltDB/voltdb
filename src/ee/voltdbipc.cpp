@@ -283,7 +283,7 @@ typedef struct {
 typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
-    voltdb::CopyOnWriteType cowType;
+    voltdb::TableStreamType cowType;
 }__attribute__((packed)) activate_copyonwrite;
 
 /*
@@ -1216,8 +1216,8 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 int8_t VoltDBIPC::activateCopyOnWriteContext(struct ipc_command *cmd) {
     activate_copyonwrite *activateCommand = (activate_copyonwrite*) cmd;
     const voltdb::CatalogId tableId = ntohl(activateCommand->tableId);
-    const voltdb::CopyOnWriteType cowType =
-            static_cast<voltdb::CopyOnWriteType>(ntohl(activateCommand->cowType));
+    const voltdb::TableStreamType cowType =
+            static_cast<voltdb::TableStreamType>(ntohl(activateCommand->cowType));
 
     try {
         if (m_engine->activateCopyOnWriteContext(tableId, cowType)) {

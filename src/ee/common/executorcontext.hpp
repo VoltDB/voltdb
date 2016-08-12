@@ -123,7 +123,7 @@ class ExecutorContext {
 
     void restorePausedTables(int subqueryId, int pausedExecutorId, TempTable * tempTable);
 
-    void loadState(SavedContext * savedContext);
+    void loadState(SavedContext &savedContext);
 
     static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
         return (clusterId << 49) | (uniqueId >> 14);
@@ -249,9 +249,7 @@ class ExecutorContext {
         std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
 #endif
             m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
-#ifdef DEBUG
         assert(result.second);
-#endif
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 

@@ -215,14 +215,14 @@ void ExecutorContext::restorePausedTables(int subqueryId, int pausedExecutorId, 
     executors[pausedExecutorId]->setOutputTempTable(tempTable);
 }
 
-void ExecutorContext::loadState(SavedContext * savedContext) {
-    assert(m_txnId == savedContext->m_txnId);
-    m_executedCtr = savedContext->m_executedCtr;
-    m_currentTxnTimestamp = savedContext->m_currentTxnTimestamp;
-    m_currentDRTimestamp = savedContext->m_currentDRTimestamp;
-    m_outFileName = savedContext->m_outFileName;
-    m_outFileCount = savedContext->m_outFileCount;
-    m_uniqueId = savedContext->m_uniqueId;
+void ExecutorContext::loadState(SavedContext &savedContext) {
+    assert(m_txnId == savedContext.m_txnId);
+    m_executedCtr = savedContext.m_executedCtr;
+    m_currentTxnTimestamp = savedContext.m_currentTxnTimestamp;
+    m_currentDRTimestamp = savedContext.m_currentDRTimestamp;
+    m_outFileName = savedContext.m_outFileName;
+    m_outFileCount = savedContext.m_outFileCount;
+    m_uniqueId = savedContext.m_uniqueId;
     m_isResumed = true;
 }
 

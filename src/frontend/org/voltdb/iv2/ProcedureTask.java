@@ -131,7 +131,7 @@ abstract public class ProcedureTask extends TransactionTask
                     m_txnState.storeResults(cr);
                 }
                 if(task.getStoredProcedureName().equals("@ReadOnlySlow")) {
-                    response.setPaused(task.getStoredProcedureInvocation(),
+                    response.prepareLRRResponse(task.getStoredProcedureInvocation(),
                             task.isSinglePartition(),
                             task.getUniqueId(),
                             task.getConnectionId());

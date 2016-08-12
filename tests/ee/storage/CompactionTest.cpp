@@ -127,9 +127,7 @@ public:
 
     ~CompactionTest() {
         delete m_engine;
-        if (m_table != NULL) {
-            delete m_table;
-        }
+        delete m_table;
     }
 
     void initTable() {
@@ -375,7 +373,7 @@ public:
             m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         }
         else if (type == LRR) {
-            m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+            m_table->activateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN, 0, m_tableId);
         }
 
 
@@ -386,7 +384,6 @@ public:
             else if (type == LRR) {
                 streamThroughTuplesLRR((tupleCount / 3), COWTuples);
             }
-
 
             voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();
             TableTuple key(pkeyIndex->getKeySchema());

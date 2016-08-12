@@ -199,7 +199,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
-    public void setPaused(StoredProcedureInvocation invocation, boolean singlePartition, long uniqueId, long connectionId) {
+    public void prepareLRRResponse(StoredProcedureInvocation invocation, boolean singlePartition, long uniqueId, long connectionId) {
         m_isLRR = true;
         m_paused = (m_response.getResults().length == 0);
         m_invocation = invocation;

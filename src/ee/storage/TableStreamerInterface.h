@@ -48,6 +48,11 @@ namespace voltdb
                                     const std::vector<std::string> &predicateStrings) = 0;
 
         /**
+         * Deactivate streaming
+         */
+        virtual void deactivateStream(TableStreamType streamType) = 0;
+
+        /**
          * Perpetuate some kinds of streaming after a TRUNCATE TABLE.
          */
         virtual TableStreamerInterface* cloneForTruncatedTable(PersistentTableSurgeon &surgeon) = 0;
@@ -63,6 +68,13 @@ namespace voltdb
          * Return the partition ID.
          */
         virtual int32_t getPartitionID() const = 0;
+
+        /**
+         * Fine-grained management
+         */
+        virtual bool advanceIterator(TableTuple &tuple) = 0;
+
+        virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) = 0;
 
         /**
          * Tuple insert hook.

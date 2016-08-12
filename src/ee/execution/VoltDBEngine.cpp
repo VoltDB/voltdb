@@ -247,7 +247,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drReplicatedStream,
                                             drClusterId,
                                             highVolumeDirPath);
-    m_savedContext = new SavedContext();
+    m_savedContext.reset(new SavedContext());
     m_lastParamStart = 0;
     return true;
 }
@@ -383,7 +383,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // count failures
     int failures = 0;
     int returnCode = ENGINE_ERRORCODE_SUCCESS;
-    bool unpause = (m_savedContext != NULL) && (m_savedContext->m_txnId == txnId);
+    bool resumingAfterSuspend = (m_savedContext != NULL) && (m_savedContext->m_txnId == txnId);
 
     setUndoToken(undoToken);
 
@@ -393,7 +393,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_tuplesProcessedSinceReport = 0;
     m_currentIndexInBatch = 0;
 
-    if (unpause) {
+    if (resumingAfterSuspend) {
         loadState();
         serialize_in.setPosition(m_lastParamStart);
         //* for debug */ std::cout << "Loaded txn: " << txnId <<
@@ -426,8 +426,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                 uniqueId,
                 m_currentIndexInBatch == 0,
                 m_currentIndexInBatch == (numFragments - 1),
-                unpause);
-        unpause = false;
+                resumingAfterSuspend);
+        resumingAfterSuspend = false;
         if (returnCode == ENGINE_ERRORCODE_ERROR) {
             ++failures;
             break;
@@ -456,7 +456,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t uniqueId,
                                       bool first,
                                       bool last,
-                                      bool unpause)
+                                      bool resumingAfterSuspend)
 {
     assert(planfragmentId != 0);
 
@@ -507,7 +507,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     try {
         setExecutorVectorForFragmentId(planfragmentId);
         assert(m_currExecutorVec);
-        if (unpause) {
+        if (resumingAfterSuspend) {
             TempTableLimits limits = m_currExecutorVec->limits();
             limits.restoreSuspendedTransactionLimits(m_savedContext->m_currMemoryInBytes,
                     m_savedContext->m_peakMemoryInBytes);
@@ -582,7 +582,7 @@ void VoltDBEngine::loadState() {
     m_tuplesProcessedSinceReport = m_savedContext->m_tuplesProcessedSinceReport;
     m_currentIndexInBatch = m_savedContext->m_currentIndexInBatch;
     m_lastParamStart = m_savedContext->m_inputParamPosition;
-    m_executorContext->loadState(m_savedContext);
+    m_executorContext->loadState(*m_savedContext);
 }
 
 void VoltDBEngine::resetExecutionMetadata() {
@@ -1654,7 +1654,7 @@ void VoltDBEngine::updateExecutorContextUndoQuantumForTest()
 
 bool VoltDBEngine::activateCopyOnWriteContext(
         const CatalogId tableId,
-        const CopyOnWriteType cowType) {
+        const TableStreamType cowType) {
     Table* found = getTable(tableId);
     if (! found) {
         return false;

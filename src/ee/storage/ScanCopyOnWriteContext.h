@@ -23,6 +23,8 @@
 #include "storage/TupleBlock.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "storage/TableStreamer.h"
+#include "storage/TableStreamerContext.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -33,7 +35,7 @@ class TempTable;
 class PersistentTableSurgeon;
 class PersistentTable;
 
-class ScanCopyOnWriteContext {
+class ScanCopyOnWriteContext : public TableStreamerContext {
 public:
 
     /**
@@ -42,6 +44,7 @@ public:
      */
     ScanCopyOnWriteContext(PersistentTable &table,
                        PersistentTableSurgeon &surgeon,
+                        int32_t partitionId,
                        int64_t totalTuples);
 
     virtual ~ScanCopyOnWriteContext();
@@ -58,38 +61,42 @@ public:
     /**
      * Activation handler.
      */
-    void handleActivation();
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType);
+
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType) {
+        return ACTIVATION_SUCCEEDED;
+    }
 
     /**
      * Do surgery
      */
-    bool advanceIterator(TableTuple &tuple);
+    virtual bool advanceIterator(TableTuple &tuple);
 
-    bool cleanupTuple(TableTuple &tuple, bool deleteTuple);
+    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple);
 
-    bool cleanup();
+    virtual bool cleanup();
 
     void completePassIfDone(bool hasMore);
 
     /**
      * Optional block compaction handler.
      */
-    void notifyBlockWasCompactedAway(TBPtr block);
+    virtual void notifyBlockWasCompactedAway(TBPtr block);
 
     /**
      * Optional tuple insert handler.
      */
-    bool notifyTupleInsert(TableTuple &tuple);
+    virtual bool notifyTupleInsert(TableTuple &tuple);
 
     /**
      * Optional tuple update handler.
      */
-    bool notifyTupleUpdate(TableTuple &tuple);
+    virtual bool notifyTupleUpdate(TableTuple &tuple);
 
     /**
      * Optional tuple delete handler.
      */
-    bool notifyTupleDelete(TableTuple &tuple);
+    virtual bool notifyTupleDelete(TableTuple &tuple);
 
     bool isTableScanFinished() {
         return m_finishedTableScan;
@@ -105,12 +112,6 @@ private:
      * Temp table for copies of tuples that were dirtied.
      */
     boost::scoped_ptr<TempTable> m_backedUpTuples;
-
-    /**
-     * Table we are maintaining a COW context for, and its surgeon
-     */
-    PersistentTable &m_table;
-    PersistentTableSurgeon &m_surgeon;
 
     /**
      * Memory pool for string allocations

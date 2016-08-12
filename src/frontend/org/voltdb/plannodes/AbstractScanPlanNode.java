@@ -43,16 +43,16 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractScanPlanNode extends AbstractPlanNode {
-    private final static String PAUSEABLE = "PAUSEABLE";
-    private final static String PAUSELIMIT = "PAUSELIMIT";
+    private final static String SUSPENDABLE = "SUSPENDABLE";
+    private final static String TUPLE_SUSPEND_LIMIT = "TUPLE_SUSPEND_LIMIT";
     private final static String PREDICATE = "PREDICATE";
     private final static String TARGET_TABLE_NAME = "TARGET_TABLE_NAME";
     private final static String TARGET_TABLE_ALIAS = "TARGET_TABLE_ALIAS";
     private final static String SUBQUERY_INDICATOR = "SUBQUERY_INDICATOR";
     private final static String PREDICATE_FALSE = "PREDICATE_FALSE";
     // True if plan node is pause-able
-    boolean m_pauseable = false;
-    int m_pauseLimit = 0;
+    boolean m_suspendable = false;
+    int m_tupleSuspendLimit = 0;
 
     // Store the columns from the table as an internal NodeSchema
     // for consistency of interface
@@ -81,13 +81,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableAlias = tableAlias;
     }
 
-    public boolean isPauseable() {
-        return m_pauseable;
+    public boolean isSuspendable() {
+        return m_suspendable;
     }
 
     public void setPausable(boolean pausable, int limit) {
-        m_pauseable = pausable;
-        m_pauseLimit = limit;
+        m_suspendable = pausable;
+        m_tupleSuspendLimit = limit;
     }
 
     @Override
@@ -469,11 +469,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_isSubQuery) {
             stringer.key(SUBQUERY_INDICATOR).value("TRUE");
         }
-        if (m_pauseable) {
-            stringer.key(PAUSEABLE).value(true);
+        if (m_suspendable) {
+            stringer.key(SUSPENDABLE).value(true);
         }
-        if (m_pauseLimit > 0) {
-            stringer.key(PAUSELIMIT).value(m_pauseLimit);
+        if (m_tupleSuspendLimit > 0) {
+            stringer.key(TUPLE_SUSPEND_LIMIT).value(m_tupleSuspendLimit);
         }
     }
 
@@ -486,15 +486,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (jobj.has("SUBQUERY_INDICATOR")) {
             m_isSubQuery = "TRUE".equals(jobj.getString( SUBQUERY_INDICATOR ));
         }
-        if (jobj.has(PAUSEABLE)) {
-            m_pauseable = jobj.getBoolean(PAUSEABLE);
+        if (jobj.has(SUSPENDABLE)) {
+            m_suspendable = jobj.getBoolean(SUSPENDABLE);
         } else {
-            m_pauseable = false;
+            m_suspendable = false;
         }
-        if (jobj.has(PAUSELIMIT)) {
-            m_pauseLimit = jobj.getInt(PAUSELIMIT);
+        if (jobj.has(TUPLE_SUSPEND_LIMIT)) {
+            m_tupleSuspendLimit = jobj.getInt(TUPLE_SUSPEND_LIMIT);
         } else {
-            m_pauseLimit = 0;
+            m_tupleSuspendLimit = 0;
         }
     }
 
@@ -518,11 +518,11 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected String explainType() {
         String explainer = "";
-        if (m_pauseable) {
+        if (m_suspendable) {
             explainer += " , PAUSABLE ";
         }
-        if (m_pauseLimit > 0) {
-            explainer += " WITH PAUSELIMIT " + m_pauseLimit + " TUPLES";
+        if (m_tupleSuspendLimit > 0) {
+            explainer += " WITH PAUSELIMIT " + m_tupleSuspendLimit + " TUPLES";
         }
         return explainer;
     }

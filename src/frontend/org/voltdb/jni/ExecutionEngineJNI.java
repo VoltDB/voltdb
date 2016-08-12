@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.CopyOnWriteType;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -501,7 +500,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateCopyOnWriteContext(int tableId, CopyOnWriteType type) {
+    public boolean activateCopyOnWriteContext(int tableId, TableStreamType type) {
         return nativeActivateCopyOnWriteContext(pointer, tableId, type.ordinal());
     }
 

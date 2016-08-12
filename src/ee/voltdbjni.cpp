@@ -988,7 +988,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
 
     try {
         try {
-            voltdb::CopyOnWriteType cowType = static_cast<voltdb::CopyOnWriteType>(type);
+            voltdb::TableStreamType cowType = static_cast<voltdb::TableStreamType>(type);
             bool success = engine->activateCopyOnWriteContext(tableId, cowType);
             return success;
         } catch (SerializableEEException &e) {

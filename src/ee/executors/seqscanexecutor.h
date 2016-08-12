@@ -61,14 +61,14 @@ namespace voltdb
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
             , m_aggExec(NULL)
-            , m_highVolume(false)
+            , m_suspendable(false)
         {}
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
 
-        virtual bool p_isSuspendable() {return m_highVolume;}
+        virtual bool p_isSuspendable() {return m_suspendable;}
 
     private:
 
@@ -76,8 +76,8 @@ namespace voltdb
         bool getNextTupleInScan(TableIterator& iterator, Table* input_table, TableTuple& tuple);
 
         AggregateExecutorBase* m_aggExec;
-        bool m_highVolume;
-        int m_limit;
+        bool m_suspendable;
+        int m_tupleLimitForSuspendableFragments;
     };
 }
 

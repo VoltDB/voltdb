@@ -97,6 +97,10 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
         try {
             boost::shared_ptr<TableStreamerContext> context;
             switch (streamType) {
+                case TABLE_STREAM_COPY_ON_WRITE_SCAN:
+                    context.reset(
+                        new ScanCopyOnWriteContext(m_table, surgeon, m_partitionId, m_table.activeTupleCount()));
+                    break;
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
                     context.reset(
@@ -128,6 +132,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     assert(false);
             }
             if (context) {
+                std::cout << "TableStreamer handleActivation" << std::endl;
                 TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType);
                 switch (retcode) {
                     case TableStreamerContext::ACTIVATION_SUCCEEDED:
@@ -153,6 +158,25 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
     }
 
     return !failed;
+}
+
+void TableStreamer::deactivateStream(TableStreamType streamType) {
+    // Rebuild the stream list as dictated by context semantics.
+    StreamList savedStreams(m_streams);
+    m_streams.clear();
+    for (StreamList::iterator iter = savedStreams.begin(); iter != savedStreams.end(); ++iter) {
+        StreamPtr streamPtr = *iter;
+        assert(streamPtr->m_context != NULL);
+        if (streamPtr->m_streamType == streamType) {
+            if (streamPtr->m_context->handleDeactivation(streamType)) {
+                m_streams.push_back(streamPtr);
+            }
+        }
+        else {
+            // Keep other existing streams.
+            m_streams.push_back(streamPtr);
+        }
+    }
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,

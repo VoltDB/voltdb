@@ -30,7 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.CopyOnWriteType;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
@@ -508,7 +507,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
     public abstract boolean activateCopyOnWriteContext(final int tableId,
-            CopyOnWriteType type);
+            TableStreamType type);
 
     public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,

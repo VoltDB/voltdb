@@ -384,6 +384,9 @@ enum TableStreamType {
     TABLE_STREAM_SNAPSHOT,
     TABLE_STREAM_ELASTIC_INDEX,
 
+    // Copy on write stream types
+    TABLE_STREAM_COPY_ON_WRITE_SCAN,
+
     // Materialize previously-captured index.
     TABLE_STREAM_ELASTIC_INDEX_READ,
 
@@ -398,10 +401,6 @@ enum TableStreamType {
 
     // Table stream type provided when no stream is active.
     TABLE_STREAM_NONE = -1
-};
-
-enum CopyOnWriteType {
-    COPY_ON_WRITE_SCAN
 };
 
 // Serialization special values returned by serializeMore(), etc. instead

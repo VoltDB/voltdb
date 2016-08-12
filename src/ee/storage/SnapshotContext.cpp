@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include "ScanCopyOnWriteContext.h"
+#include "storage/ScanCopyOnWriteContext.h"
 
 namespace voltdb {
 
@@ -40,7 +40,7 @@ SnapshotContext::SnapshotContext(
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
-             m_copyOnWriteContext(new ScanCopyOnWriteContext(table, surgeon, totalTuples)),
+             m_copyOnWriteContext(new ScanCopyOnWriteContext(table, surgeon, partitionId, totalTuples)),
              m_tuple(table.schema()),
              m_totalTuples(totalTuples),
              m_serializationBatches(0)
@@ -71,7 +71,7 @@ SnapshotContext::handleActivation(TableStreamType streamType)
         return ACTIVATION_FAILED;
     }
 
-    m_copyOnWriteContext->handleActivation();
+    m_copyOnWriteContext->handleActivation(streamType);
 
     return ACTIVATION_SUCCEEDED;
 }

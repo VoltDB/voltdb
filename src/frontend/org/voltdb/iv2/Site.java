@@ -41,7 +41,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.CopyOnWriteType;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
@@ -394,7 +393,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean activateCopyOnWriteContext(final int tableId, CopyOnWriteType type)
+        public boolean activateCopyOnWriteContext(final int tableId, TableStreamType type)
         {
             return m_ee.activateCopyOnWriteContext(tableId, type);
         }

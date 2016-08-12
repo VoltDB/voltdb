@@ -21,6 +21,8 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
+#include "storage/TableStreamer.h"
+#include "storage/TableStreamerContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
 #include "logging/LogManager.h"
@@ -36,11 +38,11 @@ namespace voltdb {
 ScanCopyOnWriteContext::ScanCopyOnWriteContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
+        int32_t partitionId,
         int64_t totalTuples) :
+            TableStreamerContext(table, surgeon, partitionId),
              m_backedUpTuples(TableFactory::buildCopiedTempTable("COW of " + table.name(),
                                                                  &table, NULL)),
-             m_table(table),
-             m_surgeon(surgeon),
              m_pool(2097152, 320),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
@@ -64,15 +66,16 @@ ScanCopyOnWriteContext::~ScanCopyOnWriteContext()
 /**
  * Activation handler.
  */
-void
-ScanCopyOnWriteContext::handleActivation()
+TableStreamerContext::ActivationReturnCode
+ScanCopyOnWriteContext::handleActivation(TableStreamType streamType)
 {
     if (m_finishedTableScan && m_tuplesRemaining == 0) {
-        return;
+        return ACTIVATION_FAILED;
     }
     m_surgeon.activateSnapshot();
 
-    m_iterator.reset(new CopyOnWriteIterator(&m_table, &m_surgeon));
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon));
+    return ACTIVATION_SUCCEEDED;
 }
 
 /**
@@ -85,6 +88,7 @@ bool ScanCopyOnWriteContext::advanceIterator(TableTuple &tuple) {
  */
     assert(m_iterator != NULL);
     bool hasMore = m_iterator->next(tuple);
+    //std::cout << "advanceIterator " << hasMore << " remaining " << m_tuplesRemaining << " scandone " << m_finishedTableScan << std::endl;
     if (hasMore && m_tuplesRemaining > 0) {
         m_tuplesRemaining--;
     }
@@ -142,7 +146,7 @@ void ScanCopyOnWriteContext::completePassIfDone(bool hasMore) {
          */
 
         if (hasMore) {
-            PersistentTable &table = m_table;
+            PersistentTable &table = getTable();
             TableTuple tuple(table.schema());
             bool hasAnother = m_iterator->next(tuple);
             if (hasAnother) {
@@ -156,7 +160,7 @@ void ScanCopyOnWriteContext::completePassIfDone(bool hasMore) {
  * Returns true for success, false if there was a serialization error
  */
 bool ScanCopyOnWriteContext::cleanup() {
-    PersistentTable &table = m_table;
+    PersistentTable &table = getTable();
     size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
     size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
     if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
@@ -320,7 +324,7 @@ void ScanCopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(m_iterator != NULL);
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
-    TableTuple tuple(m_table.schema());
+    TableTuple tuple(getTable().schema());
     boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
@@ -333,7 +337,7 @@ void ScanCopyOnWriteContext::checkRemainingTuples(const std::string &label) {
                  "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
                  "expected=%jd compacted=%jd batch=%jd "
                  "inserts=%jd updates=%jd",
-                 label.c_str(), m_table.name().c_str(), m_table.partitionColumn(),
+                 label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
                  count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
                  (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
                  (intmax_t)m_inserts, (intmax_t)m_updates);

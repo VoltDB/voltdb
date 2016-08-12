@@ -92,16 +92,16 @@ void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
     }
 
-    if (obj.hasNonNullKey("PAUSEABLE")) {
-        m_pauseable = obj.valueForKey("PAUSEABLE").asBool();
+    if (obj.hasNonNullKey("SUSPENDABLE")) {
+        m_suspendable = obj.valueForKey("SUSPENDABLE").asBool();
     }
     else {
-        m_pauseable = false;
+        m_suspendable = false;
     }
-    if (obj.hasNonNullKey("PAUSELIMIT")) {
-        m_limit = obj.valueForKey("PAUSELIMIT").asInt();
+    if (obj.hasNonNullKey("TUPLE_SUSPEND_LIMIT")) {
+        m_tupleLimitForSuspendableFragments = obj.valueForKey("TUPLE_SUSPEND_LIMIT").asInt();
     } else {
-        m_limit = 1;
+        m_tupleLimitForSuspendableFragments = 1;
     }
 }
 

@@ -246,11 +246,13 @@ public:
     }
 
     bool advanceCOWIterator(TableTuple &tuple) {
-        return m_copyOnWriteContext->advanceIterator(tuple);
+        // XXX For multiple CoW contexts, need to differentiate between CoWs when advancing the iterator
+        return m_tableStreamer->advanceIterator(tuple);
     }
 
     void cleanupTuple(TableTuple tuple) {
-        m_copyOnWriteContext->cleanupTuple(tuple, false);
+        // XXX For multiple CoW contexts, need to differentiate between CoWs when cleaning up
+        m_tableStreamer->cleanupTuple(tuple, false);
     }
 
 
@@ -383,7 +385,7 @@ public:
      * Prepare table for a long running read.
      * Return true on success or false if it was already active.
      */
-    bool activateCopyOnWriteContext(CopyOnWriteType cowType,
+    bool activateCopyOnWriteContext(TableStreamType cowType,
                         int32_t partitionId,
                         CatalogId tableId);
 
@@ -706,9 +708,6 @@ private:
 
     // Provides access to all table streaming apparati, including snapshot (COW) and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
-
-    // Provides access to a copy on write context used by a long running read
-    boost::shared_ptr<ScanCopyOnWriteContext> m_copyOnWriteContext;
 
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;

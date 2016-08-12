@@ -1151,6 +1151,7 @@ public:
     T_ValueSet m_shuffles;
 };
 
+
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     initTable(1, 0);
 
@@ -1228,6 +1229,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
     ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
 }
 
+
 // Simple test that performs LRR activation on empty table, inserts tuples and iterates through table
 TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenLRRActivateFinish) {
     initTable(1, 0);
@@ -1238,7 +1240,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenLRRActivateFinish) {
     char config[4];
     ::memset(config, 0, 4);
     // activate snapshot
-    m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+    m_table->activateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN, 0, m_tableId);
     // insert tuples
     addRandomUniqueTuples(m_table, addedTupleCount);
     // do work - start reading the table
@@ -1265,7 +1267,7 @@ TEST_F(CopyOnWriteTest, BigLRRTest) {
         char config[4];
         ::memset(config, 0, 4);
 
-        m_table->activateCopyOnWriteContext(COPY_ON_WRITE_SCAN, 0, m_tableId);
+        m_table->activateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN, 0, m_tableId);
 
         T_ValueSet COWTuples;
         int totalInserted = 0;
@@ -1487,9 +1489,11 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     }
 }
 
+
 /**
  * Exercise the multi-COW.
  */
+
 TEST_F(CopyOnWriteTest, MultiStream) {
 
     // Constants
@@ -1641,6 +1645,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
  * another tuple immediately after writing the last one. It doesn't know how
  * many there are so it yields even if no more tuples will be delivered.
  */
+
 TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     const size_t tupleCount = 3;
     const size_t bufferSize = (sizeof(int32_t) * 3) + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
@@ -1667,6 +1672,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     ASSERT_EQ(origPendingCount, curPendingCount);
 }
 
+
 /**
  * Dummy TableStreamer for intercepting and tracking tuple notifications.
  */
@@ -1680,6 +1686,9 @@ public:
                                 TableStreamType streamType,
                                 const std::vector<std::string> &predicateStrings) {
         return false;
+    }
+
+    virtual void deactivateStream(TableStreamType streamType) {
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
@@ -1696,7 +1705,7 @@ public:
 
     virtual bool advanceIterator(TableTuple &tuple) { return false; }
 
-    virtual bool cleanupTuple(TableTuple tuple) { return false; }
+    virtual bool cleanupTuple(TableTuple &tuple, bool deleteTuple) { return false; }
 
     virtual bool notifyTupleInsert(TableTuple &tuple) { return false; }
 
@@ -1788,6 +1797,7 @@ public:
 };
 
 // Test the elastic scanner.
+
 TEST_F(CopyOnWriteTest, ElasticScanner) {
 
     const int NUM_PARTITIONS = 1;
