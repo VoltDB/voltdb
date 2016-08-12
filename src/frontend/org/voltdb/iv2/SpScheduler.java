@@ -239,6 +239,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Collections.sort(doneCounters);
         for (DuplicateCounterKey key : doneCounters) {
             DuplicateCounter counter = m_duplicateCounters.remove(key);
+            m_outstandingTxns.remove(key.m_txnId);
             VoltMessage resp = counter.getLastResponse();
             setRepairLogTruncationHandle(key.m_spHandle);
             if (resp != null) {
@@ -1037,32 +1038,35 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
     {
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
-        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle()));
+        final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
+        DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
+        boolean duplicateCounterDone = true;
 
-        if (txn != null) {
-            // If this is a restart, then we need to leave the transaction state around
-            if (!msg.isRestart()) {
-                m_outstandingTxns.remove(msg.getTxnId());
-                // Set the truncation handle here instead of when processing
-                // FragmentResponseMessage to avoid letting replicas think a
-                // fragment is done before the MP txn is fully committed.
-                //
-                // We have to use the spHandle from the fragment, not from the
-                // current CompleteTransactionMessage because it hasn't been
-                // executed yet. If we use the spHandle from the current
-                // completion message, it may be advancing the truncation handle
-                // before previous SPs are finished. This could happen when the
-                // MP we are completing is either a one-shot read MP or it
-                // didn't send any fragment to this partition.
-                boolean duplicateCounterDone = true;
-                if (counter != null) {
-                    duplicateCounterDone = counter.offer(msg) == DuplicateCounter.DONE;
-                }
-                if (m_isLeader && duplicateCounterDone) {
-                    assert txn.isDone();
-                    setRepairLogTruncationHandle(txn.m_spHandle);
-                }
-            }
+        if (msg.isRestart()) {
+            // Don't mark txn done for restarts
+            duplicateCounterDone = false;
+        }
+
+        if (counter != null) {
+            duplicateCounterDone = counter.offer(msg) == DuplicateCounter.DONE;
+        }
+
+        if (m_isLeader && duplicateCounterDone) {
+            // Set the truncation handle here instead of when processing
+            // FragmentResponseMessage to avoid letting replicas think a
+            // fragment is done before the MP txn is fully committed.
+            //
+            // We have to use the spHandle from the fragment, not from the
+            // current CompleteTransactionMessage because it hasn't been
+            // executed yet. If we use the spHandle from the current
+            // completion message, it may be advancing the truncation handle
+            // before previous SPs are finished. This could happen when the
+            // MP we are completing is either a one-shot read MP or it
+            // didn't send any fragment to this partition.
+            assert txn.isDone();
+            m_outstandingTxns.remove(msg.getTxnId());
+            m_duplicateCounters.remove(duplicateCounterKey);
+            setRepairLogTruncationHandle(txn.m_spHandle);
         }
 
         // The CompleteTransactionResponseMessage ends at the SPI. It is not
