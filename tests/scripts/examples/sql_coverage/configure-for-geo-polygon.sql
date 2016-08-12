@@ -36,7 +36,8 @@
 {@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], null"}
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions
 {@optionalfn = "_geofun"}
-{@plus10 = " "} -- You cannot add to a polygon
+{@plus10 = ""} -- You cannot add to a polygon
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "ID, AsText(PT1), AsText(POLY1), AsText(POLY2), AsText(POLY3)"}
 {@lhsstar = "LHS.ID, AsText(LHS.PT1), AsText(LHS.POLY1), AsText(LHS.POLY2), AsText(LHS.POLY3)"}
 {@updatecolumn = "POLY3"}

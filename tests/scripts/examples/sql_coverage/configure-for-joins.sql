@@ -21,7 +21,8 @@
 {@numcol = "NUM"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
-{@plus10 = "+ 10"}
+{@plus10 = " + 10"}
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "NUM"}
