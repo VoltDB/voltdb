@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
@@ -44,8 +46,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
-
-import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 

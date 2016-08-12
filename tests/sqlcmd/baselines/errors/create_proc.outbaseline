@@ -1,6 +1,11 @@
+Hack! Table t was found to be sometimes(?) lingering from unrelated prior tests.
+    Drop it conditionally to keep it from polluting show procedure output.
 
 drop table t if exists;
 Command succeeded.
+Expect a blank line output after this one.
+
+Things will not go well if this test is not starting with an empty class list.
 
 --- Empty Class List -----------------------
 
