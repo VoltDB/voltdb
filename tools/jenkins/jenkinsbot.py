@@ -237,18 +237,18 @@ class WorkerThread(Thread):
                 params = None
                 filename = None
                 try:
+                    # TODO get insert option from parse_text rather than inferring it
                     (query, params, filename) = jenkins_bot.parse_text(text, channel, user)
                 except IndexError:
                     jenkins_bot.logger.exception('Incorrect number or formatting of arguments')
                     if channel:
                         jenkins_bot.post_message(channel, 'Incorrect number or formatting of arguments\n\n' +
                                                  jenkins_bot.help_text)
-                # TODO (Femi) get commit option from parse_text rather than inferring it based on filename
                 if query and params and filename:
                     jenkins_bot.post_message(channel, 'Please wait..')
                     jenkins_bot.query_and_response(query, params, [channel], filename)
                 elif query and params:
-                    jenkins_bot.query([channel], query, params, commit=True)
+                    jenkins_bot.query([channel], query, params, insert=True)
         except KeyboardInterrupt:
             # Propagate the keyboard interrupt from the worker thread that received the shut-down command
             raise
@@ -265,7 +265,7 @@ class WorkerThread(Thread):
         :return: true if bot can act on incoming data - There is incoming data, it is text data, it's not from a bot,
         the text isn't in a file, the channel isn't in #general, #random, #junit which jenkinsbot is part of
         """
-        # TODO (Femi) rather than check all channels, just check if this is an direct message
+        # TODO rather than check all channels, just check if this is an direct message
         return (self.incoming.get('text', None) is not None and self.incoming.get('bot_id', None) is None
                 and self.incoming.get('file', None) is None and self.incoming['channel'] != GENERAL_CHANNEL
                 and self.incoming['channel'] != RANDOM_CHANNEL and self.incoming['channel'] != JUNIT)
@@ -371,7 +371,7 @@ class JenkinsBot(object):
         :param user: The user who wrote the text
         :return: The query, parameters, and filename derived from the text
         """
-        # TODO (Femi) replace with argparse or something similar
+        # TODO replace with argparse or something similar
 
         query = ''
         params = {}
@@ -483,14 +483,14 @@ class JenkinsBot(object):
 
         return query, params, filename
 
-    def query(self, channels, query, params, is_retry=False, commit=False):
+    def query(self, channels, query, params, is_retry=False, insert=False):
         """
         Make a query and return a table
         :param channels: Channels this query is for
         :param query: Query to execute
         :param params: Parameters for the query
         :param is_retry: If this call of the query is a retry. Will not attempt to retry after calling.
-        :param commit: This query is an insert or something else that needs to be committed
+        :param insert: This query is an insert so the data needs to be committed
         :return: Tuple of (headers, rows) as results
         """
 
@@ -506,7 +506,7 @@ class JenkinsBot(object):
             cursor = database.cursor()
             cursor.execute(query, params)
 
-            if commit:
+            if insert:
                 database.commit()
             else:
                 headers = list(cursor.column_names)  # List of strings
@@ -524,7 +524,7 @@ class JenkinsBot(object):
 
             # Try to reconnect only once
             if self.connect_to_slack() and not is_retry:
-                table = self.query(query, params, True, commit=commit)
+                table = self.query(query, params, True, insert=insert)
         finally:
             if cursor is not None:
                 cursor.close()
@@ -574,6 +574,16 @@ class JenkinsBot(object):
             'files.upload', channels=channels, content=filecontent, filetype='text', filename=filename
         )
 
+    def generate_html(self, tables, filename):
+        with open(filename, 'a') as html_file:
+            for table in tables:
+                if len(table) != 2:
+                    continue
+                headers = table[0]
+                rows = table[1]
+                table_html = tabulate(rows, headers, tablefmt="html")
+                html_file.write(table_html)
+
     def vertical_leaderboard(self, rows, headers):
         """
         Displays each row in the table as one over the other. Similar to mysql's '\G'
@@ -581,7 +591,7 @@ class JenkinsBot(object):
         :param rows: List of tuples representing the rows
         :return: A string representing the table vertically
         """
-        # TODO (Femi) encapsulate in a Leaderboard class
+        # TODO (Femi) encapsulate in Leaderboard class
         table = ''
         for i, row in enumerate(rows):
             rows[i] = list(row)
@@ -596,7 +606,7 @@ class JenkinsBot(object):
         Edit the rows to fit on most screens.
         :param rows: Rows to edit. This method is specific to leaderboards.
         """
-        # TODO (Femi) encapsulate in a Leaderboard class
+        # TODO (Femi) encapsulate in Leaderboard class
         for i, row in enumerate(rows):
             rows[i] = list(row)
             rows[i][0] = rows[i][0].replace('branch-2-', '')
@@ -613,7 +623,7 @@ class JenkinsBot(object):
         :param days: Number of days to go back in query
         :return: A completed leaderboard query for the jobs and empty params
         """
-        # TODO (Femi) encapsulate in a Leaderboard class
+        # TODO (Femi) encapsulate in Leaderboard class
         jobs_filter = map(lambda j: 'job="%s"' % j, jobs)
         job_params = ' OR '.join(jobs_filter)
         job_params = '(' + job_params + ')'
@@ -688,22 +698,24 @@ class JenkinsBot(object):
         self.logger.info(log)
         return log
 
-    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, jobs=None):
+    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, jobs=None, generate_html=False):
         """
         Perform a single query and response
         :param query: Query to run
         :param params: Parameters for query
         :param channels: Channels to respond to
-        :param filename: Filename for the post
+        :param filename: Filename for the post, or the html file
         :param vertical: Whether a vertical version of the table should be included
         :param edit: Whether the row entries should be edited
         :param jobs: Generate status logs for these jobs
         """
         table = self.query(channels, query, params)
         log = ''
-        if jobs is not None:
+        if jobs is not None and generate_html:
             log = self.get_log(jobs)
-        self.response([table], channels, filename, vertical, edit, log=log)
+            self.response([table], channels, filename, vertical, edit, log=log)
+        else:
+            self.response_html()
 
     def create_bug_issue(self, channel, summary, description, component, version, labels,
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
@@ -786,11 +798,12 @@ class JenkinsBot(object):
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
     help_text = """
-            usage: jenkinsbot <listen|master|core|system>
+            usage: jenkinsbot <listen|master|core|system|html>
                    listen - bring jenkinsbot online (do not use if already running)
                    master - post the master branch junit leaderboard on Slack
                    core - post the core extended junit leaderboard on Slack
                    system - post the master systems test leaderboard on Slack
+                   html - generate html files of the leaderboards
             """
     if not jenkinsbot.connect_to_slack():
         print 'Not able to connect to Slack. Is the "token" environment variable set?'
@@ -828,9 +841,20 @@ if __name__ == '__main__':
                 'systems-master-past30days.txt',
                 vertical=True
             )
+        elif sys.argv[1] == 'html':
+            master_query = jenkinsbot.leaderboard_query(MASTER_JOBS, days=30)
+            core_query = jenkinsbot.leaderboard_query(CORE_JOBS, days=7)
+            system_query = SL_QUERY
+            master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
+            core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
+            system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
+            jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html')
+            jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html')
+            jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html')
         else:
             print 'Command %s not found' % sys.argv[1]
             print help_text
     else:
         print 'Incorrect number of arguments'
         print help_text
+
