@@ -574,7 +574,7 @@ class JenkinsBot(object):
             'files.upload', channels=channels, content=filecontent, filetype='text', filename=filename
         )
 
-    def generate_html(self, tables, filename):
+    def generate_html(self, tables, filename, message=''):
         with open(filename, 'a') as html_file:
             table_html = """
 <style style="text/css">
@@ -601,6 +601,9 @@ tr:hover{
                 rows = table[1]
                 table_html += tabulate(rows, headers, tablefmt='html')
                 html_file.write(table_html)
+
+        if message:
+            self.post_message(ADMIN_CHANNEL, message)
 
     def vertical_leaderboard(self, rows, headers):
         """
@@ -716,7 +719,7 @@ tr:hover{
         self.logger.info(log)
         return log
 
-    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, jobs=None, generate_html=False):
+    def query_and_response(self, query, params, channels, filename, vertical=False, edit=False, jobs=None):
         """
         Perform a single query and response
         :param query: Query to run
@@ -729,7 +732,7 @@ tr:hover{
         """
         table = self.query(channels, query, params)
         log = ''
-        if jobs is not None and generate_html:
+        if jobs is not None:
             log = self.get_log(jobs)
             self.response([table], channels, filename, vertical, edit, log=log)
         else:
@@ -834,7 +837,7 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 query,
                 (),
-                [ADMIN_CHANNEL],
+                [JUNIT],
                 'master-past30days.txt',
                 vertical=True,
                 edit=True,
@@ -845,7 +848,7 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 query,
                 (),
-                [ADMIN_CHANNEL],
+                [JUNIT],
                 'coreextended-past7days.txt',
                 vertical=True,
                 edit=True,
@@ -855,7 +858,7 @@ if __name__ == '__main__':
             jenkinsbot.query_and_response(
                 SL_QUERY,
                 (),
-                [ADMIN_CHANNEL],
+                [JUNIT],
                 'systems-master-past30days.txt',
                 vertical=True
             )
@@ -866,9 +869,9 @@ if __name__ == '__main__':
             master_table = jenkinsbot.query(ADMIN_CHANNEL, master_query, ())
             core_table = jenkinsbot.query(ADMIN_CHANNEL, core_query, ())
             system_table = jenkinsbot.query(ADMIN_CHANNEL, system_query, ())
-            jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html')
-            jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html')
-            jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html')
+            jenkinsbot.generate_html([master_table], 'master-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/master-junit-leaderboard.html')
+            jenkinsbot.generate_html([core_table], 'core-junit-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/core-junit-leaderboard.html')
+            jenkinsbot.generate_html([system_table], 'systems-master-leaderboard.html', 'Leaderboard updated at http://ci.voltdb.lan/job/leaderboards/lastSuccessfulBuild/artifact/systems-master-leaderboard.html')
         else:
             print 'Command %s not found' % sys.argv[1]
             print help_text
