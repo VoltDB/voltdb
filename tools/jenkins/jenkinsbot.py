@@ -576,12 +576,30 @@ class JenkinsBot(object):
 
     def generate_html(self, tables, filename):
         with open(filename, 'a') as html_file:
+            table_html = """
+<style style="text/css">
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: verdana,arial,sans-serif;
+}
+
+th, td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+tr:hover{
+    background-color:#f5f5f5
+}
+</style>
+"""
             for table in tables:
                 if len(table) != 2:
                     continue
                 headers = table[0]
                 rows = table[1]
-                table_html = tabulate(rows, headers, tablefmt="html")
+                table_html = tabulate(rows, headers, tablefmt='html')
                 html_file.write(table_html)
 
     def vertical_leaderboard(self, rows, headers):
