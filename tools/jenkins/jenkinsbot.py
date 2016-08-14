@@ -599,7 +599,7 @@ tr:hover{
                     continue
                 headers = table[0]
                 rows = table[1]
-                table_html = tabulate(rows, headers, tablefmt='html')
+                table_html += tabulate(rows, headers, tablefmt='html')
                 html_file.write(table_html)
 
     def vertical_leaderboard(self, rows, headers):
