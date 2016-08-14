@@ -603,7 +603,7 @@ tr:hover{
                 html_file.write(table_html)
 
         if message:
-            self.post_message(ADMIN_CHANNEL, message)
+            self.post_message(JUNIT, message)
 
     def vertical_leaderboard(self, rows, headers):
         """
