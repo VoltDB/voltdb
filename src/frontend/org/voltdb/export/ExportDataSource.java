@@ -17,8 +17,6 @@
 
 package org.voltdb.export;
 
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -591,7 +589,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
             @Override
             public void run() {
                 try {
@@ -603,7 +601,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -612,7 +609,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("truncateExportToTxnId") {
             @Override
             public void run() {
                 try {
@@ -652,12 +649,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> sync(final boolean nofsync) {
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("sync") {
             @Override
             public void run() {
                 new SyncRunnable(nofsync).run();
             }
         };
+
         return stashOrSubmitTask(runnable, false, false);
     }
 
@@ -665,7 +663,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_closed = true;
         //If we are waiting at this allow to break out when close comes in.
         m_allowAcceptingMastership.release();
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("close") {
             @Override
             public void run() {
                 try {
@@ -683,7 +681,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("poll") {
             @Override
             public void run() {
                 try {
@@ -794,7 +792,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void discard() {
             checkDoubleFree();
-            RunnableWithES runnable = new RunnableWithES() {
+            RunnableWithES runnable = new RunnableWithES("discard") {
                 @Override
                 public void run() {
                     try {
@@ -860,7 +858,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         //In replicated only master will be doing this.
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("ack") {
             @Override
             public void run() {
                 try {
@@ -927,7 +925,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
         m_mastershipAccepted = true;
-        RunnableWithES runnable = new RunnableWithES() {
+        RunnableWithES runnable = new RunnableWithES("acceptMastership") {
             @Override
             public void run() {
                 try {
@@ -968,8 +966,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // Bound the queue. It shouldn't get to this high value.
                     // Log an error so that we know if it does get to the high value.
                     if (m_queuedActions.size() > 50) {
-                        exportLog.error("Queue for export source for generation " + m_generation +
-                                " is going beyond 50. Not queueing anymore events");
+
+                        StringBuilder builder = new StringBuilder();
+                        builder.append("Export task queue is filled up to: " + m_queuedActions.size());
+                        builder.append(". Not queueing anymore events beyond 50 for generation " + m_generation);
+                        builder.append(" and table " + m_tableName + ". The queue contains the following tasks:\n");
+                        for (RunnableWithES queuedR : m_queuedActions) {
+                            builder.append(queuedR.getTaskName() + "\t");
+                         }
+
+                        exportLog.error(builder.toString());
+
                         return Futures.immediateFuture(null);
                     }
                     if (setupTask) {
@@ -1029,14 +1036,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private abstract class RunnableWithES implements Runnable {
+
+        private final String m_taskName;
+
         private ListeningExecutorService m_executorService;
 
+        public RunnableWithES(String taskName){
+            m_taskName = taskName;
+        }
         public void setExecutorService(ListeningExecutorService executorService) {
             m_executorService = executorService;
         }
 
         public ListeningExecutorService getLocalExecutorService() {
             return m_executorService;
+        }
+
+        public String getTaskName() {
+            return m_taskName;
         }
     }
 }
