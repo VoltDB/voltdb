@@ -181,7 +181,6 @@ public class SnapshotScanAgent extends OpsAgent
         for (ClientResultRow row : clientResults) {
             clientSortedResults.addRow(
                     row.path,
-                    row.pathType,
                     row.nonce,
                     row.txnid,
                     row.created,
@@ -189,7 +188,8 @@ public class SnapshotScanAgent extends OpsAgent
                     row.tablesRequired,
                     row.tablesMissing,
                     row.tablesIncomplete,
-                    row.complete
+                    row.complete,
+                    row.pathType
                     );
         }
         request.aggregateTables[0] = clientSortedResults;
@@ -346,7 +346,6 @@ public class SnapshotScanAgent extends OpsAgent
                     row.hostId,
                     row.hostName,
                     row.path,
-                    row.pathType,
                     row.name,
                     row.txnid,
                     row.created,
@@ -358,7 +357,8 @@ public class SnapshotScanAgent extends OpsAgent
                     row.totalPartitions,
                     row.readable,
                     row.result,
-                    row.errMsg
+                    row.errMsg,
+                    row.pathType
                     );
         }
         return sortedResults;
@@ -607,7 +607,6 @@ public class SnapshotScanAgent extends OpsAgent
         result_columns[ii++] = new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID);
         result_columns[ii++] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("PATH", VoltType.STRING);
-        result_columns[ii++] = new ColumnInfo("PATHTYPE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("NAME", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("TXNID", VoltType.BIGINT);
         result_columns[ii++] = new ColumnInfo("CREATED", VoltType.BIGINT);
@@ -620,6 +619,7 @@ public class SnapshotScanAgent extends OpsAgent
         result_columns[ii++] = new ColumnInfo("READABLE", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+        result_columns[ii++] = new ColumnInfo("PATHTYPE", VoltType.STRING);
 
         return new VoltTable(result_columns);
     }
@@ -654,7 +654,6 @@ public class SnapshotScanAgent extends OpsAgent
 
     public static final ColumnInfo clientColumnInfo[] = new ColumnInfo[] {
             new ColumnInfo("PATH", VoltType.STRING),
-            new ColumnInfo("PATHTYPE", VoltType.STRING),
             new ColumnInfo("NONCE", VoltType.STRING),
             new ColumnInfo("TXNID", VoltType.BIGINT),
             new ColumnInfo("CREATED", VoltType.BIGINT),
@@ -662,7 +661,8 @@ public class SnapshotScanAgent extends OpsAgent
             new ColumnInfo("TABLES_REQUIRED", VoltType.STRING),
             new ColumnInfo("TABLES_MISSING", VoltType.STRING),
             new ColumnInfo("TABLES_INCOMPLETE", VoltType.STRING),
-            new ColumnInfo("COMPLETE", VoltType.STRING)
+            new ColumnInfo("COMPLETE", VoltType.STRING),
+            new ColumnInfo("PATHTYPE", VoltType.STRING)
     };
 
     private VoltTable constructClientResultsTable() {
