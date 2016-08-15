@@ -98,8 +98,7 @@ public class KafkaImportBenchmark {
 
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
-    private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
-    private static String PauseResumeTweak = "pauseresume";
+    private static String RUNNING_STATE = "Running";
 
     static List<Integer> importProgress = new ArrayList<Integer>();
 
@@ -140,9 +139,6 @@ public class KafkaImportBenchmark {
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
-
-        @Option(desc = "Tweak option set by apprunner")
-        String tweaktype = "";
 
         @Override
         public void validate() {
@@ -416,27 +412,19 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         do {
             Thread.sleep(END_WAIT * 1000);
+
             //}
             // importProgress is an array of sampled counts of the importedcounts table, showing import progress
             // samples are recorded by the checkTimer thread
-        } while (importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
-                    importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
-                    importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
+        } while (!RUNNING_STATE.equalsIgnoreCase(MatchChecks.getClusterState(client)) ||
+                importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
+                importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
+                importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
         long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
-
-        // in case of pause / resume tweak, let it drain longer
-        int trial = 3;
-        while (PauseResumeTweak.equalsIgnoreCase(config.tweaktype) && (--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows))) {
-            Thread.sleep(PAUSE_WAIT * 1000);
-            importStatValues = MatchChecks.getImportValues(client);
-            mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
-            importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
-            importRowCount = MatchChecks.getImportRowCount(client);
-        }
 
         // some counts that might help debugging....
         log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
