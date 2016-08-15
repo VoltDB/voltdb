@@ -867,12 +867,31 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     /*
  * get query to delete a table
  */
-    def String getQueryToDeleteTable() {
+    def String getQueryToDeleteTableAndView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
         String query = ""
 
         while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#deleteOnly") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToDeleteTableOnly() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#deleteOnly") {
         }
 
         while ((line = br.readLine()) != "#name") {
@@ -894,9 +913,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#name") {
         }
 
-        while ((line = br.readLine()) != null) {
+        /*while ((line = br.readLine()) != null) {
             query = query + line + "\n"
-        }
+        }*/
+
+        query = br.readLine()
+
 
         return query
     }

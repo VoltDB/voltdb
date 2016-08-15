@@ -681,7 +681,7 @@ ul.rightShowhideList {
         text-overflow: ellipsis;
     }
 
-
+.chartLeft { float:left;}
 
 /*accordion*/
 .menu_list {
@@ -3886,6 +3886,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     ul.drList li {
         margin-left: 0;
     }
+    .chartLeft {float:left; width: 146px; position: relative;top: -10px;}
 }
 
 @media (max-width: 479px) {

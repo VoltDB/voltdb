@@ -17,6 +17,15 @@ Command succeeded.
 drop table dropable if exists;
 Command succeeded.
 
+drop table my_table_1 if exists;
+Command succeeded.
+
+drop table my_table_2 if exists;
+Command succeeded.
+
+drop table my_table_3 if exists;
+Command succeeded.
+
 drop table prefixes if exists;
 Command succeeded.
 
