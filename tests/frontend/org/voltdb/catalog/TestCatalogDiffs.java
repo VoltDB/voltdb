@@ -353,17 +353,23 @@ public class TestCatalogDiffs extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
-
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "identical3.jar"));
         Catalog c3 = catalogForJar(testDir + File.separator + "identical3.jar");
+
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "identical4.jar"));
@@ -476,23 +482,36 @@ public class TestCatalogDiffs extends TestCase {
     public void testViewConversion() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
-        // Start with table A.
+        // Start with table A, B and a single table view.
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview1.jar"));
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "convertmatview1.jar");
+        Catalog catOriginalSingle = catalogForJar(testDir + File.separator + "convertmatview1.jar");
 
-        // Add table B and recompile
+        // table A, B and a join query view.
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
+        builder.addPartitionInfo("A", "C1");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview2.jar"));
+        Catalog catOriginalJoin = catalogForJar(testDir + File.separator + "convertmatview2.jar");
+
+        // table A, B and a normal table instead of a view.
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE TABLE MATVIEW(C1 BIGINT NOT NULL, NUM INTEGER);");
         builder.addPartitionInfo("A", "C1");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview1.jar"));
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "convertmatview1.jar");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview3.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "convertmatview3.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffRejected(catOriginalSingle, catUpdated);
+        verifyDiffRejected(catOriginalJoin, catUpdated);
     }
 
     public void testAddTableColumn() throws IOException {
@@ -908,6 +927,7 @@ public class TestCatalogDiffs extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addmatview1.jar"));
@@ -915,6 +935,8 @@ public class TestCatalogDiffs extends TestCase {
 
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addmatview2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "addmatview2.jar");
 
@@ -927,8 +949,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remmatview1.jar"));
@@ -937,6 +962,7 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remmatview2.jar"));
@@ -951,8 +977,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C, NUM) AS " +
                                  "\n    SELECT C3, COUNT(*) FROM A GROUP BY C3;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview1.jar"));
@@ -961,8 +990,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a slightly different view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C, NUM) AS " +
                                  "\n    SELECT C2, COUNT(*) FROM A GROUP BY C2;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C2, COUNT(*) FROM A JOIN B ON A.C1=B.C1 GROUP BY A.C2;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview2.jar"));
@@ -977,8 +1009,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview1.jar"));
@@ -987,9 +1022,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a quite different view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C2, C1, NUM) AS " +
                                  "\n    SELECT C2, C1, COUNT(*) FROM A GROUP BY C2, C1;");
-
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C2, COUNT(*) FROM A JOIN B ON A.C1=B.C1 GROUP BY A.C2;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview2.jar"));
@@ -1004,8 +1041,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addpredmatview1.jar"));
@@ -1014,8 +1054,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "addpredmatview2.jar"));
@@ -1030,8 +1073,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "droppredmatview1.jar"));
@@ -1040,8 +1086,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "droppredmatview2.jar"));
@@ -1056,8 +1105,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 < 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C1 > 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modpredmatview1.jar"));
@@ -1066,8 +1118,11 @@ public class TestCatalogDiffs extends TestCase {
         // without a view
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A WHERE C1 > 0 GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 WHERE A.C2 <= 0 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modpredmatview2.jar"));
@@ -1082,8 +1137,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "resrcmatview1.jar"));
@@ -1092,8 +1150,11 @@ public class TestCatalogDiffs extends TestCase {
         // without an added column (should work with empty table)
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "resrcmatview2.jar"));
@@ -1108,8 +1169,11 @@ public class TestCatalogDiffs extends TestCase {
         // with a view
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
                                  "\n    SELECT C1, COUNT(*) FROM A GROUP BY C1;");
+        builder.addLiteralSchema("\nCREATE VIEW MATVIEWJOIN(C1, NUM) AS " +
+                                 "\n    SELECT A.C1, COUNT(*) FROM A JOIN B ON A.C1=B.C2 GROUP BY A.C1;");
         builder.addPartitionInfo("A", "C1");
         builder.addProcedures(org.voltdb.catalog.ProcedureA.class);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "remtablematview1.jar"));
@@ -1117,9 +1181,9 @@ public class TestCatalogDiffs extends TestCase {
 
         // without a view
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("B", "C1");
-        builder.addProcedures(org.voltdb.catalog.ProcedureB.class);
+        builder.addLiteralSchema("\nCREATE TABLE C (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("C", "C1");
+        builder.addProcedures(org.voltdb.catalog.ProcedureC.class);
         assertTrue("Failed to compile schema", builder.compile(testDir +  File.separator + "remtablematview2.jar"));
         Catalog catUpdated = catalogForJar(testDir +  File.separator + "remtablematview2.jar");
 
