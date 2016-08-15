@@ -973,10 +973,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
             m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
+        final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                 if (txn != null && txn.isDone()) {
                     setRepairLogTruncationHandle(message.getSpHandle());
                 }
@@ -993,6 +993,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             // doing duplicate suppresion: all done.
             return;
+        } else {
+            if (txn != null && txn.isDone()) {
+                setRepairLogTruncationHandle(message.getSpHandle());
+            }
         }
 
         m_mailbox.send(message.getDestinationSiteId(), message);
@@ -1055,22 +1059,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (txnDone) {
             m_outstandingTxns.remove(msg.getTxnId());
 
-            if (m_isLeader && txn != null && counter != null) {
-                // Set the truncation handle here instead of when processing
-                // FragmentResponseMessage to avoid letting replicas think a
-                // fragment is done before the MP txn is fully committed.
-                //
-                // We have to use the spHandle from the fragment, not from the
-                // current CompleteTransactionMessage because it hasn't been
-                // executed yet. If we use the spHandle from the current
-                // completion message, it may be advancing the truncation handle
-                // before previous SPs are finished. This could happen when the
-                // MP we are completing is either a one-shot read MP or it
-                // didn't send any fragment to this partition.
-                assert txn.isDone();
-                m_duplicateCounters.remove(duplicateCounterKey);
-                setRepairLogTruncationHandle(txn.m_spHandle);
-            }
+            // Set the truncation handle here instead of when processing
+            // FragmentResponseMessage to avoid letting replicas think a
+            // fragment is done before the MP txn is fully committed.
+            assert txn == null || txn.isDone();
+            m_duplicateCounters.remove(duplicateCounterKey);
+            setRepairLogTruncationHandle(msg.getSpHandle());
         }
 
         // The CompleteTransactionResponseMessage ends at the SPI. It is not
