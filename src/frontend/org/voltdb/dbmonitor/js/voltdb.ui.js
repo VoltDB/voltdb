@@ -446,7 +446,14 @@ function convertArrayOfObjectsToCSV(args) {
     return result;
 }
 
-function downloadCSV(args,whichChart) {
+function downloadCSV(event,args,whichChart) {
+    if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1 ||
+    navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
+        event.preventDefault()
+        event.stopPropagation()
+        return;
+    }
+
     var data, filename, link;
     var graphView = $("#graphView").val()
     var chartData = {}
@@ -665,6 +672,20 @@ var loadPage = function (serverName, portid) {
         }
     }, 5000);
 
+    showEnableDisableDownloadBtn()
+    function showEnableDisableDownloadBtn(){
+         if ((navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) ||
+         navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
+            $(".downloadCls").attr("src","css/resources/images/icon_download_disabled.png");
+            $(".downloadCls").attr("title","Download file feature is not supported in this browser.")
+            $(".downloadCls").css( 'cursor', 'default' );
+
+         } else {
+            $(".downloadCls").attr("src","css/resources/images/downloadBtn.png");
+            $(".downloadCls").attr("title","Download data as CSV")
+            $(".downloadCls").css( 'cursor', 'pointer' );
+         }
+    }
 
     var showAdminPage = function () {
         if (!VoltDbAdminConfig.isAdmin) {

@@ -221,7 +221,7 @@
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
                                     <h1>Server CPU <span class="activeServerName" title=""></span>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "cpu-data" }, "cpu");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -230,7 +230,7 @@
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
                                     <h1>Server RAM<span class="activeServerName" title=""></span>
-                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "memory-data" }, "memory");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -239,7 +239,7 @@
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
                                     <h1><div class="chartLeft">Cluster Latency (99th percentile, ms)</div>
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "latency-data" }, "latency");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -248,7 +248,7 @@
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
                                     <h1>Cluster Transactions (tps)
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "clusterTransaction-data" }, "transaction");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -257,7 +257,7 @@
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
                                     <h1>Partition Idle Time
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "partitionIdle-data" }, "partitionIdle");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -273,7 +273,7 @@
                             <div id="ChartDrReplicationRate" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Database Replication (DR)
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "DrReplication-data" }, "dataReplication");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
@@ -282,7 +282,7 @@
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
                                     <h1>Command Log Statistics
-                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV({ filename: "CommandLog-data" }, "commandLog");'> <img src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
                                     <div class="clear"></div>
                                     </h1>
                                 </div>
