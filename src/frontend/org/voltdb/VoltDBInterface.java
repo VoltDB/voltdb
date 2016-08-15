@@ -16,13 +16,12 @@
  */
 package org.voltdb;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -30,6 +29,10 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.settings.ClusterSettings;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
@@ -140,6 +143,14 @@ public interface VoltDBInterface
             long currentTxnTimestamp,
             byte[] deploymentBytes,
             byte[] deploymentHash);
+
+    /**
+     * Updates the cluster setting of this VoltDB
+     * @param settings the {@link ClusterSettings} update candidate
+     * @param expectedVersionId version of the current instance (same as the Zookeeper node)
+     * @return a {@link Pair} of {@link CatalogContext} and {@link CatalogSpecificPlanner}
+     */
+    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

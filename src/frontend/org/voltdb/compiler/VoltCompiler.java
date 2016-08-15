@@ -84,6 +84,7 @@ import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -670,9 +671,10 @@ public class VoltCompiler {
             VoltDBInterface voltdb = VoltDB.instance();
             // try to get a catalog context
             CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+            ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
             int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
             Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
-            int hostcount = deployment != null ? deployment.getHostcount() : 1;
+            int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
             int kfactor = deployment != null ? deployment.getKfactor() : 0;
             int sitesPerHost = deployment != null ? deployment.getSitesperhost() : 8;
             boolean isPro = MiscUtils.isPro();

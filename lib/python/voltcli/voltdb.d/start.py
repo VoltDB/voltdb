@@ -36,6 +36,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster', default=1),
         VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None),
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+        VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -46,4 +47,6 @@ def start(runner):
         runner.abort_with_help('You must specify the --host option.')
     runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
     runner.args.extend(['hostcount', runner.opts.hostcount])
+    if runner.opts.enableadd:
+        runner.args.extend(['enableadd'])
     runner.go()
