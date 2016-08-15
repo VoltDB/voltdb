@@ -199,7 +199,8 @@ public class MatchChecks {
         try {
             sysinfo = client.callProcedure("@SystemInformation", "OVERVIEW").getResults()[0];
         } catch (Exception e) {
-            log.error("Stats query failed");
+            log.warn("system info query failed");
+            return "";
         }
 
         for (int i = 0; i < sysinfo.getRowCount(); i++)
