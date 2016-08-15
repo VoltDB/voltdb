@@ -432,6 +432,20 @@ public class SQLParser extends SQLPatternFactory
             "([^;\\s]*)" +    // optional subcommand (group 2)
             InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern EchoToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "echo" +          // required ECHO command token
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            "(.*)" +          // Make everything that follows optional (group 2).
+            "$",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern EchoErrorToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "echoerror" +     // required ECHOERROR command token
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            "(.*)" +          // Make everything that follows optional (group 2).
+            "$",
+            Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile(
             "^\\s*" +         // optional indent at start of line
             "(?:exit|quit)" + // keyword alternatives, synonymous so don't bother capturing
@@ -1908,8 +1922,44 @@ public class SQLParser extends SQLPatternFactory
             assert(false);
         }
 
-
         // trivial empty batch: no lines are non-blank or non-comments
         return true;
+    }
+
+    /**
+     * Parse ECHO statement for sqlcmd.
+     * The result will be "" if the user just typed ECHO.
+     * @param statement  statement to parse
+     * @return           Argument text or NULL if statement wasn't recognized
+     */
+    public static String parseEchoStatement(String statement)
+    {
+        Matcher matcher = EchoToken.matcher(statement);
+        if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                return matcher.group(2);
+            }
+            return "";
+        }
+        return null;
+    }
+
+    /**
+     * Parse ECHOERROR statement for sqlcmd.
+     * The result will be "" if the user just typed ECHOERROR.
+     * @param statement  statement to parse
+     * @return           Argument text or NULL if statement wasn't recognized
+     */
+    public static String parseEchoErrorStatement(String statement) {
+        Matcher matcher = EchoErrorToken.matcher(statement);
+        if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                return matcher.group(2);
+            }
+            return "";
+        }
+        return null;
     }
 }
