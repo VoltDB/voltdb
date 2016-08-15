@@ -40,8 +40,8 @@ c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
 
--- query with lots of predicates in where clause - this will generate
--- stackoverflowerror for the thread it's executing
+echoerror Running a query with lots of predicates in the where clause
+echoerror      - expect this to generate a stackoverflowerror for the thread it's executing.
 select * FROM t WHERE c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
