@@ -634,7 +634,8 @@ public class FunctionSQL extends Expression {
 
             case FUNC_CURRENT_TIMESTAMP :
                 name            = Tokens.T_CURRENT_TIMESTAMP;
-                parseList       = optionalIntegerParamList;
+                parseList       = emptyParamList;
+                parseListAlt    = noParamList;
                 isValueFunction = true;
                 break;
 
@@ -2065,7 +2066,8 @@ public class FunctionSQL extends Expression {
             case FUNC_CURRENT_TIMESTAMP : {
                 int precision = DateTimeType.defaultTimestampFractionPrecision;
 
-                if (nodes[0] != null) {
+                // Because this function supports empty parameter list, the nodes array could be empty.
+                if (nodes.length > 0 && nodes[0] != null) {
                     precision = ((Number) nodes[0].valueData).intValue();
                 }
 
