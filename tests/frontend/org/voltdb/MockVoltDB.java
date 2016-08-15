@@ -23,6 +23,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -55,16 +56,18 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.settings.ClusterSettings;
 
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import java.io.IOException;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.PathsType;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -285,7 +288,9 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, new byte[] {}, null, new byte[] {}, 0) {
+        Supplier<ClusterSettings> settings = Suppliers.ofInstance(ClusterSettings.create());
+
+        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -477,6 +482,12 @@ public class MockVoltDB implements VoltDBInterface
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
             byte[] deploymentHash)
+    {
+        throw new UnsupportedOperationException("unimplemented");
+    }
+
+    @Override
+    public Pair<CatalogContext, CatalogSpecificPlanner> settingsUpdate(ClusterSettings settings, int expectedVersionId)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

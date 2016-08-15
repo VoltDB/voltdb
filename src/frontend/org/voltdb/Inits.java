@@ -394,6 +394,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
+                        m_rvdb.m_clusterSettings,
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
@@ -422,7 +423,7 @@ public class Inits {
             if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
-                                               m_deployment.getCluster().getHostcount(),
+                                               m_rvdb.m_clusterSettings.get().hostcount(),
                                                m_rvdb.getReplicationRole()))
                 {
                     // validateLicense logs. Exit call is here for testability.

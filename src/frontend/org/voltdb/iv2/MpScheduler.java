@@ -100,6 +100,11 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.updateCatalog(diffCmds, context, csp);
     }
 
+    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_pendingTasks.updateSettings(context, csp);
+    }
+
     @Override
     public void shutdown()
     {

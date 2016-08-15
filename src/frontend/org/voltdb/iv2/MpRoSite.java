@@ -214,6 +214,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public TheHashinator getCurrentHashinator()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
