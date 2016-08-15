@@ -357,12 +357,12 @@ class VoltDatabase:
 
         if add_server and server_ip != '':
             verb = 'add'
-
+        host_count = self.get_host_count()
         if verb == 'start':
             if pause.lower() == 'true':
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary, '-c', str(host_count)]
             else:
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c', str(host_count)]
         elif verb == 'add':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--host=' + server_ip]
         else:
@@ -628,3 +628,8 @@ class VoltDatabase:
                 return create_response('process not found', 200)
         except Exception, err:
             return create_response(str(err), 500)
+
+    def get_host_count(self):
+        current_db = HTTPListener.Global.DATABASES.get(self.database_id)
+        host_count = len(current_db['members'])
+        return host_count
