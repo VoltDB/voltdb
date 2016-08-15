@@ -727,6 +727,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            if (!message.isReadOnly()) {
+                setRepairLogTruncationHandle(spHandle);
+            }
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
