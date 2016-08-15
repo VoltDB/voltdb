@@ -98,7 +98,6 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -1084,54 +1083,47 @@ public abstract class CatalogUtil {
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
-        int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
-        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
-
-        if (!config.validate()) {
-            throw new RuntimeException(config.getErrorMsg());
-        } else {
-            Cluster catCluster = catalog.getClusters().get("cluster");
-            // copy the deployment info that is currently not recorded anywhere else
-            Deployment catDeploy = catCluster.getDeployment().get("deployment");
-            catDeploy.setSitesperhost(sitesPerHost);
-            catDeploy.setKfactor(kFactor);
-            // copy partition detection configuration from xml to catalog
-            String defaultPPDPrefix = "partition_detection";
-            if (deployment.getPartitionDetection().isEnabled()) {
-                catCluster.setNetworkpartition(true);
-                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                if (deployment.getPartitionDetection().getSnapshot() != null) {
-                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-                }
-                else {
-                    sched.setPrefix(defaultPPDPrefix);
-                }
+        Cluster catCluster = catalog.getClusters().get("cluster");
+        // copy the deployment info that is currently not recorded anywhere else
+        Deployment catDeploy = catCluster.getDeployment().get("deployment");
+        catDeploy.setSitesperhost(sitesPerHost);
+        catDeploy.setKfactor(kFactor);
+        // copy partition detection configuration from xml to catalog
+        String defaultPPDPrefix = "partition_detection";
+        if (deployment.getPartitionDetection().isEnabled()) {
+            catCluster.setNetworkpartition(true);
+            CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+            SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+            if (deployment.getPartitionDetection().getSnapshot() != null) {
+                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
             }
             else {
-                catCluster.setNetworkpartition(false);
+                sched.setPrefix(defaultPPDPrefix);
             }
+        }
+        else {
+            catCluster.setNetworkpartition(false);
+        }
 
-            catCluster.setAdminport(deployment.getAdminMode().getPort());
-            catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
+        catCluster.setAdminport(deployment.getAdminMode().getPort());
+        catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
 
-            setSystemSettings(deployment, catDeploy);
+        setSystemSettings(deployment, catDeploy);
 
-            catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
+        catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
 
-            // copy schema modification behavior from xml to catalog
-            if (cluster.getSchema() != null) {
-                catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
-            }
-            else {
-                // Don't think we can get here, deployment schema guarantees a default value
-                hostLog.warn("Schema modification setting not found. " +
-                        "Forcing default behavior of UpdateCatalog to modify database schema.");
-                catCluster.setUseddlschema(false);
-            }
+        // copy schema modification behavior from xml to catalog
+        if (cluster.getSchema() != null) {
+            catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
+        }
+        else {
+            // Don't think we can get here, deployment schema guarantees a default value
+            hostLog.warn("Schema modification setting not found. " +
+                    "Forcing default behavior of UpdateCatalog to modify database schema.");
+            catCluster.setUseddlschema(false);
         }
     }
 

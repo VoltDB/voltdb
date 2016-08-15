@@ -37,7 +37,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +49,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -105,6 +103,7 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -748,7 +747,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
 
-            modifyIfNecessaryDeploymentHostCount(m_config, readDepl.deployment, determination.hostCount);
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = m_config.m_startAction.doesRejoin();
@@ -1083,7 +1081,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
                                     m_replicationActive.get(),
-                                    m_configuredNumberOfPartitions,m_catalogContext.getDeployment().getCluster().getHostcount());
+                                    m_configuredNumberOfPartitions,m_catalogContext.getClusterSettings().hostcount());
                     m_producerDRGateway.start();
                     m_producerDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
@@ -1182,7 +1180,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (!isRejoin && !m_joining) {
                 try {
-                    m_messenger.waitForAllHostsToBeReady(m_catalogContext.getDeployment().getCluster().getHostcount());
+                    m_messenger.waitForAllHostsToBeReady(m_catalogContext.getClusterSettings().hostcount());
                 } catch (Exception e) {
                     hostLog.fatal("Failed to announce ready state.");
                     VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
@@ -2169,36 +2167,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    Optional<byte []> modifyIfNecessaryDeploymentHostCount(Configuration config, DeploymentType depl, int hostCount) {
-        Optional<byte[]> deploymentBytes = Optional.empty();
-
-        if ((depl.getCluster().getKfactor()+1) > hostCount) {
-            VoltDB.crashLocalVoltDB(
-                    "Number of cluster members " + hostCount + " must be greater than ksafety "
-                  + depl.getCluster().getKfactor(), false, null
-                  );
-            return Optional.empty();
-        }
-        if (hostCount != VoltDB.UNDEFINED && depl.getCluster().getHostcount() != hostCount) {
-            depl.getCluster().setHostcount(hostCount);
-            String remarshalled = null;
-            try {
-                remarshalled = CatalogUtil.getDeployment(depl, true /* pretty print indent */);
-            } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to save deployment configuration", false, e);
-                return Optional.empty();
-            }
-            deploymentBytes = Optional.of(remarshalled.getBytes(StandardCharsets.UTF_8));
-            try (FileWriter fw = new FileWriter(getConfigLogDeployment(config))) {
-                fw.write(remarshalled);
-            } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to save deployment configuration", false, e);
-                return Optional.empty();
-            }
-        }
-        return deploymentBytes;
-    }
-
     ReadDeploymentResults readPrimedDeployment(Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
@@ -2232,11 +2200,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 loadPathConfiguration(config);
                 if (config.m_hostCount == VoltDB.UNDEFINED) {
                     config.m_hostCount = 1;
-                }
-                Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(
-                        config, deployment, config.m_hostCount);
-                if (changed.isPresent()) {
-                    deploymentBytes = changed.get();
                 }
             } else {
                 config.m_hostCount = deployment.getCluster().getHostcount();
@@ -2452,6 +2415,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         };
 
+        ClusterType clusterType = readDepl.deployment.getCluster();
+
         MeshProber criteria = MeshProber.builder()
                 .coordinators(m_config.m_coordinators)
                 .versionChecker(m_versionChecker)
@@ -2460,7 +2425,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .bare(bareAtStartup)
                 .configHash(CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes))
                 .hostCountSupplier(hostCountSupplier)
-                .kfactor(readDepl.deployment.getCluster().getKfactor())
+                .kfactor(clusterType.getKfactor())
                 .paused(m_config.m_isPaused)
                 .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
                 .addAllowed(m_config.m_enableAdd)
@@ -2525,7 +2490,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (m_myHostId == 0) {
             m_clusterSettings.store(m_messenger.getZK());
         }
+        ClusterConfig config = new ClusterConfig(
+                m_clusterSettings.get().hostcount(),
+                clusterType.getSitesperhost(),
+                clusterType.getKfactor()
+                );
 
+        if (!config.validate()) {
+            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
+        }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
     }
