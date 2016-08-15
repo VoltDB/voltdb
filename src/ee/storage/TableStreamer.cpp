@@ -132,7 +132,6 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     assert(false);
             }
             if (context) {
-                std::cout << "TableStreamer handleActivation" << std::endl;
                 TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType);
                 switch (retcode) {
                     case TableStreamerContext::ACTIVATION_SUCCEEDED:
