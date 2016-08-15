@@ -99,6 +99,7 @@ public class KafkaImportBenchmark {
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
     private static final int PAUSE_WAIT = 10; // wait for server resume from pause mode
+    private static String PauseResumeTweak = "pauseresume";
 
     static List<Integer> importProgress = new ArrayList<Integer>();
 
@@ -139,6 +140,9 @@ public class KafkaImportBenchmark {
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
+
+        @Option(desc = "Tweak option set by apprunner")
+        String tweaktype = "";
 
         @Override
         public void validate() {
@@ -426,7 +430,7 @@ public class KafkaImportBenchmark {
 
         // in case of pause / resume tweak, let it drain longer
         int trial = 3;
-        while ((--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows))) {
+        while (PauseResumeTweak.equalsIgnoreCase(config.tweaktype) && (--trial > 0) && ((importStatValues[OUTSTANDING_REQUESTS] > 0) || (importRows < config.expected_rows))) {
             Thread.sleep(PAUSE_WAIT * 1000);
             importStatValues = MatchChecks.getImportValues(client);
             mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
