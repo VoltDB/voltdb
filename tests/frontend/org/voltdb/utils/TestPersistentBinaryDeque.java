@@ -330,6 +330,132 @@ public class TestPersistentBinaryDeque {
     }
 
     @Test
+    public void testReaderIsEmpty() throws Exception {
+        System.out.println("Running testReaderIsEmpty");
+        BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
+        assertTrue(reader.isEmpty());
+        assertNull(reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+        assertTrue(reader.isEmpty());
+
+        m_pbd.offer(defaultContainer());
+        assertFalse(reader.isEmpty());
+
+        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        retval.discard();
+        assertTrue(reader.isEmpty());
+
+        // more than one segment
+        for (int i = 0; i < 50; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertFalse(reader.isEmpty());
+        for (int i = 0; i < 50; i++) {
+            retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            retval.discard();
+            if (i<49) {
+                assertFalse(reader.isEmpty());
+            } else {
+                assertTrue(reader.isEmpty());
+            }
+        }
+    }
+
+    @Test
+    public void testReaderNumObjects() throws Exception {
+        System.out.println("Running testReaderNumObjects");
+        String cursor1 = "testPBD1";
+        BinaryDequeReader reader1 = m_pbd.openForRead(cursor1);
+        int count = 0;
+        int totalAdded = 0;
+        assertEquals(count, reader1.getNumObjects());
+        assertNull(reader1.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+        assertEquals(count, reader1.getNumObjects());
+
+        count++;
+        m_pbd.offer(defaultContainer());
+        totalAdded++;
+        assertEquals(count, reader1.getNumObjects());
+
+        // a second reader
+        String cursor2 = "testPBD2";
+        BinaryDequeReader reader2 = m_pbd.openForRead(cursor2);
+
+        pollDiscard(reader1);
+        assertEquals(count-1, reader1.getNumObjects());
+        assertEquals(count, reader2.getNumObjects());
+        pollDiscard(reader2);
+        count--;
+        assertEquals(count, reader1.getNumObjects());
+        assertEquals(count, reader2.getNumObjects());
+
+        // offer segments
+        for (int i = 0; i < 50; i++) {
+            m_pbd.offer(defaultContainer());
+            totalAdded++;
+            count++;
+            assertEquals(count, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+        }
+
+        for (int i = 0; i < 50; i++) {
+            pollDiscard(reader1);
+            assertEquals(count-1, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+            pollDiscard(reader2);
+            count--;
+            assertEquals(count, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+        }
+
+        final int segmentfullCount = 47;
+        // start a 3rd reader after segments have been deleted
+        String cursor3 = "testPBD3";
+        BinaryDequeReader lateReader = m_pbd.openForRead(cursor3);
+        int toAddForLate = totalAdded%segmentfullCount;
+        assertEquals(count+toAddForLate, lateReader.getNumObjects());
+
+        // offer segments with all 3 readers
+        for (int i = 0; i < 50; i++) {
+            m_pbd.offer(defaultContainer());
+            count++;
+            assertEquals(count, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+            assertEquals(count+toAddForLate, lateReader.getNumObjects());
+        }
+
+        for (int i = 0; i < 50; i++) {
+            pollDiscard(reader1);
+            assertEquals(count-1, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+            assertEquals(count+toAddForLate, lateReader.getNumObjects());
+            pollDiscard(reader2);
+            assertEquals(count-1, reader1.getNumObjects());
+            assertEquals(count-1, reader2.getNumObjects());
+            assertEquals(count+toAddForLate, lateReader.getNumObjects());
+            pollDiscard(lateReader);
+            count--;
+            assertEquals(count, reader1.getNumObjects());
+            assertEquals(count, reader2.getNumObjects());
+            assertEquals(count+toAddForLate, lateReader.getNumObjects());
+        }
+
+        assert(count==0);
+        for (int i=0; i < toAddForLate; i++) {
+            pollDiscard(lateReader);
+            assertEquals(toAddForLate-i-1, lateReader.getNumObjects());
+        }
+
+        assertEquals(0, reader1.getNumObjects());
+        assertEquals(0, reader2.getNumObjects());
+        assertEquals(0, lateReader.getNumObjects());
+    }
+
+    private void pollDiscard(BinaryDequeReader reader) throws IOException {
+        BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        retval.discard();
+    }
+
+    @Test
     public void testOfferThenPoll() throws Exception {
         System.out.println("Running testOfferThanPoll");
         BinaryDequeReader reader = m_pbd.openForRead(CURSOR_ID);
