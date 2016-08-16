@@ -32,6 +32,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.settings.ClusterSettings;
 
 import com.google_voltpatches.common.primitives.Longs;
 
@@ -66,6 +67,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     protected Procedure m_catProc;
     protected Cluster m_cluster;
+    protected ClusterSettings m_settings;
     protected SiteProcedureConnection m_site;
     private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
@@ -103,11 +105,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     void initSysProc(SiteProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
-            Procedure catProc, Cluster cluster) {
+            Procedure catProc, Cluster cluster,
+            ClusterSettings settings) {
 
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
+        m_settings = settings;
         m_loadedProcedureSet = loadedProcedureSet;
 
         init();

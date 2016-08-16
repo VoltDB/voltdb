@@ -1,1 +1,3 @@
+Running a query with lots of predicates in the where clause
+     - expect this to generate a stackoverflowerror for the thread it's executing.
 Encountered stack overflow error. Try reducing the number of predicate expressions in the query.
