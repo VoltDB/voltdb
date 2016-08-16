@@ -64,6 +64,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         m_sitePool.updateCatalog(diffCmds, context, csp);
     }
 
+    synchronized void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_sitePool.updateSettings(context, csp);
+    }
+
     void shutdown()
     {
         if (m_sitePool != null) {

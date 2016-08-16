@@ -71,6 +71,8 @@ public interface SystemProcedureExecutionContext {
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle);
 
+    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp);
+
     public TheHashinator getCurrentHashinator();
 
     public Procedure ensureDefaultProcLoaded(String procName);
