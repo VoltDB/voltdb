@@ -905,8 +905,6 @@ public class LocalCluster implements VoltServerConfig {
             //For new CLI dont pass deployment for probe.
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
-            //with probe there is no probe
-            cmdln.setForceVoltdbCreate(false);
         }
 
         if (this.m_additionalProcessEnv != null) {
