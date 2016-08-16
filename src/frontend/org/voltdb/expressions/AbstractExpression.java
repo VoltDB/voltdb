@@ -728,7 +728,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                                                  JSONObject               jobj) throws JSONException {
         if (jobj.has(AbstractExpression.SortMembers.SORT_COLUMNS.name())) {
             sortExpressions.clear();
-            sortDirections.clear();
+            if (sortDirections != null) {
+                sortDirections.clear();
+            }
             JSONArray jarray = jobj.getJSONArray(SortMembers.SORT_COLUMNS.name());
             int size = jarray.length();
             for (int ii = 0; ii < size; ii += 1) {

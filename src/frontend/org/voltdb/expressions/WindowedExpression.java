@@ -137,50 +137,6 @@ public class WindowedExpression extends AbstractExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject jobj) throws JSONException {
-        assert(false);
-        super.loadFromJSONObject(jobj);
-        m_partitionByExpressions.clear();
-
-        /*
-         * Load the array of partition expressions.  The AbstractExpression class
-         * has a useful routine to do just this for us.
-         */
-        AbstractExpression.loadFromJSONArrayChild(m_partitionByExpressions, jobj, Members.PARTITION_BY_EXPRESSIONS.name(), null);
-
-        /*
-         * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
-         * as we need to get a sort expression and a sort order for each column.
-         */
-        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, m_orderByDirections, jobj);
-    }
-
-    @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        assert(false);
-        super.toJSONString(stringer);
-        assert (m_orderByExpressions.size() == m_orderByDirections.size());
-        // Be careful.  This node may have changed to be a
-        // non-windowed expression.  Don't serialize the partition by and sort
-        // expressions unless we are really a windowed expression.
-        if (getExpressionType().getExpressionClass() == WindowedExpression.class) {
-            /*
-             * Serialize the partition expressions.  The orderby
-             * expressions which are not redundant with the PartitionBy
-             * expressions will be serialized in the orderby node which preceeds
-             * the PartitionByPlanNode.
-             */
-            stringer.key(Members.PARTITION_BY_EXPRESSIONS.name()).array();
-            for (int idx = 0; idx < m_partitionByExpressions.size(); idx += 1) {
-                stringer.object();
-                m_partitionByExpressions.get(idx).toJSONString(stringer);
-                stringer.endObject();
-            }
-            stringer.endArray();
-        }
-    }
-
-    @Override
     public void finalizeValueTypes() {
         m_valueType = VoltType.BIGINT;
         m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
