@@ -169,7 +169,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     }
 
     public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
@@ -199,7 +198,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     // NON-UNIQUE RANK SCAN TEST
     //
     public void testRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
@@ -528,6 +526,32 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         int nc = vt.getColumnCount();
         while (vt.advanceRow()) {
             assertEquals(vt.getLong(nc-2), vt.getLong(nc-1));
+        }
+    }
+
+    /*
+     * This test just makes sure that we can execute the @Explain
+     * sysproc on a windowed aggregate.  At one time this failed due to
+     * an NPE.  When deserializing a JSON string the resulting plan is not
+     * the same as the original plan.  We don't serialize sort orders
+     * for windowed aggregates.
+     */
+    public void testExplainPlan() throws Exception {
+        Client client = getClient();
+        String sql = "select rank() over ( partition by A, B order by C ) from T;";
+
+        ClientResponse cr;
+        try {
+            cr = client.callProcedure("@Explain", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            // We just care that the explain has succeeded and not
+            // caused an NPE.  The results here are not used, but they
+            // are useful for diagnosing errors.  So we leave them
+            // here.
+            VoltTable vt = cr.getResults()[0];
+            assertTrue(true);
+        } catch (Exception ex) {
+            fail("Exception on @Explain of windowed expression");
         }
     }
 
