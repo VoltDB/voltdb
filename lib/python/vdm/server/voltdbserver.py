@@ -299,9 +299,11 @@ class VoltDatabase:
         volt_db_dir = get_voltdb_dir()
         verb = 'init'
         if is_forced == 'true':
-            volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '--force', '-C', filename]
+            volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '--force', '-C', filename, '-D',
+                           self.get_volt_server_data_folder(sid)]
         else:
-            volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '-C', filename]
+            volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '-C', filename, '-D',
+                           self.get_volt_server_data_folder(sid)]
 
         G.OUTFILE_COUNTER += 1
         out_filename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH,
@@ -360,9 +362,11 @@ class VoltDatabase:
         host_count = self.get_host_count()
         if verb == 'start':
             if pause.lower() == 'true':
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary, '-c', str(host_count)]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary, '-c',
+                              str(host_count), '-D', self.get_volt_server_data_folder(sid)]
             else:
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c', str(host_count)]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c',
+                              str(host_count), '-D', self.get_volt_server_data_folder(sid)]
         elif verb == 'add':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--host=' + server_ip]
         else:
