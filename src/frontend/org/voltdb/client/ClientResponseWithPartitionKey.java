@@ -23,23 +23,17 @@ import org.voltdb.client.ClientResponse;
  * Packages up the data to be sent back to the client as a stored
  * procedure response for a partition
  *
- */
-public class PartitionClientResponse {
+ */public class ClientResponseWithPartitionKey {
 
-    private final Object m_partitionKey;
+    public final Object m_partitionKey;
     private ClientResponse m_clientResponse;
 
-    public PartitionClientResponse(Object partitionKey, ClientResponse clientResponse) {
+    ClientResponseWithPartitionKey(Object partitionKey, ClientResponse clientResponse) {
         m_partitionKey = partitionKey;
         m_clientResponse = clientResponse;
-    }
-
-    public Object getPartitionKey() {
-        return m_partitionKey;
     }
 
     public ClientResponse getClientResponse() {
         return m_clientResponse;
     }
-
 }

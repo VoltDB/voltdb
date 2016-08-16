@@ -29,5 +29,5 @@ public interface AllPartitionProcedureCallback {
      * @param clientResponse Responses for each partition to the stored procedure invocation this callback is associated with
      * @throws Exception on any Exception.
      */
-    abstract public void clientCallback(PartitionClientResponse[] clientResponse) throws Exception;
+    abstract public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception;
 }

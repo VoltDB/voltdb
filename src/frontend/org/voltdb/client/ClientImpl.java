@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -818,19 +819,19 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
 
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
         setPartitions();
         int partitionCount = m_partitionKeys.size();
-        PartitionClientResponse[] responses = new PartitionClientResponse[partitionCount];
+        ClientResponseWithPartitionKey[] responses = new ClientResponseWithPartitionKey[partitionCount];
         for (int key : m_partitionKeys) {
             args[0] = key;
             partitionCount--;
             ClientResponse response =  callProcedure(procedureName, args);
-            responses[partitionCount] = new PartitionClientResponse(key, response);
+            responses[partitionCount] = new ClientResponseWithPartitionKey(key, response);
         }
         return responses;
     }
@@ -844,24 +845,16 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         setPartitions();
         int partitionCount = m_partitionKeys.size();
-        PartitionClientResponse[] responses = new PartitionClientResponse[partitionCount];
-        CountDownLatch responseWaiter = new CountDownLatch(partitionCount);
+        ClientResponseWithPartitionKey[] responses = new ClientResponseWithPartitionKey[partitionCount];
+        AtomicInteger counter = new AtomicInteger(partitionCount);
         for (int key : m_partitionKeys) {
             args[0] = key;
             partitionCount--;
-            PartitionProcedureCallback cb = new PartitionProcedureCallback(responseWaiter, key, partitionCount, responses);
+            PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
             if(!callProcedure(cb, procedureName, args)){
                 return false;
             }
         }
-
-        try {
-            responseWaiter.await();
-            callback.clientCallback(responses);
-        } catch (Exception e) {
-            throw new IOException (e);
-        }
-
         return true;
     }
 
@@ -898,11 +891,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     class PartitionProcedureCallback implements ProcedureCallback {
 
-        final CountDownLatch m_responseWaiter;
-        final PartitionClientResponse[] m_responses;
+        final ClientResponseWithPartitionKey[] m_responses;
         final int m_index;
         final Object m_partitionKey;
-
+        final AtomicInteger m_partitionCounter;
+        final AllPartitionProcedureCallback m_cb;
         /**
          * Callback initialization
          * @param responseWaiter The count down latch
@@ -910,17 +903,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array
          */
-        public PartitionProcedureCallback(CountDownLatch responseWaiter, Object partitionKey, int index, PartitionClientResponse[] responses){
-            m_responseWaiter = responseWaiter;
+        public PartitionProcedureCallback(AtomicInteger counter, Object partitionKey, int index, ClientResponseWithPartitionKey[] responses, AllPartitionProcedureCallback cb) {
+            m_partitionCounter = counter;
             m_partitionKey = partitionKey;
             m_index = index;
             m_responses = responses;
+            m_cb = cb;
         }
 
         @Override
-        public void clientCallback(ClientResponse clientResponse) {
-            m_responses[m_index] = new PartitionClientResponse(m_partitionKey, clientResponse);
-            m_responseWaiter.countDown();
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, clientResponse);
+            m_partitionCounter.decrementAndGet();
+            if(m_partitionCounter.get() == 0){
+                m_cb.clientCallback(m_responses);
+            }
         }
     }
 }

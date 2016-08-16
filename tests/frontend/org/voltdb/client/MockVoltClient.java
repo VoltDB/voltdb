@@ -384,7 +384,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)  throws IOException, NoConnectionsException, ProcCallException{
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)  throws IOException, NoConnectionsException, ProcCallException{
         // TODO Auto-generated method stub
         return null;
     }

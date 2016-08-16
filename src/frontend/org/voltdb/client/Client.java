@@ -424,22 +424,24 @@ public interface Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 
     /**
-     * <p>Synchronously invoke a procedure. Blocks until a result is available. A {@link ProcCallException}
-     * is thrown if the response is anything other then success.</p>
+     * <p>Synchronously invoke a single partition procedure. The call will iterate through all the partitions and
+     * execute the stored procedure one partition at a time, and return response for each partition. Blocks until a result is available.
+     * A {@link ProcCallException} is thrown if the response is anything other then success.</p>
      *
      * @param procedureName <code>class</code> name (not qualified by package) of the partitioned java procedure to execute.
      * @param params  list of procedure's parameter values.
-     * @return {@link PartitionClientResponse} instance of procedure call results.
+     * @return {@link ClientResponseWithPartitionKey} instance of procedure call results.
      * @throws ProcCallException on any VoltDB specific failure.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * <p>Asynchronously invoke a replicated procedure, by providing a callback that will be invoked by the single
-     * thread backing the client instance when the procedure invocation receives a response.
+     * <p>Asynchronously invoke a single partition procedure, by providing a callback that will be invoked by the single
+     * thread backing the client instance when the procedure invocation receives a response. The call will iterate through all the partitions and
+     * execute the stored procedure one partition at a time, and return response for each partition.
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
      * blocking callbacks. If there is backpressure this call will block until the invocation is queued. If configureBlocking(false) is invoked
      * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
