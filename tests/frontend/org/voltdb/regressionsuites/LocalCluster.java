@@ -336,7 +336,8 @@ public class LocalCluster implements VoltServerConfig {
             buildDir(buildDir).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j);
+            log4j(log4j).
+            setForceVoltdbCreate(true);
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
@@ -909,6 +910,7 @@ public class LocalCluster implements VoltServerConfig {
             //For new CLI dont pass deployment for probe.
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
+            cmdln.setForceVoltdbCreate(false);
         }
 
         if (this.m_additionalProcessEnv != null) {
