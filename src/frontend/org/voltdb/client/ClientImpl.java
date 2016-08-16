@@ -821,10 +821,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
 
-        if(!m_distributer.isPartitionProcedure(procedureName)){
-            throw new IOException(procedureName + " is not a partition procedure.");
-        }
-
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
         setPartitions();
@@ -841,11 +837,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     @Override
     public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
-            Object... params)  throws IOException, NoConnectionsException, ProcCallException {
-
-        if(!m_distributer.isPartitionProcedure(procedureName)){
-            throw new IOException(procedureName + " is not a partition procedure.");
-        }
+            Object... params) throws IOException, NoConnectionsException, ProcCallException {
 
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
@@ -873,6 +865,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return true;
     }
 
+    /**
+     * Set up partitions.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
     private void setPartitions() throws IOException, NoConnectionsException, ProcCallException {
         if(m_partitionKeys == null){
             m_partitionKeys = new ArrayList<Integer>();
@@ -884,12 +882,34 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
     }
 
+   /**
+    * Return a list of partition keys
+    * @throws ProcCallException on any VoltDB specific failure.
+    * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+    * @throws IOException if there is a Java network or connection problem.
+    */
+    public List<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
+        setPartitions();
+        return m_partitionKeys;
+    }
+
+    /**
+     * Procedure call back used in {@link ClientImpl#callAllPartitionProcedure(AllPartitionProcedureCallback, String, Object...)}
+     */
     class PartitionProcedureCallback implements ProcedureCallback {
 
         final CountDownLatch m_responseWaiter;
         final PartitionClientResponse[] m_responses;
         final int m_index;
         final Object m_partitionKey;
+
+        /**
+         * Callback initialization
+         * @param responseWaiter The count down latch
+         * @param partitionKey  The partition where the call back works on
+         * @param index  The index for PartitionClientResponse
+         * @param responses The final result array
+         */
         public PartitionProcedureCallback(CountDownLatch responseWaiter, Object partitionKey, int index, PartitionClientResponse[] responses){
             m_responseWaiter = responseWaiter;
             m_partitionKey = partitionKey;
