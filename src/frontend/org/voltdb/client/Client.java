@@ -422,4 +422,35 @@ public interface Client {
      */
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
+
+    /**
+     * <p>Synchronously invoke a procedure. Blocks until a result is available. A {@link ProcCallException}
+     * is thrown if the response is anything other then success.</p>
+     *
+     * @param procName <code>class</code> name (not qualified by package) of the procedure to execute. The procedure must be partitioned.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return {@link ClientResponse} instance of procedure call results.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)
+            throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>Asynchronously invoke a replicated procedure, by providing a callback that will be invoked by the single
+     * thread backing the client instance when the procedure invocation receives a response.
+     * See the {@link Client} class documentation for information on the negative performance impact of slow or
+     * blocking callbacks. If there is backpressure this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     *
+     * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
+     * @param procName class name (not qualified by package) of the procedure to execute. The procedure must be partitioned.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName, Object... params)
+            throws IOException, NoConnectionsException, ProcCallException;
 }

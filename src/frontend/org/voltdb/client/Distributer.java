@@ -1403,4 +1403,9 @@ class Distributer {
     long getProcedureTimeoutNanos() {
         return m_procedureCallTimeoutNanos;
     }
+
+    public boolean isPartitionProcedure (String procName) {
+        final Procedure proc = m_procedureInfo.get(procName);
+        return !(proc != null && proc.multiPart);
+    }
 }

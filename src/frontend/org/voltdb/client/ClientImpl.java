@@ -22,9 +22,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -69,7 +71,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
-
+    private List<Integer> m_partitionKeys;
     /**
      * These threads belong to the network thread pool
      * that invokes callbacks. These threads are "blessed"
@@ -812,6 +814,93 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     {
         synchronized(m_vblGlobals) {
             return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
+        }
+    }
+
+    @Override
+    public PartitionClientResponse[] callAllPartitionProcedure(String procedureName, Object... params)
+            throws IOException, NoConnectionsException, ProcCallException {
+
+        if(!m_distributer.isPartitionProcedure(procedureName)){
+            throw new IOException(procedureName + " is not a partition procedure.");
+        }
+
+        Object[] args = new Object[params.length + 1];
+        System.arraycopy(params, 0, args, 1, params.length);
+        setPartitions();
+        int partitionCount = m_partitionKeys.size();
+        PartitionClientResponse[] responses = new PartitionClientResponse[partitionCount];
+        for (int key : m_partitionKeys) {
+            args[0] = key;
+            partitionCount--;
+            ClientResponse response =  callProcedure(procedureName, args);
+            responses[partitionCount] = new PartitionClientResponse(key, response);
+        }
+        return responses;
+    }
+
+    @Override
+    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
+            Object... params)  throws IOException, NoConnectionsException, ProcCallException {
+
+        if(!m_distributer.isPartitionProcedure(procedureName)){
+            throw new IOException(procedureName + " is not a partition procedure.");
+        }
+
+        Object[] args = new Object[params.length + 1];
+        System.arraycopy(params, 0, args, 1, params.length);
+
+        setPartitions();
+        int partitionCount = m_partitionKeys.size();
+        PartitionClientResponse[] responses = new PartitionClientResponse[partitionCount];
+        CountDownLatch responseWaiter = new CountDownLatch(partitionCount);
+        for (int key : m_partitionKeys) {
+            args[0] = key;
+            partitionCount--;
+            PartitionProcedureCallback cb = new PartitionProcedureCallback(responseWaiter, key, partitionCount, responses);
+            if(!callProcedure(cb, procedureName, args)){
+                return false;
+            }
+        }
+
+        try {
+            responseWaiter.await();
+            callback.clientCallback(responses);
+        } catch (Exception e) {
+            throw new IOException (e);
+        }
+
+        return true;
+    }
+
+    private void setPartitions() throws IOException, NoConnectionsException, ProcCallException {
+        if(m_partitionKeys == null){
+            m_partitionKeys = new ArrayList<Integer>();
+            VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
+            VoltTable keys = results[0];
+            for (int k = 0; k < keys.getRowCount(); k++) {
+                m_partitionKeys.add((int)(keys.fetchRow(k).getLong((1))));
+            }
+        }
+    }
+
+    class PartitionProcedureCallback implements ProcedureCallback {
+
+        final CountDownLatch m_responseWaiter;
+        final PartitionClientResponse[] m_responses;
+        final int m_index;
+        final Object m_partitionKey;
+        public PartitionProcedureCallback(CountDownLatch responseWaiter, Object partitionKey, int index, PartitionClientResponse[] responses){
+            m_responseWaiter = responseWaiter;
+            m_partitionKey = partitionKey;
+            m_index = index;
+            m_responses = responses;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            m_responses[m_index] = new PartitionClientResponse(m_partitionKey, clientResponse);
+            m_responseWaiter.countDown();
         }
     }
 }
