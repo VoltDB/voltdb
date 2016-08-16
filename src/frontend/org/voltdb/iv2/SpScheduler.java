@@ -1058,13 +1058,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         if (txnDone) {
             m_outstandingTxns.remove(msg.getTxnId());
-
-            // Set the truncation handle here instead of when processing
-            // FragmentResponseMessage to avoid letting replicas think a
-            // fragment is done before the MP txn is fully committed.
-            assert txn == null || txn.isDone();
             m_duplicateCounters.remove(duplicateCounterKey);
-            setRepairLogTruncationHandle(msg.getSpHandle());
+
+            if (txn != null) {
+                // Set the truncation handle here instead of when processing
+                // FragmentResponseMessage to avoid letting replicas think a
+                // fragment is done before the MP txn is fully committed.
+                assert txn.isDone();
+                setRepairLogTruncationHandle(txn.m_spHandle);
+            }
         }
 
         // The CompleteTransactionResponseMessage ends at the SPI. It is not
