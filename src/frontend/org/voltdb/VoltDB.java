@@ -36,6 +36,7 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import org.aeonbits.owner.ConfigFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -47,15 +48,17 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.SettingsException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.compiler.deploymentfile.PathsType;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -323,7 +326,9 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
+            /*
+             *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
+             */
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
@@ -533,7 +538,9 @@ public class VoltDB {
                     m_enableAdd = true;
                 } else if (arg.equals("noadd")) {
                     m_enableAdd = false;
-                } else if (arg.equals("replica")) {
+                } else if (arg.equals("enableadd")) {
+                    m_enableAdd = true;
+                }else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -574,7 +581,7 @@ public class VoltDB {
                     m_ipcPort = Integer.valueOf(portStr);
                 }
                 else if (arg.equals("forcecatalogupgrade")) {
-                    hostLog.info("Forced catalog upgrade will occur due to command line option.");
+                    System.out.println("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
                 }
                 // version string override for testing online upgrade
@@ -620,6 +627,12 @@ public class VoltDB {
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
+            }
+            /*
+             *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
+             */
+            if (m_forceCatalogUpgrade) {
+                hostLog.info("Forced catalog upgrade will occur due to command line option.");
             }
 
             // If no action is specified, issue an error.
@@ -673,6 +686,22 @@ public class VoltDB {
         private boolean isInitialized() {
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
+        }
+
+        public Map<String,String> asClusterSettingsMap() {
+            if (ConfigFactory.getProperty(ClusterSettings.CONFIG_DIR) == null) try {
+                File confDH = new File(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
+                ConfigFactory.setProperty(ClusterSettings.CONFIG_DIR, confDH.getPath());
+            } catch (IOException e) {
+                throw new SettingsException("failed to resolve the cluster settings directory", e);
+            }
+            return ImmutableMap.<String, String>builder()
+                    .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
+                    .build();
+        }
+
+        public ClusterSettings asClusterSettings() {
+            return ClusterSettings.create(asClusterSettingsMap());
         }
 
         /**

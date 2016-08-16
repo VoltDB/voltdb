@@ -52,7 +52,6 @@ public class VoltZK {
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
     public static final String rejoinLock = "/db/rejoin_lock";
-    public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
@@ -120,6 +119,12 @@ public class VoltZK {
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
 
+    // Settings base
+    public static final String settings_base = "/db/settings";
+
+    // Cluster settings
+    public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -134,6 +139,8 @@ public class VoltZK {
             leaders_globalservice,
             lastKnownLiveNodes,
             syncStateMachine,
+            settings_base,
+            cluster_settings,
             catalogUpdateBlockers,
             request_truncation_snapshot
     };

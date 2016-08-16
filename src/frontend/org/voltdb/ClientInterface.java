@@ -1955,4 +1955,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         return true;
     }
+
+    public AuthUser getInternalUser() {
+        return m_catalogContext.get().authSystem.getInternalAdminUser();
+    }
 }
