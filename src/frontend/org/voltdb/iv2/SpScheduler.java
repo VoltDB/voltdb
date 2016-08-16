@@ -978,7 +978,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(message.getSpHandle());
+                    setRepairLogTruncationHandle(txn.m_spHandle);
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -995,7 +995,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return;
         } else {
             if (txn != null && txn.isDone()) {
-                setRepairLogTruncationHandle(message.getSpHandle());
+                setRepairLogTruncationHandle(txn.m_spHandle);
             }
         }
 
