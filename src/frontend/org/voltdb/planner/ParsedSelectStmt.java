@@ -838,15 +838,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             switch (windowedExpression.getExpressionType()) {
             case AGGREGATE_WINDOWED_RANK:
                 if (orderByExpressions.size() == 0) {
-                    throw new PlanningErrorException("Windowed RANK() expressions need an order by expression.");
+                    throw new PlanningErrorException("Windowed RANK() expressions need an ORDER BY expression.");
                 }
                 if (orderByExpressions.size() > 1) {
                     // This is perhaps slightly misleading.
-                    throw new PlanningErrorException("Windowed RANK() expressions can have only one order by expression in their window.");
+                    throw new PlanningErrorException("Windowed RANK() expressions can have only one ORDER BY expression in their window.");
                 }
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
-                    throw new PlanningErrorException("Windowed RANK() expressions can have only integer or TIMESTAMP value types in the order by expression of their window.");
+                    throw new PlanningErrorException("Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
                 }
             }
         }
