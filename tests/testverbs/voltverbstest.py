@@ -61,6 +61,7 @@ mesh = Opt('host', 'mesh', str, 2)
 config = Opt('config', 'deployment', str, 2)
 voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
+add = Opt('add', 'enableadd', None, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -143,7 +144,8 @@ volt_opts = {'create': [admin,
                        mesh,
                        licensefile,
                        pause,
-                       replica]
+                       replica,
+                       add]
              }
 
 volt_opts_mandatory = {'create': [],
@@ -171,7 +173,7 @@ volt_opts_default = {
     'rejoin': {placementgroup.javaname: '0'},
     'add': {placementgroup.javaname: '0'},
     'init': {},
-    'start': {placementgroup.javaname: '0', mesh.javaname: "\"\"", hostcount.javaname: '1'}
+    'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""}
 }
 
 # regular expression for pre-process the actual output before comparison
@@ -231,7 +233,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
     if expectedOut:
         haddiff = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "doest not match expected:\n" + expectedOut + "\n"
+            description = "Generate stdout:\n" + stdout + "\n" + "doest not match expected:\n" + expectedOut + + "\nTest Failed!\n\n"
             haddiff = True
         else:
             description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
@@ -242,7 +244,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
         haddiff = False
         if stderr != expectedErr:
             haddiff = True
-            description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\n\n"
+            description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\nTest Failed!\n\n"
         else:
             description = "Generate expected stderr:\n" + stderr + "Test Passed!\n\n"
         reportout.write(description)
@@ -252,7 +254,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
 
     # match the verbs
     if output_str.find(verb) != 0:
-        description = "Generate java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\n\n"
+        description = "Generate java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
 
@@ -266,7 +268,7 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
             expected_tokens.append(k)
     if set(output_tokens) != set(expected_tokens):
         description = "Generate java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(
-            expected_tokens) + "\n"
+            expected_tokens) + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
 
@@ -313,7 +315,7 @@ def sanitize(text):
 
 def gen_config(mandatory_opts, all_ops, count, expected_opts={}):
     opts = []
-    i = 0  # pseudo optional value
+    i = 1  # pseudo optional value
     for opt in mandatory_opts + random.sample(all_ops, count):
         if not opt.datatype:
             o = '--' + opt.pyname
