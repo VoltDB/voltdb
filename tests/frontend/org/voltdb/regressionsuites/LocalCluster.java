@@ -336,8 +336,7 @@ public class LocalCluster implements VoltServerConfig {
             buildDir(buildDir).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j).
-            setForceVoltdbCreate(true);
+            log4j(log4j);
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
@@ -578,6 +577,11 @@ public class LocalCluster implements VoltServerConfig {
             for (String name : this.m_additionalProcessEnv.keySet()) {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
             }
+        }
+        if (clearLocalDataDirectories) {
+            cmdln.setForceVoltdbCreate(true);
+        } else {
+            cmdln.setForceVoltdbCreate(false);
         }
 
         //If we are initializing lets wait for it to finish.
