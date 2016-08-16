@@ -293,6 +293,7 @@ class VoltDatabase:
         # Gets deployment.xml for this database.
         deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(self.database_id)
         filename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH, 'deployment.xml'))
+        config_path = os.path.realpath(self.get_volt_server_data_folder(sid))
         deployment_file = open(filename, 'w')
         deployment_file.write(deployment_content)
         deployment_file.close()
@@ -300,10 +301,10 @@ class VoltDatabase:
         verb = 'init'
         if is_forced == 'true':
             volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '--force', '-C', filename, '-D',
-                           self.get_volt_server_data_folder(sid)]
+                           config_path]
         else:
             volt_db_cmd = ['nohup', os.path.join(volt_db_dir, 'voltdb'), verb, '-C', filename, '-D',
-                           self.get_volt_server_data_folder(sid)]
+                           config_path]
 
         G.OUTFILE_COUNTER += 1
         out_filename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH,
@@ -335,6 +336,7 @@ class VoltDatabase:
         start a local server process. recover if recover is true else create.
         """
         # if server is not found bail out.
+        config_path = os.path.realpath(self.get_volt_server_data_folder(sid))
         server = HTTPListener.Global.SERVERS.get(sid)
         if not server:
             return 1
@@ -363,10 +365,10 @@ class VoltDatabase:
         if verb == 'start':
             if pause.lower() == 'true':
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary, '-c',
-                              str(host_count), '-D', self.get_volt_server_data_folder(sid)]
+                              str(host_count), '-D', config_path]
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c',
-                              str(host_count), '-D', self.get_volt_server_data_folder(sid)]
+                              str(host_count), '-D', config_path]
         elif verb == 'add':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--host=' + server_ip]
         else:
