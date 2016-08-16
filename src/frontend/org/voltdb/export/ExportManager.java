@@ -568,8 +568,8 @@ public class ExportManager
 
         // If the export source changes before the previous generation drains
         // then the outstanding exports will go to the new source when export resumes.
-        int tableCount = 0;
         int connCount = 0;
+        int tableCount = 0;
         for (Connector conn : connectors) {
             // skip disabled connectors
             if (!conn.getEnabled() || conn.getTableinfo().isEmpty()) {
@@ -604,16 +604,16 @@ public class ExportManager
             config.put(targetName, connConfig);
         }
         m_processorConfig = config;
-        m_exportTablesCount = tableCount;
         m_connCount = connCount;
+        m_exportTablesCount = tableCount;
     }
 
-    public static int getExportTablesCount() {
-        return m_self.m_exportTablesCount;
+    public int getExportTablesCount() {
+        return m_exportTablesCount;
     }
 
-    public static int getConnCount() {
-        return m_self.m_connCount;
+    public int getConnCount() {
+        return m_connCount;
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)

@@ -53,7 +53,6 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
     private final String m_clusterTag;
-    private BundleWrapper m_wrapper;
 
     public ImportProcessor(
             int myHostId,
@@ -119,8 +118,8 @@ public class ImportProcessor implements ImportDataProcessor {
 
         FormatterBuilder formatterBuilder = config.getFormatterBuilder();
         try {
-            m_wrapper = m_bundles.get(bundleJar);
-            if (m_wrapper == null) {
+            BundleWrapper wrapper = m_bundles.get(bundleJar);
+            if (wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
 
                     Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
@@ -134,7 +133,7 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    m_wrapper = new BundleWrapper(o, bundle);
+                    wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
                     Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -143,17 +142,17 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                    m_wrapper = new BundleWrapper(reference.newInstance(), null);
+                    wrapper = new BundleWrapper(reference.newInstance(), null);
                 }
-                String name = m_wrapper.getImporterType();
+                String name = wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                m_bundlesByName.put(name, m_wrapper);
-                m_bundles.put(bundleJar, m_wrapper);
+                m_bundlesByName.put(name, wrapper);
+                m_bundles.put(bundleJar, wrapper);
             }
-            m_wrapper.configure(properties, formatterBuilder);
+            wrapper.configure(properties, formatterBuilder);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);
@@ -162,11 +161,13 @@ public class ImportProcessor implements ImportDataProcessor {
 
     @Override
     public int getPartitionsCount() {
-        if (m_wrapper != null) {
-            return m_wrapper.getConfigsCount();
-        } else {
-            return 0;
+        int count = 0;
+        for (BundleWrapper wapper : m_bundles.values()) {
+            if (wapper != null) {
+                count += wapper.getConfigsCount();
+            }
         }
+        return count;
     }
 
     @Override

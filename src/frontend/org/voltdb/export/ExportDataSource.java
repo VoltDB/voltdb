@@ -62,7 +62,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
