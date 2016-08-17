@@ -424,13 +424,30 @@ public interface Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 
     /**
-     * <p>Synchronously invoke a single partition procedure. The call will iterate through all the partitions and
-     * execute the stored procedure one partition at a time, and return response for each partition. Blocks until a result is available.
-     * A {@link ProcCallException} is thrown if the response is anything other then success.</p>
+     * <p>
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
+     * The call will iterate through all the partitions and execute the stored procedure one partition at a time, and return an aggregated response
+     * from each partition. Blocks until a result is available. A {@link ProcCallException} is thrown if the response from a partition is anything other then success.
+     * This method is very useful when you want to run a stored procedure in every partition but do not want to use a multi-partition procedure.
+     * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
+     * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
+     * such as large deletes.
+     *</p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter. It is assumed that the PARAMETER is always zero
+     * by default. In other words, do not specify <strong>PARAMETER</strong> in the stored procedures used in this call.
+     * When creating a class stored procedures, the first argument in the procedure's run method is reserved for the partition key, which matches the partition column type.
+     * The partition key is used to find the destination partition.
+     * For example, if a store procedure has two parameters of long type and partition column of string type, the run method should be
+     * <pre>
+     *     public VoltTable[] run(String partiyionKey id, long param1, long param2)
+     * </pre>
      *
+     * <p>
+     * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
+     * </p>
      * @param procedureName <code>class</code> name (not qualified by package) of the partitioned java procedure to execute.
-     * @param params  list of procedure's parameter values.
-     * @return {@link ClientResponseWithPartitionKey} instance of procedure call results.
+     * @param params  vararg list of procedure's parameter values.
+     * @return {@link ClientResponseWithPartitionKey} instances of procedure call results.
      * @throws ProcCallException on any VoltDB specific failure.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
@@ -439,17 +456,35 @@ public interface Client {
             throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * <p>Asynchronously invoke a single partition procedure, by providing a callback that will be invoked by the single
-     * thread backing the client instance when the procedure invocation receives a response. The call will iterate through all the partitions and
-     * execute the stored procedure one partition at a time, and return response for each partition.
+     * <p>
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
+     * The call will iterate through all the partitions and asynchronously execute the stored procedure one partition at a time.
+     * When all partition executions return responses, the provided callback will be invoked.
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
-     * blocking callbacks. If there is backpressure this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     * blocking callbacks. If there is backpressure this call will block until the invocation on a partition is queued. If configureBlocking(false) is invoked
+     * then the execution on the partition will return immediately. Then {@link ClientResponseWithPartitionKey} for this partition will not have {@link ClientResponse}.
+     * Check the return values to determine if queueing actually took place on each partition.
+     * This method is very useful when you want to run a stored procedure in every partition but you do not want to use a multi-partition procedure.
+     * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
+     * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
+     * such as large deletes.
+     * </p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter. It is assumed that the PARAMETER is always zero
+     * by default. In other words, do not specify <strong>PARAMETER</strong> in the stored procedures used in this call.
+     * When creating a class stored procedures, the first argument in the procedure's run method is reserved for the partition key, which matches the partition column type.
+     * The partition key is used to find the destination partition.
+     * For example, if a store procedure has two parameters of long type and partition column of string type, the run method should be
+     * <pre>
+     *     public VoltTable[] run(String partiyionKey id, long param1, long param2)
+     * </pre>
      *
+     * <p>
+     * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
+     * </p>
      * @param callback {@link AllPartitionProcedureCallback} that will be invoked with procedure results.
      * @param procedureName class name (not qualified by package) of the partitioned java procedure to execute.
-     * @param params  list of procedure's parameter values.
-     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @param params  vararg list of procedure's parameter values.
+     * @return <code>false</code> if the procedures on all partition are not queued and <code>true</code> otherwise.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      * @throws ProcCallException on any VoltDB specific failure.
