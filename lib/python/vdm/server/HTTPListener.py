@@ -1210,34 +1210,6 @@ class StartDatabaseAPI(MethodView):
                                  500)
 
 
-class RecoverDatabaseAPI(MethodView):
-    """Class to handle request to start servers on all nodes of a database."""
-
-    @staticmethod
-    def put(database_id):
-        """
-        Starts VoltDB database servers on all nodes for the specified database
-        Args:
-            database_id (int): The id of the database that should be started
-        Returns:
-            Status string indicating if the database start request was sent successfully
-        """
-
-        try:
-            if 'pause' in request.args:
-                pause = request.args.get('pause')
-            else:
-                pause = "false"
-
-            database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(True, pause)
-            return response
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'status':500, 'statusString': str(err)}),
-                                 500)
-
-
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
 
@@ -1390,35 +1362,6 @@ class StartLocalServerAPI(MethodView):
 
             server = voltdbserver.VoltDatabase(database_id)
             return server.check_and_start_local_server(sid, pause, database_id, force, False)
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
-                                 500)
-
-
-class RecoverServerAPI(MethodView):
-    """Class to handle request to issue recover cmd on this local server."""
-
-    @staticmethod
-    def put(database_id):
-        """
-        Issues recover cmd on this local server
-        Args:
-            database_id (int): The id of the database that should be started
-        Returns:
-            Status string indicating if the request was sent successfully
-        """
-
-        try:
-            sid = -1
-            if 'pause' in request.args:
-                pause = request.args.get('pause')
-
-            if 'id' in request.args:
-                sid = int(request.args.get('id'))
-            server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, pause, database_id, True)
-            return response
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1820,12 +1763,10 @@ def main(runner, amodule, config_dir, data_dir, server):
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
 
     START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
-    RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
     STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
     START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
     STOP_DATABASE_VIEW = StopDatabaseAPI.as_view('stop_database_api')
-    RECOVER_DATABASE_VIEW = RecoverDatabaseAPI.as_view('recover_database_api')
     DEPLOYMENT_USER_VIEW = DeploymentUserAPI.as_view('deployment_user_api')
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
@@ -1855,15 +1796,11 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
-                     view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/add', strict_slashes=False,
                      view_func=ADD_SERVER_VIEW, methods=['PUT'])
     # Internal API
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover', strict_slashes=False,
-                     view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', strict_slashes=False,
                      view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', strict_slashes=False,

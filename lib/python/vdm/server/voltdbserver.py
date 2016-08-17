@@ -333,7 +333,7 @@ class VoltDatabase:
 
     def start_local_server(self, sid, pause, add_server=False):
         """
-        start a local server process. recover if recover is true else create.
+        start a local server process. Add if add_server is true else just start the server.
         """
         # if server is not found bail out.
         config_path = os.path.realpath(self.get_volt_server_data_folder(sid))
