@@ -792,20 +792,24 @@ class DbMonitorTest extends TestBase {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
+        if(!page.storedProceduresTableDisplayed()) {
+            when: 'click Display Preference button'
+            page.openDisplayPreference()
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
 
-        when: 'Stored Procedure checkbox is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Add Stored Procedure'
-        page.storedProceduresCheckboxClick()
+            when: 'Stored Procedure checkbox is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Add Stored Procedure'
+            page.storedProceduresCheckboxClick()
+            page.savePreferencesBtn.click()
+        }
 
         when:
         page.storedProceduresTableDisplayed()
+        report 'checkafterdisplay'
         then:
         if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
             println("No data displayed-PASS")

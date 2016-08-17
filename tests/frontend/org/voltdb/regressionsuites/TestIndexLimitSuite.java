@@ -359,6 +359,8 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE A > 0;");
         callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE A = 1;");
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(C) FROM TMIN WHERE A = 1 AND B = 1;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE B <= 3;");
+        callWithExpectedResult(client, -2, "@AdHoc", "SELECT MIN(B) FROM TMIN WHERE A = 1 AND B <= 3;");
 
         // Test expression index
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ABS(B)) FROM TMIN;");
