@@ -358,10 +358,10 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "FROM AAA;",
                       "Only one windowed RANK() expression may appear in a display list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Windowed RANK() expressions can have only one order by expression in their window.");
+                      "Windowed RANK() expressions can have only one ORDER BY expression in their window.");
 
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
-                      "Windowed RANK() expressions can have only integer or TIMESTAMP value types in the order by expression of their window.");
+                      "Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
         // Windowed expressions can only appear in the display list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
                       "Windowed RANK() expressions can only appear in the select list of a query or subquery.");
