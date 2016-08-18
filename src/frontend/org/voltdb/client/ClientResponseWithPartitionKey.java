@@ -28,14 +28,26 @@ public class ClientResponseWithPartitionKey {
 
     public final Object m_partitionKey;
     public final ClientResponse m_response;
+    public final String m_errorMessage;
 
     /**
      *
      * @param partitionKey  A partition key to reach the partition
-     * @param clientResponse The ClientResponse instance from the procedure execution
+     * @param response The ClientResponse instance from the procedure execution
      */
-    ClientResponseWithPartitionKey(Object partitionKey, ClientResponse clientResponse) {
-        m_partitionKey = partitionKey;
-        m_response = clientResponse;
+    ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
+       this(partitionKey, response, null);
     }
+
+    /**
+    *
+    * @param partitionKey  A partition key to reach the partition
+    * @param response The ClientResponse instance from the procedure execution
+    * @param errorMessage  Error message
+    */
+   ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response, String errorMessage) {
+       m_partitionKey = partitionKey;
+       m_response = response;
+       m_errorMessage = errorMessage;
+   }
 }

@@ -64,7 +64,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
     final CSL m_listener = new CSL();
-
     /*
      * Username and password as set by the constructor.
      */
@@ -842,21 +841,24 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         for (Integer key : getPartitionIntegerKeys()) {
             args[0] = key;
             partitionCount--;
-            if(callback != null){
-                PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
-                if(!callProcedure(cb, procedureName, args)){
-                    asycQueuedCount--;
-                    try{
+            try{
+                if(callback != null){
+                    PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
+                    if(!callProcedure(cb, procedureName, args)){
+                        asycQueuedCount--;
                         cb.clientCallback(null);
-                    } catch (Exception e){
-                        throw new IOException(e);
                     }
+                } else {
+                    ClientResponse response =  callProcedure(procedureName, args);
+                    responses[partitionCount] = new ClientResponseWithPartitionKey(key, response);
                 }
-            } else {
-                ClientResponse response =  callProcedure(procedureName, args);
-                responses[partitionCount] = new ClientResponseWithPartitionKey(key, response);
+            } catch (ProcCallException pe){
+                responses[partitionCount] = new ClientResponseWithPartitionKey(key, pe.getClientResponse(), pe.getMessage());
+            } catch(Exception e){
+                responses[partitionCount] = new ClientResponseWithPartitionKey(key, null, e.getMessage());
             }
         }
+
         return (asycQueuedCount == 0 ? null : responses);
     }
 
@@ -884,6 +886,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     * @throws IOException if there is a Java network or connection problem.
     */
     public List<Integer> getPartitionIntegerKeys() throws NoConnectionsException, IOException, ProcCallException {
+        if(m_distributer.getPartitionKeys().size() > 0){
+            return m_distributer.getPartitionKeys();
+        }
+
         setPartitions();
         return m_partitionIntegerKeys;
     }

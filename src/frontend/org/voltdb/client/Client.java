@@ -426,23 +426,38 @@ public interface Client {
     /**
      * <p>
      * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
-     * The call will iterate through all the partitions and execute the stored procedure one partition at a time, and return an aggregated response
-     * from each partition. Blocks until a result is available. A {@link ProcCallException} is thrown if the response from a partition is anything other then success.
-     * This method is very useful when you want to run a stored procedure in every partition but do not want to use a multi-partition procedure.
+     * The set of partition values will not be updated unless client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and cluster topology is updated.
+     * The database partitions must not be changed to ensure this call routes the procedure execution to correct partitions.
+     * The call will iterate through all the partitions and execute the stored procedure one partition at a time, and return an aggregated response.
+     * Blocks until a result is available.
+     * </p><p>This method is useful when you want to run a stored procedure in every partition but do not want to use a multi-partition procedure.
      * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
      * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
      * such as large deletes.
-     *</p>
-     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter. It is assumed that the PARAMETER is always zero
-     * by default. In other words, do not specify <strong>PARAMETER</strong> in the stored procedures used in this call.
-     * When creating a class stored procedures, the first argument in the procedure's run method is reserved for the partition key, which matches the partition column type.
-     * The partition key is used to find the destination partition.
-     * For example, if a store procedure has two parameters of long type and partition column of string type, the run method should be
-     * <pre>
-     *     public VoltTable[] run(String partiyionKey id, long param1, long param2)
-     * </pre>
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to route to the target partition.
+     * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
+     * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(String, Object...)} instead.
      *
-     * <p>
+     * When creating a class stored procedure, the first argument in the procedure's run method is the partition key, which matches the partition column type, followed by the
+     * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
+     * </p><p>
+     * Example, a stored procedure has a parameter of long type and partition column of string type:
+     *</P><pre>
+     *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
+     *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);
+     *   PARTITION TABLE tableWithStringPartition ON COLUMN value_string;
+     *   CREATE PROCEDURE FROM CLASS example.Everywhere;
+     *   PARTITION PROCEDURE Everywhere ON TABLE tableWithStringPartition COLUMN value_string;
+     * </pre><pre>
+     *    public class Everywhere extends VoltProcedure {
+     *         public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM tableWithStringPartition where value1 &gt; ?;");
+     *         public VoltTable[] run(String partitionKey, long value1) {
+     *              voltQueueSQL(stmt, value1);
+     *              return voltExecuteSQL(true);
+     *         }
+     *    }
+     * </pre><p>
      * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
      * </p>
      * @param procedureName <code>class</code> name (not qualified by package) of the partitioned java procedure to execute.
@@ -458,27 +473,41 @@ public interface Client {
     /**
      * <p>
      * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
-     * The call will iterate through all the partitions and asynchronously execute the stored procedure one partition at a time.
-     * When all partition executions return responses, the provided callback will be invoked.
-     * See the {@link Client} class documentation for information on the negative performance impact of slow or
-     * blocking callbacks. If there is backpressure this call will block until the invocation on a partition is queued. If configureBlocking(false) is invoked
-     * then the execution on the partition will return immediately. Then {@link ClientResponseWithPartitionKey} for this partition will not have {@link ClientResponse}.
+     * The set of partition values will not be updated unless client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and cluster topology is updated.
+     * The database partitions must not be changed to ensure this call routes the procedure execution to correct partitions.
+     * The call will asynchronously execute the stored procedure across partitions. When results return from all partitions, the provided callback will be invoked.
+     * If there is backpressure, a call to a partition will block until the invocation on the partition is queued. If configureBlocking(false) is invoked
+     * then the execution on the partition will return immediately. Then {@link ClientResponseWithPartitionKey} for this partition will not have instantiated {@link ClientResponse}.
      * Check the return values to determine if queueing actually took place on each partition.
-     * This method is very useful when you want to run a stored procedure in every partition but you do not want to use a multi-partition procedure.
+     * </p><p>
+     * This method is useful when you want to run a stored procedure in every partition but you do not want to use a multi-partition procedure.
      * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
      * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
      * such as large deletes.
-     * </p>
-     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter. It is assumed that the PARAMETER is always zero
-     * by default. In other words, do not specify <strong>PARAMETER</strong> in the stored procedures used in this call.
-     * When creating a class stored procedures, the first argument in the procedure's run method is reserved for the partition key, which matches the partition column type.
-     * The partition key is used to find the destination partition.
-     * For example, if a store procedure has two parameters of long type and partition column of string type, the run method should be
-     * <pre>
-     *     public VoltTable[] run(String partiyionKey id, long param1, long param2)
-     * </pre>
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to route to the target partition.
+     * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
+     * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(ProcedureCallback, String, Object...)} instead.
      *
-     * <p>
+     * When creating a class stored procedure, the first argument in the procedure's run method is the partition key, which matches the partition column type, followed by the
+     * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
+     * </P><p>
+     * Example, a stored procedure has a parameter of long type and partition column of string type
+     * </p><pre>
+     *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
+     *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);
+     *   PARTITION TABLE tableWithStringPartition ON COLUMN value_string;
+     *   CREATE PROCEDURE FROM CLASS example.Everywhere;
+     *   PARTITION PROCEDURE Everywhere ON TABLE tableWithStringPartition COLUMN value_string;
+     * </pre><pre>
+     *    public class Everywhere extends VoltProcedure {
+     *         public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM tableWithStringPartition where value1 &gt; ?;");
+     *         public VoltTable[] run(String partitionKey, long value1) {
+     *              voltQueueSQL(stmt, value1);
+     *              return voltExecuteSQL(true);
+     *         }
+     *    }
+     * </pre><p>
      * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
      * </p>
      * @param callback {@link AllPartitionProcedureCallback} that will be invoked with procedure results.
