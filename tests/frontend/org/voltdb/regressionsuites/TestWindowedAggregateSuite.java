@@ -134,6 +134,15 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "create table pu (a integer, b integer);"
                 + "create index pu_idx1 on pu (a);"
                 + "create index pu_idx2 on pu (b, a);"
+
+                + "CREATE TABLE P2 ("
+                + "  ID INTEGER NOT NULL,"
+                + "  TINY TINYINT NOT NULL,"
+                + "  SMALL SMALLINT,"
+                + "  BIG BIGINT NOT NULL,"
+                + "  PRIMARY KEY (ID, TINY)"
+                + ");"
+                + "PARTITION TABLE P2 ON COLUMN TINY;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -479,6 +488,47 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+    /**
+     * Validate that we get the same answer if we calculate a rank expression
+     * in a subquery or in an outer query.  Try with queries whose partition
+     * by list contains partition columns of their tables and those whose
+     * partition by list do not.
+     *
+     * @throws Exception
+     */
+    public void testSubqueryWindowedExpressions() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("P2.insert", 0, 2, null, -67);
+        client.callProcedure("P2.insert", 1, 2, null, 39);
+        client.callProcedure("P2.insert", 2, 2, 106, -89);
+        client.callProcedure("P2.insert", 3, 2, 106, 123);
+        client.callProcedure("P2.insert", 4, 5, -100, -92);
+        client.callProcedure("P2.insert", 5, 5, -100, -52);
+        client.callProcedure("P2.insert", 6, 5, 119, -110);
+        client.callProcedure("P2.insert", 7, 5, 119, 102);
+
+        String sql;
+
+        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK FROM (SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB;";
+        validateSubqueryWithWindowedAggregate(client, sql);
+        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK FROM (SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB;";
+        validateSubqueryWithWindowedAggregate(client, sql);
+    }
+
+    private void validateSubqueryWithWindowedAggregate(Client client, String sql)
+            throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        VoltTable vt;
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        int nc = vt.getColumnCount();
+        while (vt.advanceRow()) {
+            assertEquals(vt.getLong(nc-2), vt.getLong(nc-1));
+        }
+    }
+
     /*
      * This test just makes sure that we can execute the @Explain
      * sysproc on a windowed aggregate.  At one time this failed due to
@@ -494,6 +544,10 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         try {
             cr = client.callProcedure("@Explain", sql);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            // We just care that the explain has succeeded and not
+            // caused an NPE.  The results here are not used, but they
+            // are useful for diagnosing errors.  So we leave them
+            // here.
             VoltTable vt = cr.getResults()[0];
             assertTrue(true);
         } catch (Exception ex) {
