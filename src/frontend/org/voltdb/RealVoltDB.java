@@ -3883,7 +3883,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void checkThreadsSanity() {
-        System.out.println("......checkThreadsSanity......");
         int tableCount = m_catalogContext.tables.size();
         int hostcount = m_config.m_hostCount;
         int partitions = m_iv2Initiators.size() - 1;
@@ -3892,16 +3891,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         int exportTableCount = ExportManager.instance().getExportTablesCount();
         int exportNonceCount = ExportManager.instance().getConnCount();
 
-        System.out.println("hostcount: " + hostcount);
-        System.out.println("tableCount: " + tableCount);
-        System.out.println("partitions: " + partitions);
-        System.out.println("replicates: " + replicates);
-        System.out.println("importPartitions: " + importPartitions);
-        System.out.println("exportTableCount: " + exportTableCount);
-        System.out.println("exportNonceCount: " + exportNonceCount);
-
         int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount, hostcount);
-        System.out.println("expThreadsCount: " + expThreadsCount);
+
         String[] command = {"bash", "-c" ,"ulimit -u"};
         String cmd_rst = ShellTools.local_cmd(command);
         int maxThreadsCount = 0;
