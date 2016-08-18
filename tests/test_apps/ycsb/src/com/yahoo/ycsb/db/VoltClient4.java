@@ -52,6 +52,7 @@ import com.yahoo.ycsb.ByteArrayByteIterator;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
+import com.yahoo.ycsb.Status;
 
 public class VoltClient4 extends DB {
     private Client m_client;
@@ -90,52 +91,52 @@ public class VoltClient4 extends DB {
     }
 
     @Override
-    public int delete(String keyspace, String key)
+    public Status delete(String keyspace, String key)
     {
         try
         {
             ClientResponse response = m_client.callProcedure("STORE.delete", keyspace.getBytes(UTF8), key);
-            return response.getStatus() == ClientResponse.SUCCESS ? 0 : 1;
+            return response.getStatus() == ClientResponse.SUCCESS ? Status.OK : Status.ERROR;
         }
         catch (Exception e)
         {
             e.printStackTrace();
-            return 1;
+            return Status.ERROR;
         }
     }
 
     @Override
-    public int insert(String keyspace, String key, HashMap<String, ByteIterator> columns)
+    public Status insert(String keyspace, String key, HashMap<String, ByteIterator> columns)
     {
         return update(keyspace, key, columns);
     }
 
     @Override
-    public int read(String keyspace, String key, Set<String> columns, HashMap<String, ByteIterator> result)
+    public Status read(String keyspace, String key, Set<String> columns, HashMap<String, ByteIterator> result)
     {
         try
         {
             ClientResponse response = m_client.callProcedure("Get", keyspace.getBytes(UTF8), key);
             if (response.getStatus() != ClientResponse.SUCCESS)
             {
-                return 1;
+                return Status.ERROR;
             }
             VoltTable table = response.getResults()[0];
             if (table.advanceRow())
             {
                 unpackRowData(table, columns, result);
             }
-            return 0;
+            return Status.OK;
         }
         catch (Exception e)
         {
             e.printStackTrace();
-            return 1;
+            return Status.ERROR;
         }
     }
 
     @Override
-    public int scan(String keyspace, String lowerBound, int recordCount, Set<String> columns, Vector<HashMap<String, ByteIterator>> result)
+    public Status scan(String keyspace, String lowerBound, int recordCount, Set<String> columns, Vector<HashMap<String, ByteIterator>> result)
     {
         try
         {
@@ -143,7 +144,7 @@ public class VoltClient4 extends DB {
             ClientResponse response = m_client.callProcedure("Scan", ks, lowerBound, lowerBound.getBytes(UTF8), recordCount);
             if (response.getStatus() != ClientResponse.SUCCESS)
             {
-                return 1;
+                return Status.ERROR;
             }
 
             int nFound = 0;
@@ -156,7 +157,7 @@ public class VoltClient4 extends DB {
             {
                 if (response.getStatus() != ClientResponse.SUCCESS)
                 {
-                    return 1;
+                    return Status.ERROR;
                 }
                 VoltTable table = response.getResults()[0];
                 nFound += table.getRowCount();
@@ -179,27 +180,27 @@ public class VoltClient4 extends DB {
                     response = callback.response;
                 }
             }
-            return 0;
+            return Status.OK;
         }
         catch (Exception e)
         {
             e.printStackTrace();
-            return 1;
+            return Status.ERROR;
         }
     }
 
     @Override
-    public int update(String keyspace, String key, HashMap<String, ByteIterator> columns)
+    public Status update(String keyspace, String key, HashMap<String, ByteIterator> columns)
     {
         try
         {
             ClientResponse response = m_client.callProcedure("Put", keyspace.getBytes(UTF8), key, packRowData(columns));
-            return response.getStatus() == ClientResponse.SUCCESS ? 0 : 1;
+            return response.getStatus() == ClientResponse.SUCCESS ? Status.OK : Status.ERROR;
         }
         catch (Exception e)
         {
             e.printStackTrace();
-            return 1;
+            return Status.ERROR;
         }
     }
 
