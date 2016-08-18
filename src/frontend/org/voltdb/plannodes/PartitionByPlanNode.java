@@ -161,10 +161,12 @@ public class PartitionByPlanNode extends AggregatePlanNode {
 
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
 
-        List<TupleValueExpression> TVEs = ExpressionUtil.getTupleValueExpressions(m_windowedExpression.getOrderByExpressions().get(0));
-        for (TupleValueExpression tve : TVEs) {
-            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
-            tve.setColumnIndex(index);
+        for (AbstractExpression obExpr : m_windowedExpression.getOrderByExpressions()) {
+            List<TupleValueExpression> TVEs = ExpressionUtil.getTupleValueExpressions(obExpr);
+            for (TupleValueExpression tve : TVEs) {
+                int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
+                tve.setColumnIndex(index);
+            }
         }
     }
 }
