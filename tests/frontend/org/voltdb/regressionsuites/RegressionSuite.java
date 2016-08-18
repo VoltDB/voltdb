@@ -887,6 +887,8 @@ public class RegressionSuite extends TestCase {
                                                       Object[] expectedRow,
                                                       VoltTable actualRow,
                                                       double epsilon) {
+        assertEquals("Actual row has wrong number of columns",
+                expectedRow.length, actualRow.getColumnCount());
         for (int i = 0; i < expectedRow.length; ++i) {
             String msg = "Row " + row + ", col " + i + ": ";
             Object expectedObj = expectedRow[i];

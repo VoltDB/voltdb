@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.PlanNodeType;
@@ -38,6 +39,10 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     private enum Members {
         ORDER_BY_EXPRS
     };
+
+    // This member is not serialized to JSON but the ORDER BY expressions,
+    // which it contains, are serialized
+    private WindowedExpression     m_windowedExpression = null;
 
     @Override
     public void generateOutputSchema(Database db)
@@ -150,5 +155,16 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         return answer;
     }
 
-    private WindowedExpression     m_windowedExpression = null;
+    @Override
+    public void resolveColumnIndexes() {
+        super.resolveColumnIndexes();
+
+        NodeSchema inputSchema = m_children.get(0).getOutputSchema();
+
+        List<TupleValueExpression> TVEs = ExpressionUtil.getTupleValueExpressions(m_windowedExpression.getOrderByExpressions().get(0));
+        for (TupleValueExpression tve : TVEs) {
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
+            tve.setColumnIndex(index);
+        }
+    }
 }

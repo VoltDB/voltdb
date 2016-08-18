@@ -134,6 +134,15 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "create table pu (a integer, b integer);"
                 + "create index pu_idx1 on pu (a);"
                 + "create index pu_idx2 on pu (b, a);"
+
+                + "CREATE TABLE P1_ENG_10972 ("
+                + "     ID INTEGER NOT NULL, "
+                + "     VCHAR VARCHAR(300), "
+                + "     NUM INTEGER, "
+                + "     RATIO FLOAT, "
+                + "     PRIMARY KEY (ID) "
+                + "   ); "
+                + "PARTITION TABLE P1_ENG_10972 ON COLUMN ID; "
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -501,16 +510,47 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+    public void testEng10972() throws Exception {
+        // reproducer for ENG-10972 and ENG-10973, found by sqlcoverage
+        Client client = getClient();
+        VoltTable vt;
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (0, 'BS', NULL, 2.0);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (1, 'DS', NULL, 2.0);");
+        vt = client.callProcedure("@AdHoc",
+                "SELECT RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK "
+                + "FROM P1_ENG_10972;").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {1},
+            {1}}, vt);
+
+        client.callProcedure("@AdHoc", "truncate table P1_ENG_10972");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (0, 'BS', NULL, 2.0);");
+
+        client.callProcedure("@AdHoc", "SELECT ID, VCHAR, NUM, RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK FROM P1_ENG_10972;");
+        vt = client.callProcedure("@AdHoc",
+                "SELECT RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK "
+                + "FROM P1_ENG_10972;").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {2.0, 1}}, vt);
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestWindowedAggregateSuite.class);
         boolean success = false;
 
-
+        VoltProjectBuilder project;
         try {
-            VoltProjectBuilder project = new VoltProjectBuilder();
+            project = new VoltProjectBuilder();
             config = new LocalCluster("test-windowed-rank.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            setupSchema(project);
+            success = config.compile(project);
+
+            project = new VoltProjectBuilder();
+            config = new LocalCluster("test-windowed-rank.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
         }
