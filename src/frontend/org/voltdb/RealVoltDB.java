@@ -132,6 +132,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.settings.ClusterSettings;
@@ -3095,6 +3096,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
+                checkThreadsSanity();
+
                 return Pair.of(m_catalogContext, csp);
             }
         } finally {
@@ -3877,6 +3880,70 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
+    }
+
+    private void checkThreadsSanity() {
+        System.out.println("......checkThreadsSanity......");
+        int tableCount = m_catalogContext.tables.size();
+        int hostcount = m_config.m_hostCount;
+        int partitions = m_iv2Initiators.size() - 1;
+        int replicates = m_configuredReplicationFactor;
+        int importPartitions = ImportManager.getPartitionsCount();
+        int exportTableCount = ExportManager.instance().getExportTablesCount();
+        int exportNonceCount = ExportManager.instance().getConnCount();
+
+        System.out.println("hostcount: " + hostcount);
+        System.out.println("tableCount: " + tableCount);
+        System.out.println("partitions: " + partitions);
+        System.out.println("replicates: " + replicates);
+        System.out.println("importPartitions: " + importPartitions);
+        System.out.println("exportTableCount: " + exportTableCount);
+        System.out.println("exportNonceCount: " + exportNonceCount);
+
+        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount, hostcount);
+        System.out.println("expThreadsCount: " + expThreadsCount);
+        String[] command = {"bash", "-c" ,"ulimit -u"};
+        String cmd_rst = ShellTools.local_cmd(command);
+        int maxThreadsCount = 0;
+        try {
+            maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
+        } catch(Exception e) {
+            maxThreadsCount = Integer.MAX_VALUE;
+        }
+        if (maxThreadsCount < expThreadsCount) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates \n", tableCount, partitions, replicates));
+            builder.append(String.format("with importer configuration of %d importer partitions \n", importPartitions));
+            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates \n", exportTableCount, partitions, replicates));
+            builder.append(String.format("The maximum number of threads to the system is %d", maxThreadsCount));
+            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB.");
+            consoleLog.warn(builder.toString());
+        }
+    }
+
+    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount, int hostcount) {
+        final int clusterBaseCount = 5;
+        final int hostBaseCount = 56;
+        // TODO: add DR count
+        return clusterBaseCount + (hostBaseCount + partitionCount) * hostcount
+                + computeImporterThreads(importerPartitionCount)
+                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount, hostcount);
+    }
+
+    private int computeImporterThreads(int importerPartitionCount) {
+        if (importerPartitionCount == 0) {
+            return 0;
+        }
+        int importerBaseCount = 6;
+        return importerBaseCount + importerPartitionCount;
+    }
+
+    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount, int hostcount) {
+        if (exportTableCount == 0) {
+            return 0;
+        }
+        int exporterBaseCount = 1;
+        return (exporterBaseCount + partitionCount * exportTableCount + exportNonceCount) * hostcount;
     }
 
     @Override
