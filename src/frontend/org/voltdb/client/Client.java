@@ -425,24 +425,24 @@ public interface Client {
 
     /**
      * <p>
-     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
-     * The set of partition values will not be updated unless client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and cluster topology is updated.
-     * The database partitions must not be changed to ensure this call routes the procedure execution to correct partitions.
-     * The call will iterate through all the partitions and execute the stored procedure one partition at a time, and return an aggregated response.
-     * Blocks until a result is available.
-     * </p><p>This method is useful when you want to run a stored procedure in every partition but do not want to use a multi-partition procedure.
-     * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
-     * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
-     * such as large deletes.
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values and then execute the stored procedure
+     * one partition at a time, and return an aggregated response. Blocks until results are available.
      * </p><p>
-     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to route to the target partition.
+     * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
+     * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database very 5 minutes. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to an incorrect partition.
+     * </p><p>There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes.
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
      * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
      * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(String, Object...)} instead.
      *
-     * When creating a class stored procedure, the first argument in the procedure's run method is the partition key, which matches the partition column type, followed by the
+     * When creating a class stored procedure, the first argument in the procedure's run method must be the partition key, which matches the partition column type, followed by the
      * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
      * </p><p>
-     * Example, a stored procedure has a parameter of long type and partition column of string type:
+     * Example: A stored procedure with a parameter of long type and partition column of string type
      *</P><pre>
      *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
      *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);
@@ -472,27 +472,27 @@ public interface Client {
 
     /**
      * <p>
-     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition.
-     * The set of partition values will not be updated unless client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and cluster topology is updated.
-     * The database partitions must not be changed to ensure this call routes the procedure execution to correct partitions.
-     * The call will asynchronously execute the stored procedure across partitions. When results return from all partitions, the provided callback will be invoked.
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition, and then asynchronously
+     * executes the stored procedure across partitions. When results return from all partitions, the provided callback will be invoked.
      * If there is backpressure, a call to a partition will block until the invocation on the partition is queued. If configureBlocking(false) is invoked
-     * then the execution on the partition will return immediately. Then {@link ClientResponseWithPartitionKey} for this partition will not have instantiated {@link ClientResponse}.
-     * Check the return values to determine if queueing actually took place on each partition.
+     * then the execution on the partition will return immediately. Check the return values to determine if queueing actually took place on each partition.
      * </p><p>
-     * This method is useful when you want to run a stored procedure in every partition but you do not want to use a multi-partition procedure.
-     * By running multiple single-partition procedures, the impact on latency and throughput that can result from a multi-partition procedure may be avoided.
-     * This is particularly true for longer running procedures. Using multiple, smaller procedures can also help for queries that modify large volumes of data,
-     * such as large deletes.
+     * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
+     * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database very 5 minutes. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to an incorrect partition.
      * </p><p>
-     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to route to the target partition.
+     * There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes.
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
      * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
      * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(ProcedureCallback, String, Object...)} instead.
      *
-     * When creating a class stored procedure, the first argument in the procedure's run method is the partition key, which matches the partition column type, followed by the
+     * When creating a class stored procedure, the first argument in the procedure's run method must be the partition key, which matches the partition column type, followed by the
      * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
      * </P><p>
-     * Example, a stored procedure has a parameter of long type and partition column of string type
+     * Example: A stored procedure with a parameter of long type and partition column of string type
      * </p><pre>
      *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
      *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);

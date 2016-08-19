@@ -29,14 +29,14 @@ public class ClientResponseWithPartitionKey {
     public final Object m_partitionKey;
     public final ClientResponse m_response;
     public final String m_errorMessage;
-
+    public final Exception m_cause;
     /**
      *
      * @param partitionKey  A partition key to reach the partition
      * @param response The ClientResponse instance from the procedure execution
      */
     ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
-       this(partitionKey, response, null);
+       this(partitionKey, response, null, null);
     }
 
     /**
@@ -44,10 +44,12 @@ public class ClientResponseWithPartitionKey {
     * @param partitionKey  A partition key to reach the partition
     * @param response The ClientResponse instance from the procedure execution
     * @param errorMessage  Error message
+    * @param cause  The exception
     */
-   ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response, String errorMessage) {
+   ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response, String errorMessage, Exception cause) {
        m_partitionKey = partitionKey;
        m_response = response;
        m_errorMessage = errorMessage;
+       m_cause = cause;
    }
 }

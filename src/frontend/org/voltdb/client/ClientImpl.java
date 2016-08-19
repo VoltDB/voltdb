@@ -70,7 +70,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
-    private List<Integer> m_partitionIntegerKeys;
+    private List<Integer> m_partitionIntegerKeys = new ArrayList<Integer>();
+    private long m_lastPartitionKeyFetched = 0;
+
     /**
      * These threads belong to the network thread pool
      * that invokes callbacks. These threads are "blessed"
@@ -819,17 +821,17 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
-        return private_executeAllPartitionProcedure(null, procedureName, params);
+        SyncAllPartitionProcedureCallback callBack = new SyncAllPartitionProcedureCallback();
+        callAllPartitionProcedure(callBack, procedureName, params);
+        return callBack.getResponse();
     }
 
     @Override
     public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
             Object... params) throws IOException, NoConnectionsException, ProcCallException {
-        return (private_executeAllPartitionProcedure(callback, procedureName, params) != null);
-    }
-
-    private ClientResponseWithPartitionKey[] private_executeAllPartitionProcedure(AllPartitionProcedureCallback callback,
-            String procedureName, Object... params) throws IOException, NoConnectionsException, ProcCallException {
+        if(callback == null) {
+            throw new IOException("AllPartitionProcedureCallback can not be null");
+        }
 
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
@@ -837,29 +839,34 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         int partitionCount = getPartitionIntegerKeys().size();
         ClientResponseWithPartitionKey[] responses = new ClientResponseWithPartitionKey[partitionCount];
         AtomicInteger counter = new AtomicInteger(partitionCount);
-        int asycQueuedCount = partitionCount;
         for (Integer key : getPartitionIntegerKeys()) {
             args[0] = key;
             partitionCount--;
+            PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
             try{
-                if(callback != null){
-                    PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
+                if(callback instanceof SyncAllPartitionProcedureCallback){
+                    ClientResponse response =  callProcedure(procedureName, args);
+                    cb.clientCallback(response);
+                } else {
                     if(!callProcedure(cb, procedureName, args)){
-                        asycQueuedCount--;
                         cb.clientCallback(null);
                     }
-                } else {
-                    ClientResponse response =  callProcedure(procedureName, args);
-                    responses[partitionCount] = new ClientResponseWithPartitionKey(key, response);
                 }
-            } catch (ProcCallException pe){
-                responses[partitionCount] = new ClientResponseWithPartitionKey(key, pe.getClientResponse(), pe.getMessage());
-            } catch(Exception e){
-                responses[partitionCount] = new ClientResponseWithPartitionKey(key, null, e.getMessage());
+            } catch (ProcCallException | NoConnectionsException pe){
+                try {
+                    cb.exceptionCallback(pe);
+                } catch (Exception e) {
+                    throw new IOException(e);
+                }
+            } catch(Exception ex){
+                try {
+                    cb.exceptionCallback(ex);
+                } catch (Exception e) {
+                    throw new IOException(e);
+                }
             }
         }
-
-        return (asycQueuedCount == 0 ? null : responses);
+        return true;
     }
 
     /**
@@ -869,13 +876,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws IOException if there is a Java network or connection problem.
      */
     private void setPartitions() throws IOException, NoConnectionsException, ProcCallException {
-        if(m_partitionIntegerKeys == null){
-            m_partitionIntegerKeys = new ArrayList<Integer>();
+        if(m_partitionIntegerKeys.isEmpty()){
             VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
             VoltTable keys = results[0];
             for (int k = 0; k < keys.getRowCount(); k++) {
                 m_partitionIntegerKeys.add((int)(keys.fetchRow(k).getLong(1)));
             }
+            m_lastPartitionKeyFetched = System.currentTimeMillis();
         }
     }
 
@@ -890,12 +897,17 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.getPartitionKeys();
         }
 
+        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched;
+        if(time > 5 * 60 * 1000){
+            m_partitionIntegerKeys.clear();
+        }
+
         setPartitions();
         return m_partitionIntegerKeys;
     }
 
     /**
-     * Procedure call back used in {@link ClientImpl#callAllPartitionProcedure(AllPartitionProcedureCallback, String, Object...)}
+     * Procedure call back for async callAllPartitionProcedure
      */
     class PartitionProcedureCallback implements ProcedureCallback {
 
@@ -923,11 +935,53 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, response);
+            if(response != null) {
+                m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, response);
+            } else {
+                final ClientResponse r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
+                        "The procedure is not queued for execution.");
+                m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, r,
+                        "The procedure is not queued for execution.", null);
+            }
             m_partitionCounter.decrementAndGet();
             if(m_partitionCounter.get() == 0){
                 m_cb.clientCallback(m_responses);
             }
+        }
+
+        public void exceptionCallback(Exception e) throws Exception {
+
+            if ( e instanceof ProcCallException) {
+                ProcCallException pe = (ProcCallException)e;
+                m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, pe.getClientResponse(), pe.getMessage(), pe.getCause());
+            } else {
+                byte status = ClientResponse.GRACEFUL_FAILURE;
+                if(e instanceof NoConnectionsException){
+                    status = ClientResponse.CONNECTION_LOST;
+                }
+                final ClientResponse r = new ClientResponseImpl(status, new VoltTable[0], e.getMessage());
+                m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, r, e.getMessage(), e);
+            }
+
+            m_partitionCounter.decrementAndGet();
+            if(m_partitionCounter.get() == 0){
+                m_cb.clientCallback(m_responses);
+            }
+        }
+    }
+
+    /**
+     * Sync all partition procedure call back
+     */
+    class SyncAllPartitionProcedureCallback implements AllPartitionProcedureCallback {
+
+        ClientResponseWithPartitionKey[] m_responses;
+         @Override
+        public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
+             m_responses = clientResponse;
+        }
+        public ClientResponseWithPartitionKey[] getResponse() {
+            return m_responses;
         }
     }
 }
