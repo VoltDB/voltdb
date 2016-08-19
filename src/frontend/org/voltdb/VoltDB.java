@@ -1232,16 +1232,8 @@ public class VoltDB {
      *
      * @return A reference to the underlying VoltDBInterface object.
      */
-    public static synchronized VoltDBInterface instance() {
-        if (singleton == null) {
-            singleton = new RealVoltDB();
-        }
+    public static VoltDBInterface instance() {
         return singleton;
-    }
-
-    //Used by tests that init in process cluster and start in process.
-    public static synchronized void resetInstance() {
-        singleton = null;
     }
 
     /**
@@ -1300,6 +1292,7 @@ public class VoltDB {
 
     public static void exit(int status) {
         if (isThisATest() || ignoreCrash) {
+            singleton = null;
             throw new SimulatedExitException(status);
         }
         System.exit(status);

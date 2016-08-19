@@ -616,7 +616,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeChildrenChanged) {
             boolean isBare = (!m_BareProcessed.getAndSet(true) && VoltDB.instance().isBare());
-            loggingLog.info("Scheduling truncation request processing " + (isBare ? 0 : m_truncationGatheringPeriod) + " seconds from now");
+            int truncationGatheringPeriod = (isBare ? 0 : m_truncationGatheringPeriod);
+            loggingLog.info("Scheduling truncation request processing " + truncationGatheringPeriod + " seconds from now");
             /*
              * Do it 10 seconds later because these requests tend to come in bunches
              * and we want one truncation snapshot to do truncation for all nodes
@@ -634,7 +635,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
                     }
                 }
-            }, isBare ? 0 : m_truncationGatheringPeriod, TimeUnit.SECONDS);
+            }, truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
         } else {
             /*

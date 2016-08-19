@@ -755,15 +755,13 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("paused");
         }
 
-        if (m_startAction != StartAction.INITIALIZE && m_startAction == StartAction.PROBE) {
-            cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
-        }
-
+        //Add mesh and hostcount for probe only.
         if (m_startAction == StartAction.PROBE) {
+            cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
             cmdline.add("hostcount"); cmdline.add(Integer.toString(m_hostCount));
         }
 
-        if (m_startAction == StartAction.PROBE || m_startAction == StartAction.INITIALIZE) {
+        if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
 

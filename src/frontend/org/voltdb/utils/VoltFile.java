@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -128,7 +129,7 @@ public class VoltFile extends File {
             }
             return tempUserDir;
         } catch (Exception ioe) {
-            ioe.printStackTrace();
+            Throwables.propagate(ioe);
         }
         return null;
     }

@@ -564,7 +564,7 @@ public class LocalCluster implements VoltServerConfig {
 
     public String getServerSpecificRoot(String hostId) {
         if (!m_hostRoots.containsKey(hostId)) {
-            throw new RuntimeException("getServerSpecificRoot possibly called before cluster has started.");
+            throw new IllegalArgumentException("getServerSpecificRoot possibly called before cluster has started.");
         }
         return m_hostRoots.get(hostId) + "/voltdbroot";
     }
@@ -593,7 +593,6 @@ public class LocalCluster implements VoltServerConfig {
         th.start();
         try {
             th.join();
-            VoltDB.resetInstance();
             //Keep track by hostid the voltdbroot
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getAbsolutePath());
@@ -871,7 +870,7 @@ public class LocalCluster implements VoltServerConfig {
                     + File.separator
                     + "LC-"
                     + getFileName() + "-"
-                    + m_clusterId + "-"
+                    + m_clusterId + "-init-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
@@ -1097,32 +1096,19 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
-        if (isNewCli) {
-            return recoverOne(
-                    false,
-                    0,
-                    hostId,
-                    portOffset,
-                    rejoinHost,
-                    StartAction.PROBE);
-        } else {
-            return recoverOne(
-                    false,
-                    0,
-                    hostId,
-                    portOffset,
-                    rejoinHost,
-                    liveRejoin ? StartAction.LIVE_REJOIN : StartAction.REJOIN);
-        }
+        StartAction startAction = isNewCli ? StartAction.PROBE : (liveRejoin ? StartAction.LIVE_REJOIN : StartAction.REJOIN);
+        return recoverOne(
+                false,
+                0,
+                hostId,
+                portOffset,
+                rejoinHost,
+                startAction);
     }
 
     public void joinOne(int hostId) {
         try {
-            if (isNewCli()) {
-                startOne(hostId, true, ReplicationRole.NONE, StartAction.PROBE);
-            } else {
-                startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN);
-            }
+            startOne(hostId, true, ReplicationRole.NONE, isNewCli ? StartAction.PROBE : StartAction.JOIN);
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
         }
