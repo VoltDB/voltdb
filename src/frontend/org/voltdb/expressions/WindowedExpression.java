@@ -17,12 +17,8 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
@@ -53,6 +49,13 @@ public class WindowedExpression extends AbstractExpression {
     private List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     private List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
     private List<SortDirectionType>  m_orderByDirections = new ArrayList<>();
+
+    // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
+    // the display list has a TVE which references the column which holds the values this aggregate
+    // expression will compute.  This field holds this TVE.
+    private TupleValueExpression m_displayListExpression;
+
+    private int m_xmlID = -1;
 
     public WindowedExpression() {
         //
@@ -118,22 +121,6 @@ public class WindowedExpression extends AbstractExpression {
         hash += m_orderByExpressions.hashCode();
         hash += m_partitionByExpressions.hashCode();
         return hash;
-    }
-
-    private Collection<? extends AbstractExpression> copyPartitionByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<>();
-        for (AbstractExpression ae : m_partitionByExpressions) {
-            copy.add((AbstractExpression)ae.clone());
-        }
-        return copy;
-    }
-
-    private Collection<? extends AbstractExpression> copyOrderByExpressions() {
-        List<AbstractExpression> copy = new ArrayList<>();
-        for (AbstractExpression ae : m_orderByExpressions) {
-            copy.add((AbstractExpression)ae.clone());
-        }
-        return copy;
     }
 
     @Override
@@ -209,11 +196,6 @@ public class WindowedExpression extends AbstractExpression {
         return -1;
     }
 
-    // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
-    // the display list has a TVE which references the column which holds the values this aggregate
-    // expression will compute.  This field holds this TVE.
-    private TupleValueExpression m_displayListExpression;
-
     public final TupleValueExpression getDisplayListExpression() {
         return m_displayListExpression;
     }
@@ -221,8 +203,6 @@ public class WindowedExpression extends AbstractExpression {
     public final void setDisplayListExpression(TupleValueExpression displayListExpression) {
         m_displayListExpression = displayListExpression;
     }
-
-    private int m_xmlID = -1;
 
     /**
      * When a VoltXMLElement is translated to an expression, we remember the
