@@ -690,7 +690,7 @@ public class VoltDB {
 
         public Map<String,String> asClusterSettingsMap() {
             if (ConfigFactory.getProperty(ClusterSettings.CONFIG_DIR) == null) try {
-                File confDH = new File(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
+                File confDH = new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
                 ConfigFactory.setProperty(ClusterSettings.CONFIG_DIR, confDH.getPath());
             } catch (IOException e) {
                 throw new SettingsException("failed to resolve the cluster settings directory", e);
