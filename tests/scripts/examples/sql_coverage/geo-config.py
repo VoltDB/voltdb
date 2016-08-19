@@ -30,7 +30,7 @@
 #     ant -Dpostgis=1 -Dsql_coverage_suite=geo-config.py sqlcoverage
 
 {
-    # Geospatial Tests
+    # Geospatial (point & polygon) Tests
     "geo-basic": {"schema": "geo-schema.py",
                   "ddl": "geo-DDL.sql",
                   "template": "geo-basic.sql",
@@ -108,4 +108,22 @@
                          "ddl": "DDL.sql",
                          "template": "analytic-decimal.sql",
                          "normalizer": "normalizer.py"},
+    "analytic-geo-point": {"schema": "geo-schema.py",
+                           "ddl": "geo-DDL.sql",
+                           "template": "analytic-geo-point.sql",
+                           "normalizer": "normalizer.py"},
+    "analytic-geo-polygon": {"schema": "geo-schema.py",
+                             "ddl": "geo-DDL.sql",
+                             "template": "analytic-geo-polygon.sql",
+                             "normalizer": "normalizer.py"},
+
+    # May want to add something like these, someday:
+#     "analytic-float": {"schema": "float-schema.py",
+#                        "ddl": "float-DDL.sql",
+#                        "template": "analytic-float.sql",
+#                        "normalizer": "normalizer.py"},
+#     "analytic-varbinary": {"schema": "int-schema.py",
+#                            "ddl": "index-DDL.sql",
+#                            "template": "analytic-varbinary.sql",
+#                            "normalizer": "normalizer.py"},
 }
