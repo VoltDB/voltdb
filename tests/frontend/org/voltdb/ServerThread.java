@@ -153,6 +153,11 @@ public class ServerThread extends Thread {
         VoltDB.instance().run();
     }
 
+    //Call this if you are doing init only
+    public void initialize() {
+        VoltDB.initialize(m_config);
+    }
+
     public void waitForInitialization() {
         // Wait until the server has actually started running.
         while (!VoltDB.instance().isRunning() ||

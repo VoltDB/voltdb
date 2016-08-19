@@ -589,16 +589,17 @@ public class LocalCluster implements VoltServerConfig {
         ServerThread th = new ServerThread(cmdln);
         File root = VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories);
         cmdln.voltdbRoot(root + "/voltdbroot");
-
-        th.start();
         try {
-            th.join();
-            //Keep track by hostid the voltdbroot
-            String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
-            m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getAbsolutePath());
+            th.initialize();
+        } catch (VoltDB.SimulatedExitException expected) {
+            //All ok
         } catch (Exception ex) {
-            ex.printStackTrace();
+            log.error("Failed to initialize cluster process:" + ex.getMessage(), ex);
+            assert (false);
         }
+        //Keep track by hostid the voltdbroot
+        String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
+        m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getAbsolutePath());
     }
 
     private boolean waitForAllReady()

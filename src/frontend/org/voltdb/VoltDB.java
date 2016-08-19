@@ -1292,7 +1292,6 @@ public class VoltDB {
 
     public static void exit(int status) {
         if (isThisATest() || ignoreCrash) {
-            singleton = null;
             throw new SimulatedExitException(status);
         }
         System.exit(status);
