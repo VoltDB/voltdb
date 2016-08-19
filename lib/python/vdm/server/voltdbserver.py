@@ -440,16 +440,10 @@ class VoltDatabase:
         """
         outfile = open(outfilename, 'w')
 
-        # Start server in a separate process
-        #oldwd = os.getcwd()
-        #os.chdir(server_data_folder)
-        #try:
         my_env = os.environ.copy()
         my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') + ' -DVDMStarted=true' + ' -DVDMDB=' + str(database_id)
         return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                 env=my_env, preexec_fn=ignore_signals, close_fds=True)
-        # finally:
-        #     os.chdir(oldwd)
 
     def get_first_hostname(self):
         """
