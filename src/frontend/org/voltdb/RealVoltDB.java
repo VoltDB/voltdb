@@ -307,6 +307,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
 
+    private int m_maxThreadsCount;
+
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
@@ -678,6 +680,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_replicationActive = new AtomicBoolean(false);
             m_configLogger = null;
             ActivePlanRepository.clear();
+
+            updateMaxThreadsLimit();
 
             // set up site structure
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
@@ -3884,41 +3888,48 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void checkThreadsSanity() {
         int tableCount = m_catalogContext.tables.size();
-        int hostcount = m_config.m_hostCount;
         int partitions = m_iv2Initiators.size() - 1;
         int replicates = m_configuredReplicationFactor;
         int importPartitions = ImportManager.getPartitionsCount();
         int exportTableCount = ExportManager.instance().getExportTablesCount();
         int exportNonceCount = ExportManager.instance().getConnCount();
 
-        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount, hostcount);
+        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
 
-        String[] command = {"bash", "-c" ,"ulimit -u"};
-        String cmd_rst = ShellTools.local_cmd(command);
-        int maxThreadsCount = 0;
-        try {
-            maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
-        } catch(Exception e) {
-            maxThreadsCount = Integer.MAX_VALUE;
+        // if the expected number of threads exceeds the limit, update the limit.
+        if (m_maxThreadsCount < expThreadsCount) {
+            updateMaxThreadsLimit();
         }
-        if (maxThreadsCount < expThreadsCount) {
+
+        // do insane check again.
+        if (m_maxThreadsCount < expThreadsCount) {
             StringBuilder builder = new StringBuilder();
-            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates \n", tableCount, partitions, replicates));
-            builder.append(String.format("with importer configuration of %d importer partitions \n", importPartitions));
-            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates \n", exportTableCount, partitions, replicates));
-            builder.append(String.format("The maximum number of threads to the system is %d", maxThreadsCount));
-            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB.");
+            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates, ", tableCount, partitions, replicates));
+            builder.append(String.format("with importer configuration of %d importer partitions, ", importPartitions));
+            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates, ", exportTableCount, partitions, replicates));
+            builder.append(String.format("approximately requires %d threads.", expThreadsCount));
+            builder.append(String.format("The maximum number of threads to the system is %d. \n", m_maxThreadsCount));
+            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB. \n");
             consoleLog.warn(builder.toString());
         }
     }
 
-    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount, int hostcount) {
+    private void updateMaxThreadsLimit() {
+        String[] command = {"bash", "-c" ,"ulimit -u"};
+        String cmd_rst = ShellTools.local_cmd(command);
+        try {
+            m_maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
+        } catch(Exception e) {
+            m_maxThreadsCount = Integer.MAX_VALUE;
+        }
+    }
+
+    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount) {
         final int clusterBaseCount = 5;
         final int hostBaseCount = 56;
-        // TODO: add DR count
-        return clusterBaseCount + (hostBaseCount + partitionCount) * hostcount
+        return clusterBaseCount + (hostBaseCount + partitionCount)
                 + computeImporterThreads(importerPartitionCount)
-                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount, hostcount);
+                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount);
     }
 
     private int computeImporterThreads(int importerPartitionCount) {
@@ -3929,12 +3940,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return importerBaseCount + importerPartitionCount;
     }
 
-    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount, int hostcount) {
+    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount) {
         if (exportTableCount == 0) {
             return 0;
         }
         int exporterBaseCount = 1;
-        return (exporterBaseCount + partitionCount * exportTableCount + exportNonceCount) * hostcount;
+        return exporterBaseCount + partitionCount * exportTableCount + exportNonceCount;
     }
 
     @Override
