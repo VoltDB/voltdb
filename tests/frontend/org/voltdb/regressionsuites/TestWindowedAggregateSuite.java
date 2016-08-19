@@ -602,18 +602,19 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
             config = new LocalCluster("test-windowed-rank.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
 
             project = new VoltProjectBuilder();
             config = new LocalCluster("test-windowed-rank.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
         }
         catch (IOException excp) {
             fail();
         }
-
-        assertTrue(success);
-        builder.addServerConfig(config);
 
         return builder;
     }
