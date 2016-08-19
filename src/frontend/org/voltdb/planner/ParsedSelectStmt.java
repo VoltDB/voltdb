@@ -153,6 +153,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasLargeNumberOfTableJoins = false;
     // this list is the join order either from the user or parser if it has large number of table joins.
     private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
+    private boolean m_hasPartitionColumnsInWindowedAggregates = false;
 
     /**
      * Class constructor
@@ -825,7 +826,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Check for windowed expressions.
         if (m_windowedExpressions.size() > 0) {
             if (m_windowedExpressions.size() > 1) {
-                throw new PlanningErrorException("At most one windowed display column is supported.");
+                throw new PlanningErrorException("Only one windowed RANK() expression may appear in a selection list.");
             }
             //
             // This could be an if statement, but I think it's better to
@@ -837,18 +838,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             switch (windowedExpression.getExpressionType()) {
             case AGGREGATE_WINDOWED_RANK:
                 if (orderByExpressions.size() == 0) {
-                    throw new PlanningErrorException("The RANK windowed aggregate operator needs an order by expression.");
+                    throw new PlanningErrorException("Windowed RANK() expressions need an ORDER BY expression.");
                 }
                 if (orderByExpressions.size() > 1) {
-                    // This is perhaps slightly misleading, since we will not
-                    // offer syntax for selecting any other units.
-                    throw new PlanningErrorException("Aggregate windowed expressions with range " +
-                                                     "window frame units can have only one order by expression.");
+                    // This is perhaps slightly misleading.
+                    throw new PlanningErrorException("Windowed RANK() expressions can have only one ORDER BY expression in their window.");
                 }
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
-                    throw new PlanningErrorException("Aggregate windowed expressions with RANGE " +
-                                                     "window frame units can have only integer or TIMESTAMP value types.");
+                    throw new PlanningErrorException("Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
                 }
             }
         }
@@ -857,7 +855,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
         if (hasWindowedExpression()) {
             throw new PlanningErrorException(
-                    "Use of both windowed operations and GROUP BY is not supported.");
+                    "Use of both windowed RANK() and GROUP BY in a single query is not supported.");
         }
         for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child);
@@ -899,7 +897,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_hasComplexGroupby = true;
         }
 
-        // find the matching columns in display list
+        // find the matching columns in selection list
         for (ParsedColInfo col : m_displayColumns) {
             if (! col.expression.equals(groupbyCol.expression)) {
                 continue;
@@ -1595,6 +1593,27 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_hasPartitionColumnInDistinctGroupby = true;
     }
 
+    /**
+     * Return true iff all windowed aggregate expressions have a
+     * partition key in their partition by columns.
+     *
+     * @return
+     */
+    public boolean hasPartitionColumnInWindowedExpression() {
+        if (getWindowedExpressions().size() == 0) {
+            return true;
+        }
+        return m_hasPartitionColumnsInWindowedAggregates;
+    }
+
+    /**
+     * Call this if we discover that some partition by column of a windowed
+     * aggregate is a column on which a table is partitioned.
+     */
+    public void setHasPartitionColumnInWindowedAggregate() {
+        m_hasPartitionColumnsInWindowedAggregates = true;
+    }
+
     @Override
     /**
      * Return true if this ParsedSelectStmt has order by columns
@@ -2175,4 +2194,35 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
+
+    /**
+     * Return true iff all the windowed expressions have a table partition column
+     * in their partition by list.  Since we only support one windowed expression
+     * now, this returns true if there are no windowed expressions.
+     *
+     * @return
+     */
+    public boolean isPartitionColumnInWindowedAggregatePartitionByList() {
+        for (WindowedExpression we : getWindowedExpressions()) {
+            List<AbstractExpression> partitionByExprs = we.getPartitionByExpressions();
+            for (AbstractExpression ae : partitionByExprs) {
+                if ( ! (ae instanceof TupleValueExpression ) ) {
+                    continue;
+                }
+                TupleValueExpression tve = (TupleValueExpression)ae;
+                String tableAlias    = tve.getTableAlias();
+                String columnName    = tve.getColumnName();
+                StmtTableScan scanTable = getStmtTableScanByAlias(tableAlias);
+                if (scanTable == null || scanTable.getPartitioningColumns() == null) {
+                    continue;
+                }
+                for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+                    if (pcol != null && pcol.getColumnName().equals(columnName)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
 }

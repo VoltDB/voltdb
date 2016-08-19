@@ -300,6 +300,9 @@ public class PlanAssembler {
             if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
+            if (isPartitionColumnInWindowedAggregatePartitionByList()) {
+                m_parsedSelect.setHasPartitionColumnInWindowedAggregate();
+            }
 
             // FIXME: is the following scheme/comment obsolete?
             // FIXME: turn it on when we are able to push down DISTINCT
@@ -366,6 +369,12 @@ public class PlanAssembler {
             m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.allScans(), valueEquivalence);
         }
         m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+    }
+
+    private boolean isPartitionColumnInWindowedAggregatePartitionByList() {
+        assert (m_parsedSelect != null);
+
+        return (m_parsedSelect.isPartitionColumnInWindowedAggregatePartitionByList());
     }
 
     private static void failIfNonDeterministicDml(AbstractParsedStmt parsedStmt, CompiledPlan plan) {
@@ -2955,7 +2964,7 @@ public class PlanAssembler {
         }
 
         // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
-        List<AbstractExpression> exprsForInnerNode = new ArrayList<AbstractExpression>(exprs);
+        List<AbstractExpression> exprsForInnerNode = new ArrayList<>(exprs);
         if (leftNode.getJoinExpression() != null) {
             exprsForInnerNode.add(leftNode.getJoinExpression());
         }

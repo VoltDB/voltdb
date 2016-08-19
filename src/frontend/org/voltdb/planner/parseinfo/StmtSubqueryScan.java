@@ -124,7 +124,7 @@ public class StmtSubqueryScan extends StmtTableScan {
                     }
                 }
                 if (values == null) {
-                    values = new HashSet<AbstractExpression>();
+                    values = new HashSet<>();
                 }
             }
             updateEqualSets(values, valueEquivalence, eqSets, tveKey, spExpr);
@@ -228,7 +228,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     public List<StmtTargetTableScan> getAllTargetTables() {
-        List <StmtTargetTableScan> stmtTables = new ArrayList<StmtTargetTableScan>();
+        List <StmtTargetTableScan> stmtTables = new ArrayList<>();
         for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
@@ -242,7 +242,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         return stmtTables;
     }
 
-    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
+    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<>();
     @Override
     public List<Index> getIndexes() {
         return noIndexesSupportedOnSubqueryScans;
@@ -347,6 +347,9 @@ public class StmtSubqueryScan extends StmtTableScan {
             if (! selectStmt.hasPartitionColumnInGroupby()) {
                 return false;
             }
+        }
+        if ( ! selectStmt.hasPartitionColumnInWindowedExpression()) {
+            return false;
         }
         // Now. If this sub-query joins with a partitioned table in the parent statement,
         // push the join down by removing the send/receive plan node pair.
