@@ -873,7 +873,7 @@ var loadPage = function (serverName, portid) {
                             VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
                             //show master/replica table
                             voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
-                                if(drConsumerDetails.hasOwnProperty('STATE'))
+                                if(drConsumerDetails[currentServer].hasOwnProperty('STATE'))
                                     VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
                                 else
                                     VoltDbUI.drConsumerState = 'DISABLE'
@@ -2668,4 +2668,3 @@ function getParameterByName(name) {
     else
         return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
-

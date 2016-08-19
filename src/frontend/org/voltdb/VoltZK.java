@@ -119,6 +119,12 @@ public class VoltZK {
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
 
+    // Settings base
+    public static final String settings_base = "/db/settings";
+
+    // Cluster settings
+    public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -133,6 +139,8 @@ public class VoltZK {
             leaders_globalservice,
             lastKnownLiveNodes,
             syncStateMachine,
+            settings_base,
+            cluster_settings,
             catalogUpdateBlockers,
             request_truncation_snapshot
     };

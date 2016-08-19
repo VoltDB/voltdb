@@ -129,11 +129,17 @@ public class SystemInformationAgent extends OpsAgent
         return tables;
     }
 
+    private CatalogContext getCatalogContext()
+    {
+        return VoltDB.instance().getCatalogContext();
+    }
+
     private void collectSystemInformationDeployment(PendingOpsRequest psr)
     {
+        CatalogContext catalogContext = getCatalogContext();
         VoltTable result =
-                SystemInformation.populateDeploymentProperties(VoltDB.instance().getCatalogContext().cluster,
-                        VoltDB.instance().getCatalogContext().database);
+                SystemInformation.populateDeploymentProperties(catalogContext.cluster,
+                        catalogContext.database, catalogContext.getClusterSettings());
         if (result == null) {
             sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
                     "Unable to collect DEPLOYMENT information for @SystemInformation", psr.clientData);

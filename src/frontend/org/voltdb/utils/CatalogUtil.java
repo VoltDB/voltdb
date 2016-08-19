@@ -98,7 +98,6 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -133,10 +132,12 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.settings.ClusterSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -831,58 +832,6 @@ public abstract class CatalogUtil {
         }
     }
 
-    //For deployment if paths are empty or null populate with runtime paths.
-    public static void updateRuntimeDeploymentPaths(DeploymentType deployment) {
-        PathsType paths = deployment.getPaths();
-        if (paths.getVoltdbroot() == null) {
-            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
-            root.setPath(VoltDB.instance().getVoltDBRootPath());
-            paths.setVoltdbroot(root);
-        } else {
-            paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
-        }
-        //snapshot
-        if (paths.getSnapshots() == null) {
-            PathsType.Snapshots snap = new PathsType.Snapshots();
-            snap.setPath(VoltDB.instance().getSnapshotPath());
-            paths.setSnapshots(snap);
-        } else {
-            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
-        }
-        if (paths.getCommandlog() == null) {
-            //cl
-            PathsType.Commandlog cl = new PathsType.Commandlog();
-            cl.setPath(VoltDB.instance().getCommandLogPath());
-            paths.setCommandlog(cl);
-        } else {
-            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
-        }
-        if (paths.getCommandlogsnapshot() == null) {
-            //cl snap
-            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
-            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
-            paths.setCommandlogsnapshot(clsnap);
-        } else {
-            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
-        }
-        if (paths.getExportoverflow() == null) {
-            //export overflow
-            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
-            exp.setPath(VoltDB.instance().getExportOverflowPath());
-            paths.setExportoverflow(exp);
-        } else {
-            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
-        }
-        if (paths.getDroverflow() == null) {
-            //dr overflow
-            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
-            droverflow.setPath(VoltDB.instance().getDROverflowPath());
-            paths.setDroverflow(droverflow);
-        } else {
-            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
-        }
-    }
-
     public static void populateDefaultDeployment(DeploymentType deployment) {
         //partition detection
         PartitionDetectionType pd = deployment.getPartitionDetection();
@@ -1111,6 +1060,21 @@ public abstract class CatalogUtil {
         }
     }
 
+    public final static Map<String, String> asClusterSettingsMap(DeploymentType depl) {
+        return ImmutableMap.<String,String>builder()
+                .put(ClusterSettings.HOST_COUNT, Integer.toString(depl.getCluster().getHostcount()))
+                .put(ClusterSettings.CANGAMANGA, Integer.toString(depl.getSystemsettings().getQuery().getTimeout()))
+                .build();
+    }
+
+    public final static ClusterSettings asClusterSettings(String deploymentURL) {
+        return asClusterSettings(parseDeployment(deploymentURL));
+    }
+
+    public final static ClusterSettings asClusterSettings(DeploymentType depl) {
+        return ClusterSettings.create(asClusterSettingsMap(depl));
+    }
+
     /**
      * Set cluster info in the catalog.
      * @param leader The leader hostname
@@ -1119,55 +1083,47 @@ public abstract class CatalogUtil {
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
-        int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
-        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
-
-        if (!config.validate()) {
-            throw new RuntimeException(config.getErrorMsg());
-        } else {
-            Cluster catCluster = catalog.getClusters().get("cluster");
-            // copy the deployment info that is currently not recorded anywhere else
-            Deployment catDeploy = catCluster.getDeployment().get("deployment");
-            catDeploy.setHostcount(hostCount);
-            catDeploy.setSitesperhost(sitesPerHost);
-            catDeploy.setKfactor(kFactor);
-            // copy partition detection configuration from xml to catalog
-            String defaultPPDPrefix = "partition_detection";
-            if (deployment.getPartitionDetection().isEnabled()) {
-                catCluster.setNetworkpartition(true);
-                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                if (deployment.getPartitionDetection().getSnapshot() != null) {
-                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-                }
-                else {
-                    sched.setPrefix(defaultPPDPrefix);
-                }
+        Cluster catCluster = catalog.getClusters().get("cluster");
+        // copy the deployment info that is currently not recorded anywhere else
+        Deployment catDeploy = catCluster.getDeployment().get("deployment");
+        catDeploy.setSitesperhost(sitesPerHost);
+        catDeploy.setKfactor(kFactor);
+        // copy partition detection configuration from xml to catalog
+        String defaultPPDPrefix = "partition_detection";
+        if (deployment.getPartitionDetection().isEnabled()) {
+            catCluster.setNetworkpartition(true);
+            CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+            SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+            if (deployment.getPartitionDetection().getSnapshot() != null) {
+                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
             }
             else {
-                catCluster.setNetworkpartition(false);
+                sched.setPrefix(defaultPPDPrefix);
             }
+        }
+        else {
+            catCluster.setNetworkpartition(false);
+        }
 
-            catCluster.setAdminport(deployment.getAdminMode().getPort());
-            catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
+        catCluster.setAdminport(deployment.getAdminMode().getPort());
+        catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
 
-            setSystemSettings(deployment, catDeploy);
+        setSystemSettings(deployment, catDeploy);
 
-            catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
+        catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
 
-            // copy schema modification behavior from xml to catalog
-            if (cluster.getSchema() != null) {
-                catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
-            }
-            else {
-                // Don't think we can get here, deployment schema guarantees a default value
-                hostLog.warn("Schema modification setting not found. " +
-                        "Forcing default behavior of UpdateCatalog to modify database schema.");
-                catCluster.setUseddlschema(false);
-            }
+        // copy schema modification behavior from xml to catalog
+        if (cluster.getSchema() != null) {
+            catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
+        }
+        else {
+            // Don't think we can get here, deployment schema guarantees a default value
+            hostLog.warn("Schema modification setting not found. " +
+                    "Forcing default behavior of UpdateCatalog to modify database schema.");
+            catCluster.setUseddlschema(false);
         }
     }
 
@@ -1796,7 +1752,6 @@ public abstract class CatalogUtil {
     public static void setupCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
-            File commandlogPath =  new VoltFile(voltDbRoot, "command_log");
             return;
         }
         File commandlogPath;
@@ -2584,5 +2539,56 @@ public abstract class CatalogUtil {
             }
         }
         return res;
+    }
+
+    /**
+     * Creates a shallow clone of {@link DeploymentType} where all its
+     * children references are copied except for {@link ClusterType}, and
+     * {@link PathsType} which are newly instantiated
+     * @param o
+     * @return a shallow clone of {@link DeploymentType}
+     */
+    public static DeploymentType shallowClusterAndPathsClone(DeploymentType o) {
+        DeploymentType clone = new DeploymentType();
+
+        clone.setPartitionDetection(o.getPartitionDetection());
+        clone.setAdminMode(o.getAdminMode());
+        clone.setHeartbeat(o.getHeartbeat());
+        clone.setHttpd(o.getHttpd());
+        clone.setSnapshot(o.getSnapshot());
+        clone.setExport(o.getExport());
+        clone.setUsers(o.getUsers());
+        clone.setCommandlog(o.getCommandlog());
+        clone.setSystemsettings(o.getSystemsettings());
+        clone.setSecurity(o.getSecurity());
+        clone.setDr(o.getDr());
+        clone.setImport(o.getImport());
+        clone.setConsistency(o.getConsistency());
+
+        ClusterType other = o.getCluster();
+        ClusterType cluster = new ClusterType();
+
+        cluster.setHostcount(other.getHostcount());
+        cluster.setSitesperhost(other.getSitesperhost());
+        cluster.setKfactor(other.getKfactor());
+        cluster.setId(other.getId());
+        cluster.setElastic(other.getElastic());
+        cluster.setSchema(other.getSchema());
+
+        clone.setCluster(cluster);
+
+        PathsType prev = o.getPaths();
+        PathsType paths = new PathsType();
+
+        paths.setVoltdbroot(prev.getVoltdbroot());
+        paths.setSnapshots(prev.getSnapshots());
+        paths.setExportoverflow(prev.getExportoverflow());
+        paths.setDroverflow(prev.getDroverflow());
+        paths.setCommandlog(prev.getCommandlog());
+        paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
+
+        clone.setPaths(paths);
+
+        return clone;
     }
 }
