@@ -1555,16 +1555,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             updateRow(client, dataList1.get(i), dataList2.get(i));
             verifyViewOnJoinQueryResult(client);
         }
-        truncateBeforeTest(client);
-
-        // Merge two sub-lists for the following tests.
-        dataList1.addAll(dataList2);
 
         // -- 2 -- Test inserting the data into the source tables.
         // We do a shuffle here and in the delete test. But I do believe we still
         // have the full coverage of all the cases because we are inserting and deleting
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
+        truncateBeforeTest(client);
+        // Merge two sub-lists for the following tests.
+        dataList1.addAll(dataList2);
         Collections.shuffle(dataList1);
         System.out.println("Now testing inserting data to the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
