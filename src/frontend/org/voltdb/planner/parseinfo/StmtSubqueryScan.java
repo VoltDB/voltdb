@@ -261,12 +261,20 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public String getColumnName(int m_columnIndex) {
-        return m_outputColumnList.get(m_columnIndex).getColumnName();
+    public String getColumnName(int columnIndex) {
+        return m_outputColumnList.get(columnIndex).getColumnName();
+    }
+
+    public SchemaColumn getSchemaColumn(int columnIndex) {
+        return m_outputColumnList.get(columnIndex);
+    }
+
+    public Integer getColumnIndex(String columnAlias, int differentiator) {
+        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
     }
 
     @Override
-    public void processTVE(TupleValueExpression expr, String columnName) {
+    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
         Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
@@ -276,7 +284,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         expr.setColumnIndex(idx.intValue());
         expr.setTypeSizeBytes(schemaCol.getType(), schemaCol.getSize(),
                 schemaCol.getExpression().getInBytes());
-
+        return expr;
     }
 
     /**
