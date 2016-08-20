@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -44,6 +45,14 @@ public class EEProcess {
     private int m_port;
 
     private final boolean verbose = true;
+
+    //
+    // Valgrind will write its output in this file.  The %s will be
+    // replaced by the literal string "%p" or else the stringified
+    // version of the pid.  The former is used to tell valgrind itself
+    // the name.  The latter is used to open up the file.
+    //
+    private static String VALGRIND_OUTPUT_FILE_PATTERN = "valgrind_%s.xml";
 
     public int port() {
         return m_port;
@@ -73,6 +82,11 @@ public class EEProcess {
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
         args.add("--error-exitcode=-1");
+        args.add("--suppressions=tests/test_utils/vdbsuppressions.supp");
+        args.add("--xml=yes");
+        // We will write valgrind output to a file.  The %p is replaced by
+        // valgrind with the process id of the launched process.
+        args.add(String.format("--xml-file=%s", String.format(VALGRIND_OUTPUT_FILE_PATTERN, "%p")));
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant
          * check In that scenario junit will handle logging of Valgrind
@@ -192,11 +206,12 @@ public class EEProcess {
         }
 
         /*
-         * Create a thread to parse Valgrind's output and populdate
+         * Create a thread to parse Valgrind's output and populate
          * m_valgrindErrors with errors.
          */
         final Process p = m_eeProcess;
         m_stdoutParser = new Thread() {
+            ValgrindXMLParser m_xmlParser = null;
             @Override
             public void run() {
                 while (true) {
@@ -241,9 +256,6 @@ public class EEProcess {
                                 System.err.println("[ipc=" + p.hashCode()
                                                    + "]:::" + line);
                             }
-                            if (line.startsWith("==" + m_eePID + "==")) {
-                                processValgrindOutput(line);
-                            }
                         } else {
                             try {
                                 p.waitFor();
@@ -257,10 +269,9 @@ public class EEProcess {
                                          + "] Returned end of stream and exit value "
                                          + p.exitValue());
                             }
-                            if (!m_allHeapBlocksFreed) {
-                                m_valgrindErrors
-                                .add("Not all heap blocks were freed");
-                            }
+                            File valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
+                            ValgrindXMLParser parser = new ValgrindXMLParser(valgrindOutputFile);
+                            parser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
                     } catch (final IOException e) {
@@ -270,24 +281,6 @@ public class EEProcess {
                 }
             }
 
-            private void processValgrindOutput(final String line) {
-                final String errorLineString = "ERROR SUMMARY: ";
-                final String heapBlocksFreedString = "All heap blocks were freed";
-                /*
-                 * An indirect way of making sure Valgrind reports no error
-                 * memory accesses
-                 */
-                if (line.contains(errorLineString)) {
-                    final int index = line.indexOf(errorLineString)
-                    + errorLineString.length();
-                    final char errorNumChar = line.charAt(index);
-                    if (!(errorNumChar == '0')) {
-                        m_valgrindErrors.add(line);
-                    }
-                } else if (line.contains(heapBlocksFreedString)) {
-                    m_allHeapBlocksFreed = true;
-                }
-            }
         };
 
         m_stdoutParser.setDaemon(false);

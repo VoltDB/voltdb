@@ -1,4 +1,5 @@
 import os, sys, threading, shutil, re
+import xml.etree.ElementTree as ET
 from subprocess import Popen, PIPE, STDOUT
 
 
@@ -633,39 +634,22 @@ class ValgrindError:
     def message(self):
         return self.line
 
-class ErrorState:
-    def __init__(self, expectNoErrors):
+class ValgrindErrorState:
+    def __init__(self, expectNoErrors, valgrindFile):
         self.expectErrors = not expectNoErrors
-        self.memLossPattern = re.compile(".*(?P<errorType>((definitely)|(possibly)|(indirectly))) lost: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
-        self.stillReachablePattern = re.compile(".*still reachable: (?P<byteCount>\d*) bytes in (?P<blockCount>\d*) blocks");
-        self.errorPattern = re.compile(".*ERROR SUMMARY: (?P<errorCount>\d*) errors from (?P<errorContexts>\d*) contexts")
-        self.errorLines = []
+        self.valgrindFile = valgrindFile
+        self.errorStrings = []
+        _process()
 
-    def processErrorString(self, line):
-        m = self.memLossPattern.match(line)
-        if m:
-            bytes = int(m.group('byteCount'))
-            if bytes > 0:
-                blocks = int(m.group('blockCount'))
-                errtype = m.group("errorType")
-                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errtype + " Lost.", line)]
-            return
-        m = self.stillReachablePattern.match(line)
-        if m:
-            bytes = int(m.group('byteCount'))
-            if bytes > 0:
-                blocks = int(m.group('blockCount'))
-                errType = "Memory still reachable"
-                self.errorLines += [MemLeakError(bytes, blocks, "Memory " + errType + " Lost.", line)]
-            return
-        m = self.errorPattern.match(line)
-        if m:
-            errors = int(m.group('errorCount'))
-            if errors > 0:
-                contexts = int(m.group('errorContexts'))
-                errtype = 'other'
-                self.errorLines += [ValgrindError(errors, contexts, errtype, line)]
-                
+    def _process(self):
+        tree = ET.parse(self.valgrindFile);
+        root = tree.getroot()
+        errs = root.findall("//error")
+        for err in errs:
+            self.errorStrings += toString(err)
+
+    def toString(self, err):
+        str = err.find("kind").text()
     def isExpectedState(self):
         if self.expectErrors:
             return (len(self.errorLines) > 0)
@@ -674,8 +658,11 @@ class ErrorState:
 
     def errorMessage(self):
         return ("%d Valgrind Errors: \n" % len(self.errorLines)) \
-		+ "\n".join(map(lambda l: l.message(), self.errorLines))
-    
+                + "\n".join(map(lambda l: l.message(), self.errorLines))
+
+def makeValgrindFile(pidStr):
+    return "valgrind_ee_%s.xml" % pidStr
+
 def runTests(CTX):
     failedTests = []
 
@@ -694,7 +681,7 @@ def runTests(CTX):
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
     for dir, test in tests:
-	expectNoMemLeaks = not (dir == "memleaktests")
+        expectNoMemLeaks = not (dir == "memleaktests")
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
@@ -708,18 +695,21 @@ def runTests(CTX):
                 if targetpath.find(test) != -1:
                     isValgrindTest = False;
             if CTX.PLATFORM == "Linux" and isValgrindTest:
-                process = Popen(executable="valgrind", args=["valgrind", 
-							     "--leak-check=full", 
-							     "--show-reachable=yes",
-							     "--error-exitcode=-1",
-							     "--suppressions=" + os.path.join(TEST_PREFIX,
-											      "test_utils/vdbsuppressions.supp"),
-							     targetpath], stderr=PIPE, bufsize=-1)
+                valgrindFile = makeValgrindFile("%p")
+                process = Popen(executable="valgrind",
+                                args=["valgrind",
+                                      "--leak-check=full",
+                                      "--show-reachable=yes",
+                                      "--error-exitcode=-1",
+                                      "--suppressions=" + os.path.join(TEST_PREFIX,
+                                                                       "test_utils/vdbsuppressions.supp"),
+                                      "--xml=yes",
+                                      "--xml-file=" + valgrindFile,
+                                      targetpath], stderr=PIPE, bufsize=-1)
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                errorState = ErrorState(expectNoMemLeaks)
-                for line in out_err:
-                    errorState.processErrorString(line);
+                errorState = ValgrindErrorState(expectNoMemLeaks,
+                                                makeValgrindFile("%d" % process.pid))
                 if not errorState.isExpectedState():
                     print errorState.errorMessage()
                     retval = -1
@@ -745,4 +735,3 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-
