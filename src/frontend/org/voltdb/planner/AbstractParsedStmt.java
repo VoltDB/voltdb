@@ -477,7 +477,7 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias,
+        TupleValueExpression tve = new TupleValueExpression(tableName, tableAlias,
                 columnName, columnAlias, -1, differentiator);
         // Collect the unique columns used in the plan for a given scan.
 
@@ -492,16 +492,16 @@ public abstract class AbstractParsedStmt {
             // from TestVoltCompler.testScalarSubqueriesExpectedFailures.
             throw new PlanningErrorException("Object not found: " + tableAlias);
         }
-        tableScan.resolveTVE(expr);
+        AbstractExpression resolvedExpr = tableScan.resolveTVE(tve);
 
         if (m_stmtId == tableScan.getStatementId()) {
-            return expr;
+            return resolvedExpr;
         }
 
         // This is a TVE from the correlated expression
         int paramIdx = NEXT_PARAMETER_ID++;
-        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
-        m_parameterTveMap.put(paramIdx, expr);
+        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, resolvedExpr);
+        m_parameterTveMap.put(paramIdx, resolvedExpr);
         return pve;
     }
 
@@ -698,6 +698,91 @@ public abstract class AbstractParsedStmt {
         StmtSubqueryScan subqueryScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
         m_tableAliasMap.put(tableAlias, subqueryScan);
         return subqueryScan;
+    }
+
+    /**
+     * Verify if a subquery can be replaced with a direct select from table(s)
+     * @param subquery
+     * @return TRUE/FALSE
+     */
+    private boolean canSimplifySubquery(AbstractParsedStmt subquery) {
+        // Must be a SELECT statement (not a SET operation)
+        if (!(subquery instanceof ParsedSelectStmt)) {
+            return false;
+        }
+        ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
+        // No aggregation and/or GROUP BY is allowed
+        if (selectSubquery.hasAggregateOrGroupby()) {
+            return false;
+        }
+        // No DISTINCT
+        if (selectSubquery.hasAggregateDistinct()) {
+            return false;
+        }
+        // No windowed aggregate functions like RANK.
+        if (selectSubquery.hasWindowedExpression()) {
+            return false;
+        }
+        // No LIMIT/OFFSET
+        if (selectSubquery.hasLimitOrOffset() || selectSubquery.hasLimitOrOffsetParameters()) {
+            return false;
+        }
+        // Only SELECT from a single TARGET TABLE is allowed
+        int tableCount = 0;
+        for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
+            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+                // This is an artificial table for a subquery expression
+                continue;
+            }
+            if (++tableCount > 1) {
+                return false;
+            }
+            // Only TRAGET TABLE
+            if (!(entry.getValue() instanceof StmtTargetTableScan)) {
+                return false;
+            }
+        }
+        // All display columns must be a simple COLUMNREF (no expressions)
+        for (ParsedColInfo col : selectSubquery.m_displayColumns) {
+            if (!(col.expression instanceof TupleValueExpression)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Replace an existing subquery scan with an underline table scan. The subquery
+     * has already passed all the checks from the canSimplifySubquery method.
+     * Subquery ORDER BY clause is ignored if such exists.
+     *
+     * @param subquery Parsed subquery statement
+     * @param subqueryScan subquery scan to simplify
+     * @param tableAlias
+     * @return StmtTargetTableScan
+     */
+    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(AbstractParsedStmt subquery, StmtSubqueryScan subqueryScan, String tableAlias) {
+        assert(tableAlias != null);
+        // It is guaranteed by the canSimplifySubquery that there is one and only one TABLE in the
+        // whole subquery FROM clause. There could be VOLT_TEMP_TABLEs though that we need to skip
+        // The VOLT_TEMP_TABLE_* are scans for subquery expressions
+        StmtTableScan origScan = null;
+        for (Map.Entry<String, StmtTableScan> entry : subquery.m_tableAliasMap.entrySet()) {
+            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+                // This is an artificial table for a subquery expression
+                continue;
+            }
+            origScan = entry.getValue();
+            break;
+        }
+        assert(origScan instanceof StmtTargetTableScan);
+        StmtTargetTableScan origTableScan = (StmtTargetTableScan) origScan;
+        StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
+        newTableScan.setOriginalSubqueryScan(subqueryScan);
+        // Replace the subquery scan with the table scan
+        assert(m_tableAliasMap.get(tableAlias) != null);
+        m_tableAliasMap.put(tableAlias, newTableScan);
+        return newTableScan;
     }
 
     /**
@@ -1135,6 +1220,10 @@ public abstract class AbstractParsedStmt {
         // the sub-query is already registered
         StmtTableScan tableScan = null;
         Table table = null;
+
+        // In case of a subquery we need to preserve its filter expressions
+        AbstractExpression simplifiedSunbqueryExpr = null;
+
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
             assert(table != null);
@@ -1143,10 +1232,37 @@ public abstract class AbstractParsedStmt {
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
             tableScan = addSubqueryToStmtCache(subquery, tableAlias);
+            if (canSimplifySubquery(subquery)) {
+                tableScan = addSimplifiedSubqueryToStmtCache(subquery, (StmtSubqueryScan) tableScan, tableAlias);
+                table = ((StmtTargetTableScan) tableScan).getTargetTable();
+                m_tableList.add(table);
+                // Extract subquery's filters
+                assert(subquery.m_joinTree != null);
+                // Adjust the table alias in all TVE from the eliminated subquery expressions
+                // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
+                // The table alias TA1 from the original TVE (T)TA1.C from the subquery WHERE condition
+                // needs to be replaced with the alias TA2. The new TVE will be (T)TA2.C.
+                // The column alias does not require an adjustment. It is equal to column name
+                simplifiedSunbqueryExpr = subquery.m_joinTree.getAllFilters();
+                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(simplifiedSunbqueryExpr);
+                for (TupleValueExpression tve : tves) {
+                    tve.setTableAlias(tableScan.getTableAlias());
+                    tve.setOrigStmtId(m_stmtId);
+                }
+            }
         }
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
+        if (simplifiedSunbqueryExpr != null) {
+            // Add subqueruy's expressions as JOIN filters to make sure they will
+            // stay at the node level in case of an OUTER joins and won't affect
+            // the join simplification process:
+            // select * from T LEFT JOIN (select C FROM T1 WHERE C > 2) S ON T.C = S.C;
+            joinExpr = (joinExpr != null) ?
+                    ExpressionUtil.combine(joinExpr, simplifiedSunbqueryExpr) :
+                    simplifiedSunbqueryExpr;
+        }
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
@@ -1354,6 +1470,7 @@ public abstract class AbstractParsedStmt {
         subquery.m_paramsByIndex = m_paramsByIndex;
 
         AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
+        subquery.m_parentStmt = this;
         return subquery;
     }
 
