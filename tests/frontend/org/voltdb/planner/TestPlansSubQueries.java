@@ -50,7 +50,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
@@ -2091,7 +2091,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScan(pn, "T1",  "A", "C");
         AbstractPlanNode upn = pn.getChild(0);
-        assertTrue(upn instanceof UnionPlanNode);
+        assertTrue(upn instanceof SetOpPlanNode);
 
         pn = upn.getChild(0);
         checkSeqScan(pn, "R1", "A", "C");

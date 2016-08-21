@@ -212,7 +212,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_AGGREGATE        = 50,
     PLAN_NODE_TYPE_HASHAGGREGATE    = 51,
-    PLAN_NODE_TYPE_UNION            = 52,
+    PLAN_NODE_TYPE_SETOP            = 52,
     PLAN_NODE_TYPE_ORDERBY          = 53,
     PLAN_NODE_TYPE_PROJECTION       = 54,
     PLAN_NODE_TYPE_MATERIALIZE      = 55,

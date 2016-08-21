@@ -39,7 +39,7 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QuantifierType;
@@ -387,7 +387,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             assertEquals(0, selSubq.getArgs().size()); // no correlation params
             AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
             assertNotNull(subqPlanNode);
-            assertTrue(subqPlanNode instanceof UnionPlanNode);
+            assertTrue(subqPlanNode instanceof SetOpPlanNode);
         }
         {
             // Correlation parameter on the LHS of the union
@@ -418,7 +418,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
             AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
             assertNotNull(subqPlanNode);
-            assertTrue(subqPlanNode instanceof UnionPlanNode);
+            assertTrue(subqPlanNode instanceof SetOpPlanNode);
         }
         {
             // Correlation parameter on the RHS of the union
@@ -449,7 +449,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
             AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
             assertNotNull(subqPlanNode);
-            assertTrue(subqPlanNode instanceof UnionPlanNode);
+            assertTrue(subqPlanNode instanceof SetOpPlanNode);
         }
         {
             // Correlation parameter in an intersect under a union
@@ -482,7 +482,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
 
             AbstractPlanNode subqPlanNode = selSubq.getSubqueryNode();
             assertNotNull(subqPlanNode);
-            assertTrue(subqPlanNode instanceof UnionPlanNode);
+            assertTrue(subqPlanNode instanceof SetOpPlanNode);
 
         }
     }

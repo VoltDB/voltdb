@@ -158,7 +158,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         // Union
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UNION):
+        case (voltdb::PLAN_NODE_TYPE_SETOP):
             ret = new voltdb::UnionPlanNode();
             break;
         // ------------------------------------------------------------------
