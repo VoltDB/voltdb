@@ -31,7 +31,7 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public class UnionPlanNode extends AbstractPlanNode {
+public class SetOpPlanNode extends AbstractPlanNode {
 
     public enum Members {
         UNION_TYPE
@@ -40,19 +40,19 @@ public class UnionPlanNode extends AbstractPlanNode {
     // Union Type
     private ParsedUnionStmt.UnionType m_unionType;
 
-    public UnionPlanNode() {
+    public SetOpPlanNode() {
         super();
         m_unionType = ParsedUnionStmt.UnionType.NOUNION;
     }
 
-    public UnionPlanNode(ParsedUnionStmt.UnionType unionType) {
+    public SetOpPlanNode(ParsedUnionStmt.UnionType unionType) {
         super();
         m_unionType = unionType;
     }
 
     @Override
     public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.UNION;
+        return PlanNodeType.SETOP;
     }
 
     @Override
@@ -125,7 +125,7 @@ public class UnionPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "UNION " + m_unionType.name();
+        return "SET OP " + m_unionType.name();
     }
 
     @Override

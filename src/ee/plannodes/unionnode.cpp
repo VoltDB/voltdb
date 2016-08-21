@@ -52,7 +52,7 @@ namespace voltdb {
 
 UnionPlanNode::~UnionPlanNode() { }
 
-PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
+PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
 
 std::string UnionPlanNode::debugInfo(const std::string &spacer) const
 {

@@ -74,7 +74,7 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.SetOpPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
@@ -721,11 +721,15 @@ public class PlanAssembler {
 
         m_bestAndOnlyPlanWasGenerated = true;
         // Simply return an union plan node with a corresponding union type set
-        AbstractPlanNode subUnionRoot = new UnionPlanNode(m_parsedUnion.m_unionType);
+        AbstractPlanNode subSetOpRoot = new SetOpPlanNode(m_parsedUnion.m_unionType);
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
         StatementPartitioning commonPartitioning = null;
+
+        Set<List<Integer>> commonPartitionColumns = null;
+        boolean canPushSetOpDown = true;
+        boolean needPushSetOpDown = false;
 
         // Build best plans for the children first
         int planId = 0;
@@ -757,6 +761,36 @@ public class PlanAssembler {
             // Make sure that next child's plans won't override current ones.
             planId = planSelector.m_planId;
 
+            // Need to eval even the first statement
+            // must go before the if (commonPartitioning == null)
+            if (canPushSetOpDown) {
+                // Is statement requires MP?
+                canPushSetOpDown = partitioning.requiresTwoFragments();
+                if (canPushSetOpDown) {
+                    // Is statement has a trivial coordinator?
+                    AbstractPlanNode childRoot = bestChildPlan.rootPlanGraph;
+                    if (childRoot instanceof ProjectionPlanNode) {
+                        childRoot = childRoot.getChild(0);
+                    }
+                    canPushSetOpDown = childRoot instanceof MergeReceivePlanNode ||
+                            childRoot instanceof ReceivePlanNode;
+                }
+                if (canPushSetOpDown) {
+                    if (commonPartitionColumns == null) {
+                        commonPartitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
+                    } else {
+                        // get partition columns from this child
+                        // compare it with the common.
+                        // remove mismatches
+                        Set<List<Integer>> partitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
+                        commonPartitionColumns.retainAll(partitionColumns);
+                    }
+                    if (commonPartitionColumns.isEmpty()) {
+                        canPushSetOpDown = false;
+                    }
+                }
+            }
+
             // Decide whether child statements' partitioning is compatible.
             if (commonPartitioning == null) {
                 commonPartitioning = partitioning;
@@ -765,7 +799,11 @@ public class PlanAssembler {
 
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
             if (commonPartitioning.requiresTwoFragments()) {
-                if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
+                if (partitioning.requiresTwoFragments()) {
+                    needPushSetOpDown = true;
+                }
+                if ((partitioning.requiresTwoFragments() && !canPushSetOpDown)
+                        || statementPartitionExpression != null) {
                     // If two child statements need to use a second fragment,
                     // it can't currently be a two-fragment plan.
                     // The coordinator expects a single-table result from each partition.
@@ -791,6 +829,7 @@ public class PlanAssembler {
                 // Again, currently the coordinator of a two-fragment plan is not allowed to
                 // target a particular partition, so neither can the union of the coordinator
                 // and a statement that wants to run single-partition.
+                assert(!canPushSetOpDown);
                 throw new PlanningErrorException(
                         "Statements are too complex in set operation using multiple partitioned tables.");
             }
@@ -813,23 +852,47 @@ public class PlanAssembler {
         // need to reset plan id for the entire UNION
         m_planSelector.m_planId = planId;
 
-        // Add and link children plans
+        // Add and link children plans. Push down the SetOP if needed
+        AbstractPlanNode rootNode = subSetOpRoot;
+        if (needPushSetOpDown) {
+            rootNode = SubPlanAssembler.addSendReceivePair(rootNode);
+        }
         for (CompiledPlan selectPlan : childrenPlans) {
-            subUnionRoot.addAndLinkChild(selectPlan.rootPlanGraph);
+            if (needPushSetOpDown) {
+                AbstractPlanNode childRoot = selectPlan.rootPlanGraph;
+                if (childRoot instanceof ProjectionPlanNode) {
+                    childRoot = childRoot.getChild(0);
+                }
+                assert(childRoot instanceof MergeReceivePlanNode ||
+                        childRoot instanceof ReceivePlanNode);
+                childRoot = childRoot.getChild(0).getChild(0);
+                childRoot.clearParents();
+                // can refactor
+                if (selectPlan.rootPlanGraph instanceof ProjectionPlanNode) {
+                    selectPlan.rootPlanGraph.clearChildren();
+                    selectPlan.rootPlanGraph.addAndLinkChild(childRoot);
+                    subSetOpRoot.addAndLinkChild(selectPlan.rootPlanGraph);
+                } else {
+                    subSetOpRoot.addAndLinkChild(childRoot);
+                }
+//                selectPlan.resetPlanNodeIds(1);
+            } else {
+                rootNode.addAndLinkChild(selectPlan.rootPlanGraph);
+            }
         }
 
         // order by
         if (m_parsedUnion.hasOrderByColumns()) {
-            subUnionRoot = handleOrderBy(m_parsedUnion, subUnionRoot);
+            rootNode = handleOrderBy(m_parsedUnion, rootNode);
         }
 
         // limit/offset
         if (m_parsedUnion.hasLimitOrOffset()) {
-            subUnionRoot = handleUnionLimitOperator(subUnionRoot);
+            rootNode = handleUnionLimitOperator(rootNode);
         }
 
         CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = subUnionRoot;
+        retval.rootPlanGraph = rootNode;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
         boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
@@ -842,6 +905,34 @@ public class PlanAssembler {
             retval.cost += bestChildPlan.cost;
         }
         return retval;
+    }
+
+    private Set<List<Integer>> extractPrationColumn(AbstractPlanNode rootNode) {
+        NodeSchema outputSchema = rootNode.getOutputSchema();
+        ArrayList<SchemaColumn> outputColumns = outputSchema.getColumns();
+
+        ArrayList<AbstractScanPlanNode> scanNodes = rootNode.getScanNodeList();
+        Set<List<Integer>> partitionColumnSet = new HashSet<List<Integer>>();
+        for (AbstractScanPlanNode scanNode : scanNodes) {
+            StmtTableScan stmtScan = scanNode.getTableScan();
+            List<SchemaColumn> scanPartitioningSolumns = stmtScan.getPartitioningColumns();
+            //
+            List<Integer> parttioningColumnIndxes = new ArrayList<Integer>();
+            for (SchemaColumn partitionColumn : scanPartitioningSolumns) {
+                int pos = 0;
+                for (SchemaColumn outputColumn : outputColumns) {
+                    if (outputColumn.compareNames(partitionColumn) == 0) {
+                        parttioningColumnIndxes.add(pos);
+                    }
+                    pos++;
+                }
+            }
+            // All partitioning columns are there
+            if (parttioningColumnIndxes.size() == scanPartitioningSolumns.size()) {
+                partitionColumnSet.add(parttioningColumnIndxes);
+            }
+        }
+        return partitionColumnSet;
     }
 
     private int planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
