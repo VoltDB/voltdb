@@ -38,10 +38,6 @@ public class EEProcess {
     private String m_eePID = null;
     private Thread m_stderrParser = null;
     private Thread m_stdoutParser = null;
-    // Has a received String from Valgrind saying that all heap blocks were
-    // freed
-    // ignored when running directly againsts the IPC client
-    private boolean m_allHeapBlocksFreed = false;
     private int m_port;
 
     private final boolean verbose = true;
@@ -271,6 +267,8 @@ public class EEProcess {
                             }
                             File valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
                             ValgrindXMLParser parser = new ValgrindXMLParser();
+                            // Note: This will delete the valgrind output file
+                            //       if there are no errors.
                             parser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
