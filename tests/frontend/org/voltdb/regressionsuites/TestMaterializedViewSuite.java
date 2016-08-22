@@ -1645,6 +1645,32 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
+    public void testEng11024() throws Exception {
+        // Regression test for ENG-11024, found by sqlcoverage
+        Client client = getClient();
+
+        // This is an edge case where a view with no group by keys
+        // is having its output tuples counted with count(*).  Of course,
+        // the result of this query will always be one.  This query was
+        // causing anissue because intermediate temp tables had zero columns.
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", "select count(*) from v3_eng_11024_join").getResults()[0];
+        assertEquals(vt.asScalarLong(), 1);
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from v3_eng_11024_1tbl").getResults()[0];
+        assertEquals(vt.asScalarLong(), 1);
+
+        vt = client.callProcedure("@AdHoc",
+                "select count(*) "
+                        + "from v3_eng_11024_1tbl inner join r1_eng_11024 using (ratio)").getResults()[0];
+        assertEquals(0, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc",
+                "select count(*) "
+                        + "from v3_eng_11024_1tbl left outer join r1_eng_11024 using (ratio)").getResults()[0];
+        assertEquals(1, vt.asScalarLong());
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
