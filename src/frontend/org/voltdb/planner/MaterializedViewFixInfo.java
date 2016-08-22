@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
@@ -46,11 +47,17 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.CatalogUtil;
 
+/**
+ * When a materialized view has a source table that is partitioned, and the source table's
+ * partition key is not a group by key for the materialized view, we need to "re-aggregate"
+ * the contents of the view in the coordinator fragment, in order to account for possible
+ * duplicate keys coming from different sites.  This "re-aggregation" is done by injecting
+ * an extra aggregation node above the receive node on the coordinator fragment.
+ *
+ * This class encapsulates the info required for adding in re-aggregation so that scans
+ * of the materialized view get correct answers.
+ */
 public class MaterializedViewFixInfo {
-    /**
-     * This class contain all the information that Materialized view partitioned query need to be fixed.
-     */
-
     // New inlined projection node for the scan node, contain extra group by columns.
     private ProjectionPlanNode m_scanInlinedProjectionNode = null;
     // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
@@ -128,19 +135,12 @@ public class MaterializedViewFixInfo {
         if (table.getPartitioncolumn() != null) {
             return false;
         }
+
         m_mvTableScan = mvTableScan;
 
-        Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
+        Set<String> mvDDLGroupbyColumnNames = new HashSet<>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
-
-        // Start to do real materialized view processing to fix the duplicates problem.
-        // (1) construct new projection columns for scan plan node.
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        NodeSchema inlineProjSchema = new NodeSchema();
-        for (SchemaColumn scol: scanColumns) {
-            inlineProjSchema.addColumn(scol);
-        }
 
         String mvTableAlias = getMVTableAlias();
 
@@ -169,6 +169,35 @@ public class MaterializedViewFixInfo {
             numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
         }
 
+        if (scanColumns.isEmpty() && numOfGroupByColumns == 0) {
+            // This is an edge case that can happen if the view
+            // has no group by keys, and we are just
+            // doing a count(*) on the output of the view.
+            //
+            // Having no GB keys or scan columns would cause us to
+            // produce plan nodes that have a 0-column output schema.
+            // We can't handle this in several places, so add the
+            // count(*) column from the view to the scan columns.
+            Column mvCol = mvColumnArray.get(0); // this is the "count(*)" column.
+            String colName = mvColumnArray.get(0).getName();
+            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, 0);
+
+            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
+
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias, colName, colName, tve);
+            scanColumns.add(scol);
+        }
+
+        // Start to do real materialized view processing to fix the duplicates problem.
+        // (1) construct new projection columns for scan plan node.
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<>();
+        NodeSchema inlineProjSchema = new NodeSchema();
+        for (SchemaColumn scol: scanColumns) {
+            inlineProjSchema.addColumn(scol);
+        }
+
+
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
@@ -190,9 +219,8 @@ public class MaterializedViewFixInfo {
             }
         }
 
-
         // Record the re-aggregation type for each scan columns.
-        Map<String, ExpressionType> mvColumnReAggType = new HashMap<String, ExpressionType>();
+        Map<String, ExpressionType> mvColumnReAggType = new HashMap<>();
         for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
@@ -204,6 +232,7 @@ public class MaterializedViewFixInfo {
             mvColumnReAggType.put(mvCol.getName(), reAggType);
         }
 
+        assert (inlineProjSchema.size() > 0);
         m_scanInlinedProjectionNode = new ProjectionPlanNode();
         m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
 
@@ -231,12 +260,14 @@ public class MaterializedViewFixInfo {
             aggSchema.addColumn(scol);
             outputColumnIndex++;
         }
+
+        assert (aggSchema.size() > 0);
         m_reAggNode.setOutputSchema(aggSchema);
 
 
         // Collect all TVEs that need to be do re-aggregation in coordinator.
-        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<>();
+        List<AbstractExpression> aggPostExprs = new ArrayList<>();
 
         for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
@@ -409,7 +440,7 @@ public class MaterializedViewFixInfo {
         }
 
         // Collect all TVEs that need re-aggregation in the coordinator.
-        List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> remaningExprs = new ArrayList<>();
         // Check where clause.
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
