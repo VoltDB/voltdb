@@ -1702,6 +1702,13 @@ public class PlanAssembler {
         // Adjust the differentiator fields of TVEs, since they need to reflect
         // the inlined projection node in scan nodes.
         for (TupleValueExpression tve : allTves) {
+            if (tve.getTableAlias().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
+                // Some nodes generate columns that are not from any table
+                // e.g., PartitionByPlanNode has a RANK column.  These do not need
+                // to have their differentiator updated, since its only used for
+                // disambiguation in some combinations of "SELECT *" and subqueries.
+                continue;
+            }
             tve.setDifferentiator(rootNode.adjustDifferentiatorField(tve.getColumnIndex()));
         }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
