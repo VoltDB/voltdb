@@ -65,72 +65,71 @@ public class Transfer extends VoltProcedure {
     public final SQLStmt insertActivity = new SQLStmt("INSERT INTO card_activity VALUES (?,?,?,?,?);");
 
 
-    public long run( String        from_pan,
-                     String        to_pan,
-             double        amount,
-                     String        currency
-             ) throws VoltAbortException {
+    public long run(String from_pan,
+                    String to_pan,
+                    double amount,
+                    String currency) throws VoltAbortException {
 
-    long result = 0;
+        long result = 0;
 
-    voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, from_pan);
-    voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, to_pan);
+        voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, from_pan);
+        voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, to_pan);
 
-        // assume everything is good, eliminates a round-trip to the partitions
-        voltQueueSQL(updateAcct,
-                     -amount,
-                     -amount,
-                     getTransactionTime(),
-                     from_pan
-                     );
+            // assume everything is good, eliminates a round-trip to the partitions
+            voltQueueSQL(updateAcct,
+                         -amount,
+                         -amount,
+                         getTransactionTime(),
+                         from_pan
+                         );
 
-        voltQueueSQL(updateAcct,
-                     amount,
-                     amount,
-                     getTransactionTime(),
-                     to_pan
-                     );
+            voltQueueSQL(updateAcct,
+                         amount,
+                         amount,
+                         getTransactionTime(),
+                         to_pan
+                         );
 
-        voltQueueSQL(insertActivity,
-                     from_pan,
-                     getTransactionTime(),
-                     "TRANSFER",
-                     "D",
-                     -amount
-                     );
+            voltQueueSQL(insertActivity,
+                         from_pan,
+                         getTransactionTime(),
+                         "TRANSFER",
+                         "D",
+                         -amount
+                         );
 
-        voltQueueSQL(insertActivity,
-                     to_pan,
-                     getTransactionTime(),
-                     "TRANSFER",
-                     "C",
-                     amount
-                     );
+            voltQueueSQL(insertActivity,
+                         to_pan,
+                         getTransactionTime(),
+                         "TRANSFER",
+                         "C",
+                         amount
+                         );
 
 
-    VoltTable accts[] = voltExecuteSQL(true);
+        VoltTable accts[] = voltExecuteSQL(true);
 
-    VoltTableRow from_acct = accts[0].fetchRow(0);
-    int from_available = (int)from_acct.getLong(1);
-        double from_balance = from_acct.getDouble(3);
+        VoltTableRow from_acct = accts[0].fetchRow(0);
+        int from_available = (int)from_acct.getLong(1);
+            double from_balance = from_acct.getDouble(3);
 
-    VoltTableRow to_acct = accts[1].fetchRow(0);
-    int to_available = (int)to_acct.getLong(1);
+        VoltTableRow to_acct = accts[1].fetchRow(0);
+        int to_available = (int)to_acct.getLong(1);
 
-        if (from_available == 0) {
-            // card is not available for authorization or redemption
-            throw new VoltAbortException("The transfer from card PAN " + from_pan + " was not available");
-        }
-        if (to_available == 0) {
-            // card is not available for authorization or redemption
-            throw new VoltAbortException("The transfer to card PAN " + to_pan + " was not available");
-        }
+            if (from_available == 0) {
+                // card is not available for authorization or redemption
+                throw new VoltAbortException("The transfer from card PAN " + from_pan + " was not available");
+            }
+            if (to_available == 0) {
+                // card is not available for authorization or redemption
+                throw new VoltAbortException("The transfer to card PAN " + to_pan + " was not available");
+            }
 
-        if (from_balance < amount) {
-            // no balance available, so this will be declined
-            throw new VoltAbortException("The transfer from card PAN " + from_pan + " rejected for insufficient balance");
-        }
+            if (from_balance < amount) {
+                // no balance available, so this will be declined
+                throw new VoltAbortException("The transfer from card PAN " + from_pan + " rejected for insufficient balance");
+            }
 
-        return 1;
+            return 1;
     }
 }

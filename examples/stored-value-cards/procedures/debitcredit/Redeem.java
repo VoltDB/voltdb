@@ -64,77 +64,76 @@ public class Redeem extends VoltProcedure {
     public final SQLStmt insertActivity = new SQLStmt("INSERT INTO card_activity VALUES (?,?,?,?,?);");
 
 
-    public long run( String        pan,
-             double        amount,
-                     String        currency,
-                     int           preAuth
-             ) throws VoltAbortException {
+    public long run(String pan,
+    				double amount,
+                    String currency,
+                    int preAuth) throws VoltAbortException {
 
-    long result = 0;
+        long result = 0;
 
-    voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, pan);
-    VoltTable accts[] = voltExecuteSQL();
+        voltQueueSQL(getAcct, EXPECT_ZERO_OR_ONE_ROW, pan);
+        VoltTable accts[] = voltExecuteSQL();
 
 
-    if (accts[0].getRowCount() == 0) {
-        // card was not found
-        return 0;
-    }
-
-    VoltTableRow acct = accts[0].fetchRow(0);
-    int available = (int)acct.getLong(1);
-    String status = acct.getString(2);
-        double balance = acct.getDouble(3);
-        double availableBalance = acct.getDouble(4);
-    String acctCurrency = acct.getString(5);
-
-        if (available == 0) {
-            // card is not available for authorization or redemption
+        if (accts[0].getRowCount() == 0) {
+            // card was not found
             return 0;
         }
 
-        double new_balance = balance;
-        double new_available_balance = availableBalance;
+        VoltTableRow acct = accts[0].fetchRow(0);
+        int available = (int)acct.getLong(1);
+        String status = acct.getString(2);
+            double balance = acct.getDouble(3);
+            double availableBalance = acct.getDouble(4);
+        String acctCurrency = acct.getString(5);
 
-        if (preAuth == 1) {
-            // pre-authorized (we could verify this with an ID, but for simplicity, assume it is)
-            // subtract from balance, not available_balance (which was already subtracted)
-            new_balance = balance - amount;
-
-            if (balance < amount) {
-                // no balance available, so this will be declined
+            if (available == 0) {
+                // card is not available for authorization or redemption
                 return 0;
             }
 
-        } else if (preAuth == 0) {
-            // not pre-authorized
-            // subtract from balance AND available_balance
-            new_balance = balance - amount;
-            new_available_balance = availableBalance - amount;
+            double new_balance = balance;
+            double new_available_balance = availableBalance;
 
-            if (balance < amount) {
-                // no balance available, so this will be declined
-                return 0;
+            if (preAuth == 1) {
+                // pre-authorized (we could verify this with an ID, but for simplicity, assume it is)
+                // subtract from balance, not available_balance (which was already subtracted)
+                new_balance = balance - amount;
+
+                if (balance < amount) {
+                    // no balance available, so this will be declined
+                    return 0;
+                }
+
+            } else if (preAuth == 0) {
+                // not pre-authorized
+                // subtract from balance AND available_balance
+                new_balance = balance - amount;
+                new_available_balance = availableBalance - amount;
+
+                if (balance < amount) {
+                    // no balance available, so this will be declined
+                    return 0;
+                }
             }
-        }
 
-        // account is available with sufficient balance, so execute the transaction
-        voltQueueSQL(updateAcct,
-                     new_balance,
-                     new_available_balance,
-                     getTransactionTime(),
-                     pan
-                     );
+            // account is available with sufficient balance, so execute the transaction
+            voltQueueSQL(updateAcct,
+                         new_balance,
+                         new_available_balance,
+                         getTransactionTime(),
+                         pan
+                         );
 
-        voltQueueSQL(insertActivity,
-                     pan,
-                     getTransactionTime(),
-                     "REDEEM",
-                     "D",
-                     -amount
-                     );
+            voltQueueSQL(insertActivity,
+                         pan,
+                         getTransactionTime(),
+                         "REDEEM",
+                         "D",
+                         -amount
+                         );
 
-        voltExecuteSQL(true);
-        return 1;
+            voltExecuteSQL(true);
+            return 1;
     }
 }
