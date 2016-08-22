@@ -1049,6 +1049,26 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     + tb).getResults()[0];
             assertEquals(95, vt.asScalarLong());
 
+            // Test for ENG-11025 regression -- mistaken optimization of sum(distinct)
+            vt = client.callProcedure("@AdHoc", "Select sum(distinct V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(58, vt.asScalarLong());
+
+            // test that count(distinct)s are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(distinct V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(3, vt.asScalarLong());
+
+            // test that counts are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(V_sum_rent) from "
+                    + tb).getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
+            // test that count(*)s are not mistakenly over-optimized
+            vt = client.callProcedure("@AdHoc", "Select count(*) from "
+                    + tb).getResults()[0];
+            assertEquals(4, vt.asScalarLong());
+
             vt = client.callProcedure("@AdHoc", "Select max(V_sum_rent) from "
                     + tb).getResults()[0];
             assertEquals(37, vt.asScalarLong());
@@ -1065,11 +1085,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     + tb).getResults()[0];
             assertEquals(23, vt.asScalarLong());
 
-            if (!isHSQL()) {
-                vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
-                        + tb).getResults()[0];
-                assertEquals(260, vt.asScalarLong());
-            }
+            vt = client.callProcedure("@AdHoc", "Select sum(V_sum_age) + 5 from "
+                    + tb).getResults()[0];
+            assertEquals(260, vt.asScalarLong());
 
             vt = client.callProcedure("@AdHoc", "Select avg(V_sum_age) from "
                     + tb).getResults()[0];
