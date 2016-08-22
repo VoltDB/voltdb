@@ -48,6 +48,11 @@ import org.voltdb.utils.Encoder;
  */
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
+    /*
+     * refresh the partition key cache every 5 min
+     */
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 5 * 60 * 1000;
+
     // call initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
 
@@ -821,7 +826,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
-        SyncAllPartitionProcedureCallback callBack = new SyncAllPartitionProcedureCallback();
+        OnePartitionProcedureCallback callBack = new OnePartitionProcedureCallback();
         callAllPartitionProcedure(callBack, procedureName, params);
         return callBack.getResponse();
     }
@@ -829,7 +834,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
             Object... params) throws IOException, NoConnectionsException, ProcCallException {
-        if(callback == null) {
+        if (callback == null) {
             throw new IOException("AllPartitionProcedureCallback can not be null");
         }
 
@@ -837,26 +842,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         System.arraycopy(params, 0, args, 1, params.length);
 
         int partitionCount = getPartitionIntegerKeys().size();
+        assert(partitionCount > 0);
         ClientResponseWithPartitionKey[] responses = new ClientResponseWithPartitionKey[partitionCount];
         AtomicInteger counter = new AtomicInteger(partitionCount);
         for (Integer key : getPartitionIntegerKeys()) {
             args[0] = key;
             partitionCount--;
             PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
-            try{
-                if(callback instanceof SyncAllPartitionProcedureCallback){
+            try {
+                if (callback instanceof OnePartitionProcedureCallback) {
                     ClientResponse response =  callProcedure(procedureName, args);
                     cb.clientCallback(response);
                 } else {
-                    if(!callProcedure(cb, procedureName, args)){
+                    if (!callProcedure(cb, procedureName, args)) {
                         cb.clientCallback(null);
                     }
-                }
-            } catch (ProcCallException | NoConnectionsException pe){
-                try {
-                    cb.exceptionCallback(pe);
-                } catch (Exception e) {
-                    throw new IOException(e);
                 }
             } catch(Exception ex){
                 try {
@@ -875,15 +875,16 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    private void setPartitions() throws IOException, NoConnectionsException, ProcCallException {
-        if(m_partitionIntegerKeys.isEmpty()){
-            VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
-            VoltTable keys = results[0];
-            for (int k = 0; k < keys.getRowCount(); k++) {
-                m_partitionIntegerKeys.add((int)(keys.fetchRow(k).getLong(1)));
-            }
-            m_lastPartitionKeyFetched = System.currentTimeMillis();
+    private void refreshPartitionKeys() throws IOException, NoConnectionsException, ProcCallException {
+        if (! m_partitionIntegerKeys.isEmpty()) {
+            return;
         }
+        VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
+        VoltTable keys = results[0];
+        for (int k = 0; k < keys.getRowCount(); k++) {
+            m_partitionIntegerKeys.add((int)(keys.fetchRow(k).getLong(1)));
+        }
+        m_lastPartitionKeyFetched = System.currentTimeMillis();
     }
 
    /**
@@ -893,16 +894,16 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     * @throws IOException if there is a Java network or connection problem.
     */
     public List<Integer> getPartitionIntegerKeys() throws NoConnectionsException, IOException, ProcCallException {
-        if(m_distributer.getPartitionKeys().size() > 0){
+        if (m_distributer.getPartitionKeys().size() > 0) {
             return m_distributer.getPartitionKeys();
         }
 
         long time = System.currentTimeMillis() - m_lastPartitionKeyFetched;
-        if(time > 5 * 60 * 1000){
+        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
             m_partitionIntegerKeys.clear();
         }
 
-        setPartitions();
+        refreshPartitionKeys();
         return m_partitionIntegerKeys;
     }
 
@@ -935,16 +936,16 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            if(response != null) {
+            if (response != null) {
                 m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, response);
             } else {
                 final ClientResponse r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
                         "The procedure is not queued for execution.");
                 m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, r,
-                        "The procedure is not queued for execution.", null);
+                        r.getStatusString(), null);
             }
             m_partitionCounter.decrementAndGet();
-            if(m_partitionCounter.get() == 0){
+            if (m_partitionCounter.get() == 0) {
                 m_cb.clientCallback(m_responses);
             }
         }
@@ -964,7 +965,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             }
 
             m_partitionCounter.decrementAndGet();
-            if(m_partitionCounter.get() == 0){
+            if (m_partitionCounter.get() == 0) {
                 m_cb.clientCallback(m_responses);
             }
         }
@@ -973,7 +974,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     /**
      * Sync all partition procedure call back
      */
-    class SyncAllPartitionProcedureCallback implements AllPartitionProcedureCallback {
+    private class OnePartitionProcedureCallback implements AllPartitionProcedureCallback {
 
         ClientResponseWithPartitionKey[] m_responses;
          @Override
