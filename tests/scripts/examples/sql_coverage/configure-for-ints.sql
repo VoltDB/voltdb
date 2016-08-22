@@ -21,7 +21,8 @@
 {@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[byte]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
-{@plus10 = "+ 10"}
+{@plus10 = " + 10"}
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "BIG"}
