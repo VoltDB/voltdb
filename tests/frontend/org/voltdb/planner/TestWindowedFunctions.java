@@ -375,6 +375,15 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
     }
 
+    public void testExplainPlanText() {
+        String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";
+        AbstractPlanNode plan = compile(windowedQuery);
+        String explainPlanText = plan.toExplainPlanString();
+        String expected = "Windowed AGGREGATION ops: RANK()";
+        assertTrue("Expected to find \"" + expected + "\" in explain plan text, but did not:\n"
+                + explainPlanText, explainPlanText.contains(expected));
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(true, TestWindowedFunctions.class.getResource("testplans-windowingfunctions-ddl.sql"), "testwindowfunctions");
