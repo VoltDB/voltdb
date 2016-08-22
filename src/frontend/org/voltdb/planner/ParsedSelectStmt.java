@@ -792,7 +792,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Remember the column expression.
         col.expression = colExpr;
 
-        calculateColumnNames(child, col, colExpr);
+        calculateColumnNames(child, col);
 
         // This index calculation is only used for sanity checking
         // materialized views (which use the parsed select statement but
