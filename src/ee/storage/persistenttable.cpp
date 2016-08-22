@@ -528,7 +528,7 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
     }
 }
 
-void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallible) {
+void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source) {
     // If the current table does not have a delta table, return.
     if (! m_deltaTable) {
         return;
@@ -539,7 +539,9 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
         TableIterator ti(m_deltaTable, m_deltaTable->m_data.begin());
         TableTuple tuple(m_deltaTable->m_schema);
         ti.next(tuple);
-        m_deltaTable->deleteTuple(tuple, fallible);
+        // The operation cleanning up the delta table does not need to be rolled back.
+        // So setting fallible = false.
+        m_deltaTable->deleteTuple(tuple, false);
     }
 
     TableTuple targetForDelta(m_deltaTable->m_schema);
@@ -547,7 +549,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
     targetForDelta.copyForPersistentInsert(source);
 
     try {
-        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
+        m_deltaTable->insertTupleCommon(source, targetForDelta, false);
     }
     catch (ConstraintFailureException &e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
@@ -589,7 +591,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     // Insert the tuple into the delta table first.
-    insertTupleIntoDeltaTable(source, fallible);
+    insertTupleIntoDeltaTable(source);
 
     try {
         insertTupleCommon(source, target, fallible);
@@ -814,7 +816,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views, we first insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleDelete(this, fallible);
     }
@@ -892,7 +894,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -994,7 +996,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
-    insertTupleIntoDeltaTable(target, fallible);
+    insertTupleIntoDeltaTable(target);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleDelete(this, fallible);
     }

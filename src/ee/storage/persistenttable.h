@@ -659,7 +659,7 @@ private:
     void polluteViews();
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
+    void insertTupleIntoDeltaTable(TableTuple &source);
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
