@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
+import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -74,11 +75,14 @@ public class Shutdown extends VoltSystemProcedure {
                                            SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_shutdownSync) {
+
+            VoltDB.instance().setMode(OperationMode.SHUTTINGDOWN);
             VoltDB.instance().getHostMessenger().prepareForShutdown();
             if (!m_failsafeArmed.getAndSet(true)) {
                 m_failsafe.start();
-                new VoltLogger("HOST").warn("VoltDB shutdown operation requested and in progress.  Cluster will terminate shortly.");
+                new VoltLogger("HOST").warn("VoltDB shutdown operation in progress - new transactions are not accepted. Cluster will terminate shortly.");
             }
+
             return new DependencyPair(DEP_shutdownSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) } ));
         }

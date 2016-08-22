@@ -261,6 +261,13 @@ public final class InvocationDispatcher {
     }
 
     public final ClientResponseImpl dispatch(StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn, AuthUser user) {
+
+        if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Server shutdown in progress - new transactions are not processed.",
+                    task.clientHandle);
+        }
+
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -275,6 +282,7 @@ public final class InvocationDispatcher {
                             );
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
+
         // Check for pause mode restrictions before proceeding any further
         if (!allowPauseModeExecution(handler, catProc, task)) {
             return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
