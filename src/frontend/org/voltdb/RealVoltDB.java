@@ -192,7 +192,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     // Managed voltdb directories settings
-    private PathSettings m_paths;
+    volatile private PathSettings m_paths;
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
@@ -402,32 +402,50 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getVoltDBRootPath(PathsType.Voltdbroot path) {
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
         return m_paths.getVoltDBRoot().getPath();
     }
 
     @Override
     public String getCommandLogPath(PathsType.Commandlog path) {
-        return m_paths.getCommandLog().getPath();
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_paths.resolve(m_paths.getCommandLog()).getPath();
     }
 
     @Override
     public String getCommandLogSnapshotPath(PathsType.Commandlogsnapshot path) {
-        return m_paths.getCommandLogSnapshot().getPath();
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_paths.resolve(m_paths.getCommandLogSnapshot()).getPath();
     }
 
     @Override
     public String getSnapshotPath(PathsType.Snapshots path) {
-        return m_paths.getSnapshoth().getPath();
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_paths.resolve(m_paths.getSnapshoth()).getPath();
     }
 
     @Override
     public String getExportOverflowPath(PathsType.Exportoverflow path) {
-        return m_paths.getExportOverflow().getPath();
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_paths.resolve(m_paths.getExportOverflow()).getPath();
     }
 
     @Override
     public String getDROverflowPath(PathsType.Droverflow path) {
-        return m_paths.getDROverflow().getPath();
+        if (isRunningWithOldVerbs()) {
+           return path.getPath();
+        }
+        return m_paths.resolve(m_paths.getDROverflow()).getPath();
     }
 
     @Override
@@ -2010,6 +2028,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return m_clusterSettings.get().hostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+
+    @Override
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
+        //Load deployment paths now if Legacy so that we access through the interface all the time.
+        if (isRunningWithOldVerbs() && m_paths == null) {
+            m_paths = PathSettings.create(CatalogUtil.asPathSettingsMap(deployment));
         }
     }
 

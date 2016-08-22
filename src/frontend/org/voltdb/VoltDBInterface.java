@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -105,6 +107,8 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
+
+    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
      * Update the global logging context in the server.
