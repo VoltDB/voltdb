@@ -186,7 +186,8 @@ public class ValgrindXMLParser {
      * @param valgrindOutputFile
      * @param valgrindErrors
      */
-    public static void processValgrindOutput(File valgrindOutputFile, List<String> valgrindErrors) {
+    public static void processValgrindOutput(File         valgrindOutputFile,
+                                             List<String> valgrindErrors) {
         try {
             DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
@@ -227,10 +228,6 @@ public class ValgrindXMLParser {
             ex.printStackTrace();
             return;
         }
-        // If there are no errors, the valgrind output file is
-        // not interesting.
-        if (valgrindErrors.size() == 0) {
-            valgrindOutputFile.deleteOnExit();
-        }
+        valgrindOutputFile.deleteOnExit();
     }
 }

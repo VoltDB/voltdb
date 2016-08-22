@@ -266,10 +266,8 @@ public class EEProcess {
                                          + p.exitValue());
                             }
                             File valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
-                            ValgrindXMLParser parser = new ValgrindXMLParser();
-                            // Note: This will delete the valgrind output file
-                            //       if there are no errors.
-                            parser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
+                            // Note: This will delete the valgrind output file.
+                            ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
                     } catch (final IOException e) {
