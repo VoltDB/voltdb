@@ -133,15 +133,29 @@ public class MatchChecks {
         return result[0].asScalarLong();
     }
 
-    public static long getImportTableRowCount(boolean alltypes, Client client) {
-        // check row count in import table
-        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
-        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
-        VoltTable[] countQueryResult = response.getResults();
-        VoltTable data = countQueryResult[0];
-        if (data.asScalarLong() == VoltType.NULL_BIGINT)
-            return 0;
-        return data.asScalarLong();
+    public static long getImportTableRowCount(boolean alltypes, Client client, int streams) {
+        // check row count in import table(s)
+        if (streams == 0) {
+            String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
+            ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+            VoltTable[] countQueryResult = response.getResults();
+            VoltTable data = countQueryResult[0];
+            if (data.asScalarLong() == VoltType.NULL_BIGINT)
+                return 0;
+            return data.asScalarLong();
+        } else {
+            long count = 0;
+            for (int i = 0; i < streams; i++) {
+                String table = "KafkaImportTable" + i;
+                ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+                VoltTable[] countQueryResult = response.getResults();
+                VoltTable data = countQueryResult[0];
+                if (data.asScalarLong() == VoltType.NULL_BIGINT)
+                    continue;
+                count += data.asScalarLong();
+            }
+            return count;
+        }
     }
 
     public static boolean checkPounderResults(long expected_rows, Client client) {
@@ -188,7 +202,7 @@ public class MatchChecks {
                     importStats.getString("PROCEDURE_NAME") + ", " + importStats.getLong("SUCCESSES") + ", " +
                     importStats.getLong("FAILURES") + ", " + importStats.getLong("OUTSTANDING_REQUESTS") + ", " +
                     importStats.getLong("RETRIES");
-            //log.info("statsString:" + statsString);
+            log.info("statsString:" + statsString);
         }
         return statsString;
     }
@@ -220,11 +234,13 @@ public class MatchChecks {
 
         while (importStats.advanceRow()) {
             int statnum = 0;
-            stats[statnum++] = importStats.getLong("SUCCESSES");
-            stats[statnum++] = importStats.getLong("FAILURES");
-            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
-            stats[statnum++] = importStats.getLong("RETRIES");
+            log.info("getImportValues: " + importStats.getString("PROCEDURE_NAME"));
+            stats[statnum] = importStats.getLong("SUCCESSES"); log.info("\tSUCCESSES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("FAILURES"); log.info("\tFAILURES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("OUTSTANDING_REQUESTS"); log.info("\tOUTSTANDING_REQUESTS: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("RETRIES"); log.info("\tRETRIES: " + stats[statnum++]);
         }
+
         return stats;
     }
 
