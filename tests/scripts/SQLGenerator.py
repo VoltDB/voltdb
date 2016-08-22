@@ -1033,7 +1033,19 @@ class Template:
         lines_out = []
         self.__macros = {}
         self.__generators = {}
+        previous_continued_line = ''
         for line in self.__lines:
+            # Allow the use of '\' as a line-continuation character
+            if previous_continued_line:
+                line = previous_continued_line + line
+            if line.endswith('\\'):
+                previous_continued_line = line[:-1] + ' '
+                continue
+            elif line.endswith('\\\n'):
+                previous_continued_line = line[:-2] + ' '
+                continue
+            else:
+                previous_continued_line = ''
             if line.startswith('{'):
                 match = Template.MACRO_DEFINE_PATTERN.search(line)
                 if match:

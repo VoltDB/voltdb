@@ -232,6 +232,22 @@ def get_max_mismatches(comparison_database, suite_name):
         # Known failures in the numeric-decimals "extended" test suite (see ENG-10546)
         elif config_name == 'numeric-decimals':
             max_mismatches = 300
+        # Known failures in the various "analytic" test suites, for testing the
+        # RANK function (see ENG-10953, ENG-10972, ENG-10973)
+        elif config_name == 'analytic':
+            max_mismatches = 186
+        elif config_name == 'analytic-ints':
+            max_mismatches = 312
+        elif config_name == 'analytic-strings':
+            max_mismatches = 45
+        elif config_name == 'analytic-timestamp':
+            max_mismatches = 144
+        elif config_name == 'analytic-decimal':
+            max_mismatches = 96
+        elif config_name == 'analytic-geo-point':
+            max_mismatches = 78
+        elif config_name == 'analytic-geo-polygon':
+            max_mismatches = 78
 
     return max_mismatches
 
