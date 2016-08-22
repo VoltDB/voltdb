@@ -207,7 +207,6 @@ public class EEProcess {
          */
         final Process p = m_eeProcess;
         m_stdoutParser = new Thread() {
-            ValgrindXMLParser m_xmlParser = null;
             @Override
             public void run() {
                 while (true) {
