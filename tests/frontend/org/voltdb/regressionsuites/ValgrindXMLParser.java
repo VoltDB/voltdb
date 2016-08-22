@@ -52,6 +52,10 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+/**
+ * This class manages valgrind XML output.  The main entry point is the static
+ * function processValgrindOutput.
+ */
 public class ValgrindXMLParser {
     static class StackTrace {
         public List<String> m_stackFrames = new ArrayList<>();
@@ -92,6 +96,7 @@ public class ValgrindXMLParser {
                         sb.append(String.format("    %2d.) %s\n",
                                                 frameNo,
                                                 frame));
+                        frameNo += 1;
                     }
                 }
             }
@@ -102,12 +107,16 @@ public class ValgrindXMLParser {
     private static StackTrace readStackTrace(Node stackTrace) {
         StackTrace answer = new StackTrace();
         for (Node frame = stackTrace.getFirstChild(); frame != null; frame = frame.getNextSibling()) {
+            String nodeName = frame.getNodeName();
+            if ( ! "frame".equals(nodeName)) {
+                continue;
+            }
             String  ip     = "<undefined ip>";
             String  fn     = "<unknown function>";
             String  dir    = "<unknown directory>";
             String  file   = "<unknown file>";
             String  lineNo = "<unknown line number>";
-            for (Node info = frame.getFirstChild(); info != null; info = frame.getNextSibling()) {
+            for (Node info = frame.getFirstChild(); info != null; info = info.getNextSibling()) {
                 String name = info.getNodeName();
                 String value = info.getTextContent().trim();
                 switch (name) {
@@ -130,7 +139,7 @@ public class ValgrindXMLParser {
                     break;
                 }
             }
-            answer.m_stackFrames.add(String.format("%s: %s@%s/%s: line %d",
+            answer.m_stackFrames.add(String.format("%s: %s@%s/%s: line %s",
                                                    ip,
                                                    fn,
                                                    dir,
@@ -164,6 +173,16 @@ public class ValgrindXMLParser {
         return "Error: " + text + (lbytes != null ? (", " + lbytes) : "") + ((lblks != null) ? (", " + lblks) : "");
     }
 
+    /**
+     * Given an output file from valgrind, and a list to which we want
+     * to add errors, parse the file and add any errors found in the file
+     * to the end of the list.  We do this this way, rather than just
+     * returning a list, because this list is shared with another thread.
+     * So, it has to be synchronized.
+     *
+     * @param valgrindOutputFile
+     * @param valgrindErrors
+     */
     public static void processValgrindOutput(File valgrindOutputFile, List<String> valgrindErrors) {
         try {
             DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();

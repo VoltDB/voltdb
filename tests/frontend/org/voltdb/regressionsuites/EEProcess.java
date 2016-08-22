@@ -270,7 +270,7 @@ public class EEProcess {
                                          + p.exitValue());
                             }
                             File valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
-                            ValgrindXMLParser parser = new ValgrindXMLParser(valgrindOutputFile);
+                            ValgrindXMLParser parser = new ValgrindXMLParser();
                             parser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }

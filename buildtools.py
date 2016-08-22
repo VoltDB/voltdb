@@ -681,7 +681,9 @@ def runTests(CTX):
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
     for dir, test in tests:
-        expectNoMemLeaks = not (dir == "memleaktests")
+        # We expect valgrind failures in all tests in memleaktests
+	# except for the test named no_losses.
+        expectNoMemLeaks = not (dir == "memleaktests") or not ( test == "no_losses" )
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
