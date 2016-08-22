@@ -18,6 +18,9 @@
 package org.voltdb;
 
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -85,8 +88,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 public final class InvocationDispatcher {
 

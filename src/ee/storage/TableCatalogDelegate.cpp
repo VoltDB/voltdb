@@ -757,7 +757,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) { cout << "processSchemaChanges() drop old " << catalogTable.name() << " table" << endl; }
     existingTable->decrementRefcount();
 
     ///////////////////////////////////////////////

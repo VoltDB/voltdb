@@ -20,7 +20,8 @@
 {@insertvals = "_id, _value[timestamp], _value[timestamp], _value[timestamp], _value[int64]"}
 {@onefun = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@optionalfn = " "} -- There are no handy unary timestamp-to-timestamp functions.
-{@plus10 = " "} -- You cannot add to a timestamp
+{@plus10 = ""} -- You cannot add to a timestamp
+{@rankorderbytype = "timestamp"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "PAST"}

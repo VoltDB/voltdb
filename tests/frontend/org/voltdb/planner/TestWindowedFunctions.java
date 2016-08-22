@@ -214,6 +214,52 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validateQueryWithSubquery(windowedQuery);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateQueryWithSubquery(windowedQuery);
+
+        // Test with windowed aggregates in the subquery itself.
+
+        // First, use a windowed PARTITION BY which is a table partition column. The PARTITION BY node can then be
+        // distributed.  So, we expect 0 coordinator partition by plan nodes and 1 distributed partition by plan nodes.
+        windowedQuery = "SELECT * FROM ( SELECT A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) FROM AAA_PA) ARANK;";
+        validateQueryWithSubqueryWithWindowedAggregate(windowedQuery, 0, 1);
+
+        // Now, use a windowed PARTITION BY which is not in a table partition column.  The partition by
+        // node can no longer be distributed.  So we expect it to show up in the coordinator fragment.
+        windowedQuery = "SELECT * FROM ( SELECT A, B, C, RANK() OVER (PARTITION BY B ORDER BY A) FROM AAA_PA ) ARANK;";
+        validateQueryWithSubqueryWithWindowedAggregate(windowedQuery, 1, 0);
+
+        // Test that putting a windowed aggregate in the outer selection list gets about the
+        // same answers.  The outer windowed aggregate adds 1 to all the PB counts on the
+        // coordinator fragment.
+        windowedQuery = "SELECT *, RANK() OVER (PARTITION BY A ORDER BY B) FROM ( SELECT A, B, C, RANK() OVER (PARTITION BY A ORDER BY B) FROM AAA_PA) ARANK;";
+        validateQueryWithSubqueryWithWindowedAggregate(windowedQuery, 1, 1);
+
+        // Now, use a window partition by which is not in the table partition column.  The partition by
+        // node can no longer be distributed.  So we expect it to show up in the coordinator fragment.
+        windowedQuery = "SELECT *, RANK() OVER (PARTITION BY B ORDER BY A) FROM ( SELECT A, B, C, RANK() OVER (PARTITION BY B ORDER BY A) FROM AAA_PA ) ARANK;";
+        validateQueryWithSubqueryWithWindowedAggregate(windowedQuery, 2, 0);
+    }
+
+    private void validateQueryWithSubqueryWithWindowedAggregate(String windowedQuery, int numCoordinatorPartitionBys, int numDistributedPartitionBys) {
+        List<AbstractPlanNode> nodes = compileToFragments(windowedQuery);
+
+        assertEquals(2, nodes.size());
+        assertTrue(nodes.get(0) instanceof SendPlanNode);
+        int numCoordPBNodes = countPBNodes(nodes.get(0));
+        int numDistPBNodes  = countPBNodes(nodes.get(1));
+
+        assertEquals(numCoordinatorPartitionBys, numCoordPBNodes);
+        assertEquals(numDistributedPartitionBys, numDistPBNodes);
+    }
+
+    private int countPBNodes(AbstractPlanNode node) {
+        int answer = 0;
+        while (node.getChildCount() > 0) {
+            if (node instanceof PartitionByPlanNode) {
+                answer += 1;
+            }
+            node = node.getChild(0);
+        }
+        return answer;
     }
 
     /**
@@ -306,20 +352,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
-                      "Use of both windowed operations and GROUP BY is not supported.");
+                      "Use of both windowed RANK() and GROUP BY in a single query is not supported.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
-                      "At most one windowed display column is supported.");
+                      "Only one windowed RANK() expression may appear in a selection list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Aggregate windowed expressions with range " +
-                      "window frame units can have only one order by expression.");
+                      "Windowed RANK() expressions can have only one ORDER BY expression in their window.");
+
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
-                      "Aggregate windowed expressions with RANGE " +
-                      "window frame units can have only integer or TIMESTAMP value types.");
-        // Windowed expressions can only appear in the display list.
+                      "Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+        // Windowed expressions can only appear in the selection list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
-                      "Windowed expressions can only appear in the select list.");
+                      "Windowed RANK() expressions can only appear in the selection list of a query or subquery.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery
@@ -328,6 +373,15 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
                       "WHERE ALPHA.C <> BBB.C;",
                       "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
+    }
+
+    public void testExplainPlanText() {
+        String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";
+        AbstractPlanNode plan = compile(windowedQuery);
+        String explainPlanText = plan.toExplainPlanString();
+        String expected = "Windowed AGGREGATION ops: RANK()";
+        assertTrue("Expected to find \"" + expected + "\" in explain plan text, but did not:\n"
+                + explainPlanText, explainPlanText.contains(expected));
     }
 
     @Override

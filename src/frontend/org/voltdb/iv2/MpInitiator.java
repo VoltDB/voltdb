@@ -204,6 +204,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
         sched.updateCatalog(diffCmds, context, csp);
     }
 
+    public void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_executionSite.updateSettings(context, csp);
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        sched.updateSettings(context, csp);
+    }
+
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();

@@ -94,9 +94,16 @@ public class MaterializedViewFixInfo {
     }
 
     /**
-     * Check whether the table need to be fixed or not.
-     * Set the need flag to true, only if it needs to be fixed.
-     * @return
+     * Check whether the results from a materialized view need to be
+     * re-aggregated on the coordinator by the view's GROUP BY columns
+     * prior to any of the processing specified by the query.
+     * This is normally the case when a mat view's source table is partitioned
+     * and the view's GROUP BY does not include the partition key.
+     * There is a special edge case where the query already contains the exact
+     * reaggregations that the added-cost fix would introduce, so the fix can
+     * be skipped as an optimization.
+     * Set the m_needed flag to true, only if the reaggregation fix is needed.
+     * @return The value of m_needed
      */
     public boolean processMVBasedQueryFix(StmtTableScan mvTableScan, Set<SchemaColumn> scanColumns, JoinNode joinTree,
             List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
@@ -260,22 +267,33 @@ public class MaterializedViewFixInfo {
         return true;
     }
 
-    // ENG-5386: do not fix some cases in order to get better performance.
+    /** ENG-5386: do not fix some cases in order to get better performance.
+     * There is a special edge case when certain queries are applied to
+     * partitioned materialized views that do not contain the partition key in
+     * their GROUP BY columns. In this special case, where the query duplicates
+     * the reaggregation behavior of the fix -- which must consist of MIN, MAX
+     * and/or non-distinct SUM reaggregations -- the added-cost fix code can be
+     * skipped as an optimization.
+     */
     private boolean edgeCaseQueryNoFixNeeded(Set<String> mvDDLGroupbyColumnNames,
-            Map<String, ExpressionType> mvColumnAggType, List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
+            Map<String, ExpressionType> mvColumnAggType,
+            List<ParsedColInfo> displayColumns,
+            List<ParsedColInfo> groupByColumns) {
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
         for (ParsedColInfo gcol: groupByColumns) {
             assert(gcol.expression instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) gcol.expression;
-            if (tve.getTableName().equals(getMVTableName()) && !mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
+            if (tve.getTableName().equals(getMVTableName()) &&
+                    ! mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
                 return false;
             }
         }
 
-        // Condition (2): Aggregation must be:
+        // Condition (2): All the aggregations must qualify.
         for (ParsedColInfo dcol: displayColumns) {
             if (groupByColumns.contains(dcol)) {
+                // Skip a group-by column pass-through.
                 continue;
             }
             if (dcol.expression instanceof AggregateExpression == false) {
@@ -286,20 +304,32 @@ public class MaterializedViewFixInfo {
                 return false;
             }
             ExpressionType type = aggExpr.getExpressionType();
-            TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
-            String columnName = tve.getColumnName();
 
-            if (type != ExpressionType.AGGREGATE_SUM && type != ExpressionType.AGGREGATE_MIN
+            // Only MIN, MAX, and non-DISTINCT SUM
+            // can tolerate a skipped reaggregation.
+            if ((type != ExpressionType.AGGREGATE_SUM || aggExpr.isDistinct())
+                    && type != ExpressionType.AGGREGATE_MIN
                     && type != ExpressionType.AGGREGATE_MAX) {
                 return false;
             }
 
+            TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
             if (tve.getTableName().equals(getMVTableName())) {
+                String columnName = tve.getColumnName();
+                // The type of the aggregation in the query must match the
+                // type of aggregation defined for the view column --
+                // SUMming a SUM, MINning a MIN, or MAXxing a MAX.
                 if (mvColumnAggType.get(columnName) != type ) {
                     return false;
                 }
-            } else {
-                // The other join table.
+            }
+            else {
+                // The aggregate argument is a column from the
+                // other (non-view) side of the join.
+                // It's OK for its rows to get duplicated by joining
+                // with multiple "partial group" rows ONLY if it is
+                // feeding a MIN or MAX.
+                // The duplication would corrupt a SUM.
                 if (type == ExpressionType.AGGREGATE_SUM) {
                     return false;
                 }
