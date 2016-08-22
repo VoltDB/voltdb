@@ -624,8 +624,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  BIG, "
                 + "  RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK, "
                 + "  SMALL "
-                + "FROM P1_ENG_11029 "
-                + "ORDER BY ID;").getResults()[0];
+                + "FROM P1_ENG_11029").getResults()[0];
         assertContentOfTable(new Object [][] {
             {100, 1, 10},
             {101, 2, 10},
@@ -638,8 +637,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  TINY, "
                 + "  SMALL, "
                 + "  RANK() OVER (PARTITION BY SMALL ORDER BY TINY ) RANK "
-                + "FROM P1_ENG_11029 "
-                + "ORDER BY ID;").getResults()[0];
+                + "FROM P1_ENG_11029").getResults()[0];
         assertContentOfTable(new Object [][] {
             {1, 10, 1},
             {1, 10, 1},
@@ -651,8 +649,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 "SELECT "
                 + "  BIG, "
                 + "  RANK() OVER (PARTITION BY TINY ORDER BY SMALL) RANK "
-                + "FROM P1_ENG_11029 "
-                + "ORDER BY ID;").getResults()[0];
+                + "FROM P1_ENG_11029").getResults()[0];
         assertContentOfTable(new Object [][] {
             {100, 1},
             {101, 1},
