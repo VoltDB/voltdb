@@ -36,7 +36,6 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
-import org.aeonbits.owner.ConfigFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -49,13 +48,15 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.SettingsException;
+import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.Settings;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -87,13 +88,6 @@ public class VoltDB {
     public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
-
-    public static final String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
-    public static final String CL_PATH_KEY = "org.voltdb.path.command_log";
-    public static final String SNAPTHOT_PATH_KEY = "org.voltdb.path.snapshots";
-    public static final String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
-    public static final String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
-    public static final String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -689,19 +683,30 @@ public class VoltDB {
         }
 
         public Map<String,String> asClusterSettingsMap() {
-            if (ConfigFactory.getProperty(ClusterSettings.CONFIG_DIR) == null) try {
-                File confDH = new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
-                ConfigFactory.setProperty(ClusterSettings.CONFIG_DIR, confDH.getPath());
-            } catch (IOException e) {
-                throw new SettingsException("failed to resolve the cluster settings directory", e);
-            }
+            Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
                     .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
                     .build();
         }
 
+        public Map<String,String> asPathSettingsMap() {
+            Settings.initialize(m_voltdbRoot);
+            return ImmutableMap.<String, String>builder()
+                    .put(PathSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
         public ClusterSettings asClusterSettings() {
             return ClusterSettings.create(asClusterSettingsMap());
+        }
+
+        List<File> getInitMarkers() {
+            return ImmutableList.<File>builder()
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH))
+                    .build();
         }
 
         /**

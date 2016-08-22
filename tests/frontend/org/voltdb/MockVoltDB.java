@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -56,7 +55,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -535,10 +533,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
-    }
-
-    @Override
     public String getVoltDBRootPath() {
         return "voltdbroot";
     }
@@ -551,11 +545,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public String getDROverflowPath() {
         return "dr_overflow";
-    }
-
-    @Override
-    public String getPath(String name) {
-        return "";
     }
 
     @Override
