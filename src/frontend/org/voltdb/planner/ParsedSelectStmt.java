@@ -781,7 +781,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = expr;
         }
 
-<<<<<<< HEAD
         calculateColumnNames(child, col, colExpr);
 
         // Remember the column expression.
