@@ -56,12 +56,12 @@
  * valgrind file which does not detect losses.  This tests
  * the successful path for parsing a valgrind XML file.
  */
-class DefiniteMemoryLoss : public Test {
+class NoMemoryLoss : public Test {
 public:
-    DefiniteMemoryLoss() {}
+    NoMemoryLoss() {}
 };
 
-TEST_F(DefiniteMemoryLoss, memLossTest) {
+TEST_F(NoMemoryLoss, memLossTest) {
     char *garbage = new char[128];
     memset(garbage, 0, 128);
     delete [] garbage;

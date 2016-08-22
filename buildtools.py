@@ -637,28 +637,90 @@ class ValgrindError:
 class ValgrindErrorState:
     def __init__(self, expectNoErrors, valgrindFile):
         self.expectErrors = not expectNoErrors
+        self.foundErrors    = False
         self.valgrindFile = valgrindFile
         self.errorStrings = []
-        _process()
+        self._process()
 
     def _process(self):
         tree = ET.parse(self.valgrindFile);
         root = tree.getroot()
-        errs = root.findall("//error")
+        errs = root.findall(".//error")
         for err in errs:
-            self.errorStrings += toString(err)
+            foundErrors = True
+            self.errorStrings += [self._toString(err)]
 
-    def toString(self, err):
-        str = err.find("kind").text()
-    def isExpectedState(self):
-        if self.expectErrors:
-            return (len(self.errorLines) > 0)
+    def _toString(self, err):
+        elements = '';
+        for child in err:
+            if child.tag == 'kind':
+                elements += child.text.strip() + '\n'
+            elif child.tag == 'what':
+                elements += "  " + child.text.strip() + "\n"
+            elif child.tag == 'xwhat':
+                elements += self._parseXWhat(child) + '\n'
+            elif child.tag == 'stack':
+                elements += self._parseStack(child) + '\n'
+        return elements
+
+    def _parseXWhat(self, xwhat):
+        leakedbytes = xwhat.find('leakedbytes')
+        leakedblocks = xwhat.find("leakedblocks")
+        text = xwhat.find('text')
+        if leakedbytes is not None:
+            leakedbytes = "    Leaked Bytes: " + leakedbytes.text + "\n"
         else:
-            return (len(self.errorLines) == 0)
+            leakedbytes = ""
+        if leakedblocks is not None:
+            leakedblocks = "    Leaked Blocks: " + leakedblocks.text + "\n"
+        else:
+            leakedblocks = ""
+        if text is not None:
+            text = "  " + text.text + "\n"
+        else:
+            text = ""
+        return text + leakedblocks + leakedbytes
+
+    def _parseStack(self, stack):
+        stackFrames = ""
+        stackNo = 0
+        for frame in stack:
+            if frame.tag != 'frame':
+                continue
+            ip =     "<undefined ip>"
+            fn =     "<undefined fn>"
+            dir =    "<undefined dir>"
+            file =   "<undefined file>"
+            lineNo = "<undefined line number>"
+            for elem in frame:
+                name = elem.tag
+                value = elem.text.strip()
+                if elem.tag == 'ip':
+                    ip = value
+                elif elem.tag == 'fn':
+                    fn = value
+                elif elem.tag == 'dir':
+                    dir = value
+                elif elem.tag == 'file':
+                    file = value
+                elif elem.tag == 'line':
+                    lineNo = value
+            stackFrames += ("    %03d.) %s: %s@%s/%s: line %s" % (stackNo, ip, fn, dir, file, lineNo)) + "\n"
+        return stackFrames
+
+    def isExpectedState(self):
+        return (self.expectErrors == self.foundErrors)
 
     def errorMessage(self):
-        return ("%d Valgrind Errors: \n" % len(self.errorLines)) \
-                + "\n".join(map(lambda l: l.message(), self.errorLines))
+        if self.isExpectedState():
+            exp = " (Expected)"
+        else:
+            exp = ""
+        return ("%s\n%d Valgrind Errors%s: \n" %
+                (":-----------------------------------------------------------:", \
+                 len(self.errorStrings), \
+                 exp) \
+                + "\n".join(self.errorStrings))
 
 def makeValgrindFile(pidStr):
     return "valgrind_ee_%s.xml" % pidStr
@@ -682,7 +744,7 @@ def runTests(CTX):
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
     for dir, test in tests:
         # We expect valgrind failures in all tests in memleaktests
-	# except for the test named no_losses.
+        # except for the test named no_losses.
         expectNoMemLeaks = not (dir == "memleaktests") or not ( test == "no_losses" )
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
@@ -710,15 +772,16 @@ def runTests(CTX):
                                       targetpath], stderr=PIPE, bufsize=-1)
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                errorState = ValgrindErrorState(expectNoMemLeaks,
-                                                makeValgrindFile("%d" % process.pid))
+                fileName = makeValgrindFile("%d" % process.pid)
+                errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
+                try:
+                    os.remove(fileName)
+                except ex:
+                    pass
                 if not errorState.isExpectedState():
                     print errorState.errorMessage()
                     retval = -1
-                if retval == -1:
-                    for str in out_err:
-                        print str.rstrip('\n')
-                sys.stdout.flush()
+                    sys.stdout.flush()
             else:
                 retval = os.system(targetpath)
         if retval == 0:
