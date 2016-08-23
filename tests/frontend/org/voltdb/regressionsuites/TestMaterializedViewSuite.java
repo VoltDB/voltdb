@@ -1740,6 +1740,58 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             {-4, 2, -12}}, vt);
     }
 
+    public void testEng11043() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-14, 'bouSWVaJwQHtrp', -16078, 5.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-14, 'FOO', -16079, 9.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-14, 'BAR', -16077, 7.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-15, 'NhFmPDULXEFLGI', 29960, 3.59831007623149345953e-01);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-15, 'FOOFOO', 29969, 9.59831007623149345953e-01);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-15, 'BARBAR', 29967, 7.59831007623149345953e-01);");
+
+        client.callProcedure("@AdHoc", "UPDATE P2_ENG_11024 SET NUM = 18;");
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
