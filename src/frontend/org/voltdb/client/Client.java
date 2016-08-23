@@ -430,10 +430,11 @@ public interface Client {
      * </p><p>
      * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
      * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
-     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database very 5 minutes. The database partitions are usually pretty static.
-     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to an incorrect partition.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database if the cached set is more than 1 second old. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to a partition zero time or multiple times, exactly once per partition will not be guaranteed.
      * </p><p>There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
-     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes. For example, multiple smaller single partition procedures are
+     * particularly useful to age out large stale data where strong global consistency is not required.
      * </p><p>
      * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
      * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
@@ -479,11 +480,12 @@ public interface Client {
      * </p><p>
      * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
      * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
-     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database very 5 minutes. The database partitions are usually pretty static.
-     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to an incorrect partition.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database if the cached set is more than 1 second old. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to a partition zero time or multiple times, exactly once per partition will not be guaranteed.
      * </p><p>
      * There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
-     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes. For example, multiple smaller single partition procedures are
+     * particularly useful to age out large stale data where strong global consistency is not required.
      * </p><p>
      * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
      * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to

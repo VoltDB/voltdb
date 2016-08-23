@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 
 public class PartitionFailureTestProc extends VoltProcedure {
 
-    public final SQLStmt stmt = new SQLStmt("INSERT INTO TABLE_INT_PARTITION VALUES (1001, 'one thoudand and one', 1001, 1001, '2016-09-16 00:00:00.000000');");
+    public final SQLStmt stmt = new SQLStmt("INSERT INTO TABLE_INT_PARTITION VALUES (1001, 'one thoudand and one', 1001, 1001);");
 
     public VoltTable[] run(int partitionKey) {
         voltQueueSQL(stmt);

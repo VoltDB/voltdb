@@ -24,9 +24,6 @@ package org.voltdb.client;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,7 +33,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -122,8 +118,10 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
     public void testAsyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
         Client client = getClient();
-        client.callAllPartitionProcedure(new CallBack(INT_PARTITION_EXPECTED_COUNTS), "PartitionIntegerTestProc");
+        CallBack cb = new CallBack(INT_PARTITION_EXPECTED_COUNTS);
+        client.callAllPartitionProcedure(cb, "PartitionIntegerTestProc");
         Thread.sleep(2000);
+        assertTrue(cb.m_callbackInvoked);
      }
 
     public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {
@@ -136,8 +134,10 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
     public void testAsyncCallAllPartitionProcedureWithStringPartition() throws Exception{
 
         Client client = getClient();
-        client.callAllPartitionProcedure(new CallBack(STRING_PARTITION_EXPECTED_COUNTS), "PartitionStringTestProc");
+        CallBack cb = new CallBack(STRING_PARTITION_EXPECTED_COUNTS);
+        client.callAllPartitionProcedure(cb, "PartitionStringTestProc");
         Thread.sleep(2000);
+        assertTrue(cb.m_callbackInvoked);
     }
 
     public void testCallAllPartitionProcedureFailuerProc() throws Exception {
@@ -166,14 +166,10 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
 
     private void load(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
 
-        LocalDate localDate = LocalDate.parse("2016-08-23");
         for (int i = 0; i < 1000; i++) {
             StringBuilder builder = new StringBuilder();
             builder.append("insert into " + tableName + " values (" + i);
-            Date date = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-            String currentTime = new TimestampType(date).toString();
-            localDate = localDate.plusDays(1);
-            builder.append(", '" + convert(i) + "', " + i + ", " + i + ",'" + currentTime + "')");
+            builder.append(", '" + convert(i) + "', " + i + ", " + i + ")");
             client.callProcedure("@AdHoc", builder.toString());
         }
 
@@ -211,15 +207,15 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
 
     public static class CallBack implements AllPartitionProcedureCallback {
 
-        final Map<Integer, Long> m_expectedCounts;
-
+        Map<Integer, Long> m_expectedCounts;
+        boolean m_callbackInvoked = false;
         CallBack(Map<Integer, Long> expectedCounts) {
             m_expectedCounts = expectedCounts;
         }
 
         @Override
         public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
-
+            m_callbackInvoked = true;
             if (clientResponse != null) {
                  for (ClientResponseWithPartitionKey resp: clientResponse) {
                     VoltTable results = resp.getResponse().getResults()[0];
