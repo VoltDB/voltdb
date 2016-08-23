@@ -51,22 +51,22 @@ public interface PathSettings extends Settings {
     public final static String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
 
     @Key(VOLTDBROOT_PATH_KEY)
-    public File getVoltDBRoot();
+    public VoltFile getVoltDBRoot();
 
     @Key(CL_PATH_KEY)
-    public File getCommandLog();
+    public VoltFile getCommandLog();
 
     @Key(CL_SNAPSHOT_PATH_KEY)
-    public File getCommandLogSnapshot();
+    public VoltFile getCommandLogSnapshot();
 
     @Key(SNAPTHOT_PATH_KEY)
-    public File getSnapshoth();
+    public VoltFile getSnapshoth();
 
     @Key(EXPORT_OVERFLOW_PATH_KEY)
-    public File getExportOverflow();
+    public VoltFile getExportOverflow();
 
     @Key(DR_OVERFLOW_PATH_KEY)
-    public File getDROverflow();
+    public VoltFile getDROverflow();
 
     public static PathSettings create(Map<?, ?>...imports) {
         return ConfigFactory.create(PathSettings.class, imports);
