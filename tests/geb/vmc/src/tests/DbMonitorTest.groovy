@@ -2604,11 +2604,13 @@ class DbMonitorTest extends TestBase {
         then: 'Remove Stored Procedures'
         page.storedProceduresCheckboxClick()
 
+        report "before_save"
         when: 'click close button'
         page.savePreferences()
+        report "after_save"
 
         waitFor(10){
-        println("Stored Procedure table is  displayed")
+        println("Stored Procedure table is displayed")
         page.clickMinLatency()}
 
         then: 'check if max rows is in ascending'
@@ -2693,8 +2695,11 @@ class DbMonitorTest extends TestBase {
         then: 'Remove Stored Procedures'
         page.storedProceduresCheckboxClick()
 
+        report "before_save"
         when: 'click close button'
         page.savePreferences()
+
+        report "after_save"
 
         waitFor(15){page.clickAvgLatency()}
         then: 'check if avg rows is in ascending'
