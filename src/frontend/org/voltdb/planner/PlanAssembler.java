@@ -1703,8 +1703,7 @@ public class PlanAssembler {
         // the inlined projection node in scan nodes.
         for (TupleValueExpression tve : allTves) {
             if (tve.getTableAlias().equals(AbstractParsedStmt.TEMP_TABLE_NAME)
-                    && tve.getColumnName().equals(AbstractParsedStmt.WINDOWED_AGGREGATE_COLUMN_NAME)
-                    && rootNode instanceof PartitionByPlanNode) {
+                && rootNode instanceof PartitionByPlanNode) {
                 // PartitionByPlanNode can have an internally generated RANK column.  These do not need
                 // to have their differentiator updated, since its only used for disambiguation in some
                 // combinations of "SELECT *" and subqueries.  In fact attempting to adjust this

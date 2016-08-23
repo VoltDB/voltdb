@@ -585,7 +585,11 @@ public abstract class AbstractParsedStmt {
             }
         }
 
+        String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
         String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
+        if (exprNode.attributes.containsKey("alias")) {
+            alias = exprNode.attributes.get("alias");
+        }
         WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
                                                              partitionbyExprs,
                                                              orderbyExprs,
