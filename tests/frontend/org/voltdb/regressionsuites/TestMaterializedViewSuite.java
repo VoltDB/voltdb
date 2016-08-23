@@ -1671,6 +1671,75 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, vt.asScalarLong());
     }
 
+    public void testUpdateAndMinMax() throws Exception {
+        Client client = getClient();
+
+        //        CREATE TABLE P2_ENG_11024 (
+        //                ID INTEGER NOT NULL,
+        //                VCHAR VARCHAR(300),
+        //                NUM INTEGER,
+        //                RATIO FLOAT,
+        //                PRIMARY KEY (ID)
+        //        );
+        //        PARTITION TABLE P2_ENG_11024 ON COLUMN ID;
+        //
+        //        CREATE TABLE P1_ENG_11024 (
+        //                ID INTEGER NOT NULL,
+        //                VCHAR VARCHAR(300),
+        //                NUM INTEGER,
+        //                RATIO FLOAT,
+        //                PRIMARY KEY (ID)
+        //        );
+        //
+        //        CREATE VIEW V16_ENG_11042 (ID, COUNT_STAR, NUM) AS
+        //            SELECT T2.NUM, COUNT(*), MAX(T1.NUM)
+        //            FROM R1_ENG_11024 T1 JOIN R2_ENG_11024 T2 ON T1.ID = T2.ID
+        //            GROUP BY T2.NUM;
+
+        client.callProcedure("R1_ENG_11024.Insert", 1, "", 20, 0.0);
+        client.callProcedure("R2_ENG_11024.Insert", 1, "", 100, 0.0);
+
+        client.callProcedure("R1_ENG_11024.Insert", 2, "", 1000, 0.0);
+        client.callProcedure("R2_ENG_11024.Insert", 2, "", 100, 0.0);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "select * from V16_ENG_11042").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {100, 2, 1000}}, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "update R1_ENG_11024 set num = 15 where id = 2;")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{1}}, vt);
+        vt = client.callProcedure("@AdHoc",
+                "select * from V16_ENG_11042").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {100, 2, 20}}, vt);
+
+        // A second way of reproducing, slightly different
+        client.callProcedure("@AdHoc", "DELETE FROM R1_ENG_11024");
+        client.callProcedure("@AdHoc", "DELETE FROM R2_ENG_11024");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES(-13, 'mmm', -6, -13.0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES(-13, 'mmm', -4, -13.0);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES(-12, 'mmm', -12, -12.0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES(-12, 'mmm', -4, -12.0);");
+
+        vt = client.callProcedure("@AdHoc",
+                "select * from V16_ENG_11042").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {-4, 2, -6}}, vt);
+
+        client.callProcedure("@AdHoc", "UPDATE R1_ENG_11024 A SET NUM = ID WHERE ID=-13;");
+
+        vt = client.callProcedure("@AdHoc",
+                "select * from V16_ENG_11042").getResults()[0];
+        assertContentOfTable(new Object[][] {
+            {-4, 2, -12}}, vt);
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
