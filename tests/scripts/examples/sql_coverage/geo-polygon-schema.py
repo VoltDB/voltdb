@@ -24,25 +24,19 @@
 
 {
     "P1": {
-        "columns": (("PT1", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
-                    ("PT2", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
-                    ("PT3", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
+        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("POLY1", FastSerializer.VOLTTYPE_GEOGRAPHY),
                     ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
                     ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
-                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
         },
     "R1": {
-        "columns": (("PT1", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
-                    ("PT2", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
-                    ("PT3", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
+        "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("POLY1", FastSerializer.VOLTTYPE_GEOGRAPHY),
                     ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
                     ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
-                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
