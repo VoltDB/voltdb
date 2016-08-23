@@ -84,7 +84,7 @@ public class EEProcess {
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
         args.add("--error-exitcode=-1");
-        args.add("--suppressions=tests/test_utils/vdbsuppressions.supp");
+        args.add("--suppressions=tests/ee/test_utils/vdbsuppressions.supp");
         args.add("--xml=yes");
         // We will write valgrind output to a file.  The %p is replaced by
         // valgrind with the process id of the launched process.
