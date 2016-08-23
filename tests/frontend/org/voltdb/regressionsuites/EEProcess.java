@@ -33,6 +33,12 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 
+/**
+ * This class gives an abstract interface for processes run using valgrind.  It has two
+ * important member functions, waitForShutdown() and destroy().  These are noops when
+ * not running valgrind.  When a valgrind process is run these operations manage the
+ * valgrind process and its output.
+ */
 public class EEProcess {
     private Process m_eeProcess;
     private String m_eePID = null;
@@ -243,6 +249,7 @@ public class EEProcess {
         m_stderrParser = new Thread() {
             @Override
             public void run() {
+                File valgrindOutputFile = null;
                 while (true) {
                     try {
                         final String line = stderr.readLine();
@@ -264,14 +271,27 @@ public class EEProcess {
                                          + "] Returned end of stream and exit value "
                                          + p.exitValue());
                             }
-                            File valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
-                            // Note: This will delete the valgrind output file.
+                            valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
+                            // Note: This will not delete the valgrind output file.
                             ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
                     } catch (final IOException e) {
                         e.printStackTrace();
                         return;
+                    } finally {
+                        //
+                        // Don't delete the valgrind file if there are any
+                        // errors.
+                        //
+                        if (valgrindOutputFile != null && m_valgrindErrors.size() == 0) {
+                            try {
+                                valgrindOutputFile.delete();
+                            } catch (Exception ex) {
+                                // We don't really care about this.
+                                ;
+                            }
+                        }
                     }
                 }
             }

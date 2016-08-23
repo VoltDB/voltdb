@@ -774,11 +774,14 @@ def runTests(CTX):
                 retval = process.wait()
                 fileName = makeValgrindFile("%d" % process.pid)
                 errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
-                try:
-                    os.remove(fileName)
-                except ex:
-                    pass
-                if not errorState.isExpectedState():
+                # If there are as many errors as we expect,
+                # then delete the xml file.  Otherwise keep it.
+                # It may be useful.
+                if ( not errorState.isExpectedState()):
+                    try:
+                        os.remove(fileName)
+                    except ex:
+                        pass
                     print errorState.errorMessage()
                     retval = -1
                     sys.stdout.flush()

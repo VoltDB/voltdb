@@ -47,7 +47,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FilenameFilter;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,16 +73,15 @@ public class TestValgrindParser {
 
     @Test
     public void testMemoryLeaks() {
-        URL url;
         List<String> valgrindErrors = new ArrayList<>();
-        url = TestValgrindParser.class.getResource("valgrind_test_files");
-        File urlFile = new File(url.getFile());
+        File urlFile = new File("tests/frontend/org/voltdb/utils/valgrind_test_files");
         File [] files = urlFile.listFiles(new FilenameFilter() {
 
             @Override
             public boolean accept(File dir, String name) {
                 return name.endsWith(".xml");
             }
+
         });
         Arrays.sort(files);
         for (File file : files) {
@@ -93,6 +91,9 @@ public class TestValgrindParser {
             String programName = baseName.substring(baseName.indexOf('_') + 1, baseName.length()-4);
             System.out.printf("Testing valgrind version %s with program %s\n", valgrindVersion, programName);
             valgrindErrors.clear();
+            //
+            // Don't delete the XML file.  It's checked into valgrind.
+            //
             ValgrindXMLParser.processValgrindOutput(file, valgrindErrors);
             switch (programName) {
             case "definite_losses":

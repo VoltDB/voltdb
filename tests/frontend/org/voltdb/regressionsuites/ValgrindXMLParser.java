@@ -180,8 +180,8 @@ public class ValgrindXMLParser {
      * returning a list, because this list is shared with another thread.
      * So, it has to be synchronized.
      *
-     * Note that the valgrind output file will be deleted on JVM exit if
-     * there are no errors.
+     * Note that this does not delete the valgrindOutputFile.  The caller
+     * is responsible for this.
      *
      * @param valgrindOutputFile
      * @param valgrindErrors
@@ -228,6 +228,5 @@ public class ValgrindXMLParser {
             ex.printStackTrace();
             return;
         }
-        valgrindOutputFile.deleteOnExit();
     }
 }
