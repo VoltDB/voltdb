@@ -602,8 +602,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
 
             if (config.m_startAction == StartAction.INITIALIZE) {
-                if (config.m_forceVoltdbCreate) {
-                    m_paths.clean();
+                if (config.m_forceVoltdbCreate && m_paths.clean()) {
+                    String msg = "Archived previous snapshot directory to " + m_paths.getSnapshoth() + ".1";
+                    consoleLog.info(msg);
+                    hostLog.info(msg);
                 }
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
@@ -2037,6 +2039,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Load deployment paths now if Legacy so that we access through the interface all the time.
         if (isRunningWithOldVerbs() && m_paths == null) {
             m_paths = PathSettings.create(CatalogUtil.asPathSettingsMap(deployment));
+            List<String> failed = m_paths.ensureDirectoriesExist();
+            if (!failed.isEmpty()) {
+                String msg = "Unable to validate path settings:\n  " +
+                        Joiner.on("\n  ").join(failed);
+                hostLog.fatal(msg);
+                throw new IOException(msg);
+            }
         }
     }
 

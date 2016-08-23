@@ -33,6 +33,7 @@ import org.aeonbits.owner.Config.Sources;
 import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -72,7 +73,7 @@ public interface PathSettings extends Settings {
     }
 
     default File resolve(File path) {
-        return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
+        return path.isAbsolute() ? path : new VoltFile(getVoltDBRoot(), path.getPath());
     }
 
     default NavigableMap<String, File> getManagedArtifactPaths() {
@@ -131,18 +132,22 @@ public interface PathSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
+        File configDH = resolve(new File(VoltDB.CONFIG_DIR));
+        File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {
                 failed.add("Unable to create directory \"" + path + "\"");
             }
-            if (   !path.isDirectory()
-                || !path.canRead()
+            if (!path.isDirectory()) {
+                failed.add("\"" + path + "\" is not a directory");
+            }
+            if (   !path.canRead()
                 || !path.canWrite()
                 || !path.canExecute())
             {
-                failed.add("Unable to access directory \"" + path + "\"");
+                failed.add("Unable to get write access to directory \"" + path + "\"");
             }
-            if (VoltDB.CONFIG_DIR.equals(path.getName()) || "log".equals(path.getName())) {
+            if (logDH.equals(path) || configDH.equals(path)) {
                 failed.add("\"" + path + "\" is a reserved directory name");
             }
         }
