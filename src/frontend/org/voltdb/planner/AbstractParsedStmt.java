@@ -778,7 +778,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Replace an existing subquery scan with an underline table scan. The subquery
+     * Replace an existing subquery scan with its underlying table scan. The subquery
      * has already passed all the checks from the canSimplifySubquery method.
      * Subquery ORDER BY clause is ignored if such exists.
      *
@@ -796,9 +796,11 @@ public abstract class AbstractParsedStmt {
         StmtTargetTableScan origTableScan = targetTablesList.get(0);
         StmtTargetTableScan newTableScan =
                 new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
+        // Keep the original subquery scan to be able to tie the parent
+        // statement column/table names and aliases to the table's.
         newTableScan.setOriginalSubqueryScan(subqueryScan);
         // Replace the subquery scan with the table scan
-        assert(m_tableAliasMap.get(tableAlias) != null);
+        assert(!m_tableAliasMap.containsKey(tableAlias));
         m_tableAliasMap.put(tableAlias, newTableScan);
         return newTableScan;
     }
@@ -1244,7 +1246,7 @@ public abstract class AbstractParsedStmt {
         Table table = null;
 
         // In case of a subquery we need to preserve its filter expressions
-        AbstractExpression simplifiedSunbqueryExpr = null;
+        AbstractExpression simplifiedSubqueryExpr = null;
 
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
@@ -1261,13 +1263,17 @@ public abstract class AbstractParsedStmt {
                 m_tableList.add(table);
                 // Extract subquery's filters
                 assert(subquery.m_joinTree != null);
-                // Adjust the table alias in all TVE from the eliminated subquery expressions
+                // Adjust the table alias in all TVEs from the eliminated
+                // subquery expressions. Example:
                 // SELECT TA2.CA FROM (SELECT C CA FROM T TA1 WHERE C > 0) TA2
-                // The table alias TA1 from the original TVE (T)TA1.C from the subquery WHERE condition
-                // needs to be replaced with the alias TA2. The new TVE will be (T)TA2.C.
-                // The column alias does not require an adjustment. It is equal to column name
-                simplifiedSunbqueryExpr = subquery.m_joinTree.getAllFilters();
-                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(simplifiedSunbqueryExpr);
+                // The table alias TA1 from the original TVE (T)TA1.C from the
+                // subquery WHERE condition needs to be replaced with the alias
+                // TA2. The new TVE will be (T)TA2.C.
+                // The column alias does not require an adjustment.
+                // It is equal to the column name.
+                simplifiedSubqueryExpr = subquery.m_joinTree.getAllFilters();
+                List<TupleValueExpression> tves =
+                        ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryExpr);
                 for (TupleValueExpression tve : tves) {
                     tve.setTableAlias(tableScan.getTableAlias());
                     tve.setOrigStmtId(m_stmtId);
@@ -1277,14 +1283,14 @@ public abstract class AbstractParsedStmt {
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
-        if (simplifiedSunbqueryExpr != null) {
+        if (simplifiedSubqueryExpr != null) {
             // Add subqueruy's expressions as JOIN filters to make sure they will
             // stay at the node level in case of an OUTER joins and won't affect
             // the join simplification process:
             // select * from T LEFT JOIN (select C FROM T1 WHERE C > 2) S ON T.C = S.C;
             joinExpr = (joinExpr != null) ?
-                    ExpressionUtil.combine(joinExpr, simplifiedSunbqueryExpr) :
-                    simplifiedSunbqueryExpr;
+                    ExpressionUtil.combine(joinExpr, simplifiedSubqueryExpr) :
+                    simplifiedSubqueryExpr;
         }
 
         // The join type of the leaf node is always INNER

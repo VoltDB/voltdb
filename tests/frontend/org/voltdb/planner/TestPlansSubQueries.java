@@ -2258,6 +2258,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         sql = "select * from (select R1.A, R2.C from R1, R2 where R1.C = R2.C) T1";
         checkSubqueryNoSimplification(sql);
 
+        // Subquery has join that itself has another subquery
+        sql = "select * from (select R1.A, T1.C from R1, (select C from R2 LIMIT 4) T1 where R1.C = T1.C) T2";
+        checkSubqueryNoSimplification(sql);
+
         // Subquery contains subquery
         sql = "select * from (select A from (select A from R1 limit 5) T1) T2";
         checkSubqueryNoSimplification(sql);

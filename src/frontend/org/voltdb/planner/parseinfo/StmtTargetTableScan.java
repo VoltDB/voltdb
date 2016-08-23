@@ -134,8 +134,11 @@ public class StmtTargetTableScan extends StmtTableScan {
         // The TA1(TA1).(CA)CA1 TVE needs to be adjusted to be T(TA1).C(CA)
         // since the original SELECT T.C CA FROM T TA subquery was optimized out.
         // Table name TA1 is replaced with the original table name T
-        // Column name CA is replaced wit the original column name C
-        Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName);
+        // Column name CA is replaced with the original column name C
+        // Expression differentiator to be replaced with the differentiator
+        // from the original column (T.C)
+        Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
+                tve.getDifferentiator());
         assert(columnIndex != null);
         SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
         assert(origColumnSchema != null);
