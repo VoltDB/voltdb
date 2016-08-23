@@ -24,6 +24,9 @@ package org.voltdb.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,6 +36,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -41,19 +45,55 @@ import org.voltdb.utils.VoltFile;
  */
 public class TestAllPartitionProcedureCalls extends RegressionSuite {
 
-    static final Class<?>[] PROCEDURES = {IntPartitionCallTestProc.class,
-                                          StringPartitionCallTestProc.class};
-
-    static Map<String, Integer> EXPECT_PARTIITON_COUNTS = new HashMap<String, Integer>();
+    static Map<Integer, Long> INT_PARTITION_EXPECTED_COUNTS = new HashMap<Integer, Long>();
     static {
-        EXPECT_PARTIITON_COUNTS.put("0", new Integer(129));
-        EXPECT_PARTIITON_COUNTS.put("1", new Integer(119));
-        EXPECT_PARTIITON_COUNTS.put("2", new Integer(127));
-        EXPECT_PARTIITON_COUNTS.put("7", new Integer(141));
-        EXPECT_PARTIITON_COUNTS.put("11", new Integer(118));
-        EXPECT_PARTIITON_COUNTS.put("15", new Integer(137));
-        EXPECT_PARTIITON_COUNTS.put("19", new Integer(110));
-        EXPECT_PARTIITON_COUNTS.put("23", new Integer(119));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(112));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(138));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(122));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(131));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(112));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(15), new Long(133));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(19), new Long(142));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(110));
+    }
+
+    static Map<Integer, Long> STRING_PARTITION_EXPECTED_COUNTS = new HashMap<Integer, Long>();
+    static {
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(130));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(129));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(139));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(122));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(123));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(15), new Long(114));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(19), new Long(125));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(118));
+    }
+
+    static final String[] TENS = {"", " ten"," twenty", " thirty", " forty", " fifty", " sixty", " seventy", " eighty", " ninety"};
+    static final String[] NUMS = {"", " one", " two", " three", " four", " five", " six", " seven", " eight", " nine", " ten", " eleven",
+            " twelve", " thirteen", " fourteen", " fifteen", " sixteen", " seventeen", " eighteen", " nineteen" };
+    private  static String convert(int number) {
+
+        if (number == 0) {
+            return "zero";
+        }
+
+        String soFar;
+        if (number % 100 < 20) {
+            soFar = NUMS[number % 100];
+            number /= 100;
+        } else {
+            soFar = NUMS[number % 10];
+            number /= 10;
+
+            soFar = TENS[number % 10] + soFar;
+            number /= 10;
+        }
+
+        if (number == 0) {
+            return soFar.trim();
+        }
+        return (NUMS[number] + " hundred" + soFar).trim();
     }
 
     @Override
@@ -63,78 +103,103 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
         super.setUp();
+        Client client = getClient();
+        load(client, "TABLE_INT_PARTITION");
+        load(client, "TABLE_STRING_PARTITION");
     }
 
     public TestAllPartitionProcedureCalls(String name) {
         super(name);
     }
 
-    public void testCallAllPartitionProcedures() throws Exception{
+    public void testSyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
         Client client = getClient();
+        ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
+        validateResults(responses, INT_PARTITION_EXPECTED_COUNTS);
+     }
 
-        try {
-            load(client, "TABLE_INT_PARTITION");
-            load(client, "TABLE_STRING_PARTITION");
+    public void testAsyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
-            ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("IntPartitionCallTestProc");
-            validateResults(responses);
+        Client client = getClient();
+        client.callAllPartitionProcedure(new CallBack(INT_PARTITION_EXPECTED_COUNTS), "PartitionIntegerTestProc");
+        Thread.sleep(2000);
+     }
 
-            client.callAllPartitionProcedure(new CallBack(), "IntPartitionCallTestProc");
+    public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {
 
-            responses = client.callAllPartitionProcedure("StringPartitionCallTestProc");
-            validateResults(responses);
+        Client client = getClient();
+        ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionStringTestProc");
+        validateResults(responses, STRING_PARTITION_EXPECTED_COUNTS);
+    }
 
-            client.callAllPartitionProcedure(new CallBack(), "StringPartitionCallTestProc");
+    public void testAsyncCallAllPartitionProcedureWithStringPartition() throws Exception{
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        } finally {
-            if (client != null) {
-                try {
-                    client.close();
-                } catch(InterruptedException e) {
-                    e.printStackTrace();
-                }
+        Client client = getClient();
+        client.callAllPartitionProcedure(new CallBack(STRING_PARTITION_EXPECTED_COUNTS), "PartitionStringTestProc");
+        Thread.sleep(2000);
+    }
+
+    public void testCallAllPartitionProcedureFailuerProc() throws Exception {
+
+        Client client = getClient();
+        ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionFailureTestProc");
+        for (ClientResponseWithPartitionKey resp: responses) {
+            int key = (int)(resp.getPartitionKey());
+            if (key == 7) {
+                 assertTrue(resp.getResponse().getStatus() == 1);
+            } else {
+                 assertFalse(resp.getResponse().getStatus() == 1);
             }
         }
     }
 
-    private void validateResults(ClientResponseWithPartitionKey[]  responses)
-    {
+
+    private void validateResults(ClientResponseWithPartitionKey[]  responses, Map<Integer, Long> expectedCounts) {
         for (ClientResponseWithPartitionKey resp: responses) {
-            VoltTable results = resp.m_response.getResults()[0];
-            int expected = EXPECT_PARTIITON_COUNTS.get(resp.m_partitionKey.toString());
-            assert(expected == results.fetchRow(0).getLong(0));
+            VoltTable results = resp.getResponse().getResults()[0];
+            Long expected = expectedCounts.get(resp.getPartitionKey());
+            assert(expected != null);
+            assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
         }
     }
 
     private void load(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
-        for(int i = 0; i < 1000; i++) {
+
+        LocalDate localDate = LocalDate.parse("2016-08-23");
+        for (int i = 0; i < 1000; i++) {
             StringBuilder builder = new StringBuilder();
             builder.append("insert into " + tableName + " values (" + i);
-            builder.append(", 'foo" + i + "', " + i + ", " + i + ")");
+            Date date = Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+            String currentTime = new TimestampType(date).toString();
+            localDate = localDate.plusDays(1);
+            builder.append(", '" + convert(i) + "', " + i + ", " + i + ",'" + currentTime + "')");
             client.callProcedure("@AdHoc", builder.toString());
         }
 
-        String sql = "SELECT count(*) from " + tableName;;
+        String sql = "SELECT count(*) from " + tableName;
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assert(1000 == vt.fetchRow(0).getLong(0));
+        assertTrue(1000 == vt.fetchRow(0).getLong(0));
     }
 
     static public junit.framework.Test suite() throws Exception {
-        return buildEnv();
-    }
-
-    static public MultiConfigSuiteBuilder buildEnv() throws Exception {
 
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAllPartitionProcedureCalls.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestAllPartitionProcedureCalls.class.getResource("allpartitioncall.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addPartitionInfo("TABLE_INT_PARTITION", "value_number1");
+        project.addPartitionInfo("TABLE_STRING_PARTITION", "value_string");
+
+        project.addProcedures(new VoltProjectBuilder.ProcedureInfo(PartitionIntegerTestProc.class,
+                "TABLE_INT_PARTITION.value_number1"),
+                new VoltProjectBuilder.ProcedureInfo(PartitionStringTestProc.class,
+                        "TABLE_STRING_PARTITION.value_string"),
+                new VoltProjectBuilder.ProcedureInfo(PartitionFailureTestProc.class,
+                        "TABLE_INT_PARTITION.value_number1")
+                );
+
         LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
@@ -146,14 +211,21 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
 
     public static class CallBack implements AllPartitionProcedureCallback {
 
+        final Map<Integer, Long> m_expectedCounts;
+
+        CallBack(Map<Integer, Long> expectedCounts) {
+            m_expectedCounts = expectedCounts;
+        }
+
         @Override
         public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
 
             if (clientResponse != null) {
                  for (ClientResponseWithPartitionKey resp: clientResponse) {
-                    VoltTable results = resp.m_response.getResults()[0];
-                    int expected = EXPECT_PARTIITON_COUNTS.get(resp.m_partitionKey);
-                    assert(expected == results.fetchRow(0).getLong(0));
+                    VoltTable results = resp.getResponse().getResults()[0];
+                    Long expected = m_expectedCounts.get(resp.getPartitionKey());
+                    assertTrue(expected != null);
+                    assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
                 }
             }
         }

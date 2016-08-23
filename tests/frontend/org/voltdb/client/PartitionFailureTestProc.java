@@ -20,15 +20,16 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package org.voltdb.client;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class IntPartitionCallTestProc extends VoltProcedure {
+public class PartitionFailureTestProc extends VoltProcedure {
 
-    public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM TABLE_INT_PARTITION;");
+    public final SQLStmt stmt = new SQLStmt("INSERT INTO TABLE_INT_PARTITION VALUES (1001, 'one thoudand and one', 1001, 1001, '2016-09-16 00:00:00.000000');");
 
     public VoltTable[] run(int partitionKey) {
         voltQueueSQL(stmt);

@@ -26,10 +26,10 @@ import org.voltdb.client.ClientResponse;
  */
 public class ClientResponseWithPartitionKey {
 
-    public final Object m_partitionKey;
-    public final ClientResponse m_response;
-    public final String m_errorMessage;
-    public final Exception m_cause;
+    final Object m_partitionKey;
+    final ClientResponse m_response;
+    final String m_errorMessage;
+    final Exception m_cause;
     /**
      *
      * @param partitionKey  A partition key to reach the partition
@@ -51,5 +51,21 @@ public class ClientResponseWithPartitionKey {
        m_response = response;
        m_errorMessage = errorMessage;
        m_cause = cause;
+   }
+
+   public Object getPartitionKey() {
+       return m_partitionKey;
+   }
+
+   public ClientResponse getResponse() {
+       return m_response;
+   }
+
+   public String getErrorMessage() {
+       return m_errorMessage;
+   }
+
+   public Exception getCause() {
+       return m_cause;
    }
 }

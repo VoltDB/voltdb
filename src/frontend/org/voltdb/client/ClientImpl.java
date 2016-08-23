@@ -49,9 +49,9 @@ import org.voltdb.utils.Encoder;
 public final class ClientImpl implements Client, ReplicaProcCaller {
 
     /*
-     * refresh the partition key cache every 5 min
+     * refresh the partition key cache every 1 second
      */
-    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 5 * 60 * 1000;
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 1000;
 
     // call initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
@@ -826,7 +826,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException {
-        OnePartitionProcedureCallback callBack = new OnePartitionProcedureCallback();
+        SyncAllPartitionProcedureCallback callBack = new SyncAllPartitionProcedureCallback();
         callAllPartitionProcedure(callBack, procedureName, params);
         return callBack.getResponse();
     }
@@ -848,9 +848,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         for (Integer key : getPartitionIntegerKeys()) {
             args[0] = key;
             partitionCount--;
-            PartitionProcedureCallback cb = new PartitionProcedureCallback(counter, key, partitionCount, responses, callback);
+            OnePartitionProcedureCallback cb = new OnePartitionProcedureCallback(counter, key, partitionCount, responses, callback);
             try {
-                if (callback instanceof OnePartitionProcedureCallback) {
+                if (callback instanceof SyncAllPartitionProcedureCallback) {
                     ClientResponse response =  callProcedure(procedureName, args);
                     cb.clientCallback(response);
                 } else {
@@ -910,7 +910,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     /**
      * Procedure call back for async callAllPartitionProcedure
      */
-    class PartitionProcedureCallback implements ProcedureCallback {
+    class OnePartitionProcedureCallback implements ProcedureCallback {
 
         final ClientResponseWithPartitionKey[] m_responses;
         final int m_index;
@@ -925,7 +925,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array
          */
-        public PartitionProcedureCallback(AtomicInteger counter, Object partitionKey, int index,
+        public OnePartitionProcedureCallback(AtomicInteger counter, Object partitionKey, int index,
                   ClientResponseWithPartitionKey[] responses, AllPartitionProcedureCallback cb) {
             m_partitionCounter = counter;
             m_partitionKey = partitionKey;
@@ -974,7 +974,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     /**
      * Sync all partition procedure call back
      */
-    private class OnePartitionProcedureCallback implements AllPartitionProcedureCallback {
+    private class SyncAllPartitionProcedureCallback implements AllPartitionProcedureCallback {
 
         ClientResponseWithPartitionKey[] m_responses;
          @Override
