@@ -54,19 +54,19 @@ public interface PathSettings extends Settings {
     public VoltFile getVoltDBRoot();
 
     @Key(CL_PATH_KEY)
-    public VoltFile getCommandLog();
+    public File getCommandLog();
 
     @Key(CL_SNAPSHOT_PATH_KEY)
-    public VoltFile getCommandLogSnapshot();
+    public File getCommandLogSnapshot();
 
     @Key(SNAPTHOT_PATH_KEY)
-    public VoltFile getSnapshoth();
+    public File getSnapshoth();
 
     @Key(EXPORT_OVERFLOW_PATH_KEY)
-    public VoltFile getExportOverflow();
+    public File getExportOverflow();
 
     @Key(DR_OVERFLOW_PATH_KEY)
-    public VoltFile getDROverflow();
+    public File getDROverflow();
 
     public static PathSettings create(Map<?, ?>...imports) {
         return ConfigFactory.create(PathSettings.class, imports);
@@ -139,13 +139,13 @@ public interface PathSettings extends Settings {
                 failed.add("Unable to create directory \"" + path + "\"");
             }
             if (!path.isDirectory()) {
-                failed.add("\"" + path + "\" is not a directory");
+                failed.add("Specified path \"" + path + "\" is not a directory");
             }
             if (   !path.canRead()
                 || !path.canWrite()
                 || !path.canExecute())
             {
-                failed.add("Unable to get write access to directory \"" + path + "\"");
+                failed.add("Directory \"" + path + "\" is not read, write, execute (rwx) accessible");
             }
             if (logDH.equals(path) || configDH.equals(path)) {
                 failed.add("\"" + path + "\" is a reserved directory name");

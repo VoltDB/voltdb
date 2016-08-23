@@ -640,6 +640,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
+            List<String> failed = m_paths.ensureDirectoriesExist();
+            if (!failed.isEmpty()) {
+                String msg = "Unable to access or create the following directories:\n  - " +
+                        Joiner.on("\n  - ").join(failed);
+                VoltDB.crashLocalVoltDB(msg);
+                return;
+            }
+
             if (config.m_hostCount == VoltDB.UNDEFINED) {
                 config.m_hostCount = readDepl.deployment.getCluster().getHostcount();
             }
