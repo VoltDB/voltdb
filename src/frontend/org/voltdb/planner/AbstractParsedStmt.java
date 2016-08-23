@@ -584,6 +584,7 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
+
         String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
         String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
         if (exprNode.attributes.containsKey("alias")) {

@@ -152,6 +152,15 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  PRIMARY KEY (ID, TINY)"
                 + ");"
                 + "PARTITION TABLE P2 ON COLUMN TINY;"
+
+                + "CREATE TABLE P1_ENG_11029 ("
+                + "        ID INTEGER NOT NULL,"
+                + "        TINY TINYINT NOT NULL,"
+                + "        SMALL SMALLINT NOT NULL,"
+                + "        BIG BIGINT NOT NULL,"
+                + "        PRIMARY KEY (ID)"
+                + ");"
+                + "PARTITION TABLE P1_ENG_11029 ON COLUMN ID;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -588,6 +597,65 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "FROM P1_ENG_10972;").getResults()[0];
         assertContentOfTable(new Object[][] {
             {2.0, 1}}, vt);
+    }
+
+    public void testEng11029() throws Exception {
+        // Regression test for ENG-11029
+        Client client = getClient();
+
+        //        CREATE TABLE P1_ENG_11029 (
+        //                ID INTEGER NOT NULL,
+        //                TINY TINYINT NOT NULL,
+        //                SMALL SMALLINT NOT NULL,
+        //                BIG BIGINT NOT NULL,
+        //                PRIMARY KEY (ID)
+        //        );
+        //
+        //        PARTITION TABLE P1_ENG_11029 ON COLUMN ID;
+
+        client.callProcedure("P1_ENG_11029.Insert", 0, 1, 10, 100);
+        client.callProcedure("P1_ENG_11029.Insert", 1, 1, 10, 101);
+        client.callProcedure("P1_ENG_11029.Insert", 2, 2, 12, 102);
+        client.callProcedure("P1_ENG_11029.Insert", 3, 2, 12, 103);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  BIG, "
+                + "  RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK, "
+                + "  SMALL "
+                + "FROM P1_ENG_11029").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {100, 1, 10},
+            {101, 2, 10},
+            {102, 1, 12},
+            {103, 2, 12}
+        }, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  TINY, "
+                + "  SMALL, "
+                + "  RANK() OVER (PARTITION BY SMALL ORDER BY TINY ) RANK "
+                + "FROM P1_ENG_11029").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {1, 10, 1},
+            {1, 10, 1},
+            {2, 12, 1},
+            {2, 12, 1}
+        }, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  BIG, "
+                + "  RANK() OVER (PARTITION BY TINY ORDER BY SMALL) RANK "
+                + "FROM P1_ENG_11029").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {100, 1},
+            {101, 1},
+            {102, 1},
+            {103, 1}
+        }, vt);
     }
 
     static public junit.framework.Test suite() {
