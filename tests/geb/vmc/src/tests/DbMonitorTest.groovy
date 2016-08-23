@@ -2676,32 +2676,38 @@ class DbMonitorTest extends TestBase {
             assert false
     }
 
-    def CheckIfAvgLatencyIsClickable() {
+    def checkIfAvgLatencyIsClickable() {
         String before = ""
         String after  = ""
 
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
+        while (!page.storedProcedure.isDisplayed()) {
+            when: 'click Display Preference button'
+            page.openDisplayPreference()
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
 
-        when: 'Stored Procedures checkbox is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Remove Stored Procedures'
-        page.storedProceduresCheckboxClick()
+            when: 'Stored Procedures checkbox is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Remove Stored Procedures'
+            page.storedProceduresCheckboxClick()
 
-        report "before_save"
-        when: 'click close button'
-        page.savePreferences()
+            report "before_save"
+            when: 'click close button'
+            page.savePreferences()
+            then: 'check if avg latency is displayed'
+            waitFor(waitTime) { page.clickAvgLatency() }
+            break
+        }
 
+        when: 'click avg latency for first time'
         report "after_save"
-
-        waitFor(15){page.clickAvgLatency()}
+        page.clickAvgLatency()
+        report "first_click"
         then: 'check if avg rows is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2710,12 +2716,14 @@ class DbMonitorTest extends TestBase {
 
         when: 'click avg latency'
         page.clickAvgLatency()
+        report "after_click"
         then: 'check if avg rows is in descending'
         if ( page.tableInDescendingOrder() )
             after = "descending"
         else
             after = "ascending"
 
+        println(before  + " " + after)
         if ( before.equals("ascending") && after.equals("descending") )
             assert true
         else
