@@ -781,7 +781,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = expr;
         }
 
-<<<<<<< HEAD
         calculateColumnNames(child, col, colExpr);
 
         // Remember the column expression.
@@ -810,13 +809,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col, AbstractExpression colExpr) {
         // Calculate the names.
-        if (child.name.equals("columnref")) {
-            col.columnName = child.attributes.get("column");
-            col.tableName = child.attributes.get("table");
-            col.tableAlias = child.attributes.get("tablealias");
-            if (col.tableAlias == null) {
-                col.tableAlias = col.tableName;
-            }
         col.alias = child.attributes.get("alias");
         if (child.name.equals("columnref")) {
             col.expression = colExpr;

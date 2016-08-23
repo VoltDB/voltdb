@@ -746,35 +746,29 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Replace an existing subquery scan with an underline table scan. The subquery
+     * Replace an existing subquery scan with its underline table scan. The subquery
      * has already passed all the checks from the canSimplifySubquery method.
      * Subquery ORDER BY clause is ignored if such exists.
      *
      * @param subquery Parsed subquery statement
-     * @param subqueryScan subquery scan to simplify
      * @param tableAlias
      * @return StmtTargetTableScan
      */
-    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(AbstractParsedStmt subquery, StmtSubqueryScan subqueryScan, String tableAlias) {
+    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(AbstractParsedStmt subquery, String tableAlias) {
         assert(tableAlias != null);
         // It is guaranteed by the canSimplifySubquery that there is one and only one TABLE in the
         // whole subquery FROM clause. There could be VOLT_TEMP_TABLEs though that we need to skip
         // The VOLT_TEMP_TABLE_* are scans for subquery expressions
-        StmtTableScan origScan = null;
-        for (Map.Entry<String, StmtTableScan> entry : subquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
-                // This is an artificial table for a subquery expression
-                continue;
-            }
-            origScan = entry.getValue();
-            break;
-        }
-        assert(origScan instanceof StmtTargetTableScan);
-        StmtTargetTableScan origTableScan = (StmtTargetTableScan) origScan;
-        StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
+        assert(subquery.m_tableList.size() == 1);
+        Table origTable = subquery.m_tableList.get(0);
+        StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTable, tableAlias, m_stmtId);
+
+        // Keep the original subquery scan to be able to tie the parent statement column/table names and aliases
+        // to the table ones.
+        StmtSubqueryScan subqueryScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
         newTableScan.setOriginalSubqueryScan(subqueryScan);
         // Replace the subquery scan with the table scan
-        assert(m_tableAliasMap.get(tableAlias) != null);
+        assert(!m_tableAliasMap.containsKey(tableAlias));
         m_tableAliasMap.put(tableAlias, newTableScan);
         return newTableScan;
     }
@@ -1216,7 +1210,7 @@ public abstract class AbstractParsedStmt {
         Table table = null;
 
         // In case of a subquery we need to preserve its filter expressions
-        AbstractExpression simplifiedSunbqueryExpr = null;
+        AbstractExpression simplifiedSubqueryExpr = null;
 
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
@@ -1225,9 +1219,8 @@ public abstract class AbstractParsedStmt {
             tableScan = addTableToStmtCache(table, tableAlias);
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
-            tableScan = addSubqueryToStmtCache(subquery, tableAlias);
             if (canSimplifySubquery(subquery)) {
-                tableScan = addSimplifiedSubqueryToStmtCache(subquery, (StmtSubqueryScan) tableScan, tableAlias);
+                tableScan = addSimplifiedSubqueryToStmtCache(subquery, tableAlias);
                 table = ((StmtTargetTableScan) tableScan).getTargetTable();
                 m_tableList.add(table);
                 // Extract subquery's filters
@@ -1237,25 +1230,27 @@ public abstract class AbstractParsedStmt {
                 // The table alias TA1 from the original TVE (T)TA1.C from the subquery WHERE condition
                 // needs to be replaced with the alias TA2. The new TVE will be (T)TA2.C.
                 // The column alias does not require an adjustment. It is equal to column name
-                simplifiedSunbqueryExpr = subquery.m_joinTree.getAllFilters();
-                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(simplifiedSunbqueryExpr);
+                simplifiedSubqueryExpr = subquery.m_joinTree.getAllFilters();
+                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(simplifiedSubqueryExpr);
                 for (TupleValueExpression tve : tves) {
                     tve.setTableAlias(tableScan.getTableAlias());
                     tve.setOrigStmtId(m_stmtId);
                 }
+            } else {
+                tableScan = addSubqueryToStmtCache(subquery, tableAlias);
             }
         }
 
         AbstractExpression joinExpr = parseJoinCondition(tableNode);
         AbstractExpression whereExpr = parseWhereCondition(tableNode);
-        if (simplifiedSunbqueryExpr != null) {
+        if (simplifiedSubqueryExpr != null) {
             // Add subqueruy's expressions as JOIN filters to make sure they will
             // stay at the node level in case of an OUTER joins and won't affect
             // the join simplification process:
             // select * from T LEFT JOIN (select C FROM T1 WHERE C > 2) S ON T.C = S.C;
             joinExpr = (joinExpr != null) ?
-                    ExpressionUtil.combine(joinExpr, simplifiedSunbqueryExpr) :
-                    simplifiedSunbqueryExpr;
+                    ExpressionUtil.combine(joinExpr, simplifiedSubqueryExpr) :
+                    simplifiedSubqueryExpr;
         }
 
         // The join type of the leaf node is always INNER

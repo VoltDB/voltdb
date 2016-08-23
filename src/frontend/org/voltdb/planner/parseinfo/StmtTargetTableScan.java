@@ -135,7 +135,7 @@ public class StmtTargetTableScan extends StmtTableScan {
             SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
             assert(origColumnSchema != null);
             // Get the original column expression and adjust its aliases
-            AbstractExpression colExpr = (AbstractExpression) origColumnSchema.getExpression();
+            AbstractExpression colExpr = origColumnSchema.getExpression();
             List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(colExpr);
             for (TupleValueExpression tve : tves) {
                 tve.setTableAlias(expr.getTableAlias());
