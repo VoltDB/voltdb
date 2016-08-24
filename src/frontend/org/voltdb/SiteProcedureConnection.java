@@ -27,6 +27,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.JoinProducerBase;
+import org.voltdb.messaging.FastDeserializer;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -107,7 +108,7 @@ public interface SiteProcedureConnection {
      * Note: it's ok to pass null for inputDepIds if the fragments
      * have no dependencies.
      */
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
@@ -118,6 +119,12 @@ public interface SiteProcedureConnection {
             long uniqueId,
             boolean readOnly,
             boolean traceOn) throws EEException;
+
+    /**
+     * Allows caller to determine that a 50MB temporary (deallocated on next call) buffer
+     * was used to generate the EE result table.
+     */
+    public boolean usingFallbackBuffer();
 
     /**
      * Let the EE know which batch of sql is running so it can include this

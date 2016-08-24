@@ -58,6 +58,7 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.messaging.FastDeserializer;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -570,7 +571,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
@@ -584,6 +585,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public boolean usingFallbackBuffer() {
+        return false;
     }
 
     @Override

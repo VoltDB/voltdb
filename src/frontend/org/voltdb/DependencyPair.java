@@ -17,15 +17,77 @@
 
 package org.voltdb;
 
-public class DependencyPair {
+import java.nio.ByteBuffer;
+
+public abstract class DependencyPair {
 
     public final int depId;
-    public final VoltTable dependency;
 
-    public DependencyPair(int depId, VoltTable dependency) {
-        assert(dependency != null);
-
+    public DependencyPair(int depId) {
         this.depId = depId;
-        this.dependency = dependency;
+    }
+
+    public abstract ByteBuffer getBufferDependency();
+
+    public abstract VoltTable getTableDependency();
+
+    public static class TableDependencyPair extends DependencyPair {
+        private final VoltTable dependencyTable;
+
+        public TableDependencyPair(int depId, VoltTable dependency) {
+            super(depId);
+            assert(dependency != null);
+
+            this.dependencyTable = dependency;
+        }
+
+        public ByteBuffer getBufferDependency() {
+            if (dependencyTable == null) {
+                return null;
+            }
+            return TableHelper.getBackedBuffer(dependencyTable);
+        }
+
+        public VoltTable getTableDependency() {
+            return dependencyTable;
+        }
+    }
+
+    public static class BufferDependencyPair extends DependencyPair {
+        private final byte[] dependencyByteArray;
+        private final int startPosition;
+        private final int totalLen;
+        private VoltTable dependencyTable = null;
+
+        public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen) {
+            super(depId);
+            assert(dependency != null);
+            assert(dependency.length >= 4);
+            this.dependencyByteArray = dependency;
+            this.startPosition = startPosition;
+            this.totalLen = totalLen;
+        }
+
+
+        public ByteBuffer getBufferDependency() {
+            return ByteBuffer.wrap(dependencyByteArray, startPosition, totalLen);
+        }
+
+        private static int byteArrayToInt(byte[] b, int position)
+        {
+            return   b[position+3] & 0xFF |
+                    (b[position+2] & 0xFF) << 8 |
+                    (b[position+1] & 0xFF) << 16 |
+                    (b[position] & 0xFF) << 24;
+        }
+
+        public VoltTable getTableDependency() {
+            if (dependencyTable == null) {
+                dependencyTable = PrivateVoltTableFactory.createVoltTableFromByteArray(dependencyByteArray, startPosition, totalLen);
+            }
+            return dependencyTable;
+        }
     }
 }
+
+

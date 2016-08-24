@@ -1894,6 +1894,35 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         buf.put(dup);
     }
 
+    private void initFromRawBuffer() {
+        m_buffer.position(m_buffer.limit());
+
+        // rowstart represents and offset to the start of row data,
+        //  but the serialization is the non-inclusive length of the header,
+        //  so add two bytes.
+        m_rowStart = m_buffer.getInt(0) + 4;
+
+        m_colCount = m_buffer.getShort(5);
+        m_rowCount = m_buffer.getInt(m_rowStart);
+
+        assert(verifyTableInvariants());
+    }
+
+    void initFromByteArray(byte[] byteArray, int position, int len) {
+        m_buffer = ByteBuffer.wrap(byteArray, position, len).asReadOnlyBuffer();
+        initFromRawBuffer();
+    }
+
+    public final void convertToHeapBuffer() {
+        if (m_buffer.isDirect()) {
+            ByteBuffer heapBuffer = ByteBuffer.allocate(m_buffer.limit());
+            m_buffer.position(0);
+            heapBuffer.put(m_buffer);
+            heapBuffer.position(heapBuffer.limit());
+            m_buffer = heapBuffer.asReadOnlyBuffer();
+        }
+    }
+
     void initFromBuffer(ByteBuffer buf) {
         // Note: some of the snapshot and save/restore code makes assumptions
         // about the binary layout of tables.
@@ -1908,18 +1937,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         m_buffer = buf.slice().asReadOnlyBuffer();
         buf.limit(startLimit);
         buf.position(buf.position() + len);
-
-        m_buffer.position(m_buffer.limit());
-
-        // rowstart represents and offset to the start of row data,
-        //  but the serialization is the non-inclusive length of the header,
-        //  so add two bytes.
-        m_rowStart = m_buffer.getInt(0) + 4;
-
-        m_colCount = m_buffer.getShort(5);
-        m_rowCount = m_buffer.getInt(m_rowStart);
-
-        assert(verifyTableInvariants());
+        initFromRawBuffer();
     }
 
     /**

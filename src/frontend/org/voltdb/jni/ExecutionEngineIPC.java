@@ -41,6 +41,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -537,6 +538,48 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
 
+        public ByteBuffer readResultsBuffer() throws IOException {
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            final boolean dirty  = dirtyBytes.get() > 0;
+            if (dirty)
+                m_dirty = true;
+
+            final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (resultTablesLengthBytes.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesLengthBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesLengthBytes.flip();
+            final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            if (resultTablesLength <= 0)
+                return resultTablesLengthBytes;
+
+            final ByteBuffer resultTablesBuffer = ByteBuffer
+                    .allocate(resultTablesLength);
+            //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            while (resultTablesBuffer.hasRemaining()) {
+                int read = m_socketChannel.read(resultTablesBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            resultTablesBuffer.flip();
+            return resultTablesBuffer;
+        }
+
         /**
          * Read and deserialize a long from the wire.
          */
@@ -945,7 +988,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    protected FastDeserializer coreExecutePlanFragments(
+            final int bufferHint,
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
@@ -966,6 +1010,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         while (true) {
             try {
                 result = m_connection.readStatusByte();
+                ByteBuffer resultTables = null;
 
                 if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
                     long fragmentId = m_connection.readLong();
@@ -976,17 +1021,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     m_connection.write();
                 }
                 else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-                    for (int ii = 0; ii < numFragmentIds; ii++) {
-                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-                    }
                     try {
-                        m_connection.readResultTables(resultTables);
+                        resultTables = m_connection.readResultsBuffer();
                     } catch (final IOException e) {
                         throw new EEException(
                                 ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
                     }
-                    return resultTables;
+                    return new FastDeserializer(resultTables);
                 }
                 else {
                     // failure

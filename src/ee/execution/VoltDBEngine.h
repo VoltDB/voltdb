@@ -249,15 +249,26 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool returnUniqueViolations,
                        bool shouldDRStream);
 
-        void resetReusedResultOutputBuffer(size_t headerSize = 0) {
-            m_resultOutput.initializeWithPosition(m_reusedResultBuffer,
-                                                  m_reusedResultCapacity,
-                                                  headerSize);
+        /**
+         * Reset the result buffer (use the final one by default in case the first is still in use)
+         */
+        void resetReusedResultOutputBuffer(const size_t headerSize = 0, const int bufferHint = 1) {
+            if (bufferHint == 0) {
+                m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
+                                                      m_firstReusedResultCapacity,
+                                                      headerSize);
+            }
+            else {
+                m_resultOutput.initializeWithPosition(m_finalReusedResultBuffer,
+                                                      m_finalReusedResultCapacity,
+                                                      headerSize);
+            }
             m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
                                                      m_exceptionBufferCapacity,
                                                      headerSize);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
-                voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+                    voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+
         }
 
         void resetPerFragmentStatsOutputBuffer(int8_t perFragmentTimingEnabled = -1) {
@@ -280,12 +291,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
 
-        void setBuffers(char* parameterBuffer, int parameterBufferCapacity,
+        void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,
                 char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
-                char* resultBuffer, int resultBufferCapacity,
-                char* exceptionBuffer, int exceptionBufferCapacity);
+                char *firstResultBuffer, int firstResultBufferCapacity,
+                char *finalResultBuffer, int finalResultBufferCapacity,
+                char *exceptionBuffer, int exceptionBufferCapacity);
 
-        char const* getParameterBuffer() const { return m_parameterBuffer; }
+        const char* getParameterBuffer() const { return m_parameterBuffer; }
 
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
@@ -301,10 +313,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int getResultsSize() const;
 
         /** Returns the buffer for receiving result tables from EE. */
-        char* getReusedResultBuffer() const { return m_reusedResultBuffer; }
+        char* getReusedResultBuffer() const { return m_finalReusedResultBuffer; }
 
         /** Returns the size of buffer for receiving result tables from EE. */
-        int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
+        int getReusedResultBufferCapacity() const { return m_finalReusedResultCapacity; }
 
         int getPerFragmentStatsSize() const;
         char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
@@ -621,11 +633,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         int m_exceptionBufferCapacity;
 
-        /** buffer object to receive result tables from EE. */
-        char* m_reusedResultBuffer;
+        /** buffer object to receive all but the final result tables from EE. */
+        char* m_firstReusedResultBuffer;
 
-        /** size of reused_result_buffer. */
-        int m_reusedResultCapacity;
+        /** size of m_firstReusedResultBuffer. */
+        int m_firstReusedResultCapacity;
+
+        /** buffer object to receive final result tables from EE. */
+        char* m_finalReusedResultBuffer;
+
+        /** size of m_finalReusedResultBuffer. */
+        int m_finalReusedResultCapacity;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?

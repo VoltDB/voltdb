@@ -142,6 +142,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
+    boolean m_usingFallbackBuffer = false;
     private long m_startTime;
     private long m_lastMsgTime;
     private long m_logDuration = INITIAL_LOG_DURATION;
@@ -161,6 +162,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Has the database changed any state since the last reset of dirty status? */
     public boolean getDirtyStatus() {
         return m_dirty;
+    }
+
+    public boolean usingFallbackBuffer() {
+        return m_usingFallbackBuffer;
     }
 
     public void setBatchTimeout(int batchTimeout) {
@@ -619,17 +624,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Run multiple plan fragments */
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-                                            long[] planFragmentIds,
-                                            long[] inputDepIds,
-                                            Object[] parameterSets,
-                                            String[] sqlTexts,
-                                            long txnId,
-                                            long spHandle,
-                                            long lastCommittedSpHandle,
-                                            long uniqueId,
-                                            long undoQuantumToken,
-                                            boolean traceOn) throws EEException
+    public FastDeserializer executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            String[] sqlTexts,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoQuantumToken,
+            boolean traceOn) throws EEException
     {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
@@ -649,7 +655,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 }
             }
 
-            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
+            int bufferHint = Math.min(m_currentBatchIndex,1);
+            FastDeserializer results = coreExecutePlanFragments(bufferHint, numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken, traceOn);
 
             if (traceOn) {
@@ -675,16 +682,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
-                                                            long[] planFragmentIds,
-                                                            long[] inputDepIds,
-                                                            Object[] parameterSets,
-                                                            long txnId,
-                                                            long spHandle,
-                                                            long lastCommittedSpHandle,
-                                                            long uniqueId,
-                                                            long undoQuantumToken,
-                                                            boolean traceOn) throws EEException;
+    protected abstract FastDeserializer coreExecutePlanFragments(
+            int bufferHint,
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoQuantumToken,
+            boolean traceOn) throws EEException;
 
     public abstract void setPerFragmentTimingEnabled(boolean enabled);
 
@@ -880,16 +889,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param parameter_buffer_size
      * @param per_fragment_stats_buffer
      * @param per_fragment_stats_buffer_size
-     * @param resultBuffer
-     * @param result_buffer_size
+     * @param firstResultBuffer
+     * @param first_result_buffer_size
+     * @param finalResultBuffer
+     * @param final_result_buffer_size
      * @param exceptionBuffer
      * @param exception_buffer_size
      * @return error code
      */
-    protected native int nativeSetBuffers(long pointer,
-                                          ByteBuffer parameter_buffer, int parameter_buffer_size,
+    protected native int nativeSetBuffers(long pointer, ByteBuffer parameter_buffer, int parameter_buffer_size,
                                           ByteBuffer per_fragment_stats_buffer, int per_fragment_stats_buffer_size,
-                                          ByteBuffer resultBuffer, int result_buffer_size,
+                                          ByteBuffer firstResultBuffer, int first_result_buffer_size,
+                                          ByteBuffer finalResultBuffer, int final_result_buffer_size,
                                           ByteBuffer exceptionBuffer, int exception_buffer_size);
 
     /**
@@ -936,6 +947,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native int nativeExecutePlanFragments(
             long pointer,
+            int bufferHint,
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
