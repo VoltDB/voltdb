@@ -20,7 +20,8 @@
 {@insertvals = "_id, _value[decimal], _value[decimal null30], _value[float]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
-{@plus10 = "+ 10"}
+{@plus10 = " + 10"}
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "CASH"}

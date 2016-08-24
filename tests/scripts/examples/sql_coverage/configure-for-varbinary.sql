@@ -21,7 +21,8 @@
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
 {@optionalfn = ""}
-{@plus10 = " "} -- You cannot add to a varbinary
+{@plus10 = ""} -- You cannot add to a varbinary
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "_value[varbinary]"}

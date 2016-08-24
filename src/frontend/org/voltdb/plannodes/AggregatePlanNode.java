@@ -472,19 +472,25 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    private static String planNodeTypeToAggDescString(PlanNodeType nodeType) {
+        switch (nodeType) {
+        case AGGREGATE:
+            return "Serial";
+        case PARTIALAGGREGATE:
+            return "Partial";
+        case PARTITIONBY:
+            return "Windowed";
+        default:
+            assert(nodeType == PlanNodeType.HASHAGGREGATE);
+            return "Hash";
+        }
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        String aggType = "Hash";
-        if (getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            aggType = "Serial";
-        } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
-            aggType = "Partial";
-        } else {
-            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE
-                    || getPlanNodeType() == PlanNodeType.PARTITIONBY);
-        }
+        String aggType = planNodeTypeToAggDescString(getPlanNodeType());
 
         sb.append(aggType + " AGGREGATION ops: ");
         String sep = "";

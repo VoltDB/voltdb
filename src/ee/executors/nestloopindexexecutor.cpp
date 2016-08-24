@@ -477,6 +477,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                                        index,
                                                        &indexCursor,
                                                        num_of_searchkeys)) {
+                    if (inner_tuple.isPendingDelete()) {
+                        continue;
+                    }
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
                     pmp.countdownProgress();

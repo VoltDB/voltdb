@@ -551,7 +551,7 @@ public abstract class AbstractParsedStmt {
                     return we.getDisplayListExpression();
                 }
             }
-            throw new PlanningErrorException("Windowed expressions can only appear in the select list.");
+            throw new PlanningErrorException("Windowed RANK() expressions can only appear in the selection list of a query or subquery.");
         }
         // Parse individual rank expressions
         List<AbstractExpression> partitionbyExprs = new ArrayList<>();
@@ -584,6 +584,7 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
+
         String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
         String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
         if (exprNode.attributes.containsKey("alias")) {

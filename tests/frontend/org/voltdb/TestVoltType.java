@@ -268,6 +268,20 @@ public class TestVoltType extends TestCase {
         fail();
     }
 
+    public void testTimestampToStringBeforeEpoch() {
+        long micros = -48932323284323L;
+        TimestampType beforeEpoch = new TimestampType(micros);
+        assertEquals("1968-06-13 11:41:16.715677", beforeEpoch.toString());
+        assertEquals(micros, beforeEpoch.getTime());
+
+        // test Long.MIN as NULL_TimestampType
+        // NULL_TimestampType is translated to VoltType.NULL_BIGINT in
+        // @see org.voltdb.ParameterSet#flattenToBuffer()
+        beforeEpoch = new TimestampType(VoltType.NULL_BIGINT);
+        assertEquals("290303-12-10 14:59:05.224192", beforeEpoch.toString());
+        assertEquals(VoltType.NULL_BIGINT, beforeEpoch.getTime());
+    }
+
     public void testTimestampStringRoundTrip() {
         String[] date_str = {"1900-01-01",
                              "2000-02-03",
