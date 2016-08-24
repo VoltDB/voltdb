@@ -24,11 +24,15 @@
 package windowing;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -61,7 +65,9 @@ public class WindowingApp {
 
     private final AtomicLong deletesSinceLastChecked = new AtomicLong(0);
 
-    // the value is updated by the UpdatePartitionData class each time it is run
+    // these values are updated by the UpdatePartitionData class each time it is run
+    private final AtomicReference<Map<Long, PartitionInfo>> partitionData =
+            new AtomicReference<Map<Long, PartitionInfo>>(new HashMap<Long, PartitionInfo>());
     private final AtomicLong targetRowsPerPartition = new AtomicLong(Long.MAX_VALUE);
 
     /**
@@ -122,6 +128,11 @@ public class WindowingApp {
     // PACKAGE VISIBLE SHARED STATE ACCESS BELOW
     /////
 
+    static final class PartitionInfo {
+        String partitionKey;
+        long tupleCount;
+    }
+
     // Reference to the database connection we will use
     final Client client;
 
@@ -138,6 +149,10 @@ public class WindowingApp {
     final MaxTracker maxTracker;
     final Reporter reporter;
 
+    Map<Long, PartitionInfo> getPartitionData() {
+        return partitionData.get();
+    }
+
     long getTargetRowsPerPartition() {
         return targetRowsPerPartition.get();
     }
@@ -147,9 +162,9 @@ public class WindowingApp {
         return new TimestampType(targetTimestampMillis * 1000);
     }
 
-    void updatePartitionInfo(long partitionSize) {
-        assert(partitionSize > 0);
-        targetRowsPerPartition.set(config.maxrows / partitionSize);
+    void updatePartitionInfo(Map<Long, PartitionInfo> partitionData) {
+        this.partitionData.set(partitionData);
+        targetRowsPerPartition.set(config.maxrows / partitionData.size());
     }
 
     void addToDeletedTuples(long count) {

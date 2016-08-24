@@ -25,14 +25,22 @@
 package windowing;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
 
+import windowing.WindowingApp.PartitionInfo;
+
 /**
- * <p>Runnable-implementor that fetches partition count using VoltDB system procedure "@GetPartitionKeys".
- * </p>
+ * <p>Runnable-implementor that fetches some per-partition information
+ * from a running VoltDB procedure using VoltDB system procedures.
+ * First, it uses "@GetPartitionKeys" to get a value that will partition
+ * to each partition (used for targeting single-partition procedure call).
+ * Then it uses "@Statistics" with the "TABLE" selector to get the number
+ * of tuples in the 'timedata' table at each partition.</p>
  *
  * <p>Every time that it's called, it updates a global data structure. This
  * structure is primarily used by the ContinuousDeleter class.</p>
@@ -55,11 +63,67 @@ public class PartitionDataTracker implements Runnable {
 
     @Override
     public void run() {
-         try {
-                VoltTable results[] = app.client.callProcedure("@GetPartitionKeys", "integer").getResults();
-                app.updatePartitionInfo(results[0].getRowCount());
-        } catch (IOException | ProcCallException e) {
-            failureCount.incrementAndGet();
+        Map<Long, PartitionInfo> partitionData = new HashMap<Long, PartitionInfo>();
+
+        VoltTable partitionKeys = null, tableStats = null;
+
+        try {
+            tableStats = app.client.callProcedure("@Statistics", "TABLE").getResults()[0];
+            partitionKeys = app.client.callProcedure("@GetPartitionKeys", "STRING").getResults()[0];
         }
-     }
+        catch (IOException | ProcCallException e) {
+            // Track failures in a simplistic way.
+            failureCount.incrementAndGet();
+
+            // No worries. Will be scheduled again soon.
+            return;
+        }
+
+        while (tableStats.advanceRow()) {
+            if (!tableStats.getString("TABLE_NAME").equalsIgnoreCase("timedata")) {
+                continue;
+            }
+
+            PartitionInfo pinfo = new PartitionInfo();
+            long partitionId = tableStats.getLong("PARTITION_ID");
+            pinfo.tupleCount = tableStats.getLong("TUPLE_COUNT");
+            pinfo.partitionKey = null;
+
+            // If redundancy (k-safety) is enabled, this will put k+1 times per partition,
+            // but the tuple count will be the same so it will be ok.
+            partitionData.put(partitionId, pinfo);
+        }
+
+        while (partitionKeys.advanceRow()) {
+            long partitionId = partitionKeys.getLong("PARTITION_ID");
+            PartitionInfo pinfo = partitionData.get(partitionId);
+            if (pinfo == null) {
+                // The set of partitions from the two calls don't match.
+                // Try again next time this is called... Maybe things
+                // will have settled down.
+                return;
+            }
+
+            pinfo.partitionKey = partitionKeys.getString("PARTITION_KEY");
+        }
+
+        // This is a sanity check to see that every partition has
+        // a partition value
+        boolean allMatched = true;
+        for (PartitionInfo pinfo : partitionData.values()) {
+            // a partition has a count, but no key
+            if (pinfo.partitionKey == null) {
+                allMatched = false;
+            }
+        }
+        if (!allMatched) {
+            // The set of partitions from the two calls don't match.
+            // Try again next time this is called... Maybe things
+            // will have settled down.
+            return;
+        }
+
+        // atomically update the new map for the old one
+        app.updatePartitionInfo(partitionData);
+    }
 }
