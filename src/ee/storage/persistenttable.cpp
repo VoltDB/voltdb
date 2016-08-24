@@ -344,6 +344,7 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
         destTcd->deleteCommand();
         destTcd->setTable(destTable);
+        viewHandler->setInactive(false);
     }
 
     decrementRefcount();
@@ -457,6 +458,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     BOOST_FOREACH (MaterializedViewHandler *viewHandler, m_viewHandlers) {
+        // If the view is obsolete (pending truncate release), skip.
+        if (viewHandler->isInactive()) {
+            continue;
+        }
         PersistentTable *destTable = viewHandler->destTable();
         TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
         catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
@@ -464,6 +469,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         PersistentTable *destEmptyTable = destTcd->getPersistentTable();
         assert(destEmptyTable);
         new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+        viewHandler->setInactive(true);
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one

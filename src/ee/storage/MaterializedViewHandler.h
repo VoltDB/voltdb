@@ -69,6 +69,9 @@ public:
      */
     bool isDirty() { return m_dirty; }
     void pollute() { m_dirty = true; }
+    // If the view is pending truncate table release, mark it as inactive.
+    bool isInactive() { return m_inactive; }
+    void setInactive(bool inactive) { m_inactive = inactive; }
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
     // The update operation is considered as a sequence of delete and insert operation.
@@ -91,6 +94,7 @@ private:
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
+    bool m_inactive;
     // Both the existingTuple and the updatedTuple have the same schema of the view table.
     // The difference is the updatedTuple has its own storage, it's a standalone tuple.
     // existingTuple is used to search in the view table for the row with designated group-by columns.
