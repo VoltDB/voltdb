@@ -156,7 +156,7 @@ public interface PathSettings extends Settings {
                 .add(getVoltDBRoot())
                 .build();
         if (distinct.size() < (managedArtifactsPaths.size() + 1)) {
-            failed.add("Managed path values \"" + managedArtifactsPaths.values() + "\" are not distinct");
+            failed.add("Managed path values \"" + managedArtifactsPaths + "\" are not distinct");
         }
         return failed.build();
     }
