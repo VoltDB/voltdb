@@ -1970,8 +1970,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler *viewHandler) {
 }
 
 void PersistentTable::polluteViews() {
-    BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
-        mvHanlder->pollute();
+    BOOST_FOREACH (auto mvHandler, m_viewHandlers) {
+        mvHandler->pollute();
     }
 }
 
