@@ -53,6 +53,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     // have two columns named "C".  HSQL is able to tell these apart, so we use the
     // "index" field produced by voltXML as a differentiator between identical columns.
     private int m_differentiator = -1;
+    private boolean m_needsDifferentiation = true;
 
     private boolean m_hasAggregate = false;
     /** The statement id this TVE refers to */
@@ -451,6 +452,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         } else {
             return "<none>";
         }
+    }
+
+    public final boolean needsDifferentiation() {
+        return m_needsDifferentiation;
+    }
+
+    public final void setNeedsNoDifferentiation() {
+        m_needsDifferentiation = false;
     }
 
     @Override

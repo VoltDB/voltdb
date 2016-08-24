@@ -604,6 +604,8 @@ public abstract class AbstractParsedStmt {
         tve.setColumnIndex(offset);
         tve.setValueType(rankExpr.getValueType());
         tve.setValueSize(rankExpr.getValueSize());
+        // This tve does not ever need a differentiator.
+        tve.setNeedsNoDifferentiation();
         rankExpr.setDisplayListExpression(tve);
         return tve;
     }
