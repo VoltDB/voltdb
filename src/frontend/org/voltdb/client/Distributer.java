@@ -1398,8 +1398,11 @@ class Distributer {
     private void updatePartitioning(VoltTable vt) {
         m_partitionKeys.clear();
         while (vt.advanceRow()) {
-            Integer key = (int)(vt.getLong(1));
-            m_partitionKeys.add(key);
+            //check for mock unit test
+            if (vt.getColumnCount() == 2) {
+                Integer key = (int)(vt.getLong("PARTITION_KEY"));
+                m_partitionKeys.add(key);
+            }
         }
     }
 

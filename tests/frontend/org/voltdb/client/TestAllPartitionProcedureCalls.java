@@ -68,6 +68,13 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
     static final String[] TENS = {"", " ten"," twenty", " thirty", " forty", " fifty", " sixty", " seventy", " eighty", " ninety"};
     static final String[] NUMS = {"", " one", " two", " three", " four", " five", " six", " seven", " eight", " nine", " ten", " eleven",
             " twelve", " thirteen", " fourteen", " fifteen", " sixteen", " seventeen", " eighteen", " nineteen" };
+
+    /**
+     * convert the number into its word form so that these numbers will be distributed among the partitions with string partition
+     * differently from the distribution with integer partition.
+     * @param number  a number less than 1000
+     * @return  the word form of the number
+     */
     private  static String convert(int number) {
 
         if (number == 0) {
