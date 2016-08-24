@@ -41,7 +41,7 @@ LICENSE="$VOLTDB_VOLTDB/license.xml"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $CLIENTNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput ycsb-procs.jar $CLIENTNAME.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -54,32 +54,29 @@ function srccompile() {
     if [ $? != 0 ]; then exit; fi
 }
 
-# build an application catalog
-function catalog() {
+function jars() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ycsb_ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-function makeclient() {
-    srccompile
+    jar cf ycsb-procs.jar -C obj com/procedures
     jar cf $CLIENTNAME.jar -C obj com/yahoo/ycsb/db
     if [ $? != 0 ]; then exit; fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    if [ ! -f ycsb-procs.jar ]; then jars; fi
+    $VOLTDB_BIN/sqlcmd < ycsb_ddl.sql
 }
 
 # run the client that drives the example
 function workload() {
     # if a client doesn't exist, build one
-    if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
+    if [ ! -f $CLIENTNAME.jar ]; then jars; fi
     # run the YCSB workload, which must exist at $YCSB_HOME/workloads
     java -cp "$CLASSPATH:$CLIENTNAME.jar" com.yahoo.ycsb.Client -t -s -db com.yahoo.ycsb.db.VoltClient4 \
         -P $YCSB_HOME/workloads/$WORKLOAD -P workload.properties -P base.properties
@@ -87,14 +84,14 @@ function workload() {
 
 function load() {
     # if a client doesn't exist, build one
-    if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
+    if [ ! -f $CLIENTNAME.jar ]; then jars; fi
     # run the YCSB load phase
     java -cp "$CLASSPATH:$CLIENTNAME.jar" com.yahoo.ycsb.Client -load -s -db com.yahoo.ycsb.db.VoltClient4 \
         -P load.properties -P base.properties
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|makeclient|server [hostname]|load|workload [file]}"
+    echo "Usage: ./run.sh {clean|jars|server [hostname]|init|load|workload [file]}"
 }
 
 # check if an explicit target was specified
