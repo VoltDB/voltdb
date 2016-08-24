@@ -61,10 +61,10 @@ UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables WHERE (_
 SELECT @star FROM @dmltable
 
 -- ... using arithmetic (+, -, *, /) ops in the SELECT clause
-UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype])                                 SELECT @idcol + 20, __[#c2] @plus10                  FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id])                                 SELECT __[#c2] @plus10, @idcol + 30                  FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype], _variable[#c3 @comparabletype]) SELECT @idcol + 40, __[#c2] @plus10, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id], _variable[#c3 @comparabletype]) SELECT __[#c2] @plus10, @idcol + 50, __[#c3] @plus10 FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[#c3 @comparabletype], _variable[id]) SELECT __[#c2] @plus10, __[#c3] @plus10, @idcol + 60 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype])                                 SELECT @idcol + 20, __[#c2]@plus10                 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id])                                 SELECT __[#c2]@plus10, @idcol + 30                 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[id], _variable[#c2 @comparabletype], _variable[#c3 @comparabletype]) SELECT @idcol + 40, __[#c2]@plus10, __[#c3]@plus10 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[id], _variable[#c3 @comparabletype]) SELECT __[#c2]@plus10, @idcol + 50, __[#c3]@plus10 FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (_variable[#c2 @comparabletype], _variable[#c3 @comparabletype], _variable[id]) SELECT __[#c2]@plus10, __[#c3]@plus10, @idcol + 60 FROM @fromtables ORDER BY @idcol
 -- Confirm the values that were "upserted"
 SELECT @star FROM @dmltable

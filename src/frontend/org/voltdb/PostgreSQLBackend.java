@@ -73,12 +73,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // those will be ignored (similar to
     // voltdb/tests/scripts/examples/sql_coverage/StandardNormalzer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
+            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?)"
+            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?"
+            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/)\\s*\\w+)*(\\s+(ASC|DESC))?))?",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an ORDER BY clause, by adding (for each
     // order-by column) either NULLS FIRST or (after "DESC") NULL LAST, so

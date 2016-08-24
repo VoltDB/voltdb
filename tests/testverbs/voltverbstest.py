@@ -24,6 +24,7 @@ import random
 import re
 import subprocess
 import sys
+import xmlrunner
 import unittest
 from optparse import OptionParser
 
@@ -422,7 +423,8 @@ def do_main():
                                      expectedOut="""Usage: voltdb {} [ OPTIONS ... ]{}\n\nvoltdb: error: no such option: --{}\n""".
                                      format(verb, volt_verbs_output[verb], volt_opts_negative[0].pyname)) or haddiffs
 
-        unittest.main(verbosity=2)
+        unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
+        # unittest.main(verbosity=2)
     finally:
         print "Summary report written to file://" + os.path.abspath(options.report_file)
         if haddiffs:

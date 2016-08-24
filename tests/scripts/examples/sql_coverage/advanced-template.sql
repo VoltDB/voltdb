@@ -15,7 +15,7 @@
 -- {@dmltable = "_table"}
 -- {@fromtables = "_table"}
 -- {@optionalfn = "_numfun"}
--- {@plus10 = "+ 10"}
+-- {@plus10 = " + 10"}
 -- {@star = "*"}
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
@@ -147,12 +147,12 @@ SELECT @star FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '
 --- argument type(s). You might need to add explicit type casts", which suggests that the comparison
 --- operators are given higher precedence than the concatenation operator. In contrast, VoltDB and
 --- HSQL behave the same, with or without the parens.
-SELECT @star FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] @cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END @cmp (@comparableconstant @plus10)
-SELECT @star FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] @cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END @cmp (@comparableconstant @plus10)
+SELECT @star FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] @cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END @cmp (@comparableconstant@plus10)
+SELECT @star FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] @cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END @cmp (@comparableconstant@plus10)
 SELECT __[#numone]            Q36,      CASE WHEN   A._variable[#arg @columntype] @cmp @comparableconstant THEN   A._variable[#numone @columntype]            ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q37,      CASE WHEN   A._variable[#arg @columntype] @cmp @comparableconstant THEN   A.__[#arg]                                                               END FROM @fromtables A WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END @cmp (@comparableconstant @plus10)
-SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant @plus10)
+SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END @cmp (@comparableconstant@plus10)
+SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant@plus10)
 SELECT __[#numone]            Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate
