@@ -22,11 +22,12 @@
 {@idcol = "ID"}
 
 {@insertcols = "ID, PT1, PT2, PT3, POLY1, POLY2, POLY3, RATIO"}
-{@insertvals = "_id, _value[point], _value[point null25], _value[point null50], null, null, null, _value[float]"}
+{@insertvals = "_id, _value[point], _value[point null25], _value[point null50], null, null, null, _value[float null25]"}
 {@onefun = ""}  -- There are no handy unary point-to-point functions
 {@optionalfn = "_geofun"}
-{@plus10 = " "} -- You cannot add to a point
-{@star    = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), LONGITUDE(PT3), LATITUDE(PT3)"}
+{@plus10 = ""} -- You cannot add to a point
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@star    = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), LONGITUDE(PT3), LATITUDE(PT3), RATIO"}
 {@lhsstar = "LHS.ID, LONGITUDE(LHS.PT1), LATITUDE(LHS.PT1), LONGITUDE(LHS.PT2), LATITUDE(LHS.PT2), LONGITUDE(LHS.PT3), LATITUDE(LHS.PT3)"}
 {@updatecolumn = "PT3"}
 {@updatesource = "PT1"}
