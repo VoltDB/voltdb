@@ -36,12 +36,19 @@
                     var data = [['XX',0]];
                     var agg = [0,0,0,0,0,0];
                     var tot = 1;
+                    console.log("NTables: " + response.results.length);
                     for(var i=0;i<response.results[0].data.length;i++)
                     {
-                        if (response.results[0].data[i][3] == 1)
-                            data.push([response.results[0].data[i][0], response.results[0].data[i][1]-1]);
-                        agg[response.results[0].data[i][1]-1] += response.results[0].data[i][2];
+                        data.push([response.results[0].data[i][0], response.results[0].data[i][1]-1]);
                         tot += response.results[0].data[i][2];
+                    }
+                    console.log("Counts: " + response.results[1].data)
+                    for (var i=0; i < response.results[1].data.length; i++)
+                    {
+                        var contestant = response.results[1].data[i][0] - 1;
+                        var nvotes     = response.results[1].data[i][1];
+                        console.log("vote: " + contestant + " : " + agg[contestant] + " -> " + nvotes)
+                        agg[contestant] = nvotes;
                     }
                     for(var i=0;i<agg.length;i++)
                     {
