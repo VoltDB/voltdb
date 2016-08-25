@@ -121,6 +121,40 @@ class CreateDatabase(Database):
         self.assertEqual(value['statusString'], 'database name already exists')
         self.assertEqual(response.status_code, 400)
 
+    def test_validate_db_name_invalid(self):
+        """
+        ensure database name is valid
+        """
+        headers = {'Content-type': 'application/json; charset=utf-8'}
+        data = {'name': '@#$'}
+        response = requests.post(__url__, json=data, headers=headers)
+        value =  response.json()
+
+        self.assertEqual(value['statusString'][0], 'Only alphabets, numbers, _ and . are allowed.')
+        self.assertEqual(response.status_code, 200)
+
+    def test_validate_db_name_invalid_datatype(self):
+        """
+        ensure database name is of valid datatype
+        """
+        headers = {'Content-type': 'application/json; charset=utf-8'}
+        # When name is bool value
+        data = {'name': True}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+
+        self.assertEqual(value['statusString'], 'Invalid datatype for field database name.')
+        self.assertEqual(response.status_code, 200)
+
+        # When name is integer value
+        data = {'name': 11}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+
+        self.assertEqual(value['statusString'], 'Invalid datatype for field database name.')
+        self.assertEqual(response.status_code, 200)
+
+
 
 class UpdateDatabase(Database):
     """
@@ -219,6 +253,47 @@ class UpdateDatabase(Database):
         else:
             print "Database list is empty."
 
+    def test_validate_db_name_invalid(self):
+        """
+        ensure database name is valid
+        """
+        response = requests.get(__url__)
+        value = response.json()
+
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = __url__ + str(last_db_id)
+            response = requests.put(url, json={'name': '@#@#@'})
+            value = response.json()
+            self.assertEqual(value['statusString'][0], 'Only alphabets, numbers, _ and . are allowed.')
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "Database list is empty."
+
+    def test_validate_db_name_invalid_datatype(self):
+        """
+        ensure database name is of valid datatype
+        """
+        response = requests.get(__url__)
+        value = response.json()
+
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = __url__ + str(last_db_id)
+            # When name is bool value
+            response = requests.put(url, json={'name': True})
+            value = response.json()
+            self.assertEqual(value['statusString'], 'Invalid datatype for field database name.')
+            self.assertEqual(response.status_code, 200)
+            # When name is integer value
+            response = requests.put(url, json={'name': 11})
+            value = response.json()
+            self.assertEqual(value['statusString'], 'Invalid datatype for field database name.')
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "Database list is empty."
 
 class DeleteDatabase(unittest.TestCase):
     """
