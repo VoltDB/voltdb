@@ -575,7 +575,7 @@ class JenkinsBot(object):
         )
 
     def generate_html(self, tables, filename, message=''):
-        with open(filename, 'a') as html_file:
+        with open(filename, 'r+') as html_file:
             table_html = """
 <style style="text/css">
 table {
