@@ -26,15 +26,15 @@ import org.voltdb.client.ClientResponse;
  */
 public class ClientResponseWithPartitionKey {
 
-    final public Object m_partitionKey;
-    final public ClientResponse m_response;
+    final public Object partitionKey;
+    final public ClientResponse response;
     /**
      *
      * @param partitionKey  A partition key to reach the partition
      * @param response The ClientResponse instance from the procedure execution
      */
     ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
-        m_partitionKey = partitionKey;
-        m_response = response;
+        this.partitionKey = partitionKey;
+        this.response = response;
     }
 }

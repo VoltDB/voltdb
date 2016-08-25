@@ -152,11 +152,11 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
         Client client = getClient();
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionFailureTestProc");
         for (ClientResponseWithPartitionKey resp: responses) {
-            int key = (int)(resp.m_partitionKey);
+            int key = (int)(resp.partitionKey);
             if (key == 7) {
-                 assertTrue(resp.m_response.getStatus() == 1);
+                 assertTrue(resp.response.getStatus() == 1);
             } else {
-                 assertFalse(resp.m_response.getStatus() == 1);
+                 assertFalse(resp.response.getStatus() == 1);
             }
         }
     }
@@ -164,8 +164,8 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
 
     private void validateResults(ClientResponseWithPartitionKey[]  responses, Map<Integer, Long> expectedCounts) {
         for (ClientResponseWithPartitionKey resp: responses) {
-            VoltTable results = resp.m_response.getResults()[0];
-            Long expected = expectedCounts.get(resp.m_partitionKey);
+            VoltTable results = resp.response.getResults()[0];
+            Long expected = expectedCounts.get(resp.partitionKey);
             assert(expected != null);
             assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
         }
@@ -225,8 +225,8 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
             m_callbackInvoked = true;
             if (clientResponse != null) {
                  for (ClientResponseWithPartitionKey resp: clientResponse) {
-                    VoltTable results = resp.m_response.getResults()[0];
-                    Long expected = m_expectedCounts.get(resp.m_partitionKey);
+                    VoltTable results = resp.response.getResults()[0];
+                    Long expected = m_expectedCounts.get(resp.partitionKey);
                     assertTrue(expected != null);
                     assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
                 }
