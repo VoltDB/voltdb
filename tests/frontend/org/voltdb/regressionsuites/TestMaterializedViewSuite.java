@@ -1640,16 +1640,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
         }
 
-// This part of the test commented out until ENG-11048 is fixed
-//
-//        // -- 5 -- Test deleting the data from the source tables.
-//
-//        Collections.shuffle(dataList1);
-//        System.out.println("Now testing deleting data from the join query view source table.");
-//        for (int i=0; i<dataList1.size(); i++) {
-//            deleteRow(client, dataList1.get(i));
-//            verifyViewOnJoinQueryResult(client);
-//        }
+        // -- 5 -- Test deleting the data from the source tables.
+
+        Collections.shuffle(dataList1);
+        System.out.println("Now testing deleting data from the join query view source table.");
+        for (int i=0; i<dataList1.size(); i++) {
+            deleteRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
     }
 
     public void testEng11024() throws Exception {
