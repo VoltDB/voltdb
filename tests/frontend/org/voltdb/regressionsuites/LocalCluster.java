@@ -144,7 +144,7 @@ public class LocalCluster implements VoltServerConfig {
     // with the port numbers and command line parameter value specific to that
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
-    private boolean isNewCli = true;
+    private boolean isNewCli = Boolean.valueOf(System.getenv("NEW_CLI") == null ? "true" : System.getenv("NEW_CLI"));
     public boolean isNewCli() { return isNewCli; };
     public void setNewCli(boolean flag) {
         isNewCli = flag;
@@ -670,7 +670,7 @@ public class LocalCluster implements VoltServerConfig {
             // Set paused mode
             templateCmdLine.startPaused();
         }
-
+        System.out.println("New CLI options set to: " + isNewCli);
         // set to true to spew startup timing data
         boolean logtime = false;
         long startTime = 0;
