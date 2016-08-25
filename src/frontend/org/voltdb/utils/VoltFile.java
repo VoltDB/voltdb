@@ -294,6 +294,7 @@ public class VoltFile extends File {
 
             int offset = pathname.indexOf(m_magic) + m_magic.length();
             String relativePath = pathname.substring(offset);
+            // System.out.println("VOLTFILE:::relative path: " + relativePath);
             // The this is probably a snapshot path and needs to be re-mapped to our snapshot
             // directory because truncation snapshot requests specify absolute paths
             return m_voltFilePrefix.getAbsolutePath() + relativePath;
@@ -304,6 +305,7 @@ public class VoltFile extends File {
 
     public VoltFile(String parent, String child) {
         super(getFixedPathname(parent), child);
+        //System.out.println("VOLTFILE:::supplied: " + parent + ", computed parent: " + getFixedPathname(parent) + ", voltprefix: " + m_voltFilePrefix.getAbsolutePath());
     }
 
     public VoltFile(File parent, String child) {

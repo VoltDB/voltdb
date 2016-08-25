@@ -995,9 +995,10 @@ public final class InvocationDispatcher {
 
             final byte[] catalog;
             try {
+                log.info (" Fetch catalog from: " + catalogFH + ". \n JSON " + jsObj.toString());
                 catalog = MiscUtils.fileToBytes(catalogFH);
             } catch (IOException e) {
-                log.warn("Unable to access catalog file " + catalogFH, e);
+                log.warn("Unable to access catalog file " + catalogFH + ". \n JSON " + jsObj.toString(), e);
                 return unexpectedFailureResponse(
                         "Unable to access catalog file " + catalogFH,
                         task.clientHandle);
