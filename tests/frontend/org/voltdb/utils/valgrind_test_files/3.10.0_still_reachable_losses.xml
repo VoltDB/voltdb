@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+
+<valgrindoutput>
+
+<protocolversion>4</protocolversion>
+<protocoltool>memcheck</protocoltool>
+
+<preamble>
+  <line>Memcheck, a memory error detector</line>
+  <line>Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.</line>
+  <line>Using Valgrind-3.10.0 and LibVEX; rerun with -h for copyright info</line>
+  <line>Command: /home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</line>
+</preamble>
+
+<pid>9229</pid>
+<ppid>9228</ppid>
+<tool>memcheck</tool>
+
+<args>
+  <vargv>
+    <exe>/usr/bin/valgrind</exe>
+    <arg>--leak-check=full</arg>
+    <arg>--show-reachable=yes</arg>
+    <arg>--error-exitcode=-1</arg>
+    <arg>--suppressions=/home/bwhite/workspaces/workspace.vdb/voltdb/tests/ee/test_utils/vdbsuppressions.supp</arg>
+    <arg>--xml=yes</arg>
+    <arg>--xml-file=/home/bwhite/workspaces/workspace.vdb/voltdb/tests/frontend/org/voltdb/utils/valgrind_test_files/3.10.0_still_reachable_losses.xml</arg>
+  </vargv>
+  <argv>
+    <exe>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</exe>
+  </argv>
+</args>
+
+<status>
+  <state>RUNNING</state>
+  <time>00:00:00:00.023 </time>
+</status>
+
+
+<status>
+  <state>FINISHED</state>
+  <time>00:00:00:00.363 </time>
+</status>
+
+<error>
+  <unique>0x1</unique>
+  <tid>1</tid>
+  <kind>Leak_StillReachable</kind>
+  <xwhat>
+    <text>128 bytes in 1 blocks are still reachable in loss record 1 of 1</text>
+    <leakedbytes>128</leakedbytes>
+    <leakedblocks>1</leakedblocks>
+  </xwhat>
+  <stack>
+    <frame>
+      <ip>0x4C2A7AA</ip>
+      <obj>/usr/lib64/valgrind/vgpreload_memcheck-amd64-linux.so</obj>
+      <fn>operator new[](unsigned long)</fn>
+    </frame>
+    <frame>
+      <ip>0x406824</ip>
+      <obj>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</obj>
+      <fn>__static_initialization_and_destruction_0(int, int)</fn>
+      <dir>/home/bwhite/workspaces/workspace.vdb/voltdb/tests/ee/memleaktests</dir>
+      <file>still_reachable_losses.cpp</file>
+      <line>55</line>
+    </frame>
+    <frame>
+      <ip>0x406854</ip>
+      <obj>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</obj>
+      <fn>global constructors keyed to still_reachable_losses.cpp</fn>
+      <dir>/home/bwhite/workspaces/workspace.vdb/voltdb/tests/ee/memleaktests</dir>
+      <file>still_reachable_losses.cpp</file>
+      <line>74</line>
+    </frame>
+    <frame>
+      <ip>0x40A2F5</ip>
+      <obj>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</obj>
+    </frame>
+    <frame>
+      <ip>0x40623A</ip>
+      <obj>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/still_reachable_losses</obj>
+    </frame>
+  </stack>
+</error>
+
+<errorcounts>
+</errorcounts>
+
+<suppcounts>
+  <pair>
+    <count>1</count>
+    <name>glibc-2.5.x-on-SUSE-10.2-(PPC)-2a</name>
+  </pair>
+</suppcounts>
+
+</valgrindoutput>
+
