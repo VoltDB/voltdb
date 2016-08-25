@@ -17,27 +17,29 @@ On the Command Line
 The simplest way to start VoltDB is by using a command like this:
 
 ```bash
-voltdb create
+voltdb init
+voltdb start
 ```
 
 But you may typically be starting VoltDB with options, like:
 
 ```bash
-voltdb create -f -d deployment.xml -H myleaderhostname
+voltdb init --force -C deployment.xml
+voltdb start -c [cluster-node-count] -H coordinato1,coordinator2
 ```
 
-Both of these commands will start VoltDB in the foreground of a Linux or OS X console. By default, log messages sent to the CONSOLE log4j appender will go to the console's standard output, while more detailed logging will go to the `voltdb.log` in the `log` folder on the filesystem.
+Both of these commands will start VoltDB in the foreground of a Linux or OS X console. By default, log messages sent to the CONSOLE log4j appender will go to the console's standard output, while more detailed logging will go to the `voltdb.log` in the `voltdbroot/log` folder on the filesystem.
 
 To start as a daemon, or backgrounded process, we use the `-B` or `--background` option, like so:
 
 ```bash
-voltdb create -f -B -d deployment.xml -H myleaderhost 
+voltdb start -B -c [cluster-node-count] -H coordinato1,coordinator2
 ```
 
 This will allow you to close the terminal or shell and the process will continue running. It will also allow you to run other commands. You will notice that log messages still go to standard output, possibly interfering with any later commands you try to run on this shell. To redirect the console log output to a file named `nohup.out`, add to the end of the command like so:
 
 ```bash
-voltdb create -f -B -d deployment.xml -H myleaderhost > nohup.log 2>&1 &
+voltdb start -B -c [cluster-node-count] -H coordinato1,coordinator2 > nohup.log 2>&1 &
 ```
 
 Now that the process is backgrounded, you can no longer kill the server process with ctrl-c. You have two options for stopping.
@@ -68,14 +70,14 @@ If you would like to add these back to your run.sh, or to your own VoltDB Bash s
 ```bash
 # wait for backgrounded server to start up
 function wait_for_startup() {
-    # use sqlcmd 
+    # use sqlcmd
     until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
     do
         sleep 2
         echo " ... Waiting for VoltDB to start"
         if [[ $SECONDS -gt 60 ]]
         then
-            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2;      
+            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2;
             exit 1;
         fi
     done
@@ -87,8 +89,9 @@ function wait_for_startup() {
 # startup server in background and load schema
 function background_server_andload() {
     # run the server in the background
-    voltdb create -f -B -d deployment.xml \
-        -H $STARTUPLEADERHOST > nohup.log 2>&1 &
+    voltdb init --force -C deployment.xml
+    voltdb start -B -c $CLUSTERHOSTCOUNT \
+        -H $COORDINATORHOSTS > nohup.log 2>&1 &
     # block until the server is accepting work
     wait_for_startup
     # load schema, procedures and possibly data

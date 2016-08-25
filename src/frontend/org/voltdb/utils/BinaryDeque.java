@@ -70,18 +70,22 @@ public interface BinaryDeque {
     public void push(BBContainer objects[]) throws IOException;
 
     /**
-     * Remove and return the object at the head of the queue
-     * @param ocf
-     * @return
-     * @throws IOException
+     * Start a BinaryDequeReader for reading, positioned at the start of the deque.
+     * @param cursorId a String identifying the cursor. If a cursor is already open for this id,
+     * the existing cursor will be returned.
+     * @return a BinaryDequeReader for this cursorId
+     * @throws IOException on any errors trying to read the PBD files
      */
-    public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+    public BinaryDequeReader openForRead(String cursorId) throws IOException;
+
 
     /**
      * Persist all objects in the queue to the backing store
      * @throws IOException
      */
     public void sync() throws IOException;
+
+    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
@@ -90,14 +94,48 @@ public interface BinaryDeque {
      */
     public void close() throws IOException;
 
-    public boolean isEmpty() throws IOException;
-
     public boolean initializedFromExistingFiles();
 
     public long sizeInBytes() throws IOException;
-    public int getNumObjects();
+    public int getNumObjects() throws IOException;
 
     public void closeAndDelete() throws IOException;
+
+    /**
+     * Reader class used to read entries from the deque. Multiple readers may be active at the same time,
+     * each of them maintaining their own read location within the deque.
+     */
+    public interface BinaryDequeReader {
+        /**
+         * Read and return the object at the current read position of this reader.
+         * The entry will be removed once all active readers have read the entry.
+         * @param ocf
+         * @return BBContainer with the bytes read. Null if there is nothing left to read.
+         * @throws IOException
+         */
+        public BBContainer poll(OutputContainerFactory ocf) throws IOException;
+
+        /**
+         * Number of bytes left to read for this reader.
+         * @return number of bytes left to read for this reader.
+         * @throws IOException
+         */
+        public long sizeInBytes() throws IOException;
+
+        /**
+         *  Number of objects left to read for this reader.
+         * @return number of objects left to read for this reader
+         * @throws IOException
+         */
+        public int getNumObjects() throws IOException;
+
+        /**
+         * Returns true if this reader still has entries to read. False otherwise
+         * @return true if this reader still has entries to read. False otherwise
+         * @throws IOException
+         */
+        public boolean isEmpty() throws IOException;
+    }
 
     public static class TruncatorResponse {
         public enum Status {
@@ -129,6 +167,4 @@ public interface BinaryDeque {
          */
         public TruncatorResponse parse(BBContainer bb);
     }
-
-    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 }

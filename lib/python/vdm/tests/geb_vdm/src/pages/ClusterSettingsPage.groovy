@@ -20,70 +20,74 @@ import geb.Page
 class ClusterSettingsPage extends Page {
     static content = {
         // Tabs
-        clusterSettingsTab              { $("#dbManager") }
-        serverSettingsTab               { $("#serverSetting") }
+        clusterSettingsTab { $("#dbManager") }
+        serverSettingsTab { $("#serverSetting") }
 
         // DB
-        startCluster                    { $("#divDbManager > div.clusterContent > div.clusterStartStop > div > a") }
+        startCluster { $("#divDbManager > div.clusterContent > div.clusterStartStop > div > a") }
 
         // Servers
-        buttonAddServer                 { $("#btnAddServer") }
-        btnAddServerOption              { $("#btnAddServerOption") }
+        buttonAddServer { $("#btnAddServer") }
+        btnAddServerOption { $("#btnAddServerOption") }
 
         // Add Server Popup
-        popupAddServer                          { $("#addServer > div > div") }
-        popupAddServerDetails                   { $("#accordion > div > div.panel-heading > h4 > a") }
-        popupAddServerNameField                 { $("#serverName") }
-        popupAddServerHostNameField             { $("#txtHostName") }
-        popupAddServerDescriptionField          { $("#txtDescription") }
-        popupAddServerClientListenerField       { $("#txtClientPort") }
-        popupAddServerAdminListenerField        { $("#txtAdminPort") }
-        popupAddServerHttpListenerField         { $("#txtHttpPort") }
-        popupAddServerInternalListenerField     { $("#txtInternalPort") }
-        popupAddServerZookeeperListenerField    { $("#txtZookeeper") }
-        popupAddServerReplicationListenerField  { $("#txtReplicationPort") }
-        popupAddServerInternalInterfaceField    { $("#txtInternalInterface") }
-        popupAddServerExternalInterfaceField    { $("#txtExternalInterface") }
-        popupAddServerPublicInterfaceField      { $("#txtPublicInterface") }
-        popupAddServerPlacementGroupField       { $("#txtPlacementGroup") }
+        popupAddServer { $("#addServer > div > div") }
+        popupAddServerDetails { $("#accordion > div > div.panel-heading > h4 > a") }
+        popupAddServerNameField { $("#serverName") }
+        popupAddServerHostNameField { $("#txtHostName") }
+        popupAddServerDescriptionField { $("#txtDescription") }
+        popupAddServerClientListenerField { $("#txtClientPort") }
+        popupAddServerAdminListenerField { $("#txtAdminPort") }
+        popupAddServerHttpListenerField { $("#txtHttpPort") }
+        popupAddServerInternalListenerField { $("#txtInternalPort") }
+        popupAddServerZookeeperListenerField { $("#txtZookeeper") }
+        popupAddServerReplicationListenerField { $("#txtReplicationPort") }
+        popupAddServerInternalInterfaceField { $("#txtInternalInterface") }
+        popupAddServerExternalInterfaceField { $("#txtExternalInterface") }
+        popupAddServerPublicInterfaceField { $("#txtPublicInterface") }
+        popupAddServerPlacementGroupField { $("#txtPlacementGroup") }
 
-        popupAddServerButtonOk              { $("#btnCreateServerOk") }
-        popupAddServerButtonCancel          { $("#addServer > div > div > div.modal-footer > button.btn.btn-gray") }
+        popupAddServerButtonOk { $("#btnCreateServerOk") }
+        popupAddServerButtonCancel { $("#addServer > div > div > div.modal-footer > button.btn.btn-gray") }
 
         // Delete Server
-        deleteServer                        { $("#serverList > tbody > tr:nth-child(5) > td:nth-child(2) > a > div") }
-        popupDeleteServer                   { $("#deleteConfirmation > div > div") }
-        popupDeleteServerButtonOk           { $("#deleteServerOk") }
+        deleteServer { $("#serverList > tbody > tr:nth-child(5) > td:nth-child(2) > a > div") }
+        popupDeleteServer { $("#deleteConfirmation > div > div") }
+        popupDeleteServerButtonOk { $("#deleteServerOk") }
 
-        testingPath                         (required:false) { $("#serverList > tbody > tr:nth-child(5) > td:nth-child(1)") }
-        errorServerName                     {$("#errorServerName")}
-        errorHostName                       {$("#errorHostName")}
-        errorClientPort                     {$("#errorClientPort")}
-        errorInternalInterface              {$("#errorInternalInterface")}
+        testingPath(required: false) { $("#serverList > tbody > tr:nth-child(5) > td:nth-child(1)") }
+        errorServerName { $("#errorServerName") }
+        errorHostName { $("#errorHostName") }
+        errorClientPort { $("#errorClientPort") }
+        errorInternalInterface { $("#errorInternalInterface") }
 
         // Database
-        firstDatabase                       { $("#dbInfo_1") }
-        secondDatabase                      { $("#dbInfo_2") }
-        currentDatabase                     { $("#clusterName") }
+        firstDatabase { $("#dbInfo_1") }
+        secondDatabase { $("#dbInfo_2") }
+        currentDatabase { $("#clusterName") }
 
-        buttonDatabase                      { $(id:"btnDatabaseLink") }
-        buttonAddDatabase                   { $("#btnAddDatabase") }
+        buttonDatabase { $(id: "btnDatabaseLink") }
+        buttonAddDatabase { $("#btnAddDatabase") }
 
-        popupAddDatabase                    { $("#txtDbName") }
-        popupAddDatabaseNameField           { $("#txtDbName") }
-        popupAddDatabaseDeploymentField     { $("#txtDeployment") }
-        popupAddDatabaseButtonOk            (required:false) { $("#btnAddDatabaseOk") }
-        popupAddDatabaseButtonCancel        { $("#addDatabase > div > div > div.modal-footer > button.btn.btn-gray") }
-        popupEditDatabaseButtonOk           { $("#btnAddDatabaseOk") }
-        popupDeleteDatabaseButtonOk         { $("#btnDeleteDatabaseOk") }
+        popupAddDatabase { $("#txtDbName") }
+        popupAddDatabaseNameField { $("#txtDbName") }
+        popupAddDatabaseDeploymentField { $("#txtDeployment") }
+        popupAddDatabaseButtonOk(required: false) { $("#btnAddDatabaseOk") }
+        popupAddDatabaseButtonCancel { $("#addDatabase > div > div > div.modal-footer > button.btn.btn-gray") }
+        popupEditDatabaseButtonOk { $("#btnAddDatabaseOk") }
+        popupDeleteDatabaseButtonOk { $("#btnDeleteDatabaseOk") }
 
         // Change Save Status
-        saveStatus                          { $(id:"changeSaveStatus") }
+        saveStatus { $(id: "changeSaveStatus") }
+
+        //
+        logPopupTitle           { $("#errorHeader") }
+        logPopupOk              { $("#divServerLogPopup > div > div > div.modal-footer > button") }
 
         // MODULES - The elements of Cluster Configuration are separated into modules
-        overview        { module OverviewModule }
-        directories     { module DirectoriesModule }
-        dr              { module DatabaseReplicationModule }
+        overview { module OverviewModule }
+        directories { module DirectoriesModule }
+        dr { module DatabaseReplicationModule }
     }
 
     static at = {
@@ -91,16 +95,17 @@ class ClusterSettingsPage extends Page {
         //      waitFor(30) { serverSettingsTab.isDisplayed() }
     }
 
-
     /*
      *  Return the id of Server with index as input
      */
+
     String getIdOfServer(int index) {
         return ("tdHostname_" + String.valueOf(index))
     }
     /*
      *  Return the id of delete button of Server with index as input
      */
+
     String getIdOfDeleteButton(int index) {
         return ("deleteServer_" + String.valueOf(index))
     }
@@ -108,6 +113,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the id of edit button of Server with index as input
      */
+
     String getIdOfEditButton(int index) {
         return ("editServer_" + String.valueOf(index))
     }
@@ -115,6 +121,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the id of delete button for Database with index as input
      */
+
     String getIdOfDatabaseDeleteButton(String index) {
         return ("deleteDatabase_" + index)
     }
@@ -122,6 +129,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the id of edit button for Database with index as input
      */
+
     String getIdOfDatabaseEditButton(String index) {
         return ("editDatabase_" + index)
     }
@@ -138,11 +146,12 @@ class ClusterSettingsPage extends Page {
     String newValueDatabase = 0
     String saveMessage = "Changes have been saved."
     boolean foundStatus = false
-    int count= 0
+    int count = 0
 
     /*
      *  Create a new Database
      */
+
     int createNewDatabase(String create_DatabaseTest_File) {
         newValueDatabase = 0
         foundStatus = false
@@ -206,8 +215,8 @@ class ClusterSettingsPage extends Page {
         for (count = 0; count < numberOfTrials; count++) {
             try {
                 try {
-                    waitFor { 1==0 }
-                } catch(geb.waiting.WaitTimeoutException e) {
+                    waitFor { 1 == 0 }
+                } catch (geb.waiting.WaitTimeoutException e) {
 
                 }
                 popupAddDatabaseNameField.value(nameValue)
@@ -254,71 +263,71 @@ class ClusterSettingsPage extends Page {
         println(nextCount)
         def newId = $(".btnDbList")[nextCount].parent().attr("data-id")
 
-        return (Integer.valueOf(newValueDatabase) +1)
+        return (Integer.valueOf(newValueDatabase) + 1)
     }
 
     /*
      *  Delete the database with the given index and name
      */
+
     boolean deleteNewDatabase(int indexOfNewDatabase, String databaseName) {
-        int nextCount =0
+        int nextCount = 0
         String new_string = ""
         String deleteId = getIdOfDatabaseDeleteButton(String.valueOf(indexOfNewDatabase))
 
-        for(count=0; count<numberOfTrials; count++) {
+        for (count = 0; count < numberOfTrials; count++) {
             try {
-                for(nextCount=0; nextCount<numberOfTrials; nextCount++) {
+                for (nextCount = 0; nextCount < numberOfTrials; nextCount++) {
                     try {
                         waitFor { buttonAddDatabase.isDisplayed() }
                         break
-                    } catch(geb.waiting.WaitTimeoutException exception) {
+                    } catch (geb.waiting.WaitTimeoutException exception) {
                         currentDatabase.click()
                     }
                 }
-                $(id:deleteId).click()
+                $(id: deleteId).click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
-            } catch(geb.waiting.WaitTimeoutException e) {
+            } catch (geb.waiting.WaitTimeoutException e) {
                 println("Unable to find the Delete popup - Retrying")
-            } catch(geb.error.RequiredPageContentNotPresent e) {
+            } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the delete button - Retrying")
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element exception - Retrying")
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 try {
                     waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                     break
-                } catch(geb.waiting.WaitTimeoutException ex) {
+                } catch (geb.waiting.WaitTimeoutException ex) {
                     println("Unable to find the Delete popup - Retrying")
                 }
             }
         }
 
         foundStatus = false
-        for(count=0; count<numberOfTrials; count++) {
+        for (count = 0; count < numberOfTrials; count++) {
             try {
                 popupDeleteDatabaseButtonOk.click()
-                for(nextCount=0; nextCount<=indexOfNewDatabase; nextCount++){
+                for (nextCount = 0; nextCount <= indexOfNewDatabase; nextCount++) {
                     new_string = $(".btnDbList", nextCount).text()
-                    if(new_string.equals(databaseName)) {
+                    if (new_string.equals(databaseName)) {
                         foundStatus = true
                         break
                     }
                 }
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the Ok button - Retrying")
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 break
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element exception - Retrying")
             }
         }
 
-        if(foundStatus == false) {
+        if (foundStatus == false) {
             println("The Database was Deleted")
             return true
-        }
-        else {
+        } else {
             println("The Database wasn't Deleted")
             return false
         }
@@ -327,26 +336,27 @@ class ClusterSettingsPage extends Page {
     /*
      *  Choose the database with given index and name
      */
+
     boolean chooseDatabase(int indexOfNewDatabase, String newDatabaseName) {
         int countNext = 0
         for (count = 0; count < numberOfTrials; count++) {
             try {
-                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                for (countNext = 0; countNext < numberOfTrials; countNext++) {
                     try {
                         waitFor { buttonAddDatabase.isDisplayed() }
                         break
-                    } catch(geb.waiting.WaitTimeoutException exception) {
+                    } catch (geb.waiting.WaitTimeoutException exception) {
                         currentDatabase.click()
                     }
                 }
-                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                $(id: getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
                 waitFor { currentDatabase.text().equals(newDatabaseName) }
                 return true
             } catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element exception - Retrying")
-            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            } catch (org.openqa.selenium.ElementNotVisibleException exception) {
                 try {
                     waitFor { currentDatabase.text().equals(newDatabaseName) }
                     return true
@@ -361,11 +371,11 @@ class ClusterSettingsPage extends Page {
     /*
      *  Check the Save Message
      */
+
     boolean checkSaveMessage() {
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        if (waitFor(60) { saveStatus.text().equals(saveMessage) }) {
             return true
-        }
-        else {
+        } else {
             println("Test Fail: The required text is not displayed")
             return false
         }
@@ -374,26 +384,26 @@ class ClusterSettingsPage extends Page {
     /*
      *
      */
+
     boolean openDatabase() {
-        for(count=0; count<numberOfTrials; count++) {
+        for (count = 0; count < numberOfTrials; count++) {
             try {
                 currentDatabase.click()
                 waitFor { buttonAddDatabase.isDisplayed() }
                 break
-            }  catch (geb.waiting.WaitTimeoutException exception) {
+            } catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element exception - Retrying")
-            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
-                if(count>1) {
+            } catch (org.openqa.selenium.ElementNotVisibleException exception) {
+                if (count > 1) {
                     try {
                         waitFor { buttonAddDatabase.isDisplayed() }
                         break
                     } catch (geb.waiting.WaitTimeoutException exc) {
                         println("Waiting - Retrying")
                     }
-                }
-                else if(count==0) {
+                } else if (count == 0) {
                     try {
                         waitFor(30) { !saveStatus.isDisplayed() }
                     } catch (geb.waiting.WaitTimeoutException exc) {
@@ -407,6 +417,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the value of Database name in CSV file
      */
+
     String nameOfDatabaseInCSV(String create_DatabaseTest_File) {
         try {
             br = new BufferedReader(new FileReader(create_DatabaseTest_File))
@@ -433,6 +444,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the CSS path of database delete button with index as input
      */
+
     String returnCssPathOfDatabaseDelete(int index) {
         return "#tblDatabaseList > tbody > tr:nth-child(" + index + ") > td:nth-child(3) > a"
     }
@@ -440,6 +452,7 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the CSS path of database with index as input
      */
+
     String returnCssPathOfDatabase(int index) {
         return "#tblDatabaseList > tbody > tr:nth-child(" + index + ") > td:nth-child(1) > a"
     }
@@ -447,17 +460,17 @@ class ClusterSettingsPage extends Page {
     /*
      *  Return the index of the databaseName
      */
+
     int returnTheDatabaseIndexToDelete(int numberOfDatabases, String databaseName) {
-        if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+        if (checkIfDatabaseExists(numberOfDatabases, databaseName, false) == false) {
             return 0
-        }
-        else {
-            for(count=0; count<numberOfDatabases; count++) {
-                if($(".btnDbList", count).text().equals(databaseName)) {
+        } else {
+            for (count = 0; count < numberOfDatabases; count++) {
+                if ($(".btnDbList", count).text().equals(databaseName)) {
                     break
                 }
             }
-            return (count+1)
+            return (count + 1)
         }
     }
 
@@ -465,16 +478,17 @@ class ClusterSettingsPage extends Page {
      *  Check if the name of Database provided exists
      *  The status of displayMessage decides if the message is to be displayed or not
      */
+
     boolean checkIfDatabaseExists(int numberOfDatabases, String databaseName, boolean displayMessage) {
-        for(count=0; count<numberOfDatabases; count++) {
-            if($(".btnDbList", count).text().equals(databaseName)) {
-                if(displayMessage==true) {
+        for (count = 0; count < numberOfDatabases; count++) {
+            if ($(".btnDbList", count).text().equals(databaseName)) {
+                if (displayMessage == true) {
                     println("The database to delete was found")
                 }
                 return true
             }
         }
-        if(displayMessage==true) {
+        if (displayMessage == true) {
             println("The database to delete wasn't found")
         }
         return false
@@ -482,30 +496,29 @@ class ClusterSettingsPage extends Page {
 
     boolean deleteDatabase(String create_DatabaseTest_File) {
         String databaseName = nameOfDatabaseInCSV(create_DatabaseTest_File)
-        int numberOfDatabases =  $('.btnDbList').size()
+        int numberOfDatabases = $('.btnDbList').size()
         //buttonDatabase.click()
         int indexOfDatabaseToDelete = returnTheDatabaseIndexToDelete(numberOfDatabases, databaseName)
 
-        if(indexOfDatabaseToDelete==0) {
+        if (indexOfDatabaseToDelete == 0) {
             println("Database not found")
-        }
-        else {
-            for(count=0; count<numberOfTrials; count++) {
+        } else {
+            for (count = 0; count < numberOfTrials; count++) {
                 try {
                     $(returnCssPathOfDatabaseDelete(indexOfDatabaseToDelete)).click()
                     waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                     break
-                } catch(geb.waiting.WaitTimeoutException exception) {
+                } catch (geb.waiting.WaitTimeoutException exception) {
 
                 }
             }
-            for(count=0; count<numberOfTrials; count++) {
+            for (count = 0; count < numberOfTrials; count++) {
                 try {
                     popupDeleteDatabaseButtonOk.click()
-                    if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+                    if (checkIfDatabaseExists(numberOfDatabases, databaseName, false) == false) {
                         println("Database was deleted")
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
 
                 }
             }
@@ -518,10 +531,9 @@ class ClusterSettingsPage extends Page {
     def String getCssPathOfServer(int index) {
         String cssPath
 
-        if(index==1) {
+        if (index == 1) {
             cssPath = "#serverList > tbody > tr > td:nth-child(1)"
-        }
-        else {
+        } else {
             cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) + ") > td:nth-child(1)"
         }
         return cssPath
@@ -530,11 +542,10 @@ class ClusterSettingsPage extends Page {
     def String getCssPathOfEditServer(int index) {
         String cssPath
 
-        if(index==1) {
+        if (index == 1) {
             cssPath = "#serverList > tbody > tr > td:nth-child(2) > a > div"
-        }
-        else {
-            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) +") > td:nth-child(2) > a > div"
+        } else {
+            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) + ") > td:nth-child(2) > a > div"
         }
         return cssPath
     }
@@ -542,15 +553,17 @@ class ClusterSettingsPage extends Page {
     def String getCssPathOfDeleteServer(int index) {
         String cssPath
 
-        if(index==1) {
+        if (index == 1) {
             cssPath = "#serverList > tbody > tr > td:nth-child(3) > a > div"
-        }
-        else {
-            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) +") > td:nth-child(3) > a > div"
+        } else {
+            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) + ") > td:nth-child(3) > a > div"
         }
         return cssPath
     }
 
+    def String getCssPathOfLog(int index) {
+        String cssPath = "#editServer_" + String.valueOf(index) + " > span"
 
-
+        return cssPath
+    }
 }

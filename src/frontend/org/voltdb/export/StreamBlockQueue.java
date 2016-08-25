@@ -26,6 +26,7 @@ import java.util.Iterator;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque;
+import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.PersistentBinaryDeque;
@@ -57,14 +58,16 @@ public class StreamBlockQueue {
     private final BinaryDeque m_persistentDeque;
 
     private final String m_nonce;
+    private final BinaryDequeReader m_reader;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
         m_nonce = nonce;
+        m_reader = m_persistentDeque.openForRead(m_nonce);
     }
 
     public boolean isEmpty() throws IOException {
-        if (m_memoryDeque.isEmpty() && m_persistentDeque.isEmpty()) {
+        if (m_memoryDeque.isEmpty() && m_reader.isEmpty()) {
             return true;
         }
         return false;
@@ -82,7 +85,7 @@ public class StreamBlockQueue {
     private StreamBlock pollPersistentDeque(boolean actuallyPoll) {
         BBContainer cont = null;
         try {
-            cont = m_persistentDeque.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            cont = m_reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
         } catch (IOException e) {
             exportLog.error(e);
         }
@@ -249,7 +252,7 @@ public class StreamBlockQueue {
                                                     //to make book keeping consistent when flushed to disk
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_persistentDeque.sizeInBytes() - (8 * m_persistentDeque.getNumObjects());
+        return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
     }
 
     public void close() throws IOException {

@@ -108,7 +108,7 @@ public class TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg, null);
+            new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg, null);
         return task;
     }
 

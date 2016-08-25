@@ -337,7 +337,9 @@ function QueryUI(queryTab) {
                     typ = 9;  //code for varchar
                 }
                 else if(typ == 22){
-                    val = parseFloat(val).toFixed(12)
+                    if(val!= null){
+                        val = parseFloat(val).toFixed(12)
+                    }
                 }
                 if (isExplainQuery == true) {
                     val = applyFormat(val);
