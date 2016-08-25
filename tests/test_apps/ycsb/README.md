@@ -1,4 +1,4 @@
-# Voltdb Binding for YCSB
+# VoltDB Binding for YCSB
 
 This section describes how to run YCSB (Yahoo Cloud Serving Benchmark) on VoltDB.
 
@@ -18,17 +18,17 @@ Next, you need to set:
 
 		export YCSB_HOME="<directory where you extracted the above tarball>"
 
-Start Voltdb Server
+Start VoltDB Server
 --------------------
 To start or add a server to your cluster, invoke run.sh with the "server" parameter, passing the name of the leader host as the second parameter:
 
-		./run.sh server <name of the leader host>
+		./run.sh server [leader]
 
-For example, to start a cluster with 3 nodes (host0(leader), host1, host2), type following command on host0, host1 and host2:
+For example, to start a cluster with 3 nodes (host0(leader), host1, host2), type following command on those hosts:
 
 		./run.sh server host0
 
-If <name of the leader host> is not provided, by default "localhost" is used.
+If leader host is not provided, by default "localhost" is used.
 
 You can specify other server configurations such as hostcount, sitesperhost or kfactor in deployment.xml.
 
@@ -40,24 +40,24 @@ Then, before running the workload, you need to "load" data first:
 
 		./run.sh load
 
-You can adjust loading parameters such as the number of keys to insert, in load.properties.
+You can adjust loading parameters such as the number of keys to insert in load.properties.
 
-Now you can run a workload by passing the workload name following the "workload" parameter, for example, to run workload A:
+Now you can run a workload by passing the name of the workload file following the "workload" parameter. For example, to run workload A:
 
 		./run.sh workload workloada
 
-If no workload name is provided, "workload" uses the YCSB core "workloadb" which mixes 95% reads with 5% updates. Please make sure your desired workload exists in $YCSB_HOME/workloads.
+If no file name is provided, "workload" uses the YCSB core "workloadb" which mixes 95% reads with 5% updates. Please make sure specified workload file exists in $YCSB_HOME/workloads.
 
 The zipfian distribution workload parameter is set as key with a double value greater than 0, by default is 0.99: zipfianconstant.
 
 Other run.sh Actions
 ---------------------
 - *run.sh* : start the server on localhost
-- *run.sh server <name of the leader host>* : start or add the server to cluster. Default: localhost
+- *run.sh server [leader]* : start or add the server to cluster. Default: localhost
 - *run.sh srccompile* : compile java clients and stored procedures
 - *run.sh jars* : compile java clients and stored procedures into two Java jarfiles
 - *run.sh init* : load the schema and stored procedures to server
 - *run.sh load* : load YCSB data to server
-- *run.sh workload <workload name>* : run a workload. Default: workload B
+- *run.sh workload [file]* : run a workload. Default: workloadb
 - *run.sh clean* : remove compilation and runtime artifacts, as well as the jars
 - *run.sh help* : show help messages

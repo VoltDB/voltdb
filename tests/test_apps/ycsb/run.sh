@@ -91,7 +91,7 @@ function load() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server [hostname]|init|load|workload [file]}"
+    echo "Usage: ./run.sh {clean|jars|server [leader]|init|load|workload [file]}"
 }
 
 # check if an explicit target was specified
