@@ -52,6 +52,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -238,7 +239,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Collections.sort(doneCounters);
         for (DuplicateCounterKey key : doneCounters) {
             DuplicateCounter counter = m_duplicateCounters.remove(key);
+            m_outstandingTxns.remove(key.m_txnId);
             VoltMessage resp = counter.getLastResponse();
+            setRepairLogTruncationHandle(key.m_spHandle);
             if (resp != null) {
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
@@ -383,6 +386,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof CompleteTransactionMessage) {
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
+        else if (message instanceof CompleteTransactionResponseMessage) {
+            handleCompleteTransactionResponseMessage((CompleteTransactionResponseMessage) message);
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
@@ -721,7 +727,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            setRepairLogTruncationHandle(spHandle);
+            if (!message.isReadOnly()) {
+                setRepairLogTruncationHandle(spHandle);
+            }
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
@@ -965,12 +973,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
             m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
+        final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
                 if (txn != null && txn.isDone()) {
-                    setRepairLogTruncationHandle(message.getSpHandle());
+                    setRepairLogTruncationHandle(txn.m_spHandle);
                 }
 
                 m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
@@ -985,6 +993,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             // doing duplicate suppresion: all done.
             return;
+        } else {
+            if (txn != null && txn.isDone()) {
+                setRepairLogTruncationHandle(txn.m_spHandle);
+            }
         }
 
         m_mailbox.send(message.getDestinationSiteId(), message);
@@ -994,7 +1006,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
-            msg = new CompleteTransactionMessage(message);
+            msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             if (!msg.isForReplay()) advanceTxnEgo();
@@ -1011,36 +1023,59 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // now, fix that later.
         if (txn != null)
         {
+            final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+                DuplicateCounter counter;
+                counter = new DuplicateCounter(msg.getCoordinatorHSId(),
+                                               msg.getTxnId(),
+                                               m_replicaHSIds,
+                                               msg);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle()), counter);
+            }
+
             Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, msg, m_drGateway);
+                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
-            // If this is a restart, then we need to leave the transaction state around
-            if (!msg.isRestart()) {
-                m_outstandingTxns.remove(msg.getTxnId());
+        }
+    }
+
+    public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
+    {
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+        final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
+        DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
+        boolean txnDone = true;
+
+        if (msg.isRestart()) {
+            // Don't mark txn done for restarts
+            txnDone = false;
+        }
+
+        if (counter != null) {
+            txnDone = counter.offer(msg) == DuplicateCounter.DONE;
+        }
+
+        if (txnDone) {
+            m_outstandingTxns.remove(msg.getTxnId());
+            m_duplicateCounters.remove(duplicateCounterKey);
+
+            if (txn != null) {
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
-                //
-                // We have to use the spHandle from the fragment, not from the
-                // current CompleteTransactionMessage because it hasn't been
-                // executed yet. If we use the spHandle from the current
-                // completion message, it may be advancing the truncation handle
-                // before previous SPs are finished. This could happen when the
-                // MP we are completing is either a one-shot read MP or it
-                // didn't send any fragment to this partition.
-                //
-                // It is also possible to receive a CompleteTransactionMessage
-                // before the fragment runs, e.g. an early abort could happen if
-                // another partition failed its fragment before this partition
-                // even starts running the fragment. In this case, we don't want
-                // to update the truncation handle until after we run the
-                // fragment. Checking the doneness of the transaction state
-                // achieves this.
-                if (m_isLeader && txn.isDone()) {
-                    setRepairLogTruncationHandle(txn.m_spHandle);
-                }
+                assert txn.isDone();
+                setRepairLogTruncationHandle(txn.m_spHandle);
             }
+        }
+
+        // The CompleteTransactionResponseMessage ends at the SPI. It is not
+        // sent to the MPI because it doesn't care about it.
+        //
+        // The SPI uses this response message to track if all replicas have
+        // committed the transaction.
+        if (!m_isLeader) {
+            m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
 
@@ -1222,8 +1257,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void setRepairLogTruncationHandle(long newHandle)
     {
         assert newHandle >= m_repairLogTruncationHandle;
-        m_repairLogTruncationHandle = newHandle;
-        scheduleRepairLogTruncateMsg();
+        if (newHandle > m_repairLogTruncationHandle) {
+            m_repairLogTruncationHandle = newHandle;
+            scheduleRepairLogTruncateMsg();
+        }
     }
 
     /**
@@ -1255,7 +1292,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 synchronized (m_lock) {
                     if (m_lastSentTruncationHandle < m_repairLogTruncationHandle) {
                         m_lastSentTruncationHandle = m_repairLogTruncationHandle;
-                        m_mailbox.send(m_sendToHSIds, new RepairLogTruncationMessage(m_repairLogTruncationHandle));
+                        final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(m_repairLogTruncationHandle);
+                        // Also keep the local repair log's truncation point up-to-date
+                        // so that it can trigger the callbacks.
+                        m_mailbox.deliver(truncMsg);
+                        m_mailbox.send(m_sendToHSIds, truncMsg);
                     }
                 }
             }
