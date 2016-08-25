@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
@@ -120,7 +121,8 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
-    private final List<Integer> m_partitionKeys = new ArrayList<Integer>();
+    private final AtomicReference<List<Integer>> m_partitionKeys =
+            new AtomicReference<List<Integer>>(new ArrayList<Integer>());
 
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
@@ -201,8 +203,7 @@ class Distributer {
                             updatePartitioning(results[0]);
                         }
                     }
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -1396,14 +1397,15 @@ class Distributer {
     }
 
     private void updatePartitioning(VoltTable vt) {
-        m_partitionKeys.clear();
+        List<Integer> ketSet = new ArrayList<Integer>();
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
                 Integer key = (int)(vt.getLong("PARTITION_KEY"));
-                m_partitionKeys.add(key);
+                ketSet.add(key);
             }
         }
+        m_partitionKeys.set(ketSet);
     }
 
     /**
@@ -1449,7 +1451,7 @@ class Distributer {
         return m_procedureCallTimeoutNanos;
     }
 
-   public  List<Integer> getPartitionKeys() {
-        return m_partitionKeys;
+    List<Integer> getPartitionKeys() {
+        return m_partitionKeys.get();
     }
 }
