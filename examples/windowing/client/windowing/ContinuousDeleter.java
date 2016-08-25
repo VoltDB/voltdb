@@ -70,6 +70,8 @@ public class ContinuousDeleter implements Runnable {
                return;
             }
 
+            app.updatePartitionInfo(clientResponse.length);
+
             for (ClientResponseWithPartitionKey resp: clientResponse) {
 
                 if (resp.getResponse() != null && resp.getResponse().getStatus() == ClientResponse.SUCCESS) {

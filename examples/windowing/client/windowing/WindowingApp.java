@@ -30,10 +30,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -128,12 +130,11 @@ public class WindowingApp {
     // validated command line configuration
     final WindowingConfig config;
 
-    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
     final long startTS = System.currentTimeMillis();
 
     final ContinuousDeleter deleter;
-    final PartitionDataTracker partitionTracker;
     final RandomDataInserter inserter;
     final MaxTracker maxTracker;
     final Reporter reporter;
@@ -165,7 +166,6 @@ public class WindowingApp {
         try {
             scheduler.awaitTermination(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
@@ -229,7 +229,6 @@ public class WindowingApp {
             e.printStackTrace();
         }
 
-        partitionTracker = new PartitionDataTracker(this);
         deleter = new ContinuousDeleter(this);
         inserter = new RandomDataInserter(this, insertsClient);
         maxTracker = new MaxTracker(this);
@@ -298,16 +297,17 @@ public class WindowingApp {
         System.out.println(" Starting Processing");
         System.out.println(HORIZONTAL_RULE);
 
+        try {
+            VoltTable results[] = client.callProcedure("@GetPartitionKeys", "integer").getResults();
+            updatePartitionInfo(results[0].getRowCount());
+        } catch (IOException | ProcCallException e) {
+            e.printStackTrace();
+        }
+
         // Print periodic stats/analysis to the console
         scheduler.scheduleWithFixedDelay(reporter,
                                                config.displayinterval,
                                                config.displayinterval,
-                                               TimeUnit.SECONDS);
-
-        // Update the partition key set, row counts and redundancy level once per second
-        scheduler.scheduleWithFixedDelay(partitionTracker,
-                                               1,
-                                               1,
                                                TimeUnit.SECONDS);
 
         if (!config.inline) {
