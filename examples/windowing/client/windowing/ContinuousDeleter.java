@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.client.AllPartitionProcedureCallback;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientResponseWithPartitionKey;
 import org.voltdb.types.TimestampType;
@@ -51,45 +50,6 @@ public class ContinuousDeleter implements Runnable {
         this.app = app;
     }
 
-    /**
-     * CallBack for the asynchronous all partition procedure that deletes tuples.
-     *
-     */
-    class CallBack implements AllPartitionProcedureCallback {
-
-        final AtomicBoolean unifinished;
-
-        CallBack(AtomicBoolean unfinished) {
-            this.unifinished = unfinished;
-        }
-
-        @Override
-        public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
-
-            if (clientResponse == null) {
-               return;
-            }
-
-            app.updatePartitionInfo(clientResponse.length);
-
-            for (ClientResponseWithPartitionKey resp: clientResponse) {
-
-                if (resp.getResponse() != null && resp.getResponse().getStatus() == ClientResponse.SUCCESS) {
-
-                    long tuplesDeleted = resp.getResponse().getResults()[0].asScalarLong();
-                    app.addToDeletedTuples(tuplesDeleted);
-
-                    // If the procedure deleted up to its limit, reduce the time before the deletes process runs again.
-                    if (tuplesDeleted >= app.config.deletechunksize) {
-                        unifinished.set(true);
-                    }
-                } else {
-                    failureCount.incrementAndGet();
-                }
-            }
-        }
-    }
-
     @Override
     public void run() {
 
@@ -104,22 +64,30 @@ public class ContinuousDeleter implements Runnable {
             // old rows by date or by row count.
             TimestampType dateTarget = app.getTargetDate();
             long rowTarget = app.getTargetRowsPerPartition();
-
             // Send the procedure call to all partitions and get results from each partitions.
+            ClientResponseWithPartitionKey[] responses;
             if (app.config.historyseconds > 0) {
-                app.client.callAllPartitionProcedure(new CallBack(unfinished),
-                                         "DeleteAfterDate",
-                                         dateTarget,
-                                         app.config.deletechunksize);
+                responses = app.client.callAllPartitionProcedure("DeleteAfterDate", dateTarget, app.config.deletechunksize);
             }
             // Deleting all rows beyond a given rowcount...
             else /* if (app.config.maxrows > 0) */ {
-                app.client.callAllPartitionProcedure(new CallBack(unfinished),
-                                         "DeleteOldestToTarget",
-                                         rowTarget,
-                                         app.config.deletechunksize);
+                responses = app.client.callAllPartitionProcedure("DeleteOldestToTarget", rowTarget, app.config.deletechunksize);
             }
 
+            app.updatePartitionCount(responses.length);
+            for (ClientResponseWithPartitionKey resp: responses) {
+                if (resp.getResponse().getStatus() == ClientResponse.SUCCESS) {
+                    long tuplesDeleted = resp.getResponse().getResults()[0].asScalarLong();
+                    app.addToDeletedTuples(tuplesDeleted);
+
+                    // If the procedure deleted up to its limit, reduce the time before the deletes process runs again.
+                    if (tuplesDeleted >= app.config.deletechunksize) {
+                        unfinished.set(true);
+                    }
+                } else {
+                    failureCount.incrementAndGet();
+                }
+            }
             // If this round of deletes didn't remove all of the tuples that could have been removed, reduce the pause time before the
             // next round to zero. If this process still can't keep up, then you can always add a second ContinuousDeleter instance in
             // WindowingApp and schedule two of them to run concurrently.

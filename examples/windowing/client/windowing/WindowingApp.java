@@ -148,7 +148,7 @@ public class WindowingApp {
         return new TimestampType(targetTimestampMillis * 1000);
     }
 
-    void updatePartitionInfo(long partitionSize) {
+    void updatePartitionCount(long partitionSize) {
         assert(partitionSize > 0);
         targetRowsPerPartition.set(config.maxrows / partitionSize);
     }
@@ -293,16 +293,26 @@ public class WindowingApp {
      * @throws Exception if anything unexpected happens.
      */
     public void run() {
+
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(" Getting initial database partition count");
+        long partitionCount = 0;
+        try {
+            VoltTable results[] = client.callProcedure("@GetPartitionKeys", "integer").getResults();
+            partitionCount = results[0].getRowCount();
+            updatePartitionCount(partitionCount);
+        } catch (IOException | ProcCallException e) {
+            System.out.print(HORIZONTAL_RULE);
+            System.out.println("Could not get partition information. Processing terminated. Error:" + e.getMessage());
+            e.printStackTrace();
+            shutdown();
+            System.out.print(HORIZONTAL_RULE);
+            return;
+        }
+        System.out.println(" Initial database partition count: " + partitionCount);
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Processing");
         System.out.println(HORIZONTAL_RULE);
-
-        try {
-            VoltTable results[] = client.callProcedure("@GetPartitionKeys", "integer").getResults();
-            updatePartitionInfo(results[0].getRowCount());
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
-        }
 
         // Print periodic stats/analysis to the console
         scheduler.scheduleWithFixedDelay(reporter,
