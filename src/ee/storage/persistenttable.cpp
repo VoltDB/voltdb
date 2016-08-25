@@ -812,13 +812,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
-    BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
-        viewHandler->handleTupleDelete(this, fallible);
-    }
-
-    // This is for single table view.
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
+            viewHandler->handleTupleDelete(this, fallible);
+        }
+        // This is for single table view.
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
         }
