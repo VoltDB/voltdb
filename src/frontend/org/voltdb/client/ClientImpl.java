@@ -43,6 +43,8 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 /**
  *  A client that connects to one or more nodes in a VoltCluster
  *  and provides methods to call stored procedures and receive
@@ -77,8 +79,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
-    private final AtomicReference<List<Integer>> m_partitionIntegerKeys =
-            new AtomicReference<List<Integer>>(new ArrayList<Integer>());
+    private final AtomicReference<ImmutableSet<Integer>> m_partitionIntegerKeys = new AtomicReference<ImmutableSet<Integer>>();
 
     private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
 
@@ -851,7 +852,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
 
-        final List<Integer> partitionSet = getPartitionIntegerKeys();
+        final ImmutableSet<Integer> partitionSet = getPartitionIntegerKeys();
         int partitionCount = partitionSet.size();
         AtomicInteger counter = new AtomicInteger(partitionCount);
         assert(partitionCount > 0);
@@ -884,17 +885,19 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws IOException if there is a Java network or connection problem.
      */
     private void refreshPartitionKeys() throws IOException, NoConnectionsException, ProcCallException {
-        if (!m_partitionIntegerKeys.get().isEmpty()) {
-            return;
+
+        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
+        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
+            VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
+            VoltTable keys = results[0];
+            List<Integer> pkeys = new ArrayList<Integer>();
+            for (int k = 0; k < keys.getRowCount(); k++) {
+                pkeys.add((int)(keys.fetchRow(k).getLong(1)));
+            }
+
+            m_partitionIntegerKeys.set(ImmutableSet.copyOf(pkeys));
+            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
         }
-        VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
-        VoltTable keys = results[0];
-        List<Integer> pkeys = new ArrayList<Integer>();
-        for (int k = 0; k < keys.getRowCount(); k++) {
-            pkeys.add((int)(keys.fetchRow(k).getLong(1)));
-        }
-        m_partitionIntegerKeys.set(pkeys);
-        m_lastPartitionKeyFetched.set(System.currentTimeMillis());
     }
 
    /**
@@ -903,14 +906,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
     * @throws IOException if there is a Java network or connection problem.
     */
-    public List<Integer> getPartitionIntegerKeys() throws NoConnectionsException, IOException, ProcCallException {
-        if (m_distributer.getPartitionKeys().size() > 0) {
+    public ImmutableSet<Integer> getPartitionIntegerKeys() throws NoConnectionsException, IOException, ProcCallException {
+        if (m_distributer.getPartitionKeys() != null && m_distributer.getPartitionKeys().size() > 0) {
             return m_distributer.getPartitionKeys();
-        }
-
-        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
-        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
-            m_partitionIntegerKeys.set(new ArrayList<Integer>());
         }
 
         refreshPartitionKeys();
@@ -947,8 +945,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, response);
-            m_partitionCounter.decrementAndGet();
-            if (m_partitionCounter.get() == 0) {
+            if (m_partitionCounter.decrementAndGet() == 0) {
                 m_cb.clientCallback(m_responses);
             }
         }
@@ -966,9 +963,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 final ClientResponse r = new ClientResponseImpl(status, new VoltTable[0], e.getMessage());
                 m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, r);
             }
-
-            m_partitionCounter.decrementAndGet();
-            if (m_partitionCounter.get() == 0) {
+            if (m_partitionCounter.decrementAndGet() == 0) {
                 m_cb.clientCallback(m_responses);
             }
         }

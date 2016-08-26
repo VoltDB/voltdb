@@ -65,6 +65,7 @@ import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -121,8 +122,8 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
-    private final AtomicReference<List<Integer>> m_partitionKeys =
-            new AtomicReference<List<Integer>>(new ArrayList<Integer>());
+
+    private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
 
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
@@ -1405,7 +1406,7 @@ class Distributer {
                 ketSet.add(key);
             }
         }
-        m_partitionKeys.set(ketSet);
+        m_partitionKeys.set(ImmutableSet.copyOf(ketSet));
     }
 
     /**
@@ -1451,7 +1452,7 @@ class Distributer {
         return m_procedureCallTimeoutNanos;
     }
 
-    List<Integer> getPartitionKeys() {
+    ImmutableSet<Integer> getPartitionKeys() {
         return m_partitionKeys.get();
     }
 }
