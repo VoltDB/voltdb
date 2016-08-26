@@ -954,19 +954,11 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             cmdln.zkport(portGenerator.nextZkPort());
-            if (!isNewCli) {
-                if (startAction == StartAction.JOIN) {
-                    cmdln.startCommand(startAction);
-                    int portNoToRejoin = m_cmdLines.get(0).internalPort();
-                    cmdln.leader(":" + portNoToRejoin);
-                    cmdln.enableAdd(true);
-                }
-            } else {
-                if (m_cmdLines.size() > 0) {
-                    int portNoToRejoin = m_cmdLines.get(0).internalPort();
-                    cmdln.coordinators(":" + portNoToRejoin);
-                    cmdln.enableAdd(true);
-                }
+            if (!isNewCli && startAction == StartAction.JOIN) {
+                cmdln.startCommand(startAction);
+                int portNoToRejoin = m_cmdLines.get(0).internalPort();
+                cmdln.leader(":" + portNoToRejoin);
+                cmdln.enableAdd(true);
             }
 
             // If local directories are being cleared
