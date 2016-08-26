@@ -298,8 +298,10 @@ namespace voltdb {
             NValue existingValue = m_existingTuple.getNValue(columnIndex);
             NValue deltaValue = deltaTuple.getNValue(columnIndex);
             NValue newValue = existingValue;
+            ExpressionType aggType = m_aggTypes[aggIndex];
+
             if (! deltaValue.isNull()) {
-                switch(m_aggTypes[aggIndex]) {
+                switch(aggType) {
                     case EXPRESSION_TYPE_AGGREGATE_SUM:
                     case EXPRESSION_TYPE_AGGREGATE_COUNT:
                         newValue = existingValue.op_subtract(deltaValue);
@@ -310,13 +312,18 @@ namespace voltdb {
                             // re-calculate MIN / MAX
                             newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
                         }
-                        minMaxColumnIndex++;
                         break;
                     default:
                         assert(false); // Should have been caught when the matview was loaded.
                         // no break
                 }
             }
+
+            if (aggType == EXPRESSION_TYPE_AGGREGATE_MIN
+                || aggType == EXPRESSION_TYPE_AGGREGATE_MAX) {
+                minMaxColumnIndex++;
+            }
+
             m_updatedTuple.setNValue(columnIndex, newValue);
         }
     }
