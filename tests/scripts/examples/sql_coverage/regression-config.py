@@ -192,6 +192,11 @@
                               "template": "advanced-matview-join.sql",
                               "normalizer": "nulls-lowest-normalizer.py"},
 
+    "joined-matview": {"schema": "joined-matview-schema.py",
+                       "ddl": "joined-matview-DDL.sql",
+                       "template": "joined-matview.sql",
+                       "normalizer": "normalizer.py"},
+
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",
                      "ddl": "DDL.sql",
