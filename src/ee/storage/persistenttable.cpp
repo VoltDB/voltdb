@@ -338,6 +338,15 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         // update the view table pointer with the original view
         targetTcd->setTable(targetTable);
     }
+
+    BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
+        PersistentTable *destTable = viewHandler->destTable();
+        TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
+        destTcd->deleteCommand();
+        destTcd->setTable(destTable);
+        viewHandler->setInactive(false);
+    }
+
     decrementRefcount();
 
     // reset base table pointer
@@ -363,21 +372,18 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    if (originalTable->m_viewHandlers.size() == 0) {
-        // Single table view.
-        std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
-        // reset all view table pointers
-        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
-            PersistentTable * targetTable = originalView->targetTable();
-            targetTable->decrementRefcount();
-        }
+    // Single table view.
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        targetTable->decrementRefcount();
     }
-    else {
-        // Joined table view.
-        BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
-            PersistentTable *destTable = viewHandler->destTable();
-            destTable->decrementRefcount();
-        }
+
+    // Joined table view.
+    BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
+        PersistentTable *destTable = viewHandler->destTable();
+        destTable->decrementRefcount();
     }
     originalTable->decrementRefcount();
 }
@@ -412,7 +418,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
         const double blockLoadFactor = m_data.begin().data()->loadFactor();
-        if ((!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) ||
+        bool hasView = ! (m_views.empty() && m_viewHandlers.empty());
+        if ((hasView && blockLoadFactor <= tableWithViewsLFCutoffForTrunc) ||
             (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) {
             deleteAllTuples(true, fallible);
             return;
@@ -439,28 +446,30 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->setPreTruncateTable(this);
     }
 
-    if (m_viewHandlers.size() == 0) {
-        // add matView
-        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
-            PersistentTable * targetTable = originalView->targetTable();
-            TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
-            catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
-            targetTcd->init(*engine->getDatabase(), *catalogViewTable);
-            PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
-            assert(targetEmptyTable);
-            MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
-        }
+    // add matView
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+        targetTcd->init(*engine->getDatabase(), *catalogViewTable);
+        PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+        assert(targetEmptyTable);
+        MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
-    else {
-        BOOST_FOREACH (MaterializedViewHandler *viewHandler, m_viewHandlers) {
-            PersistentTable *destTable = viewHandler->destTable();
-            TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
-            catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
-            destTcd->init(*engine->getDatabase(), *catalogViewTable);
-            PersistentTable *destEmptyTable = destTcd->getPersistentTable();
-            assert(destEmptyTable);
-            new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+
+    BOOST_FOREACH (MaterializedViewHandler *viewHandler, m_viewHandlers) {
+        // If the view is obsolete (pending truncate release), skip.
+        if (viewHandler->isInactive()) {
+            continue;
         }
+        PersistentTable *destTable = viewHandler->destTable();
+        TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
+        destTcd->init(*engine->getDatabase(), *catalogViewTable);
+        PersistentTable *destEmptyTable = destTcd->getPersistentTable();
+        assert(destEmptyTable);
+        new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+        viewHandler->setInactive(true);
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -525,7 +534,7 @@ void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tu
     }
 }
 
-void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallible) {
+void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source) {
     // If the current table does not have a delta table, return.
     if (! m_deltaTable) {
         return;
@@ -536,7 +545,9 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
         TableIterator ti(m_deltaTable, m_deltaTable->m_data.begin());
         TableTuple tuple(m_deltaTable->m_schema);
         ti.next(tuple);
-        m_deltaTable->deleteTuple(tuple, fallible);
+        // The operation cleanning up the delta table does not need to be rolled back.
+        // So setting fallible = false.
+        m_deltaTable->deleteTuple(tuple, false);
     }
 
     TableTuple targetForDelta(m_deltaTable->m_schema);
@@ -544,7 +555,7 @@ void PersistentTable::insertTupleIntoDeltaTable(TableTuple &source, bool fallibl
     targetForDelta.copyForPersistentInsert(source);
 
     try {
-        m_deltaTable->insertTupleCommon(source, targetForDelta, fallible);
+        m_deltaTable->insertTupleCommon(source, targetForDelta, false);
     }
     catch (ConstraintFailureException &e) {
         m_deltaTable->deleteTupleStorage(targetForDelta);
@@ -586,7 +597,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     // Insert the tuple into the delta table first.
-    insertTupleIntoDeltaTable(source, fallible);
+    insertTupleIntoDeltaTable(source);
 
     try {
         insertTupleCommon(source, target, fallible);
@@ -811,7 +822,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views, we first insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
         BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
@@ -888,7 +899,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
+    insertTupleIntoDeltaTable(targetTupleToUpdate);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
     }
@@ -990,7 +1001,7 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
-    insertTupleIntoDeltaTable(target, fallible);
+    insertTupleIntoDeltaTable(target);
     {
         SetAndRestorePendingDeleteFlag setPending(target);
 
@@ -1961,8 +1972,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler *viewHandler) {
 }
 
 void PersistentTable::polluteViews() {
-    BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
-        mvHanlder->pollute();
+    BOOST_FOREACH (auto mvHandler, m_viewHandlers) {
+        mvHandler->pollute();
     }
 }
 

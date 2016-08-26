@@ -37,7 +37,8 @@ namespace voltdb {
                                                      VoltDBEngine *engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
-            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
+            m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()),
+            m_inactive(false) {
         install(mvHandlerInfo, engine);
         setUpAggregateInfo(mvHandlerInfo);
         setUpCreateQuery(mvHandlerInfo, engine);
@@ -381,11 +382,13 @@ namespace voltdb {
             if (existingCount.compare(deltaCount) == 0 && m_groupByColumnCount > 0) {
                 m_destTable->deleteTuple(m_existingTuple, fallible);
             }
-            mergeTupleForDelete(deltaTuple);
-            // Shouldn't need to update group-key-only indexes such as the primary key
-            // since their keys shouldn't ever change, but do update other indexes.
-            m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                        m_updatableIndexList, fallible);
+            else {
+                mergeTupleForDelete(deltaTuple);
+                // Shouldn't need to update group-key-only indexes such as the primary key
+                // since their keys shouldn't ever change, but do update other indexes.
+                m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                            m_updatableIndexList, fallible);
+            }
         }
         ec->cleanupExecutorsForSubquery(executorList);
     }
