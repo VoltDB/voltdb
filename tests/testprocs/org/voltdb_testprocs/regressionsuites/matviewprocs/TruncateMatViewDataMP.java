@@ -133,13 +133,11 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview14); // ("SELECT COUNT(*) FROM VENG6511expR;");
         voltQueueSQL(validateview15); // ("SELECT COUNT(*) FROM VENG6511expLR;");
         voltQueueSQL(validateview16); // ("SELECT COUNT(*) FROM VENG6511C;");
-        // TODO: It is very strange that validateview 17-21 fails but the view tables seem to be empty.
-        //       Disabling those checks for now.
-        // voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
-        // voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
-        // voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
-        // voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
-        // voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
+        voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
+        voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
+        voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
+        voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
+        voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
         voltQueueSQL(validateview22); // ("SELECT * FROM MATPEOPLE_COUNT;");
         voltQueueSQL(validateview23); // ("SELECT * FROM MATPEOPLE_CONDITIONAL_COUNT;");
         voltQueueSQL(validateview24); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_SUM;");
