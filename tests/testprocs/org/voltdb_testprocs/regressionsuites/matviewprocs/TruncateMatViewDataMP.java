@@ -75,7 +75,7 @@ public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt validateview17 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
     // ORDER_COUNT_GLOBAL is a view without group by column.
     // If the soruce tables are sucessfully truncated, it will have one row with value 0.
-    public final SQLStmt validateview18 = new SQLStmt("SELECT * FROM ORDER_COUNT_GLOBAL;");
+    public final SQLStmt validateview18 = new SQLStmt("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
     public final SQLStmt validateview19 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
     public final SQLStmt validateview20 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
     public final SQLStmt validateview21 = new SQLStmt("SELECT COUNT(*) FROM ORDER2016;");

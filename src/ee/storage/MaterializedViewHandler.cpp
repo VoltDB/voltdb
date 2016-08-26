@@ -293,7 +293,7 @@ namespace voltdb {
         NValue newCount = existingCount.op_subtract(deltaCount);
         m_updatedTuple.setNValue(m_groupByColumnCount, newCount);
         int aggOffset = m_groupByColumnCount + 1;
-        NValue newValue;        
+        NValue newValue;
         if (newCount.isZero()) {
             // no group by key, no rows, aggs will be null except for count().
             for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
@@ -301,7 +301,7 @@ namespace voltdb {
                     newValue = ValueFactory::getBigIntValue(0);
                 }
                 else {
-                    newValue = ValueFactory::getNullValue();
+                    newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(columnIndex));
                 }
                 m_updatedTuple.setNValue(columnIndex, newValue);
             }
