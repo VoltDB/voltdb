@@ -22,7 +22,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -30,7 +29,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
@@ -79,9 +77,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
-    private final AtomicReference<ImmutableSet<Integer>> m_partitionIntegerKeys = new AtomicReference<ImmutableSet<Integer>>();
-
-    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
 
     /**
      * These threads belong to the network thread pool
@@ -852,7 +847,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
 
-        final ImmutableSet<Integer> partitionSet = getPartitionIntegerKeys();
+        final ImmutableSet<Integer> partitionSet = m_distributer.getPartitionKeys();
         int partitionCount = partitionSet.size();
         AtomicInteger counter = new AtomicInteger(partitionCount);
         assert(partitionCount > 0);
@@ -876,43 +871,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             }
         }
         return true;
-    }
-
-    /**
-     * Set up partitions.
-     * @throws ProcCallException on any VoltDB specific failure.
-     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-     * @throws IOException if there is a Java network or connection problem.
-     */
-    private void refreshPartitionKeys() throws IOException, NoConnectionsException, ProcCallException {
-
-        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
-        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
-            VoltTable results[] = callProcedure("@GetPartitionKeys", "integer").getResults();
-            VoltTable keys = results[0];
-            List<Integer> pkeys = new ArrayList<Integer>();
-            for (int k = 0; k < keys.getRowCount(); k++) {
-                pkeys.add((int)(keys.fetchRow(k).getLong(1)));
-            }
-
-            m_partitionIntegerKeys.set(ImmutableSet.copyOf(pkeys));
-            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
-        }
-    }
-
-   /**
-    * Return a list of integer partition keys
-    * @throws ProcCallException on any VoltDB specific failure.
-    * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-    * @throws IOException if there is a Java network or connection problem.
-    */
-    public ImmutableSet<Integer> getPartitionIntegerKeys() throws NoConnectionsException, IOException, ProcCallException {
-        if (m_distributer.getPartitionKeys() != null && m_distributer.getPartitionKeys().size() > 0) {
-            return m_distributer.getPartitionKeys();
-        }
-
-        refreshPartitionKeys();
-        return m_partitionIntegerKeys.get();
     }
 
     /**

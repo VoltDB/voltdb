@@ -81,6 +81,7 @@ class Distributer {
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 1000;
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -124,6 +125,7 @@ class Distributer {
     private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
 
     private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
+    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
 
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
@@ -1452,7 +1454,37 @@ class Distributer {
         return m_procedureCallTimeoutNanos;
     }
 
-    ImmutableSet<Integer> getPartitionKeys() {
+    ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
+        //null check: the topology update uses async update, thus partition info may not be ready upon client connection.
+        if (!m_useClientAffinity || m_partitionKeys.get() == null) {
+            refreshPartitionKeys();
+        }
         return m_partitionKeys.get();
+    }
+
+    /**
+     * Set up partitions.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    private void refreshPartitionKeys() throws IOException, NoConnectionsException, ProcCallException {
+
+        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
+        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
+            SyncCallback cb = new SyncCallback();
+            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+            try {
+                cb.waitForResponse();
+            } catch (final InterruptedException e) {
+                throw new java.io.InterruptedIOException("Interrupted while waiting for response");
+            }
+            if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
+                throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
+            }
+            updatePartitioning(cb.getResponse().getResults()[0]);
+            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
+        }
     }
 }
