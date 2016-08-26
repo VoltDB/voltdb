@@ -964,7 +964,7 @@ public class LocalCluster implements VoltServerConfig {
             } else {
                 if (m_cmdLines.size() > 0) {
                     int portNoToRejoin = m_cmdLines.get(0).internalPort();
-                    cmdln.leader(":" + portNoToRejoin);
+                    cmdln.coordinators(":" + portNoToRejoin);
                     cmdln.enableAdd(true);
                 }
             }
@@ -986,7 +986,7 @@ public class LocalCluster implements VoltServerConfig {
                     subroot = m_subRoots.get(hostId);
                 }
                 cmdln.voltFilePrefix(subroot.getPath());
-                cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
+                cmdln.voltRoot(subroot.getPath() + File.separator + m_voltdbroot);
             }
 
             if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
