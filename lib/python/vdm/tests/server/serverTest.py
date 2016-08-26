@@ -108,6 +108,7 @@ class CreateServer(Server):
         """
         ensure GET server list
         """
+        print "Running test to check get server list API."
         response = requests.get(__db_url__)
         value = response.json()
         if value:
@@ -124,6 +125,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['statusString'], 'OK')
             self.assertEqual(value['status'], 200)
+        print "Completed test to check get server list API."
 
     def test_request_with_id(self):
         """
@@ -369,6 +371,92 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['statusString'], 'Port 5555 for the same host is already used by server %s for '
                                               'replication-listener.' % __host_or_ip__)
+
+    def test_validate_invalid_field_values(self):
+        """
+        ensure server name is not empty
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            # test invalid admin-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'admin-listener': True}
+            check_invalid_value(self, 'admin-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'admin-listener': 111}
+            check_invalid_value(self, 'admin-listener', data, url, 'POST')
+
+            # test invalid zookeeper-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'zookeeper-listener': True}
+            check_invalid_value(self, 'zookeeper-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'zookeeper-listener': 111}
+            check_invalid_value(self, 'zookeeper-listener', data, url, 'POST')
+
+            # test invalid replication-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'replication-listener': True}
+            check_invalid_value(self, 'replication-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'replication-listener': 111}
+            check_invalid_value(self, 'replication-listener', data, url, 'POST')
+
+            # test invalid client-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'client-listener': True}
+            check_invalid_value(self, 'client-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'client-listener': 111}
+            check_invalid_value(self, 'client-listener', data, url, 'POST')
+
+            # test invalid internal-interface value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'internal-interface': True}
+            check_invalid_value(self, 'internal-interface', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'internal-interface': 111}
+            check_invalid_value(self, 'internal-interface', data, url, 'POST')
+
+            # test invalid external-interface value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'external-interface': True}
+            check_invalid_value(self, 'external-interface', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'external-interface': 111}
+            check_invalid_value(self, 'external-interface', data, url, 'POST')
+
+            # test invalid public-interface value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'public-interface': True}
+            check_invalid_value(self, 'public-interface', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'public-interface': 111}
+            check_invalid_value(self, 'public-interface', data, url, 'POST')
+
+            # test invalid internal-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'internal-listener': True}
+            check_invalid_value(self, 'internal-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'internal-listener': 111}
+            check_invalid_value(self, 'internal-listener', data, url, 'POST')
+
+            #  invalid http-listener value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'http-listener': True}
+            check_invalid_value(self, 'http-listener', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'http-listener': 111}
+            check_invalid_value(self, 'http-listener', data, url, 'POST')
+
+            # test invalid name value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': True}
+            check_invalid_value(self, 'name', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 111}
+            check_invalid_value(self, 'name', data, url, 'POST')
+
+            # test invalid description value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'description': True}
+            check_invalid_value(self, 'description', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'description': 111}
+            check_invalid_value(self, 'description', data, url, 'POST')
+
+            # test invalid placement-group value
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'placement-group': True}
+            check_invalid_value(self, 'placement-group', data, url, 'POST')
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'placement-group': 111}
+            check_invalid_value(self, 'placement-group', data, url, 'POST')
+
+        else:
+            print "Database is empty."
 
 
 class UpdateServer(Server):
@@ -806,6 +894,108 @@ class UpdateServer(Server):
                     self.assertEqual(value['statusString'], 'Port 5555 for the same host is already used by server %s for '
                                                       'replication-listener.' % __host_or_ip__)
 
+    def test_validate_invalid_field_values(self):
+        """
+        ensure server fields are of correct data type
+        """
+        """
+        ensure host name is not empty
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__, last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/' % \
+                      (__host_or_ip__,last_db_id, last_server_id)
+                # test invalid hostname value
+                data = {'description': 'test', 'hostname': 11, 'name': 'test'}
+                check_invalid_value(self, 'hostname', data, url, 'PUT')
+                data = {'description': 'test', 'hostname': True, 'name': 'test'}
+                check_invalid_value(self, 'hostname', data, url, 'PUT')
+
+                # test invalid description value
+                data = {'description': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'description', data, url, 'PUT')
+                data = {'description': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'description', data, url, 'PUT')
+
+                # test invalid enabled value
+                data = {'enabled': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'enabled', data, url, 'PUT')
+                data = {'enabled': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'enabled', data, url, 'PUT')
+
+                # test invalid admin-listener value
+                data = {'hostname': __host_or_ip__, 'admin-listener': True}
+                check_invalid_value(self, 'admin-listener', data, url, 'PUT')
+                data = {'hostname': __host_or_ip__, 'admin-listener': 11}
+                check_invalid_value(self, 'admin-listener', data, url, 'PUT')
+
+                # test invalid internal-listener value
+                data = {'internal-listener': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'internal-listener', data, url, 'PUT')
+                data = {'internal-listener': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'internal-listener', data, url, 'PUT')
+
+                # test invalid http-listener value
+                data = {'http-listener': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'http-listener', data, url, 'PUT')
+                data = {'http-listener': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'http-listener', data, url, 'PUT')
+
+                # test invalid zookeeper-listener value
+                data = {'zookeeper-listener': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'zookeeper-listener', data, url, 'PUT')
+                data = {'zookeeper-listener': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'zookeeper-listener', data, url, 'PUT')
+
+                # test invalid replication-listener value
+                data = {'replication-listener': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'replication-listener', data, url, 'PUT')
+                data = {'replication-listener': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'replication-listener', data, url, 'PUT')
+
+                # test invalid client-listener value
+                data = {'client-listener': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'client-listener', data, url, 'PUT')
+                data = {'client-listener': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'client-listener', data, url, 'PUT')
+
+                # test invalid internal-interface value
+                data = {'internal-interface': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'internal-interface', data, url, 'PUT')
+                data = {'internal-interface': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'internal-interface', data, url, 'PUT')
+
+                # test invalid external-interface value
+                data = {'external-interface': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'external-interface', data, url, 'PUT')
+                data = {'external-interface': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'external-interface', data, url, 'PUT')
+
+                # test invalid public-interface value
+                data = {'public-interface': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'public-interface', data, url, 'PUT')
+                data = {'public-interface': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'public-interface', data, url, 'PUT')
+
+                # test invalid placement-group value
+                data = {'placement-group': True, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'placement-group', data, url, 'PUT')
+                data = {'placement-group': 11, 'hostname': __host_or_ip__, 'name': 'test'}
+                check_invalid_value(self, 'placement-group', data, url, 'PUT')
+            else:
+                print "The Server list is empty"
+
 
 class ServerDelete(unittest.TestCase):
     """
@@ -865,6 +1055,22 @@ class DeleteServer(ServerDelete):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
+                url_non_existing_server =url + str(3)
+                response_non_existing_server = requests.delete(url_non_existing_server)
+                value_non_existing_server = response_non_existing_server.json()
+                print value_non_existing_server['statusstring']
+                self.assertEqual(value_non_existing_server['statusstring'], 'No server found for id: 3 in database 2')
+                self.assertEqual(response_non_existing_server.status_code, 404)
+
+                url_non_existing_database = 'http://%s:8000/api/1.0/databases/3/servers/' % \
+                (__host_or_ip__)
+                url_non_existing_database += str(last_server_id)
+                response_non_existing_database = requests.delete(url_non_existing_database)
+                value_non_existing_database = response_non_existing_database.json()
+                print value_non_existing_database['statusstring']
+                self.assertEqual(str(value_non_existing_database['statusstring']), 'No database found for id: 3')
+                self.assertEqual(response_non_existing_database.status_code, 404)
+
                 url += str(last_server_id)
                 response = requests.delete(url)
                 if response.status_code == 403:
@@ -878,6 +1084,17 @@ class DeleteServer(ServerDelete):
                     self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
+
+
+def check_invalid_value(self, field, data, url, request_type):
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    if request_type == 'POST':
+        response = requests.post(url, json=data, headers=headers)
+    else:
+        response = requests.put(url, json=data, headers=headers)
+    value = response.json()
+    self.assertEqual(value['statusString'], 'Invalid value for field ' + field + '.')
+    self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

@@ -806,12 +806,12 @@ public class TestDistributer extends TestCase {
 
            // this call blocks for a result!
            clt.callProcedure("Foo", new Integer(1));
-           assertEquals(4, volt.handler.roundTrips.get());
+           assertEquals(5, volt.handler.roundTrips.get());
 
            // this call doesn't block! (use drain)
            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
            clt.drain();
-           assertEquals(5, volt.handler.roundTrips.get());
+           assertEquals(6, volt.handler.roundTrips.get());
        }
        finally {
            if (volt != null) {

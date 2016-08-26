@@ -120,6 +120,8 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
+    private final List<Integer> m_partitionKeys = new ArrayList<Integer>();
+
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
     //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
@@ -184,6 +186,28 @@ class Distributer {
         }
     }
 
+    /**
+     * Handles partition updates for client affinity
+     */
+    class PartitionUpdateCallback implements ProcedureCallback {
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+                try {
+                    synchronized (Distributer.this) {
+                        VoltTable results[] = clientResponse.getResults();
+                        if (results != null && results.length > 0) {
+                            updatePartitioning(results[0]);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
     /**
      * Handles @Subscribe response
      */
@@ -1003,6 +1027,16 @@ class Distributer {
                         true,
                         USE_DEFAULT_CLIENT_TIMEOUT);
             }
+
+            //Partition key update
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            cxn.createWork(System.nanoTime(),
+                    spi.getHandle(),
+                    spi.getProcName(),
+                    serializeSPI(spi),
+                    new PartitionUpdateCallback(),
+                    true,
+                    USE_DEFAULT_CLIENT_TIMEOUT);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1361,6 +1395,17 @@ class Distributer {
         }
     }
 
+    private void updatePartitioning(VoltTable vt) {
+        m_partitionKeys.clear();
+        while (vt.advanceRow()) {
+            //check for mock unit test
+            if (vt.getColumnCount() == 2) {
+                Integer key = (int)(vt.getLong("PARTITION_KEY"));
+                m_partitionKeys.add(key);
+            }
+        }
+    }
+
     /**
      * Return if Hashinator is initialed. This is useful only for non standard clients.
      * This will only only ever return true if client affinity is turned on.
@@ -1402,5 +1447,9 @@ class Distributer {
 
     long getProcedureTimeoutNanos() {
         return m_procedureCallTimeoutNanos;
+    }
+
+   public  List<Integer> getPartitionKeys() {
+        return m_partitionKeys;
     }
 }
