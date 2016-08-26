@@ -1813,6 +1813,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     public void testEng11047() throws Exception {
         Client client = getClient();
 
+        ClientResponse cr;
+        VoltTable      vt;
+
         client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-1, null, null, null);");
         client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-1, null, null, null);");
         client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-2, null, null, -22.22);");
@@ -1844,7 +1847,28 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-15, 'NhFmPDULXEFLGI', 29960, 3.59831007623149345953e-01);");
         client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-15, 'BAR', 29967, 7.59831007623149345953e-01);");
 
-        client.callProcedure("@AdHoc", "SELECT (A.NUM) AS Q5 FROM V21 A WHERE (A.NUM) = (A.ID) ORDER BY 1 LIMIT 82;");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (1, 'aaa', 1, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (1, 'yyy', 1, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (2, 'xxx', 2, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (2, 'zzz', 2, 0);");
+
+        // The answers here and in the next query were determined by
+        // a judicious mix of testing and clever insertion.  The last four
+        // insert statements above give the values in the second test.
+        cr = client.callProcedure("@AdHoc", "SELECT (A.NUM) AS Q5 FROM V21 A WHERE (A.NUM) = (A.ID - 14) ORDER BY 1 LIMIT 82;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(-13, vt.getLong(0));
+
+        cr = client.callProcedure("@AdHoc", "SELECT (A.NUM) AS Q5 FROM V21 A WHERE (A.NUM) = (A.ID) ORDER BY 1 LIMIT 82;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(1, vt.getLong(0));
+
     }
 
     /**
