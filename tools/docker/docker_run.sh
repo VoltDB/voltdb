@@ -40,25 +40,18 @@ function start() {
                 if [ ! -d  $HOST_LOCATION ]; then
                     echo "Storage location on host, $HOST_LOCATION, is not a directory"
                     exit
-                fi
-                #echo "Node $1 data will be stored in $HOST_LOCATION"
-            #else
-                #echo "Create directory $HOST_LOCATION"
-                #mkdir $HOST_LOCATION
+                fi            
             fi
         fi 
 
         # instantiate docker containers
-
         if [ -z $STORAGE ]; then
-            docker run -d -P -e HOST_COUNT="$HOSTCOUNT" -e HOSTS="$NODE_LIST" --name=$NODE$i --network=voltLocalCluster $DOCKER_IMAGE
-            echo;
+            docker run -d -P -e HOST_COUNT="$HOSTCOUNT" -e HOSTS="$NODE_LIST" --name=$NODE$i --network=voltLocalCluster $DOCKER_IMAGE            
         else
-            echo "Node: $NODE$i Mounted host directory, $HOST_LOCATION, into the container's voltdbroot at $DOCKER_DATA_STORE"
-             
+            echo "Node: $NODE$i Mounted host directory, $HOST_LOCATION, into the container's voltdbroot at $DOCKER_DATA_STORE"             
             docker run -d -P -e HOST_COUNT="$HOSTCOUNT" -e HOSTS="$NODE_LIST"  -v $HOST_LOCATION:$DOCKER_DATA_STORE  --name=$NODE$i --network=voltLocalCluster $DOCKER_IMAGE
         fi
     done
 }
 
-start 
+start

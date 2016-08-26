@@ -14,11 +14,8 @@ RUN apt-get update && \
     apt-get install -y  --no-install-recommends --no-install-suggests openjdk-8-jdk wget 
 
 # get the voltdb image
-#ENV VOLTDB_BUNDLE = voltdb-ent-6.6rc1.tar.gz
-RUN wget http://10.10.180.10/kits/released/voltdb-6.6rc1/voltdb-ent-6.6rc1.tar.gz && \
-    tar -zxvf  voltdb-ent-6.6rc1.tar.gz
-#COPY {VOLTDB_BUNDLE} .
-#RUN tar -zxvf ${VOLTDB_BUNDLE}
+COPY voltdb-ent-6.6rc1.tar.gz .
+RUN tar -zxvf voltdb-ent-6.6rc1.tar.gz
 
 
 ENV VOLTDB_DIST=/opt/voltdb
@@ -55,17 +52,10 @@ WORKDIR $VOLTDB_DIST
 COPY deployment.xml ${VOLTDB_DIST}
 ENV DEPLOYMENT=$VOLTDB_DIST/deployment.xml
 
-#RUN echo "set entry point"
 COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
-ENTRYPOINT ["./docker-entrypoint.sh"]
-
 
 ENV DIRECTORY_SPEC=/var/voltdb/
 RUN mkdir $DIRECTORY_SPEC
 
-#RUN bin/voltdb init -C deployment.xml -D ${DIRECTORY_SPEC}
-
-#CMD ["sh", "-c", "$VOLTDB_DIST/bin/voltdb start --ignore=thp -D ${DIRECTORY_SPEC} -c ${HOST_COUNT} -H ${HOSTS}"]
-#CMD ["sh", "-c", "$VOLTDB_DIST/bin/voltdb start --ignore=thp -D ${DIRECTORY_SPEC} "]
-#CMD ["bin/voltdb start"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
