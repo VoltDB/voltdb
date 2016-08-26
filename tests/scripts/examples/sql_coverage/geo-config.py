@@ -87,6 +87,7 @@
                            "template": "upsert-geo-polygon.sql",
                            "normalizer": "normalizer.py",
                            "precision": "8"},
+
     # Tests of SQL Analytic Functions (e.g. RANK)
     "analytic": {"schema": "schema.py",
                  "ddl": "DDL.sql",
@@ -126,4 +127,22 @@
 #                            "ddl": "index-DDL.sql",
 #                            "template": "analytic-varbinary.sql",
 #                            "normalizer": "normalizer.py"},
+
+    # Tests of Materialized Views defined using Joins
+    "joined-matview": {"schema": "joined-matview-schema.py",
+                       "ddl": "joined-matview-DDL.sql",
+                       "template": "joined-matview.sql",
+                       "normalizer": "normalizer.py"},
+    "joined-matview-int": {"schema": "joined-matview-int-schema.py",
+                           "ddl": "joined-matview-int-DDL.sql",
+                           "template": "joined-matview-int.sql",
+                           "normalizer": "nulls-lowest-normalizer.py"},
+    "joined-matview-string": {"schema": "joined-matview-string-schema.py",
+                              "ddl": "joined-matview-string-DDL.sql",
+                              "template": "joined-matview-string.sql",
+                              "normalizer": "normalizer.py"},
+    "joined-matview-timestamp": {"schema": "joined-matview-timestamp-schema.py",
+                                 "ddl": "joined-matview-timestamp-DDL.sql",
+                                 "template": "joined-matview-timestamp.sql",
+                                 "normalizer": "normalizer.py"},
 }
