@@ -65,7 +65,7 @@ function client() {
     jars-ifneeded
     java -classpath $APPNAME-client.jar:$APPCLASSPATH com.MyTPCC \
         --servers=localhost \
-#--transactions=2000000 \
+        --transactions=2000000 \
         --warehouses=512 \
         --scalefactor=22
 }
