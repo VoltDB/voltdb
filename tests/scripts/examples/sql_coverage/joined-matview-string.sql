@@ -1,7 +1,10 @@
 <configure-for-string.sql>
 
 -- Run SELECT queries against Views, rather than Tables
-{@fromtables = "V_value[int:0,36;6]"}
+{@fromtables = "V_value[int:0,36,1]"}
+-- The alternative, quick, but less thorough, version, running against
+-- a few of the defined views, randomly selected
+--{@fromtables = "V_value[int:0,36;6]"}
 
 -- DML, purge and regenerate random data first.
 DELETE FROM @dmltable
@@ -24,16 +27,6 @@ INSERT INTO @dmltable VALUES (-13, 'mmm', 'mmm', 'mmm', -13)
 INSERT INTO @dmltable VALUES (-14, _value[string null20], _value[string null20], _value[string null20], _value[float])
 INSERT INTO @dmltable VALUES (-15, _value[string null20], _value[string null20], _value[string null20], _value[float])
 
--- Run both the "basic" and "advanced" SELECT query tests
-<basic-select.sql>
-<advanced-select.sql>
-
--- Run the basic UPDATE tests, and check the results afterward
-<basic-update.sql>
-SELECT @star FROM @dmltable   ST1
-SELECT @star FROM @fromtables SV1
-
--- Run the basic DELETE tests, and check the results afterward
-<basic-delete.sql>
-SELECT @star FROM @dmltable   ST2
-SELECT @star FROM @fromtables SV2
+-- Run both the "basic" and "advanced" SELECT query tests, and the basic UPDATE
+-- and DELETE tests (with some extra SELECT statements, to check those results)
+<basic-and-advanced-template.sql>
