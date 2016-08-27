@@ -51,7 +51,7 @@ function jars-ifneeded() {
 # run the voltdb server locally
 function server() {
     # note: "create --force" will delete any existing data
-    voltdb create --force -B deployment.xml -H $STARTUPLEADERHOST
+    voltdb create --force -B -d deployment.xml -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures
@@ -65,7 +65,7 @@ function client() {
     jars-ifneeded
     java -classpath $APPNAME-client.jar:$APPCLASSPATH com.MyTPCC \
         --servers=localhost \
-        --transaction=2000000 \
+#--transactions=2000000 \
         --warehouses=512 \
         --scalefactor=22
 }
