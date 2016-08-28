@@ -39,6 +39,8 @@ import org.voltdb.client.exampleutils.ClientConnectionPool;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.ArrayList;
+import java.io.FileWriter;
 
 public class MyTPCC
     implements TPCCSimulation.ProcCaller
@@ -60,6 +62,9 @@ public class MyTPCC
     public static long[] latencyCounter = new long[] {0,0,0,0,0,0,0,0,0};
     public static boolean checkLatency = false;
     public static final ReentrantLock counterLock = new ReentrantLock();
+    // Yiwen: Add a arraylist to store latency of every transaction; let's ignore setting initial capacity for now
+    public static ArrayList<Long> latencyArray = new ArrayList<Long>();
+    public static long startTime;
 
     public static void main(String args[])
     {
@@ -86,7 +91,7 @@ public class MyTPCC
 
         setTransactionDisplayNames();
 
-        long startTime = System.currentTimeMillis();
+        startTime = System.currentTimeMillis();
 //        long endTime = startTime + (1000l * testDurationSecs);
         long currentTime = startTime;
         long lastFeedbackTime = startTime;
@@ -228,6 +233,20 @@ public class MyTPCC
         }
 
         m_clientCon.close();
+        
+        // Yiwen: write our arraylist to file
+        try
+        {
+        	FileWriter writer = new FileWriter("cdf.txt");
+            for (Long latency: latencyArray) {
+            	writer.write(latency.toString()+"\n");
+            }
+            writer.close();
+        }
+        catch (IOException e)
+        {
+        	System.err.println("Unable to write to file");
+        }
     }
 
     public MyTPCC(String args[])
@@ -328,8 +347,10 @@ public class MyTPCC
 
                 if (checkLatency)
                 {
+                	// Yiwen: Description in ClientRespnse.java: Get the amount of time it took to 
+                	// run the transaction through the Client API, database, and back to the callback.
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -401,7 +422,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -499,10 +520,10 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-
+                        latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
-
+                        
                         if (executionTime < minExecutionMilliseconds)
                         {
                             minExecutionMilliseconds = executionTime;
@@ -626,7 +647,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -689,7 +710,7 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-
+                        latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
 
