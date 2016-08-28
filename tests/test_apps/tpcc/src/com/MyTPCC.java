@@ -64,7 +64,7 @@ public class MyTPCC
     public static final ReentrantLock counterLock = new ReentrantLock();
     // Yiwen: Add a arraylist to store latency of every transaction; let's ignore setting initial capacity for now
     public static ArrayList<Long> latencyArray = new ArrayList<Long>();
-    public static long startTime;
+    //public static long startTime;
 
     public static void main(String args[])
     {
@@ -91,7 +91,7 @@ public class MyTPCC
 
         setTransactionDisplayNames();
 
-        startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis();
 //        long endTime = startTime + (1000l * testDurationSecs);
         long currentTime = startTime;
         long lastFeedbackTime = startTime;
@@ -350,7 +350,7 @@ public class MyTPCC
                 	// Yiwen: Description in ClientRespnse.java: Get the amount of time it took to 
                 	// run the transaction through the Client API, database, and back to the callback.
                     long executionTime =  clientResponse.getClientRoundtrip();
-                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -422,7 +422,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -520,7 +520,7 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-                        latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
+                        latencyArray.add(executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
                         
@@ -647,7 +647,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-                    latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -710,7 +710,7 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-                        latencyArray.add(System.currentTimeMillis() - startTime + executionTime);
+                        latencyArray.add(executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
 
