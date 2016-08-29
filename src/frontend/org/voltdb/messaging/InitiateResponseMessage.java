@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -272,7 +273,13 @@ public class InitiateResponseMessage extends VoltMessage {
         else
             sb.append("\n  ROLLBACK/ABORT, ");
         sb.append("\n CLIENT RESPONSE: \n");
-        sb.append(m_response.toJSONString());
+        if (m_response == null) {
+            // This is not going to happen in the real world, but only in the test cases
+            // TestSpSchedulerDedupe
+            sb.append( "NULL" );
+        } else {
+            sb.append(m_response.toJSONString());
+        }
 
         return sb.toString();
     }
