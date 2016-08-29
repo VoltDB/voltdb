@@ -84,7 +84,7 @@ public class VoltFile extends File {
             throw new IOException("\"" + m_root + "\" exists but is not writable");
         }
         if (!m_root.canExecute()) {
-            throw new IOException("\"" + m_root + "\" exists but is not writable");
+            throw new IOException("\"" + m_root + "\" exists but is not executable");
         }
     }
 

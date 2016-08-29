@@ -480,6 +480,7 @@ public class LocalCluster implements VoltServerConfig {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
 
+
         if (!isNewCli) {
             try {
                 if (m_filePrefix != null) {
@@ -489,8 +490,7 @@ public class LocalCluster implements VoltServerConfig {
                     m_subRoots.add(subroot);
                 } else if (clearLocalDataDirectories) {
                     subroot = VoltFile.initNewSubrootForThisProcess();
-                    log.info("LclSrvr: " + hostId +"- subroot with INIT_NEW_SUBROOT: " + subroot.getAbsolutePath() +
-                            ", filePrefix: " + m_filePrefix);
+                    log.info("LclSrvr: " + hostId +"- subroot with INIT_NEW_SUBROOT: " + subroot.getAbsolutePath());
                     m_subRoots.add(subroot);
                 } else {
                     if (m_subRoots.size() <= hostId) {
@@ -498,11 +498,10 @@ public class LocalCluster implements VoltServerConfig {
                         m_subRoots.add(subroot);
                         //m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
                         log.info("LclSrvr: " + hostId +"- subroot " + subroot.getAbsolutePath() + ", hostid: " + hostId +
-                                " subroot list size: " + m_subRoots.size() + ", filePrefix: " + m_filePrefix);
+                                " subroot list size: " + m_subRoots.size());
                     }
                     subroot = m_subRoots.get(hostId);
-                    log.info("Fetchd subroot for the cluster with hostid: " + hostId + " path: " + subroot.getAbsolutePath() +
-                            ", filePrefix: " + m_filePrefix);
+                    log.info("Fetchd subroot for the cluster with hostid: " + hostId + " path: " + subroot.getAbsolutePath());
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -520,9 +519,12 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
             }
         }
+
         if (!isNewCli) {
             cmdln.voltFilePrefix(subroot.getPath());
+            //cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
         }
+
         cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
         cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
@@ -993,6 +995,7 @@ public class LocalCluster implements VoltServerConfig {
                     log.info("Strt Srvr: " + hostId + " - subroot:" + subroot.getAbsolutePath() + " using fileprefix: " + m_filePrefix);
                 } else if (clearLocalDataDirectories) {
                     subroot = VoltFile.getNewSubroot();
+                    log.info("Strt Srvr: " + hostId + " - subroot:" + subroot.getAbsolutePath() + " clean dir");
                     m_subRoots.add(subroot);
                 } else {
                     if (m_subRoots.size() <= hostId) {
@@ -1002,7 +1005,7 @@ public class LocalCluster implements VoltServerConfig {
                     }
                     subroot = m_subRoots.get(hostId);
                     log.info("Strt Srvr: " + hostId +" - subroot:" + subroot.getAbsolutePath() + " hostid: " + hostId +
-                            " subroots list size: " + m_subRoots.size() + ", file prefix: " + m_filePrefix);
+                            " subroots list size: " + m_subRoots.size());
                 }
                 cmdln.voltFilePrefix(subroot.getPath());
                 cmdln.voltRoot(subroot.getPath() + File.separator + m_voltdbroot);
