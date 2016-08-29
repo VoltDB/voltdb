@@ -26,8 +26,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
+import org.junit.After;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -35,40 +39,60 @@ import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.utils.VoltFile;
 
+import junit.framework.TestCase;
+
 /**
  *  Test client all partition calls
  *
  */
-public class TestAllPartitionProcedureCalls extends RegressionSuite {
+public class TestAllPartitionProcedureCalls extends TestCase {
 
     static Map<Integer, Long> INT_PARTITION_EXPECTED_COUNTS = new HashMap<Integer, Long>();
     static {
-        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(112));
-        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(138));
-        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(122));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(114));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(128));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(130));
         INT_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(131));
-        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(112));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(102));
         INT_PARTITION_EXPECTED_COUNTS.put(new Integer(15), new Long(133));
         INT_PARTITION_EXPECTED_COUNTS.put(new Integer(19), new Long(142));
-        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(110));
+        INT_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(120));
     }
 
     static Map<Integer, Long> STRING_PARTITION_EXPECTED_COUNTS = new HashMap<Integer, Long>();
     static {
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(130));
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(129));
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(139));
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(122));
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(123));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(132));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(126));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(137));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(119));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(125));
         STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(15), new Long(114));
         STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(19), new Long(125));
-        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(118));
+        STRING_PARTITION_EXPECTED_COUNTS.put(new Integer(23), new Long(122));
+    }
+
+    static Map<Integer, Long> ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS = new HashMap<Integer, Long>();
+    static {
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(0), new Long(78));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(1), new Long(84));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(2), new Long(101));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(5), new Long(77));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(7), new Long(98));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(10), new Long(70));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(11), new Long(70));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(15), new Long(87));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(19), new Long(100));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(20), new Long(82));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(24), new Long(72));
+        ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS.put(new Integer(33), new Long(81));
     }
 
     static final String[] TENS = {"", " ten"," twenty", " thirty", " forty", " fifty", " sixty", " seventy", " eighty", " ninety"};
     static final String[] NUMS = {"", " one", " two", " three", " four", " five", " six", " seven", " eight", " nine", " ten", " eleven",
             " twelve", " thirteen", " fourteen", " fifteen", " sixteen", " seventeen", " eighteen", " nineteen" };
 
+    private LocalCluster cluster;
+    private Client client;
     /**
      * convert the number into its word form so that these numbers will be distributed among the partitions with string partition
      * differently from the distribution with integer partition.
@@ -106,50 +130,94 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
         super.setUp();
-        Client client = getClient();
+
+        if (TheHashinator.getConfiguredHashinatorType() != TheHashinator.HashinatorType.ELASTIC) return;
+        cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster.overrideAnyRequestForValgrind();
+
+        cluster.setHasLocalServer(false);
+        cluster.setJavaProperty("ELASTIC_TOTAL_TOKENS", "128");
+        cluster.setJavaProperty("ELASTIC_TARGET_THROUGHPUT", "10485760");
+        cluster.setJavaProperty("ELASTIC_TARGET_TRANSFER_TIME_MS", "1000");
+
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.setUseDDLSchema(true);
+        project.addSchema(TestAllPartitionProcedureCalls.class.getResource("allpartitioncall.sql"));
+        project.addPartitionInfo("TABLE_INT_PARTITION", "value_number1");
+        project.addPartitionInfo("TABLE_STRING_PARTITION", "value_string");
+
+        project.addProcedures(new VoltProjectBuilder.ProcedureInfo(PartitionIntegerTestProc.class,
+                "TABLE_INT_PARTITION.value_number1"),
+                new VoltProjectBuilder.ProcedureInfo(PartitionStringTestProc.class,
+                        "TABLE_STRING_PARTITION.value_string"),
+                new VoltProjectBuilder.ProcedureInfo(PartitionFailureTestProc.class,
+                        "TABLE_INT_PARTITION.value_number1")
+                );
+
+        boolean success = cluster.compile(project);
+        assertTrue(success);
+        cluster.startUp();
+
+        ClientConfig config = new ClientConfig();
+        config.setClientAffinity(false);
+        client = ClientFactory.createClient(config);
+        client.createConnection("", cluster.port(0));
         load(client, "TABLE_INT_PARTITION");
         load(client, "TABLE_STRING_PARTITION");
     }
 
-    public TestAllPartitionProcedureCalls(String name) {
-        super(name);
+    @Override
+    @After
+    public void tearDown() throws Exception {
+        if (cluster != null) {
+            cluster.shutDown();
+        }
+        if(client != null){
+            client.close();
+        }
     }
 
+    @Test
     public void testSyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
-        Client client = getClient();
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
         validateResults(responses, INT_PARTITION_EXPECTED_COUNTS);
      }
 
+    @Test
     public void testAsyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
-        Client client = getClient();
-        CallBack cb = new CallBack(INT_PARTITION_EXPECTED_COUNTS);
+        CountDownLatch latch = new CountDownLatch(1);
+        CallBack cb = new CallBack(INT_PARTITION_EXPECTED_COUNTS, latch);
         client.callAllPartitionProcedure(cb, "PartitionIntegerTestProc");
-        Thread.sleep(2000);
-        assertTrue(cb.m_callbackInvoked);
+        try{
+            latch.await();
+        } catch (InterruptedException e) {
+
+        }
      }
 
+    @Test
     public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {
 
-        Client client = getClient();
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionStringTestProc");
         validateResults(responses, STRING_PARTITION_EXPECTED_COUNTS);
     }
 
+    @Test
     public void testAsyncCallAllPartitionProcedureWithStringPartition() throws Exception{
-
-        Client client = getClient();
-        CallBack cb = new CallBack(STRING_PARTITION_EXPECTED_COUNTS);
+        CountDownLatch latch = new CountDownLatch(1);
+        CallBack cb = new CallBack(STRING_PARTITION_EXPECTED_COUNTS, latch);
         client.callAllPartitionProcedure(cb, "PartitionStringTestProc");
-        Thread.sleep(2000);
-        assertTrue(cb.m_callbackInvoked);
+       try{
+           latch.await();
+       } catch (InterruptedException e) {
+
+       }
     }
 
+    @Test
     public void testCallAllPartitionProcedureFailuerProc() throws Exception {
-
-        Client client = getClient();
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionFailureTestProc");
         for (ClientResponseWithPartitionKey resp: responses) {
             int key = (int)(resp.partitionKey);
@@ -161,14 +229,26 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
         }
     }
 
+    @Test
+    public void testSyncCallAllPartitionProcedureWithElasticJoin() throws Exception {
+        //add a new node, should get 12 partitions
+        cluster.joinOne(2);
+        Thread.sleep(5000);
+        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
+        validateResults(responses, ELASTIC_JOIN_INT_PARTITION_EXPECTED_COUNTS);
+    }
 
-    private void validateResults(ClientResponseWithPartitionKey[]  responses, Map<Integer, Long> expectedCounts) {
+     private void validateResults(ClientResponseWithPartitionKey[]  responses, Map<Integer, Long> expectedCounts) {
+        long total = 0;
         for (ClientResponseWithPartitionKey resp: responses) {
             VoltTable results = resp.response.getResults()[0];
             Long expected = expectedCounts.get(resp.partitionKey);
             assert(expected != null);
-            assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
+            long count = results.fetchRow(0).getLong(0);
+            total += count;
+            assertTrue(expected.longValue() == count);
         }
+        assertTrue(total == 1000);
     }
 
     private void load(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
@@ -184,52 +264,30 @@ public class TestAllPartitionProcedureCalls extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTrue(1000 == vt.fetchRow(0).getLong(0));
     }
-
-    static public junit.framework.Test suite() throws Exception {
-
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAllPartitionProcedureCalls.class);
-        Map<String, String> additionalEnv = new HashMap<String, String>();
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.setUseDDLSchema(true);
-        project.addSchema(TestAllPartitionProcedureCalls.class.getResource("allpartitioncall.sql"));
-        project.addPartitionInfo("TABLE_INT_PARTITION", "value_number1");
-        project.addPartitionInfo("TABLE_STRING_PARTITION", "value_string");
-
-        project.addProcedures(new VoltProjectBuilder.ProcedureInfo(PartitionIntegerTestProc.class,
-                "TABLE_INT_PARTITION.value_number1"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionStringTestProc.class,
-                        "TABLE_STRING_PARTITION.value_string"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionFailureTestProc.class,
-                        "TABLE_INT_PARTITION.value_number1")
-                );
-
-        LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
-        config.setHasLocalServer(false);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        builder.addServerConfig(config);
-        return builder;
-    }
-
     public static class CallBack implements AllPartitionProcedureCallback {
 
         Map<Integer, Long> m_expectedCounts;
-        boolean m_callbackInvoked = false;
-        CallBack(Map<Integer, Long> expectedCounts) {
+        final CountDownLatch m_latch;
+        CallBack(Map<Integer, Long> expectedCounts, CountDownLatch latch) {
             m_expectedCounts = expectedCounts;
+            m_latch = latch;
         }
 
         @Override
         public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
-            m_callbackInvoked = true;
-            if (clientResponse != null) {
-                 for (ClientResponseWithPartitionKey resp: clientResponse) {
+            long total = 0;
+            try {
+                for (ClientResponseWithPartitionKey resp: clientResponse) {
                     VoltTable results = resp.response.getResults()[0];
                     Long expected = m_expectedCounts.get(resp.partitionKey);
                     assertTrue(expected != null);
-                    assertTrue(expected.longValue() == results.fetchRow(0).getLong(0));
+                    long count = results.fetchRow(0).getLong(0);
+                    total += count;
+                    assertTrue(expected.longValue() == count);
                 }
+                assertTrue(total == 1000);
+            } finally {
+                m_latch.countDown();
             }
         }
     }
