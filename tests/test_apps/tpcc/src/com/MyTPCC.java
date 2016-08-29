@@ -63,8 +63,7 @@ public class MyTPCC
     public static boolean checkLatency = false;
     public static final ReentrantLock counterLock = new ReentrantLock();
     // Yiwen: Add a arraylist to store latency of every transaction; let's ignore setting initial capacity for now
-    public static ArrayList<Long> latencyArray = new ArrayList<Long>();
-    //public static long startTime;
+    public static ArrayList<Long> latencyArray;
 
     public static void main(String args[])
     {
@@ -78,6 +77,7 @@ public class MyTPCC
         long client_feedback_interval_secs = m_helpah.longValue("displayinterval");
         // Yiwen: Use # of transction instead of duration
         long totalTransactions = m_helpah.longValue("transactions");
+        latencyArray = new ArrayList<Long>((int)totalTransactions);
 //        long testDurationSecs = m_helpah.longValue("duration");
         long lag_latency_seconds = 0;
         long lag_latency_millis = lag_latency_seconds * 1000l;
