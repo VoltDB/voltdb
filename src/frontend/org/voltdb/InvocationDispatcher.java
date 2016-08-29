@@ -991,7 +991,7 @@ public final class InvocationDispatcher {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
             final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
             final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new VoltFile(path, nonce + ".jar");
+            final File catalogFH = new VoltFile(path, nonce + ".jar", true);
 
             final byte[] catalog;
             try {

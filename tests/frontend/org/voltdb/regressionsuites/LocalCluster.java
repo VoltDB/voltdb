@@ -522,7 +522,7 @@ public class LocalCluster implements VoltServerConfig {
 
         if (!isNewCli) {
             cmdln.voltFilePrefix(subroot.getPath());
-            //cmdln.voltRoot(subroot.getPath() + "/" + m_voltdbroot);
+            //cmdln.voltRoot(subroot.getPath() + File.separator + m_voltdbroot);
         }
 
         cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
