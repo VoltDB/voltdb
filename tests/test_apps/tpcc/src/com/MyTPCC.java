@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.io.FileWriter;
 
 public class MyTPCC
@@ -234,12 +235,22 @@ public class MyTPCC
 
         m_clientCon.close();
         
-        // Yiwen: write our arraylist to file
+        
+        // Yiwen: For CDF:
+        Collections.sort(latencyArray);
+        long[] cdfArray = new long[101];
+        cdfArray[0] = latencyArray.get(0);
+        for (int i = 1; i < 101; ++i)
+        {
+        	int idx = (int) (latencyArray.size() * 0.01 * i - 1);
+        	cdfArray[i] = latencyArray.get(idx);
+        }
+        
         try
         {
         	FileWriter writer = new FileWriter("cdf.txt");
-            for (Long latency: latencyArray) {
-            	writer.write(latency.toString()+"\n");
+            for (long latency: cdfArray) {
+            	writer.write(String.valueOf(latency) + "\n");
             }
             writer.close();
         }
