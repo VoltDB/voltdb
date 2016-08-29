@@ -92,12 +92,8 @@ public class BufferedReadLog
 
     //  SPI offers a new message.
     private void offerInternal(Mailbox mailbox, Item item, long handle) {
-        if (item.getSpHandle() <= handle) {
-            mailbox.send(item.getResponseHSId(), item.getMessage());
-        } else {
-            m_bufferedReads.add(item);
-            releaseBufferedReads(mailbox, handle);
-        }
+        m_bufferedReads.add(item);
+        releaseBufferedReads(mailbox, handle);
     }
 
 
