@@ -1485,7 +1485,10 @@ public class TestVoltCompiler extends TestCase {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "partition table books on column cash;\n" +
-            "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;";
+            "create table foo (cash integer not null);\n" +
+            "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;\n" +
+            "create view matt2 (title, cash, num, foo) as select books.title, books.cash, count(*), sum(books.cash) from books join foo on books.cash = foo.cash group by books.title, books.cash;";
+
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -2138,14 +2141,22 @@ public class TestVoltCompiler extends TestCase {
         String ddl = "";
 
         ddl = "create table foo(a integer, b float, c float);\n" +
+              "create table foo2(a integer, b float, c float);\n" +
               "create view bar (a, b, total) as select a, b, count(*) as total from foo group by a, b;\n" +
+              "create view bar2 (a, b, total) as select foo.a, foo.b, count(*) as total from foo join foo2 on foo.a = foo2.a group by foo.a, foo.b;\n" +
               "create index baridx on bar (a);\n" +
+              "drop index baridx;\n" +
+              "create index baridx on bar2(a);\n" +
               "drop index baridx;\n";
         checkDDLErrorMessage(ddl, null);
 
         ddl = "create table foo(a integer, b float);\n" +
+              "create table foo2(a integer, b float);\n" +
               "create view bar (a, total) as select a, count(*) as total from foo group by a;\n" +
+              "create view bar2 (a, total) as select foo.a, count(*) as total from foo join foo2 on foo.a = foo2.a group by foo.a;\n" +
               "create index baridx on bar (a, total);\n" +
+              "drop index baridx;\n" +
+              "create index baridx on bar2 (a, total);\n" +
               "drop index baridx;\n";
         checkDDLErrorMessage(ddl, null);
     }

@@ -35,7 +35,6 @@ import java.util.Calendar;
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 class DbMonitorTest extends TestBase {
-
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         int count = 0
@@ -50,36 +49,36 @@ class DbMonitorTest extends TestBase {
 
                 ///Check all unchecked UserPreferences
 
-                expect: 'Display Preference button exists'
-                page.displayPreferenceDisplayed()
-
-                when: 'click Display Preference button'
-                page.openDisplayPreference()
-                then: 'display title and save button of preferences'
-                page.preferencesTitleDisplayed()
-                page.savePreferencesBtnDisplayed()
-                page.popupCloseDisplayed()
-
-                when: 'Stored Procedures checkbox is displayed'
-                page.storedProceduresCheckboxDisplayed()
-                page.dataTablesCheckboxDisplayed()
-                page.partitionIdleTimeCheckboxDisplayed()
-               // page.clusterTransactionsCheckboxDisplayed()
-                //page.clusterLatencyCheckboxDisplayed()
-
-
-                then: 'Add all the preferences'
-                page.storedProceduresCheckboxClick()
-                //page.dataTablesCheckboxClick()
-                page.partitionIdleTimeCheckboxClick()
-              //  page.clusterTransactionsCheckboxClick()
-               // page.clusterLatencyCheckboxClick()
-
-
-                when: 'click close button'
-                page.savePreferences()
-                then: 'no Stored Procedures displayed'
-                page.storedProceduresDisplayed()
+//                expect: 'Display Preference button exists'
+//                page.displayPreferenceDisplayed()
+//
+//                when: 'click Display Preference button'
+//                page.openDisplayPreference()
+//                then: 'display title and save button of preferences'
+//                page.preferencesTitleDisplayed()
+//                page.savePreferencesBtnDisplayed()
+//                page.popupCloseDisplayed()
+//
+//                when: 'Stored Procedures checkbox is displayed'
+//                page.storedProceduresCheckboxDisplayed()
+//                page.dataTablesCheckboxDisplayed()
+//                page.partitionIdleTimeCheckboxDisplayed()
+//               // page.clusterTransactionsCheckboxDisplayed()
+//                //page.clusterLatencyCheckboxDisplayed()
+//
+//
+//                then: 'Add all the preferences'
+//                page.storedProceduresCheckboxClick()
+//                //page.dataTablesCheckboxClick()
+//                page.partitionIdleTimeCheckboxClick()
+//              //  page.clusterTransactionsCheckboxClick()
+//               // page.clusterLatencyCheckboxClick()
+//
+//
+//                when: 'click close button'
+//                page.savePreferences()
+//                then: 'no Stored Procedures displayed'
+//                page.storedProceduresDisplayed()
 
 
                 break
@@ -248,7 +247,6 @@ class DbMonitorTest extends TestBase {
         waitFor(30) { header.banner.isDisplayed() }
     }
 
-
     def "header image exists" () {
         when:
         at DbMonitorPage
@@ -374,7 +372,6 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
     def "header username click and close" () {
         when:
         at DbMonitorPage
@@ -403,8 +400,7 @@ class DbMonitorTest extends TestBase {
         header.logoutPopupCancelButton.click()
     }
 
-
-   // LOGOUT TEST
+    // LOGOUT TEST
 
     def "logout button test close" ()  {
         when: 'click the Admin link (if needed)'
@@ -516,32 +512,40 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-
-
-    def "Add a table in Tables and check it"() {
-
+    def addTableAndCheck() {
         String createQuery = page.getQueryToCreateTable()
-        String deleteQuery = page.getQueryToDeleteTable()
+        String deleteQuery = page.getQueryToDeleteTableOnly()
         String tablename = page.getTablename()
+        String deleteQuery1 = page.getQueryToDeleteTableAndView()
+        when:
+        println(createQuery)
+        println(deleteQuery)
+        then:
+        println(tablename)
+
 
         when: 'sql query tab is clicked'
         page.gotoSqlQuery()
         then: 'at sql query'
         at SqlQueryPage
+        report "hello1"
 
         when: 'set query in the box'
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
+        report "hello2"
 
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
         then: 'at DbMonitor Page'
         at DbMonitorPage
+        report "hello3"
 
         when:
         page.searchDatabaseTable(tablename)
         then:
+        report "hello4"
         waitFor(30) {
             !page.databaseTableCurrentPage.text().equals("0")
             !page.databaseTableTotalPage.text().equals("0")
@@ -562,6 +566,7 @@ class DbMonitorTest extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
+        report "delete"
 
         when: 'Db Monitor tab is clicked'
         page.gotoDbMonitor()
@@ -571,6 +576,7 @@ class DbMonitorTest extends TestBase {
         when:
         page.searchDatabaseTable(tablename)
         then:
+        report "delete1"
         waitFor(30) {
             page.databaseTableCurrentPage.text().equals("0")
             page.databaseTableTotalPage.text().equals("0")
@@ -610,7 +616,7 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
-    def "check if Max Rows is clickable"() {
+    def checkIfMaxRowsIsClickable() {
         String before = ""
         String after  = ""
 
@@ -716,18 +722,32 @@ class DbMonitorTest extends TestBase {
 
     // stored procedure ascending descending
 
-        def "check if stored procedure is clickable"() {
+    def CheckIfStoredProcedureIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click stored procedure'
-            try {
-                page.tableInAscendingOrder()
-                before = "ascending"
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-                before = "descending"
-            }
-            waitFor(30) { page.clickStoredProcedure() }
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedure checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedure'
+        page.storedProceduresCheckboxClick()
+
+        try {
+            page.tableInAscendingOrder()
+            before = "ascending"
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            before = "descending"
+        }
+        waitFor(30) { page.clickStoredProcedure() }
         then: 'check if table is in ascending'
             try {
                 page.tableInAscendingOrder()
@@ -768,11 +788,28 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
+    def CheckDataInStoredProcedures() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
 
+        if(!page.storedProceduresTableDisplayed()) {
+            when: 'click Display Preference button'
+            page.openDisplayPreference()
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
 
-    def "Check Data in Stored Procedures"() {
+            when: 'Stored Procedure checkbox is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Add Stored Procedure'
+            page.storedProceduresCheckboxClick()
+            page.savePreferencesBtn.click()
+        }
+
         when:
         page.storedProceduresTableDisplayed()
+        report 'checkafterdisplay'
         then:
         if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
             println("No data displayed-PASS")
@@ -814,7 +851,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-   // ALERT
+    // ALERT
 
     def "set alert and replace trigger alert"() {
         int count = 0
@@ -1201,7 +1238,7 @@ class DbMonitorTest extends TestBase {
     }
 
     //for server ram
-    def "check min value in server ram days"(){
+    def checkMinValueInServerRamDays(){
         int count = 0
 
         when:
@@ -1265,18 +1302,22 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server ram days"(){
+    def CheckMaxValueInServerRamDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){ page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Days")
+
             if(graphView.text().equals("")) {
                 break
             }
         }
+
+
         count = 0
         then:
         String stringMax = ""
@@ -1300,7 +1341,14 @@ class DbMonitorTest extends TestBase {
             }
         }
 
-        String monthMax = page.changeToMonth(stringMax)
+//        waitFor(waitTime){ page.chooseGraphView("Minutes")}
+//
+//        waitFor(waitTime){ page.chooseGraphView("Days")}
+//
+//        stringMax = page.serverrammax.text()
+//        stringMin = page.serverrammin.text()
+
+        String monthMax = waitFor(waitTime){page.changeToMonth(stringMax)}
         String monthMin = page.changeToMonth(stringMin)
 
         String dateMax = page.changeToDate(stringMax)
@@ -1585,10 +1633,11 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster latency days"(){
+    def checkMaxValueInClusterLatencyDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2158,10 +2207,11 @@ class DbMonitorTest extends TestBase {
     }
 
     // for partition idle graph
-    def "check min value in Partition Idle graph with respect to seconds"() {
+    def CheckMinValueInPartitionIdleGraphWithRespectToSeconds() {
         int count = 0
 
         when:
+        page.chooseGraphView("Minutes")
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2246,11 +2296,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster Partition Idle graph with respect to minutes"(){
+    def CheckMinValueInClusterPartitionIdlegraphWithRespecttoMinutes(){
         int count = 0
 
         when:
         // This loop is used to gain time.
+        waitFor(10){page.chooseGraphView("Days")}
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Minutes")
@@ -2332,11 +2383,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster Partition Idle graph with respect to days"(){
+    def checkMinValueInClusterPartitionIdleGraphWithRespectToDays(){
         int count = 0
 
         when:
         // This loop is used to gain time.
+        waitFor(waitTime){ page.chooseGraphView("Minutes")}
         while(count<numberOfTrials) {
             count++
             page.chooseGraphView("Days")
@@ -2396,10 +2448,11 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster Partition Idle graph with respect to days"(){
+    def checkMaxValueInClusterPartitionIdlegraphWithRespecttoDays(){
         int count = 0
 
         when:
+        waitFor(waitTime){page.chooseGraphView("Minutes")}
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2532,16 +2585,33 @@ class DbMonitorTest extends TestBase {
     }
 
 
-
-
-    def "check if Min Latency is clickable"() {
+    def checkIfMinLatencyIsClickable() {
         String before = ""
         String after  = ""
 
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
 
-        when: 'click min latency'
-           println("Stored Procedure table is  displayed")
-           page.clickMinLatency()
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        report "before_save"
+        when: 'click close button'
+        page.savePreferences()
+        report "after_save"
+
+        waitFor(10){
+        println("Stored Procedure table is displayed")
+        page.clickMinLatency()}
 
         then: 'check if max rows is in ascending'
             if (page.tableInAscendingOrder())
@@ -2563,14 +2633,29 @@ class DbMonitorTest extends TestBase {
                 assert false
     }
 
-
-    def "check if Max Latency is clickable"() {
+    def checkIfMaxLatencyIsClickable() {
         String before = ""
         String after  = ""
 
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
 
-        when: 'click max latency'
-        page.clickMaxLatency()
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(10){page.clickMaxLatency()}
         then: 'check if min rows is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2591,12 +2676,38 @@ class DbMonitorTest extends TestBase {
             assert false
     }
 
-    def "check if Avg Latency is clickable"() {
+    def checkIfAvgLatencyIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click avg latency'
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        while (!page.storedProcedure.isDisplayed()) {
+            when: 'click Display Preference button'
+            page.openDisplayPreference()
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            when: 'Stored Procedures checkbox is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Remove Stored Procedures'
+            page.storedProceduresCheckboxClick()
+
+            report "before_save"
+            when: 'click close button'
+            page.savePreferences()
+            then: 'check if avg latency is displayed'
+            waitFor(waitTime) { page.clickAvgLatency() }
+            break
+        }
+
+        when: 'click avg latency for first time'
+        report "after_save"
         page.clickAvgLatency()
+        report "first_click"
         then: 'check if avg rows is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2605,24 +2716,43 @@ class DbMonitorTest extends TestBase {
 
         when: 'click avg latency'
         page.clickAvgLatency()
+        report "after_click"
         then: 'check if avg rows is in descending'
         if ( page.tableInDescendingOrder() )
             after = "descending"
         else
             after = "ascending"
 
+        println(before  + " " + after)
         if ( before.equals("ascending") && after.equals("descending") )
             assert true
         else
             assert false
     }
 
-    def "check if Time of Execution is clickable"() {
+    def CheckIfTimeOfExecutionIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click time of execution'
-        page.clickTimeOfExecution()
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+
+        waitFor(20){page.clickTimeOfExecution()}
         then: 'check if type is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -2827,16 +2957,15 @@ class DbMonitorTest extends TestBase {
         page.serverRamCheckboxClick()
 
         when: 'click close button'
-        page.savePreferences()
+        waitFor(waitTime){page.savePreferences()}
         then: 'no Server RAM displayed'
         page.serverCpuDisplayed()
         !page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
+//        page.partitionIdleTimeDisplayed()
         when: 'click Display Preference button'
-        page.openDisplayPreference()
+        waitFor(waitTime){page.openDisplayPreference()}
         then: 'display title and save button of preferences'
         page.preferencesTitleDisplayed()
         page.savePreferencesBtnDisplayed()
@@ -2880,7 +3009,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         !page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+//        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3109,7 +3238,7 @@ class DbMonitorTest extends TestBase {
     }
 
     /// Test cases relating to Graph end
-    def cleanupSpec() {
+    /*def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
@@ -3123,9 +3252,10 @@ class DbMonitorTest extends TestBase {
         page.openSqlQueryPage()
         then: 'should be on DB Monitor page'
         at SqlQueryPage
-        String deleteQuery = page.getQueryToDeleteTable()
+
+        String deleteQuery = page.getQueryToDeleteTableAndView()
         page.setQueryText(deleteQuery)
 
         page.runQuery()
-    }
+    }*/
 }

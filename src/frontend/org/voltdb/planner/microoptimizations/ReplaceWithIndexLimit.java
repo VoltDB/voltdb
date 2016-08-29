@@ -317,6 +317,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 ispn.setLookupType(IndexLookupType.GTE);
                 ispn.removeLastSearchKey();
                 ispn.addEndExpression(ExpressionUtil.uncombinePredicate(ispn.getInitialExpression()).get(numberOfExprs - 1));
+                ispn.setSkipNullPredicate(numOfSearchKeys);
                 ispn.resetPredicate();
             }
             // add an inline LIMIT plan node to this index scan plan node

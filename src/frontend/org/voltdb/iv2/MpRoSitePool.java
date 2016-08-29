@@ -175,6 +175,15 @@ class MpRoSitePool {
     }
 
     /**
+     * update cluster settings
+     */
+    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_catalogContext = context;
+        m_csp = csp;
+    }
+
+    /**
      * Repair: Submit the provided task to the MpRoSite running the transaction associated
      * with txnId.  This occurs when the MPI has survived a node failure and needs to interrupt and
      * re-run the current MP transaction; this task is used to run the repair algorithm in the site thread.

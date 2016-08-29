@@ -9,14 +9,22 @@ import logging
 import os
 import sys
 
+import mysql.connector
+
 from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
-from six.moves.urllib.error import HTTPError
-from six.moves.urllib.error import URLError
-from six.moves.urllib.request import urlopen
+from urllib2 import HTTPError, URLError, urlopen
 
-import mysql.connector
+# Get job names from environment variables
+COMMUNITY = os.environ.get('community', None)
+PRO = os.environ.get('pro', None)
+
+# Number of failures in a row for a test needed to trigger a new Jira issue
+TOLERANCE = 3
+
+# Slack channel to notify if and when issue is reported
+JUNIT = os.environ.get('junit', None)
 
 
 class Stats(object):
@@ -26,11 +34,12 @@ class Stats(object):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.cmdhelp = """
-        usage: junit-stats <job> <range>
-        ex: junit-stats branch-2-pro-junit-master 800-802
+        usage: junit-stats <job> <build_range>
+        ex: junit-stats branch-2-pro-junit-master 800-990
         ex: junit-stats branch-2-community-junit-master 550-550
+        You can also specify 'job' and 'build_range' environment variables
         """
-        logging.basicConfig(filename='junit-stats.log')
+        logging.basicConfig(stream=sys.stdout)
 
     def read_url(self, url):
         """
@@ -49,9 +58,9 @@ class Stats(object):
             logging.exception('Something unexpected went wrong.')
         return data
 
-    def build_history(self, job, build_range):
+    def get_build_data(self, job, build_range):
         """
-        Displays build history for a job. Can specify an inclusive build range.
+        Gets build data for a job. Can specify an inclusive build range.
         For every build specified on the job, saves the test results
         :param job: Full job name on Jenkins
         :param build_range: Build range that exists for the job on Jenkins, ie "700-713", "1804-1804"
@@ -122,6 +131,7 @@ class Stats(object):
                     percent = fails * 100.0 / total
 
                 # Get timestamp job ran on.
+                # Appears to be same url as build_url
                 job_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
                 job_report = self.read_url(job_url)
                 if job_report is None:
@@ -181,9 +191,8 @@ class Stats(object):
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            report_url = child['child']['url'] + 'testReport/'
-                            report_url = report_url + \
-                                         name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
+                            testcase_url = child['child']['url'] + 'testReport/' + name
+                            testcase_url.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
                             # Record tests that don't pass.
                             if status != 'PASSED':
                                 test_data = {
@@ -191,7 +200,7 @@ class Stats(object):
                                     'job': job,
                                     'status': status,
                                     'timestamp': test_stamp,
-                                    'url': report_url,
+                                    'url': testcase_url,
                                     'build': build,
                                     'host': host
                                 }
@@ -220,18 +229,36 @@ class Stats(object):
         cursor.close()
         db.close()
 
+        if job != PRO and job != COMMUNITY:
+            return
+
         try:
             jenkinsbot = JenkinsBot()
             for issue in issues:
-                error_url = issue['url']
-                error_report = self.read_url(error_url)
+                # Only report pro and community job
 
-                if error_report is not None:
-                    age = error_report['age']
-                    summary = issue['name'] + ' has failed ' + str(age) + ' times in a row on ' + issue['job']
-                    description = error_url + '\n' + error_report['errorStackTrace']
-                    jenkinsbot.create_bug_issue(age, issue, summary, description, 'Core', 'V6.6',
-                                                'junit-consistent-failure')
+                error_url = issue['url']
+                error_report = self.read_url(error_url + '/api/python')
+
+                if error_report is None:
+                    continue
+
+                age = error_report['age']
+                yesterday = datetime.now() - timedelta(days=1)
+                timestamp = issue['timestamp']
+                old = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') < yesterday
+
+                # Don't file ticket if age within tolerance and this failure happened over one day ago
+                if age < TOLERANCE and old:
+                    continue
+
+                failed_since = error_report['failedSince']
+                summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
+                description = error_url + '\n' + error_report['errorStackTrace']
+                current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
+                                                    'master/version.txt'))
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
+                                            ['junit-consistent-failure', 'automatic'])
         except:
             logging.exception('Error with creating issue')
 
@@ -249,4 +276,4 @@ if __name__ == '__main__':
     if len(args) > 2:
         build_range = args[2]
 
-    stats.build_history(job, build_range)
+    stats.get_build_data(job, build_range)

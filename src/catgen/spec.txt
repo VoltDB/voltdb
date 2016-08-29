@@ -21,7 +21,6 @@ begin Cluster                      "A set of connected hosts running one or more
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
-  int hostcount                   "The number of hosts in the cluster"
   int kfactor                     "The required k-safety factor"
   int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"
@@ -244,6 +243,7 @@ begin Column                    "A table column"
   ConstraintRef* constraints    "Constraints that use this column"
   int aggregatetype             "If part of a materialized view, represents aggregate type"
   Column? matviewsource         "If part of a materialized view, represents source column"
+  MaterializedViewInfo? matview "Deprecated, keep for DR back-compatible reason."
   bool inbytes                  "If a varchar column and size was specified in bytes"
 end
 

@@ -165,6 +165,7 @@ public class SystemProcedureCatalog {
         /* @ExecuteTask is a all-in-one system store procedure and should be ONLY used for internal purpose */
         builder.put("@ExecuteTask",             new Config("org.voltdb.sysprocs.ExecuteTask",              false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true));
         builder.put("@ExecuteTask_SP",          new Config("org.voltdb.sysprocs.ExecuteTask_SP",           true,  false, false, 0,    VoltType.VARBINARY, false, false, true,  true,      true));
+        builder.put("@UpdateSettings",          new Config("org.voltdb.sysprocs.UpdateSettings",           false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true));
         builder.put("@Ping",                    new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false));
         builder.put("@GetPartitionKeys",        new Config(null,                                           false, true,  true,  0,    VoltType.INVALID,   false, false, true,  true,      false));
         builder.put("@Subscribe",               new Config(null,                                           false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false));

@@ -23,6 +23,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -32,18 +33,28 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 
+/**
+ * This class gives an abstract interface for processes run using valgrind.  It has two
+ * important member functions, waitForShutdown() and destroy().  These are noops when
+ * not running valgrind.  When a valgrind process is run these operations manage the
+ * valgrind process and its output.
+ */
 public class EEProcess {
     private Process m_eeProcess;
     private String m_eePID = null;
     private Thread m_stderrParser = null;
     private Thread m_stdoutParser = null;
-    // Has a received String from Valgrind saying that all heap blocks were
-    // freed
-    // ignored when running directly againsts the IPC client
-    private boolean m_allHeapBlocksFreed = false;
     private int m_port;
 
     private final boolean verbose = true;
+
+    //
+    // Valgrind will write its output in this file.  The %s will be
+    // replaced by the literal string "%p" or else the stringified
+    // version of the pid.  The former is used to tell valgrind itself
+    // the name.  The latter is used to open up the file.
+    //
+    private static String VALGRIND_OUTPUT_FILE_PATTERN = "valgrind_%s.xml";
 
     public int port() {
         return m_port;
@@ -73,6 +84,11 @@ public class EEProcess {
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
         args.add("--error-exitcode=-1");
+        args.add("--suppressions=tests/ee/test_utils/vdbsuppressions.supp");
+        args.add("--xml=yes");
+        // We will write valgrind output to a file.  The %p is replaced by
+        // valgrind with the process id of the launched process.
+        args.add(String.format("--xml-file=%s", String.format(VALGRIND_OUTPUT_FILE_PATTERN, "%p")));
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant
          * check In that scenario junit will handle logging of Valgrind
@@ -192,7 +208,7 @@ public class EEProcess {
         }
 
         /*
-         * Create a thread to parse Valgrind's output and populdate
+         * Create a thread to parse Valgrind's output and populate
          * m_valgrindErrors with errors.
          */
         final Process p = m_eeProcess;
@@ -233,6 +249,7 @@ public class EEProcess {
         m_stderrParser = new Thread() {
             @Override
             public void run() {
+                File valgrindOutputFile = null;
                 while (true) {
                     try {
                         final String line = stderr.readLine();
@@ -240,9 +257,6 @@ public class EEProcess {
                             if (verbose) {
                                 System.err.println("[ipc=" + p.hashCode()
                                                    + "]:::" + line);
-                            }
-                            if (line.startsWith("==" + m_eePID + "==")) {
-                                processValgrindOutput(line);
                             }
                         } else {
                             try {
@@ -257,37 +271,31 @@ public class EEProcess {
                                          + "] Returned end of stream and exit value "
                                          + p.exitValue());
                             }
-                            if (!m_allHeapBlocksFreed) {
-                                m_valgrindErrors
-                                .add("Not all heap blocks were freed");
-                            }
+                            valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
+                            // Note: This will not delete the valgrind output file.
+                            ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
                     } catch (final IOException e) {
                         e.printStackTrace();
                         return;
+                    } finally {
+                        //
+                        // Don't delete the valgrind file if there are any
+                        // errors.
+                        //
+                        if (valgrindOutputFile != null && m_valgrindErrors.size() == 0) {
+                            try {
+                                valgrindOutputFile.delete();
+                            } catch (Exception ex) {
+                                // We don't really care about this.
+                                ;
+                            }
+                        }
                     }
                 }
             }
 
-            private void processValgrindOutput(final String line) {
-                final String errorLineString = "ERROR SUMMARY: ";
-                final String heapBlocksFreedString = "All heap blocks were freed";
-                /*
-                 * An indirect way of making sure Valgrind reports no error
-                 * memory accesses
-                 */
-                if (line.contains(errorLineString)) {
-                    final int index = line.indexOf(errorLineString)
-                    + errorLineString.length();
-                    final char errorNumChar = line.charAt(index);
-                    if (!(errorNumChar == '0')) {
-                        m_valgrindErrors.add(line);
-                    }
-                } else if (line.contains(heapBlocksFreedString)) {
-                    m_allHeapBlocksFreed = true;
-                }
-            }
         };
 
         m_stdoutParser.setDaemon(false);

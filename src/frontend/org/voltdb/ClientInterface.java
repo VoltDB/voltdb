@@ -142,6 +142,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
@@ -1954,5 +1956,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         return true;
+    }
+
+    public AuthUser getInternalUser() {
+        return m_catalogContext.get().authSystem.getInternalAdminUser();
     }
 }

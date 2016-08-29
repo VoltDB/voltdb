@@ -28,6 +28,7 @@ import re
 import random
 import time
 import datetime
+from math import ceil
 from sys import maxint
 from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
@@ -49,24 +50,57 @@ fn_generator = field_name_generator()
 
 class IntValueGenerator:
     """This is the base generator for integers.
+       Typically, integer values would be specified as, e.g., _value[int:0,10],
+       which would yield a small number of random values (two, by default)
+       between 0 and 10 (inclusive). However, it is also possible to specify a
+       count, e.g., _value[int:0,10;5] would yield five random values between
+       0 and 10; or you can specify a step, e.g., _value[int:0,10,2] (note the
+       comma, rather than semi-colon) would yield the (non-random) values
+       0, 2, 4, 6, 8, 10; or, you may specify both, e.g., _value[int:6,12,3;9]
+       would yield the 9 (non-random) values 6, 9, 12, 8, 11, 7, 10, 6, 9;
+       notice how the values increase by 3, but cycle around via the mod (%)
+       operator, always between the specified min of 6 and max of 12.
+       It is also possible to specify the type of integer you want, i.e.:
+       _value[byte], _value[int16], _value[int32], or _value[int64], though in
+       that case you will always get random values, whose min and max values
+       are defined for you.
+       You may also specify a null percentage, e.g., _value[byte null25] will
+       yield random byte values (between -127 and 127, inclusive), with a 25%
+       chance of being null.
     """
 
     def __init__(self):
         self.__min = -maxint - 1
         self.__max = maxint
+        self.__step = 0
+        self.__count = 0
         self.__nullpct = 0
 
-    def set_min_max(self, min, max):
+    def set_min_max(self, min, max, step=0):
         self.__min = int(min)
         self.__max = int(max)
+        self.__step = int(step)
+        # If step is specified by count is not, set it large enough to cover
+        # the range between min and max, with the given step size
+        if step and not self.__count:
+            self.__count = int(ceil( (self.__max + 1.0 - self.__min) / self.__step ))
+
+    def set_count(self, count):
+        self.__count = int(count)
 
     def set_nullpct(self, nullpct):
         self.__nullpct = nullpct
 
     def generate_values(self, count):
-        for i in xrange(count):
+        for i in xrange(max(count, self.__count)):
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
+            # If the step was specified, return non-random integer values,
+            # starting with the min, ending with the max, increasing by the
+            # step, and cycling around via the mod (%) operator, if the count
+            # requires additional values
+            elif self.__step:
+                yield self.__min + ((i*self.__step) % (self.__max+1 - self.__min))
             else:
                 yield random.randint(self.__min, self.__max)
 
@@ -222,7 +256,7 @@ class PolygonValueGenerator:
     def set_nullpct(self, nullpct):
         self.__nullpct = nullpct
 
-    def set_num_holes(self, num_holes):
+    def set_count(self, num_holes):
         self.__num_holes = int(num_holes)
 
     def generate_vertex(self, longmin, longmax, latmin, latmax):
@@ -446,16 +480,16 @@ class BaseGenerator:
     MAX_VALUE_PATTERN_GROUP =                                                                                                 "max" # optional max (only for numeric values)
     #                   |       |             |                      |                                  |                      |
     __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*)),(?P<max>(-?\d*\.?\d*))" \
-                      r"(,(?P<latmin>(-?\d*\.?\d*)),(?P<latmax>(-?\d*\.?\d*)))?)?(;(?P<numholes>(-?\d+)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                         |                         |                         |                                     |                    |
-    #                         |                         |                         |                                     |                    end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                                                                          "nullpct" # optional null percentage
-    #                         |                         |                         |
-    NUM_HOLES_PATTERN_GROUP   =                                                  "numholes" # number of holes (only for polygon values)
-    #                         |                         |                         |
-    MAX_LAT_PATTERN_GROUP   =                          "latmax" # optional latitude max (only for geo values)
+                      r"(,(?P<latmin>(-?\d*\.?\d*))(,(?P<latmax>(-?\d*\.?\d*)))?)?)?(;(?P<numholes>(-?\d+)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                          |                                |                                  |                    |
+    #                         |                          |                                |                                  |                    end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                                                                               "nullpct" # optional null percentage
+    #                         |                          |                                |
+    NUM_HOLES_PATTERN_GROUP   =                                                          "numholes" # number of holes (for polygon values); or the count (for int values)
+    #                         |                          |
+    MAX_LAT_PATTERN_GROUP   =                           "latmax" # optional latitude max (only for geo values)
     #                         |
-    MIN_LAT_PATTERN_GROUP   ="latmin" # optional latitude min (only for geo values)
+    MIN_LAT_PATTERN_GROUP   ="latmin" # optional latitude min (for geo values); or the step (for int values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
@@ -786,6 +820,7 @@ class ConstantGenerator(BaseGenerator):
     def __init__(self):
         BaseGenerator.__init__(self, "_value")
 
+        self.__count = COUNT
         self.__type = None
 
     def prepare_params(self, attribute_groups):
@@ -803,13 +838,16 @@ class ConstantGenerator(BaseGenerator):
         self.__value_generator = ConstantGenerator.TYPES[self.__type]()
 
         if min is not None and max is not None:
-            if latmin is not None and latmax is not None:
-                self.__value_generator.set_min_max(min, max, latmin, latmax)
+            if latmin is not None:
+                if latmax is not None:
+                    self.__value_generator.set_min_max(min, max, latmin, latmax)
+                else:
+                    self.__value_generator.set_min_max(min, max, latmin)
             else:
                 self.__value_generator.set_min_max(min, max)
 
         if numholes is not None:
-            self.__value_generator.set_num_holes(numholes)
+            self.__value_generator.set_count(numholes)
 
         nullpct = attribute_groups[BaseGenerator.NULL_PCT_PATTERN_GROUP]
         if nullpct:
@@ -817,7 +855,7 @@ class ConstantGenerator(BaseGenerator):
 
 
     def next_param(self):
-        for i in self.__value_generator.generate_values(COUNT):
+        for i in self.__value_generator.generate_values(self.__count):
             if i == None:
                 i = u"NULL"
             elif isinstance(i, basestring):
@@ -1033,7 +1071,19 @@ class Template:
         lines_out = []
         self.__macros = {}
         self.__generators = {}
+        previous_continued_line = ''
         for line in self.__lines:
+            # Allow the use of '\' as a line-continuation character
+            if previous_continued_line:
+                line = previous_continued_line + line
+            if line.endswith('\\'):
+                previous_continued_line = line[:-1] + ' '
+                continue
+            elif line.endswith('\\\n'):
+                previous_continued_line = line[:-2] + ' '
+                continue
+            else:
+                previous_continued_line = ''
             if line.startswith('{'):
                 match = Template.MACRO_DEFINE_PATTERN.search(line)
                 if match:

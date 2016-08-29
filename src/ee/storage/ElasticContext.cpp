@@ -250,13 +250,14 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
                                          TableTuple &targetTuple)
 {
     if (m_indexActive) {
-        StreamPredicateList &predicates = getPredicates();
-        assert(predicates.size() > 0);
         if (m_surgeon.indexHas(sourceTuple)) {
             m_surgeon.indexRemove(sourceTuple);
-        }
-        if (predicates[0].eval(&targetTuple).isTrue()) {
-            m_surgeon.indexAdd(targetTuple);
+            // If the tuple is pending delete, it's held on by COW but
+            // shouldn't be accessible anymore. So don't add it back to
+            // elastic index.
+            if (!targetTuple.isPendingDelete()) {
+                m_surgeon.indexAdd(targetTuple);
+            }
         }
     }
 }

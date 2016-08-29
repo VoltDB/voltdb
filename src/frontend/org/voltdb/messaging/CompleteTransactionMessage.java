@@ -79,9 +79,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISRESTART, isRestart);
     }
 
-    public CompleteTransactionMessage(CompleteTransactionMessage msg)
+    public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
     {
-        super(msg.getInitiatorHSId(), msg.getCoordinatorHSId(), msg);
+        super(initiatorHSId, coordinatorHSId, msg);
         m_hash = msg.m_hash;
         m_flags = msg.m_flags;
     }

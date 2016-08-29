@@ -193,6 +193,27 @@ public class MatchChecks {
         return statsString;
     }
 
+    protected static String getClusterState(Client client) {
+        VoltTable sysinfo = null;
+
+        try {
+            sysinfo = client.callProcedure("@SystemInformation", "OVERVIEW").getResults()[0];
+        } catch (Exception e) {
+            log.warn("system info query failed");
+            return "";
+        }
+
+        for (int i = 0; i < sysinfo.getRowCount(); i++)
+        {
+            sysinfo.advanceRow();
+            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
+            {
+                return (String) sysinfo.get("VALUE",VoltType.STRING);
+            }
+        }
+        return "";
+    }
+
     protected static long[] getImportValues(Client client) {
         VoltTable importStats = statsCall(client);
         long stats[] = {0, 0, 0, 0};

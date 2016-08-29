@@ -202,12 +202,22 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         File napFH = new File(logDH, "volt.log");
 
         Logger rootLogger = LogManager.getRootLogger();
-        Appender current = rootLogger.getAppender("file");
+        DailyRollingFileAppender oap = null;
 
-        checkArgument(current != null, "failed to locate the file appender");
-        checkArgument(current instanceof DailyRollingFileAppender, "file appender is not a DailyRollingFileAppender");
+        @SuppressWarnings("unchecked")
+        Enumeration<Appender> appen = rootLogger.getAllAppenders();
+        while (appen.hasMoreElements()) {
+            Appender appndr = appen.nextElement();
+            if (!(appndr instanceof DailyRollingFileAppender)) continue;
+            oap = (DailyRollingFileAppender)appndr;
+            File logFH = new File(oap.getFile());
+            if (!logFH.isAbsolute()) break;
+            oap = null;
+        }
+        if (oap == null) {
+            return;
+        }
 
-        DailyRollingFileAppender oap = (DailyRollingFileAppender)current;
         DailyRollingFileAppender nap = null;
         try {
             if (!logDH.exists() && !logDH.mkdirs()) {
