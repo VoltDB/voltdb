@@ -646,10 +646,12 @@ public final class InvocationDispatcher {
     }
 
     private ClientResponseImpl dispatchPrepareShutdown(StoredProcedureInvocation task) {
-        VoltDB.instance().getHostMessenger().prepareForShutdown();
         VoltDB.instance().setMode(OperationMode.PRE_SHUTDOWN);
         hostLog.info("preparing for cluster shutdown");
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+
+        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        t.addRow(VoltSystemProcedure.STATUS_OK);
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[]{t}, "SUCCESS", task.clientHandle);
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
