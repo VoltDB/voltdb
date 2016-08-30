@@ -262,12 +262,6 @@ public final class InvocationDispatcher {
 
     public final ClientResponseImpl dispatch(StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn, AuthUser user) {
 
-        if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Server shutdown in progress - new transactions are not processed.",
-                    task.clientHandle);
-        }
-
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -281,6 +275,12 @@ public final class InvocationDispatcher {
                             errorMessage + ". This message is rate limited to once every 60 seconds."
                             );
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
+        }
+
+        if (VoltDB.instance().getMode() == OperationMode.PRE_SHUTDOWN && !catProc.getAllowedinshutdown()) {
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Server shutdown in progress - new transactions are not processed.",
+                    task.clientHandle);
         }
 
         // Check for pause mode restrictions before proceeding any further
@@ -384,7 +384,9 @@ public final class InvocationDispatcher {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
-
+            else if (task.procName.equals("@PrepareShutdown")) {
+                return dispatchPrepareShutdown(task);
+            }
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
             if (!MiscUtils.isPro()) {
@@ -641,6 +643,13 @@ public final class InvocationDispatcher {
         });
         return null;
 
+    }
+
+    private ClientResponseImpl dispatchPrepareShutdown(StoredProcedureInvocation task) {
+        VoltDB.instance().getHostMessenger().prepareForShutdown();
+        VoltDB.instance().setMode(OperationMode.PRE_SHUTDOWN);
+        hostLog.info("preparing for cluster shutdown");
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
