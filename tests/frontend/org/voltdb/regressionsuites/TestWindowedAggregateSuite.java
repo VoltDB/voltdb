@@ -152,6 +152,15 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                 + "  PRIMARY KEY (ID, TINY)"
                 + ");"
                 + "PARTITION TABLE P2 ON COLUMN TINY;"
+
+                + "CREATE TABLE P1_ENG_11029 ("
+                + "        ID INTEGER NOT NULL,"
+                + "        TINY TINYINT NOT NULL,"
+                + "        SMALL SMALLINT NOT NULL,"
+                + "        BIG BIGINT NOT NULL,"
+                + "        PRIMARY KEY (ID)"
+                + ");"
+                + "PARTITION TABLE P1_ENG_11029 ON COLUMN ID;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -519,9 +528,16 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
 
         String sql;
 
-        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK FROM (SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB;";
+        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SRANK "
+                + "FROM ( SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB "
+                + "ORDER BY ID, TINY, SMALL, BIG, SRANK;"
+                ;
         validateSubqueryWithWindowedAggregate(client, sql);
-        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) RANK FROM (SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB;";
+
+        sql = "SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SRANK "
+               + "FROM (SELECT *, RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SUBRANK FROM P2 W09) SUB "
+               + "ORDER BY ID, TINY, SMALL, BIG, SRANK;"
+               ;
         validateSubqueryWithWindowedAggregate(client, sql);
     }
 
@@ -572,7 +588,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (0, 'BS', NULL, 2.0);");
         client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (1, 'DS', NULL, 2.0);");
         vt = client.callProcedure("@AdHoc",
-                "SELECT RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK "
+                "SELECT RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) SRANK "
                 + "FROM P1_ENG_10972;").getResults()[0];
         assertContentOfTable(new Object[][] {
             {1},
@@ -582,12 +598,75 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
 
         client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_10972 VALUES (0, 'BS', NULL, 2.0);");
 
-        client.callProcedure("@AdHoc", "SELECT ID, VCHAR, NUM, RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK FROM P1_ENG_10972;");
+        client.callProcedure("@AdHoc", "SELECT ID, VCHAR, NUM, RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) SRANK FROM P1_ENG_10972;");
         vt = client.callProcedure("@AdHoc",
-                "SELECT RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) RANK "
-                + "FROM P1_ENG_10972;").getResults()[0];
+                "SELECT RATIO, RANK() OVER (PARTITION BY ID ORDER BY ABS(NUM) ) SRANK "
+                 + "FROM P1_ENG_10972 "
+                 + "ORDER BY RATIO, SRANK;").getResults()[0];
         assertContentOfTable(new Object[][] {
             {2.0, 1}}, vt);
+    }
+
+    public void testEng11029() throws Exception {
+        // Regression test for ENG-11029
+        Client client = getClient();
+
+        //        CREATE TABLE P1_ENG_11029 (
+        //                ID INTEGER NOT NULL,
+        //                TINY TINYINT NOT NULL,
+        //                SMALL SMALLINT NOT NULL,
+        //                BIG BIGINT NOT NULL,
+        //                PRIMARY KEY (ID)
+        //        );
+        //
+        //        PARTITION TABLE P1_ENG_11029 ON COLUMN ID;
+
+        client.callProcedure("P1_ENG_11029.Insert", 0, 1, 10, 100);
+        client.callProcedure("P1_ENG_11029.Insert", 1, 1, 10, 101);
+        client.callProcedure("P1_ENG_11029.Insert", 2, 2, 12, 102);
+        client.callProcedure("P1_ENG_11029.Insert", 3, 2, 12, 103);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  BIG, "
+                + "  RANK() OVER (PARTITION BY SMALL ORDER BY BIG ) SRANK, "
+                + "  SMALL "
+                + "FROM P1_ENG_11029 "
+                + "ORDER BY BIG, SRANK, SMALL;").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {100, 1, 10},
+            {101, 2, 10},
+            {102, 1, 12},
+            {103, 2, 12}
+        }, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  TINY, "
+                + "  SMALL, "
+                + "  RANK() OVER (PARTITION BY SMALL ORDER BY TINY ) SRANK "
+                + "FROM P1_ENG_11029 "
+                + "ORDER BY TINY, SMALL, SRANK;").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {1, 10, 1},
+            {1, 10, 1},
+            {2, 12, 1},
+            {2, 12, 1}
+        }, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "SELECT "
+                + "  BIG, "
+                + "  RANK() OVER (PARTITION BY TINY ORDER BY SMALL) SRANK "
+                + "FROM P1_ENG_11029 "
+                + "ORDER BY BIG, SRANK;").getResults()[0];
+        assertContentOfTable(new Object [][] {
+            {100, 1},
+            {101, 1},
+            {102, 1},
+            {103, 1}
+        }, vt);
     }
 
     static public junit.framework.Test suite() {

@@ -36,8 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
     public class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Node rejoin completed";
-        final static String m_joinToken = "Node join completed";
         final static String m_hostID = "Host id of this node is: ";
 
         FileWriter m_writer ;

@@ -16,7 +16,8 @@
 {@dmlcolumnpredicate = "_variable[int] @cmp _value[int]"}
 {@idcol = "V_G1"}
 {@numcol = "V_SUM_AGE"}
-{@plus10 = "+ 10"}
+{@plus10 = " + 10"}
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 {@star = "*"}
 {@lhsstar = "*"}
 

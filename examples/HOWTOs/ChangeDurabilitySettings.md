@@ -10,9 +10,9 @@ VoltDB supports the following persistence/durability options:
 How to Use a Deployment File
 -----------------------------------------
 
-In order to change the default persistence settings, you're going to need to start the server with a deployment file. 
+In order to change the default persistence settings, you're going to need to initialize the server with a deployment file.
 
-When you start without one, the server uses a default 1-node deployment file and writes it out to the voltdbroot folder. If you've already run a VoltDB example, you can probably find this default file there. It should have the following contents:
+When you initialize without one, the server uses a default 1-node deployment file and writes it out to the voltdbroot folder. If you've already run a VoltDB example, you can probably find this default file there. It should have the following contents:
 
 ```xml
 <?xml version="1.0"?>
@@ -26,10 +26,11 @@ When you start without one, the server uses a default 1-node deployment file and
 
 So copy that file up one level, or simply create a file named `deployment.xml` with the contents above. You can even borrow a file from the `/examples/HOWTOs/deployment-file-examples` directory.
 
-To start with a deployment file add `-d path/to/deployment.xml` to the VoltDB startup command. For example:
+To start with a deployment file add `-C path/to/deployment.xml` to the VoltDB startup commands. For example:
 
 ```bash
-voltdb create --force -d deployment.xml
+voltdb init --force -C deployment.xml
+voltdb start
 ```
 
 Command Logging
@@ -65,17 +66,15 @@ Paths
 
 By default, all user data written to disk is written to the `voltdbroot` folder, which lives, by default, in the directory where the server process was started.
 
-It is possible to customize where the `voltdbroot` folder is placed using the `paths` element in the deployment file.
+It is possible to specify where the `voltdbroot` folder is placed using the `--dir or -D` init and start command line option.
 
-Note that when you make these changes, the path must be a valid path on all cluster nodes because deployment settings are cluster-wide.
+You can also change the location of the command log, the command log truncation snapshots, any periodic snapshots, and the export overflow data by specifying their respective paths elements in the deployment file provided at `voltdb init` command.
 
-You can also change the location of the command log, the command log truncation snapshots, any periodic snapshots, and the export overflow data.
-
-You can find examples of these changes in section 14.3.4 of the Using VoltDB book. 
+You can find examples of these changes in section 14.3.4 of the Using VoltDB book.
 
 One reason you might want to do this is to use dedicated disks for some of these high-throughput write directories. If disk performance is limiting, separating truncation snapshots and command log data onto different disks may help. It also might help with storage needs, if snapshots are particularly large, for example.
 
-Using VoltDB Section 14.3.4: 
+Using VoltDB Section 14.3.4:
 Configuring Command Logging for Optimal Performance
 Hardware Considerations
 https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php

@@ -584,6 +584,7 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
+
         String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
         String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
         if (exprNode.attributes.containsKey("alias")) {
@@ -603,6 +604,8 @@ public abstract class AbstractParsedStmt {
         tve.setColumnIndex(offset);
         tve.setValueType(rankExpr.getValueType());
         tve.setValueSize(rankExpr.getValueSize());
+        // This tve does not ever need a differentiator.
+        tve.setNeedsNoDifferentiation();
         rankExpr.setDisplayListExpression(tve);
         return tve;
     }

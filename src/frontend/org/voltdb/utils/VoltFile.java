@@ -16,6 +16,7 @@
  */
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.base.Throwables;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -112,6 +113,26 @@ public class VoltFile extends File {
         return tempFile;
     }
 
+    public static File getServerSpecificRoot(String hostId, boolean clearLocalDataDirectories) {
+        try {
+            ensureUserRootExists();
+            //We need this not just number as DR uses 2 clusters and dont have to collide directories.
+            File tempUserDir = new File(m_root, hostId + "-" + String.valueOf(System.nanoTime()));
+            Thread.sleep(0, 1);
+            if (!tempUserDir.isDirectory()) {
+                if (!tempUserDir.mkdir()) {
+                    return null;
+                }
+            }
+            if (clearLocalDataDirectories) {
+                recursivelyDelete(tempUserDir);
+            }
+            return tempUserDir;
+        } catch (Exception ioe) {
+            Throwables.propagate(ioe);
+        }
+        return null;
+    }
     /*
      * Basic kill it with fire. Deletes everything in /tmp/${username} of
      * the actual filesystem (not one of the created subroots)

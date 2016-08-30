@@ -2,9 +2,9 @@
 
 ### Step One: Create a Deployment File
 
-In order to run VoltDB in a cluster, you're going to need to start the server with a deployment file. 
+In order to run VoltDB in a cluster, you're going to need to initialize the server with a deployment file.
 
-When you start without one, the server uses a default 1-node deployment file and writes it out to the voltdbroot folder. If you've already run a VoltDB example, you can probably find this default file there. It should have the following contents:
+When you initialize without one, the server uses a default 1-node deployment file and writes it out to the voltdbroot folder. If you've already run a VoltDB example, you can probably find this default file there. It should have the following contents:
 
 ```xml
 <?xml version="1.0"?>
@@ -18,10 +18,13 @@ When you start without one, the server uses a default 1-node deployment file and
 
 So copy that file up one level, or simply create a file named `deployment.xml` with the contents above. You can even borrow a file from the `/examples/HOWTOs/deployment-file-examples` directory.
 
-To start with a deployment file add `-d path/to/deployment.xml` to the VoltDB startup command. For example:
+To start with a deployment file add `-C path/to/deployment.xml` to the VoltDB startup commands. For example:
 
 ```bash
-voltdb create --force -d deployment.xml -H myhostname
+voltdb init --force -C deployment.xml
+#
+# start a 3 node cluster comprised of server1,server2,server3
+voltdb start -c 3 -H server1,server2
 ```
 
 ### Step Two: Prepare the Client to Connect to Multiple Servers
@@ -54,37 +57,40 @@ If your servers are configured with different ports, you would need to change th
 
 Now save the `run.sh` file.
 
-### Step Two: Choose a Leader
+### Step Two: Choose a set of Coordinator Nodes
 
 Consider our host list again: `voltserver1`, `voltserver2`, and `voltserver3`.
 
-We need to pick a startup leader. This is the node the other nodes will connect to at startup. It can be any node in the list. After startup, the leader has no special role at all. After startup, there are no special nodes in a VoltDB cluster.
+We need to pick a set of coordinator nodes. These are the node the other nodes will connect to at startup. It can be any node in the list. After startup, the coordinators have no special role at all. After startup, there are no special nodes in a VoltDB cluster.
 
-Let's pick `voltserver1` for this example.
+Let's pick `voltserver1, voltserver2` for this example.
 
 ### Step Three: Start VoltDB
 
 On `voltserver1` type:
 
 ```bash
-> voltdb create --force -d deployment -H voltserver1
+> voltdb init --force -C deployment
+> voltdb start -c 3 -H voltserver1,voltserver2
 ```
 
 On `voltserver2` type:
 
 ```bash
-> voltdb create --force -H voltserver1
+> voltdb init --force -C deployment
+> voltdb start -c 3 -H voltserver1,voltserver2
 ```
 
 On `voltserver3` type:
 
 ```bash
-> voltdb create --force -H voltserver1
+> voltdb init --force -C deployment
+> voltdb start -c 3 -H voltserver1,voltserver2
 ```
 
 Now you should have a running cluster. On all three machines you should see the `Server Completed Initialization.` log message.
 
-Note that you can actually specify the deployment on all three nodes, and it will only read the file from the leader node. This allows you to use the _same command line on all three hosts_. This can be quite useful for scripting or even just for copy-pasting.
+Note that you can actually specify the deployment on all three nodes, the deployment files may differ only in the following elements: paths, host count, and admin mode (the last two are ignored).
 
 ### Step Four: Run the Client
 

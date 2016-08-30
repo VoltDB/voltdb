@@ -1,6 +1,6 @@
 -- BASIC SQL Coverage cases.  These represent more-or-less the
 -- simplest possible templates for SQL statements that cover the SQL
--- keywords that we want to support for a version 1 release.
+-- keywords that we want to support.
 --
 -- Required preprocessor template:
 -- {@aftermath = " _math _value[int:1,3]"}

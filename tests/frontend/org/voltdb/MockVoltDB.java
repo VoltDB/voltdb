@@ -557,6 +557,10 @@ public class MockVoltDB implements VoltDBInterface
     public String getPath(String name) {
         return "";
     }
+    @Override
+    public boolean isBare() {
+        return false;
+    }
 
     @Override
     public boolean rejoinDataPending() {

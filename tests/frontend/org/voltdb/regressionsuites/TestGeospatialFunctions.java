@@ -918,7 +918,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where (distance(borders.region, places.loc) <= 50000.1) and borders.pk = 1 "
                 + "order by distance, borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual(prefix, vt2, vt1);
+        assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
 
         // distance argument is null
         sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, NULL);";
@@ -935,7 +935,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from places A, places B where distance(A.loc, B.loc) <= 100000 and A.pk <> B.pk "
                 + "order by distance, A.pk, B.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual(prefix, vt2, vt1);
+        assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
 
         // test results of within using contains function
         prefix = "Assertion failed comparing results from DWithin and Contains functions: ";
@@ -948,7 +948,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where Contains(borders.region, places.loc) "
                 + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual(prefix, vt2, vt1);
+        assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
 
         sql = "select borders.name, places.name "
                 + "from borders, places where NOT DWithin(borders.region, places.loc, 0) "
@@ -959,7 +959,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where NOT Contains(borders.region, places.loc) "
                 + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual(prefix, vt2, vt1);
+        assertTablesAreEqual(prefix, vt2, vt1, GEOGRAPHY_DISTANCE_EPSILON);
     }
 
     public void testPolygonPointDWithinNegative() throws Exception {

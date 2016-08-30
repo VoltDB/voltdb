@@ -111,6 +111,15 @@ public class VoltProjectBuilder {
             assert(this.name != null);
         }
 
+        public ProcedureInfo(final Class<?> cls, final String partitionInfo) {
+            this.roles = new String[0];
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionInfo = partitionInfo;
+            assert(this.name != null);
+        }
+
         public ProcedureInfo(
                 final String roles[],
                 final String name,
@@ -539,7 +548,7 @@ public class VoltProjectBuilder {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(Integer.parseInt(parameter[1].trim()) > 0) {
+                if(parameter.length > 1 && Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");

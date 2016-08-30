@@ -918,6 +918,70 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['status'], 200)
             self.assertEqual(response.status_code, 200)
 
+    def test_invalid_string(self):
+        """ensure invalid string is validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {"dr": {"id": "1", "listen": True, "port": 112}
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'1' is not of type 'integer'")
+            self.assertEqual(response.status_code, 200)
+
+    def test_invalid_boolean(self):
+        """ensure invalid boolean is validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {"dr": {"id": 1, "listen": "true", "port": 112}}
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'true' is not of type 'boolean'")
+            self.assertEqual(response.status_code, 200)
+
+    def test_invalid_number(self):
+        """ensure invalid number is validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {"dr": {"id": 1, "listen": True, "port": "112"}}
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'112' is not of type 'integer'")
+            self.assertEqual(response.status_code, 200)
+
+    def test_additional_properties(self):
+        """ensure additional properties is validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {"dr": {"id": 1, "liste": True, "port": 112}}
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "Additional properties are not allowed (u'liste' was unexpected)")
+            self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

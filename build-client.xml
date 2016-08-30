@@ -188,6 +188,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/Client.java" />
             <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
             <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ClientResponseWithPartitionKey.java" />
+            <include name="src/frontend/org/voltdb/client/AllPartitionProcedureCallback.java" />
             <include name="src/frontend/org/voltdb/client/ClientConfig.java" />
             <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
             <include name="src/frontend/org/voltdb/client/SyncCallback.java" />

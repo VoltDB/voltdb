@@ -137,7 +137,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
                 // TODO Auto-generated method stub
                 return 0;
             }
-
         };
     }
 
@@ -380,6 +379,19 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public boolean callProcedureWithTimeout(ProcedureCallback callback,
             int batchTimeout, String procName, Object... parameters)
             throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)  throws IOException, NoConnectionsException, ProcCallException{
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
+            Object... params)  throws IOException, NoConnectionsException, ProcCallException {
         // TODO Auto-generated method stub
         return false;
     }

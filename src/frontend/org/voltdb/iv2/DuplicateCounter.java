@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -178,6 +179,11 @@ public class DuplicateCounter
     }
 
     int offer(FragmentResponseMessage message)
+    {
+        return checkCommon(0, message.isRecovering(), null, message);
+    }
+
+    int offer(CompleteTransactionResponseMessage message)
     {
         return checkCommon(0, message.isRecovering(), null, message);
     }
