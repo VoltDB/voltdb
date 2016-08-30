@@ -207,11 +207,9 @@ class Distributer {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                synchronized (Distributer.this) {
-                    VoltTable results[] = clientResponse.getResults();
-                    if (results != null && results.length > 0) {
-                        updatePartitioning(results[0]);
-                    }
+                VoltTable results[] = clientResponse.getResults();
+                if (results != null && results.length > 0) {
+                    updatePartitioning(results[0]);
                 }
             }
 
