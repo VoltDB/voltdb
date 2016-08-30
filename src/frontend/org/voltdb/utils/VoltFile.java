@@ -277,34 +277,24 @@ public class VoltFile extends File {
      * These methods override file behavior and prefix a root path to all the files exactly once
      */
     public VoltFile(String pathname) {
-        super(getFixedPathname(pathname, false));
+        super(getFixedPathname(pathname));
     }
 
     /*
      * Given the requested pathname, come up with the altered one based on the value
      * of m_voltFilePrefix
      */
-    private static String getFixedPathname(final String pathname, boolean debug) {
+    private static String getFixedPathname(final String pathname) {
         if (pathname == null || m_voltFilePrefix == null) {
-            if(debug) {
-                System.out.println("VOLTFILE:: file prefix potentially null: " + m_voltFilePrefix == null ? "true " : "false");
-            }
             return pathname;
         }
         if (pathname.contains(m_magic)) {
             if (pathname.contains(m_voltFilePrefix.getAbsolutePath())) {
-                if (debug) {
-                    System.out.println("VOLTFILE::pathname contains prefix");
-                }
                 return pathname;
             }
 
             int offset = pathname.indexOf(m_magic) + m_magic.length();
             String relativePath = pathname.substring(offset);
-            if(debug) {
-                System.out.println("VOLTFILE:: path: " + pathname + ", magic: " + m_magic +
-                        ", prefix path: "+ m_voltFilePrefix.getAbsolutePath() + ", relative path: " + relativePath);
-            }
             // The this is probably a snapshot path and needs to be re-mapped to our snapshot
             // directory because truncation snapshot requests specify absolute paths
             return m_voltFilePrefix.getAbsolutePath() + relativePath;
@@ -313,18 +303,12 @@ public class VoltFile extends File {
         return m_voltFilePrefix + File.separator + pathname;
     }
 
-    public VoltFile(String parent, String child, boolean debugPrint) {
-        super(getFixedPathname(parent, debugPrint), child);
-        //System.out.println("VOLTFILE:::supplied: " + parent + ", computed parent: " + getFixedPathname(parent) + ", voltprefix: " + m_voltFilePrefix.getAbsolutePath());
-    }
-
     public VoltFile(String parent, String child) {
-        super(getFixedPathname(parent, false), child);
-        //System.out.println("VOLTFILE:::supplied: " + parent + ", computed parent: " + getFixedPathname(parent) + ", voltprefix: " + m_voltFilePrefix.getAbsolutePath());
+        super(getFixedPathname(parent), child);
     }
 
     public VoltFile(File parent, String child) {
-        super(getFixedPathname(parent.getPath(), false), child);
+        super(getFixedPathname(parent.getPath()), child);
     }
 
     public VoltFile(VoltFile parent, String child) {

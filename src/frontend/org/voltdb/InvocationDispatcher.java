@@ -991,14 +991,13 @@ public final class InvocationDispatcher {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
             final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
             final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new VoltFile(path, nonce + ".jar", true);
+            final File catalogFH = new VoltFile(path, nonce + ".jar");
 
             final byte[] catalog;
             try {
-                log.info (" Fetch catalog from: " + catalogFH + ". \n JSON " + jsObj.toString());
                 catalog = MiscUtils.fileToBytes(catalogFH);
             } catch (IOException e) {
-                log.warn("Unable to access catalog file " + catalogFH + ". \n JSON " + jsObj.toString(), e);
+                log.warn("Unable to access catalog file " + catalogFH, e);
                 return unexpectedFailureResponse(
                         "Unable to access catalog file " + catalogFH,
                         task.clientHandle);

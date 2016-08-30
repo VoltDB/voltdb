@@ -479,36 +479,24 @@ public class LocalCluster implements VoltServerConfig {
     void startLocalServer(int hostId, boolean clearLocalDataDirectories, StartAction action) throws IOException {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
-
-
         if (!isNewCli) {
             try {
                 if (m_filePrefix != null) {
                     subroot = m_filePrefix;
-                    log.info("LclSrv: " + hostId +"- subroot " + subroot.getAbsolutePath() +
-                            " using file prefix: " + m_filePrefix);
                     m_subRoots.add(subroot);
                 } else if (clearLocalDataDirectories) {
                     subroot = VoltFile.initNewSubrootForThisProcess();
-                    log.info("LclSrvr: " + hostId +"- subroot with INIT_NEW_SUBROOT: " + subroot.getAbsolutePath());
                     m_subRoots.add(subroot);
                 } else {
                     if (m_subRoots.size() <= hostId) {
-                        subroot = VoltFile.initNewSubrootForThisProcess();
-                        m_subRoots.add(subroot);
-                        //m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
-                        log.info("LclSrvr: " + hostId +"- subroot " + subroot.getAbsolutePath() + ", hostid: " + hostId +
-                                " subroot list size: " + m_subRoots.size());
+                        m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
                     }
                     subroot = m_subRoots.get(hostId);
-                    log.info("Fetchd subroot for the cluster with hostid: " + hostId + " path: " + subroot.getAbsolutePath());
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
-
-
 
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -519,12 +507,9 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
             }
         }
-
         if (!isNewCli) {
             cmdln.voltFilePrefix(subroot.getPath());
-            //cmdln.voltRoot(subroot.getPath() + File.separator + m_voltdbroot);
         }
-
         cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
         cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
@@ -722,15 +707,12 @@ public class LocalCluster implements VoltServerConfig {
 
         // create the in-process server instance.
         if (m_hasLocalServer) {
-
             try {
                 //Init
                 if (isNewCli && !skipInit) {
                     initLocalServer(oopStartIndex, clearLocalDataDirectories);
                 }
                 startLocalServer(oopStartIndex, clearLocalDataDirectories);
-                log.info("IN PROCESS server instance, hostid: " + oopStartIndex +
-                        ", subroot: " + getSubRoots().get(oopStartIndex).getAbsolutePath());
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
@@ -739,14 +721,11 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-
             try {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
                 }
                 startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
-                log.info("created OUT OF PROCESS server instance, hostid: " + i +
-                        ", subroot: " + getSubRoots().get(i).getAbsolutePath());
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
@@ -799,7 +778,6 @@ public class LocalCluster implements VoltServerConfig {
 
         // if supposed to kill a server, it's go time
         if (m_failureState != FailureState.ALL_RUNNING) {
-            log.info("kill one: " + m_failureState);
             killOne();
         }
 
@@ -807,7 +785,6 @@ public class LocalCluster implements VoltServerConfig {
         if (m_failureState == FailureState.ONE_RECOVERING) {
             int hostId = m_hasLocalServer ? 1 : 0;
             recoverOne(logtime, startTime, hostId);
-            log.info("recover one");
         }
     }
 
@@ -987,25 +964,18 @@ public class LocalCluster implements VoltServerConfig {
             // If local directories are being cleared
             // generate a new subroot, otherwise reuse the existing directory
             File subroot = null;
-
             if (!isNewCli) {
                 if (m_filePrefix != null) {
                     subroot = m_filePrefix;
                     m_subRoots.add(subroot);
-                    log.info("Strt Srvr: " + hostId + " - subroot:" + subroot.getAbsolutePath() + " using fileprefix: " + m_filePrefix);
                 } else if (clearLocalDataDirectories) {
                     subroot = VoltFile.getNewSubroot();
-                    log.info("Strt Srvr: " + hostId + " - subroot:" + subroot.getAbsolutePath() + " clean dir");
                     m_subRoots.add(subroot);
                 } else {
                     if (m_subRoots.size() <= hostId) {
-                        subroot = VoltFile.getNewSubroot();
-                        log.info("Strt Srvr: " + hostId + " - subroot:" + subroot.getAbsolutePath() + " clean dir, fileprefix: " + m_filePrefix);
-                        m_subRoots.add(subroot);
+                        m_subRoots.add(VoltFile.getNewSubroot());
                     }
                     subroot = m_subRoots.get(hostId);
-                    log.info("Strt Srvr: " + hostId +" - subroot:" + subroot.getAbsolutePath() + " hostid: " + hostId +
-                            " subroots list size: " + m_subRoots.size());
                 }
                 cmdln.voltFilePrefix(subroot.getPath());
                 cmdln.voltRoot(subroot.getPath() + File.separator + m_voltdbroot);
