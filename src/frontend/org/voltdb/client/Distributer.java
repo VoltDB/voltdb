@@ -127,6 +127,7 @@ class Distributer {
 
     private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
     private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
+    private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
 
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
@@ -206,17 +207,16 @@ class Distributer {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                try {
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = clientResponse.getResults();
-                        if (results != null && results.length > 0) {
-                            updatePartitioning(results[0]);
-                        }
+                synchronized (Distributer.this) {
+                    VoltTable results[] = clientResponse.getResults();
+                    if (results != null && results.length > 0) {
+                        updatePartitioning(results[0]);
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
             }
+
+            m_partitionUpdateStatus.set(clientResponse);
+
             if (m_latch != null) {
                 m_latch.countDown();
             }
@@ -1374,12 +1374,7 @@ class Distributer {
             }
         }
 
-
-        try {
-            refreshPartitionKeys(true);
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
-        }
+        refreshPartitionKeys(true);
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
@@ -1466,6 +1461,11 @@ class Distributer {
 
     ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
         refreshPartitionKeys(false);
+
+        if (m_partitionUpdateStatus.get().getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(m_partitionUpdateStatus.get(), null, null);
+        }
+
         return m_partitionKeys.get();
     }
 
@@ -1476,28 +1476,29 @@ class Distributer {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    private void refreshPartitionKeys(boolean topologyUpdate) throws IOException, NoConnectionsException, ProcCallException {
+    private void refreshPartitionKeys(boolean topologyUpdate)  {
 
         long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
         if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
             return;
         }
 
-        ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
-        CountDownLatch latch = null;
+        try {
+            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            CountDownLatch latch = null;
 
-        if (!topologyUpdate) {
-            latch = new CountDownLatch(1);
-        }
-        PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
-        queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
-        if (!topologyUpdate) {
-            try {
-                latch.await();
-            } catch (final InterruptedException e) {
-                throw new java.io.InterruptedIOException("Interrupted while waiting for response");
+            if (!topologyUpdate) {
+                latch = new CountDownLatch(1);
             }
+            PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
+            queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+            if (!topologyUpdate) {
+                latch.await();
+            }
+            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
+        } catch (InterruptedException | IOException e) {
+            m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                    "Fails to fetch partition keys from server:" + e.getMessage()));
         }
-        m_lastPartitionKeyFetched.set(System.currentTimeMillis());
     }
 }
