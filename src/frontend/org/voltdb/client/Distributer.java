@@ -1491,7 +1491,10 @@ class Distributer {
                 latch = new CountDownLatch(1);
             }
             PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
-            queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+            if (!queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT)) {
+                m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                        "Fails to queue the partition update query, please try later."));
+            }
             if (!topologyUpdate) {
                 latch.await();
             }
