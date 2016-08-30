@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -81,7 +82,7 @@ class Distributer {
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
-    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 1000;
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -196,6 +197,12 @@ class Distributer {
      */
     class PartitionUpdateCallback implements ProcedureCallback {
 
+        final CountDownLatch m_latch;
+
+        PartitionUpdateCallback(CountDownLatch latch) {
+            m_latch = latch;
+        }
+
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
@@ -209,6 +216,9 @@ class Distributer {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+            }
+            if (m_latch != null) {
+                m_latch.countDown();
             }
         }
     }
@@ -1033,14 +1043,7 @@ class Distributer {
             }
 
             //Partition key update
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
-            cxn.createWork(System.nanoTime(),
-                    spi.getHandle(),
-                    spi.getProcName(),
-                    serializeSPI(spi),
-                    new PartitionUpdateCallback(),
-                    true,
-                    USE_DEFAULT_CLIENT_TIMEOUT);
+            refreshPartitionKeys(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1370,6 +1373,13 @@ class Distributer {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
         }
+
+
+        try {
+            refreshPartitionKeys(true);
+        } catch (IOException | ProcCallException e) {
+            e.printStackTrace();
+        }
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
@@ -1400,15 +1410,15 @@ class Distributer {
     }
 
     private void updatePartitioning(VoltTable vt) {
-        List<Integer> ketSet = new ArrayList<Integer>();
+        List<Integer> keySet = new ArrayList<Integer>();
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
                 Integer key = (int)(vt.getLong("PARTITION_KEY"));
-                ketSet.add(key);
+                keySet.add(key);
             }
         }
-        m_partitionKeys.set(ImmutableSet.copyOf(ketSet));
+        m_partitionKeys.set(ImmutableSet.copyOf(keySet));
     }
 
     /**
@@ -1455,36 +1465,39 @@ class Distributer {
     }
 
     ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
-        //null check: the topology update uses async update, thus partition info may not be ready upon client connection.
-        if (!m_useClientAffinity || m_partitionKeys.get() == null) {
-            refreshPartitionKeys();
-        }
+        refreshPartitionKeys(false);
         return m_partitionKeys.get();
     }
 
     /**
      * Set up partitions.
+     * @param topologyUpdate  if true, it is called from topology update
      * @throws ProcCallException on any VoltDB specific failure.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    private void refreshPartitionKeys() throws IOException, NoConnectionsException, ProcCallException {
+    private void refreshPartitionKeys(boolean topologyUpdate) throws IOException, NoConnectionsException, ProcCallException {
 
-        long time = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
-        if (time > PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
-            SyncCallback cb = new SyncCallback();
-            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
-            queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+        long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
+        if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
+            return;
+        }
+
+        ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+        CountDownLatch latch = null;
+
+        if (!topologyUpdate) {
+            latch = new CountDownLatch(1);
+        }
+        PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
+        queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+        if (!topologyUpdate) {
             try {
-                cb.waitForResponse();
+                latch.await();
             } catch (final InterruptedException e) {
                 throw new java.io.InterruptedIOException("Interrupted while waiting for response");
             }
-            if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-                throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
-            }
-            updatePartitioning(cb.getResponse().getResults()[0]);
-            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
         }
+        m_lastPartitionKeyFetched.set(System.currentTimeMillis());
     }
 }
