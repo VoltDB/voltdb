@@ -4,28 +4,24 @@ RUN set -e
 
 # Install VoltDB 
 # update repo - Trusty does not seem to have add-repo command by default
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get upgrade -y 
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y  --no-install-recommends --no-install-suggests install python-software-properties && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+                                   apt-get upgrade -y && \
+                                   apt-get -y  --no-install-recommends --no-install-suggests install python-software-properties && \
                                    apt-get -y  --no-install-recommends --no-install-suggests install software-properties-common
 
-RUN add-apt-repository -y  ppa:openjdk-r/ppa 
-
-RUN apt-get update && \
+RUN add-apt-repository -y  ppa:openjdk-r/ppa && \
+    apt-get update && \
     apt-get install -y  --no-install-recommends --no-install-suggests openjdk-8-jdk wget 
 
-# get the voltdb image
-COPY voltdb-ent-6.6rc1.tar.gz .
-RUN tar -zxvf voltdb-ent-6.6rc1.tar.gz
-
-
 ENV VOLTDB_DIST=/opt/voltdb
+ENV PATH=$PATH:$VOLTDB_DIST/bin
 
-# layout voltdb image and update path
-RUN mkdir $VOLTDB_DIST && \
+# get the voltdb image and layout voltdb image
+COPY voltdb-ent-6.6rc1.tar.gz .
+RUN tar -zxvf voltdb-ent-6.6rc1.tar.gz && \
+    mkdir $VOLTDB_DIST && \
     cp -r voltdb-ent-6.6/* $VOLTDB_DIST && \
     rm -r voltdb-ent-6.6 voltdb-ent-6.6rc1.tar.gz
-
-ENV PATH=$PATH:$VOLTDB_DIST/bin
 
 # Set locale-related environment variables
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en
