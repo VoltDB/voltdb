@@ -24,13 +24,17 @@ To start or add a server to your cluster, invoke run.sh with the "server" parame
 
 		./run.sh server [leader]
 
-For example, to start a cluster with 3 nodes (host0(leader), host1, host2), type following command on those hosts:
+For example, to start a cluster with 3 nodes (host0(leader), host1, host2), set hostcount="3" in deployment.xml. Then type the following command on those hosts:
 
 		./run.sh server host0
 
 If leader host is not provided, by default "localhost" is used.
 
-You can specify other server configurations such as hostcount, sitesperhost or kfactor in deployment.xml.
+You can also specify other server configurations such as hostcount, sitesperhost or kfactor in deployment.xml.
+
+Lastly, let VoltDB load the schema and stored procedures:
+
+		./run.sh init
 
 Run Workload
 --------------------
