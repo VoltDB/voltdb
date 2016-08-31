@@ -236,12 +236,12 @@ public class MaterializedViewProcessor {
                     // Correctly set the type of the column so that it's consistent.
                     // Otherwise HSQLDB might promote types differently than Volt.
                     destColumn.setType(col.expression.getValueType().getValue());
-                    if (! col.expression.getValueType().isVariableLength()) {
-                        destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
-                    }
-                    else {
+                    if (col.expression.getValueType().isVariableLength()) {
                         destColumn.setSize(col.expression.getValueSize());
                         destColumn.setInbytes(col.expression.getInBytes());
+                    }
+                    else {
+                        destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
                     }
 
                     // Set the expression type here to determine the behavior of the merge function.
@@ -353,7 +353,11 @@ public class MaterializedViewProcessor {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     destColumn.setType(col.expression.getValueType().getValue());
-                    if (! col.expression.getValueType().isVariableLength()) {
+                    if (col.expression.getValueType().isVariableLength()) {
+                        destColumn.setSize(col.expression.getValueSize());
+                        destColumn.setInbytes(col.expression.getInBytes());
+                    }
+                    else {
                         destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
                     }
                 }
@@ -374,7 +378,11 @@ public class MaterializedViewProcessor {
                     // Correctly set the type of the column so that it's consistent.
                     // Otherwise HSQLDB might promote types differently than Volt.
                     destColumn.setType(col.expression.getValueType().getValue());
-                    if (! col.expression.getValueType().isVariableLength()) {
+                    if (col.expression.getValueType().isVariableLength()) {
+                        destColumn.setSize(col.expression.getValueSize());
+                        destColumn.setInbytes(col.expression.getInBytes());
+                    }
+                    else {
                         destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
                     }
                 }

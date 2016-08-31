@@ -1883,7 +1883,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         client.callProcedure("P2_ENG_11074.Insert", 0, "alpha", "beta", "gamma", 6.66);
         client.callProcedure("P2_ENG_11074.Insert", 1, "aleph", "beth", "gimel", 6.66);
 
-        vt = client.callProcedure("@AdHoc", "select * from v_eng_11074").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select * from vjoin_eng_11074").getResults()[0];
         assertContentOfTable(new Object[][] {{2, "gamma"}}, vt);
 
         vt = client.callProcedure("@AdHoc", "select * from v1_eng_11074").getResults()[0];
