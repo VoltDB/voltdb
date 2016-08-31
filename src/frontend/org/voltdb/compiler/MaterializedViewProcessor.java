@@ -29,6 +29,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -233,16 +234,7 @@ public class MaterializedViewProcessor {
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    // Correctly set the type of the column so that it's consistent.
-                    // Otherwise HSQLDB might promote types differently than Volt.
-                    destColumn.setType(col.expression.getValueType().getValue());
-                    if (col.expression.getValueType().isVariableLength()) {
-                        destColumn.setSize(col.expression.getValueSize());
-                        destColumn.setInbytes(col.expression.getInBytes());
-                    }
-                    else {
-                        destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
-                    }
+                    setTypeAttributesForColumn(destColumn, col.expression);
 
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
@@ -352,14 +344,7 @@ public class MaterializedViewProcessor {
                 for (int i=0; i<=stmt.m_groupByColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    destColumn.setType(col.expression.getValueType().getValue());
-                    if (col.expression.getValueType().isVariableLength()) {
-                        destColumn.setSize(col.expression.getValueSize());
-                        destColumn.setInbytes(col.expression.getInBytes());
-                    }
-                    else {
-                        destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
-                    }
+                    setTypeAttributesForColumn(destColumn, col.expression);
                 }
 
                 // parse out the aggregation columns into the dest table
@@ -375,16 +360,7 @@ public class MaterializedViewProcessor {
                     processMaterializedViewColumn(srcTable, destColumn,
                             col.expression.getExpressionType(), tve);
 
-                    // Correctly set the type of the column so that it's consistent.
-                    // Otherwise HSQLDB might promote types differently than Volt.
-                    destColumn.setType(col.expression.getValueType().getValue());
-                    if (col.expression.getValueType().isVariableLength()) {
-                        destColumn.setSize(col.expression.getValueSize());
-                        destColumn.setInbytes(col.expression.getInBytes());
-                    }
-                    else {
-                        destColumn.setSize(col.expression.getValueType().getMaxLengthInBytes());
-                    }
+                    setTypeAttributesForColumn(destColumn, col.expression);
                 }
 
                 if (srcTable.getPartitioncolumn() != null) {
@@ -918,6 +894,34 @@ public class MaterializedViewProcessor {
             candidate = index;
         }
         return candidate;
+    }
+
+    private static void setTypeAttributesForColumn(Column column, AbstractExpression expr) {
+        VoltType voltTy = expr.getValueType();
+        column.setType(voltTy.getValue());
+
+        if (expr.getValueType().isVariableLength()) {
+            int viewColumnLength = expr.getValueSize();
+
+            int lengthInBytes = expr.getValueSize();
+            lengthInBytes = expr.getInBytes() ? lengthInBytes : lengthInBytes * 4;
+
+            // We don't create a view column that is wider than the default.
+            if (lengthInBytes < voltTy.defaultLengthForVariableLengthType()) {
+                column.setSize(viewColumnLength);
+                column.setInbytes(expr.getInBytes());
+            }
+            else {
+                // Declining to create a view column that is wider than the default.
+                // This ensures that if there are a large number of aggregates on a string
+                // column that we have a reasonable chance of not exceeding the static max row size limit.
+                column.setSize(voltTy.defaultLengthForVariableLengthType());
+                column.setInbytes(true);
+            }
+        }
+        else {
+            column.setSize(voltTy.getMaxLengthInBytes());
+        }
     }
 
     private static boolean isInvalidIndexCandidate(int idxSize, int gbSize, int diffAllowance) {
