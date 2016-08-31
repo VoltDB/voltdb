@@ -384,9 +384,7 @@ public final class InvocationDispatcher {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
-            else if (task.procName.equals("@PrepareShutdown")) {
-                return dispatchPrepareShutdown(task);
-            }
+
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
             if (!MiscUtils.isPro()) {
@@ -440,7 +438,7 @@ public final class InvocationDispatcher {
 
         // Verify that admin mode sysprocs are called from a client on the
         // admin port, otherwise return a failure
-        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName)) && !handler.isAdmin()) {
+        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName) || "@PrepareShutdown".equals(task.procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
                     task.procName + " is not available to this client",
                     task.clientHandle);
@@ -643,15 +641,6 @@ public final class InvocationDispatcher {
         });
         return null;
 
-    }
-
-    private ClientResponseImpl dispatchPrepareShutdown(StoredProcedureInvocation task) {
-        VoltDB.instance().setMode(OperationMode.PRE_SHUTDOWN);
-        hostLog.info("preparing for cluster shutdown");
-
-        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(VoltSystemProcedure.STATUS_OK);
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[]{t}, "SUCCESS", task.clientHandle);
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
