@@ -362,9 +362,10 @@ class VoltDatabase:
         if add_server and server_ip != '':
             verb = 'add'
         host_count = self.get_host_count()
+        host_list = self.get_host_list()
         if verb == 'start':
             if pause.lower() == 'true':
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', primary, '-c',
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', host_list, '-c',
                               str(host_count), '-D', config_path]
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c',
@@ -373,7 +374,7 @@ class VoltDatabase:
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), 'start', '--add', '--host=' + server_ip,
                           '-D', config_path]
         else:
-            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c',
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-c',
                           str(host_count), '-D', config_path]
 
         self.build_network_options(server, voltdb_cmd)
@@ -635,3 +636,19 @@ class VoltDatabase:
         current_db = HTTPListener.Global.DATABASES.get(self.database_id)
         host_count = len(current_db['members'])
         return host_count
+
+    def get_host_list(self):
+        current_db = HTTPListener.Global.DATABASES.get(self.database_id)
+        if not current_db:
+            abort(404)
+
+        host_count = 0
+        host_list = ''
+        for host in current_db['members']:
+            current_server = HTTPListener.Global.SERVERS.get(int(host))
+            if host_count == 0:
+                host_list = current_server['hostname']
+            else:
+                host_list += ',' + current_server['hostname']
+            host_count += 1
+        return host_list
