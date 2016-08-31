@@ -277,7 +277,7 @@ public final class InvocationDispatcher {
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
 
-        if (VoltDB.instance().getMode() == OperationMode.PRE_SHUTDOWN && !catProc.getAllowedinshutdown()) {
+        if (VoltDB.instance().isShuttingdown() && !catProc.getAllowedinshutdown()) {
             return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0], "Server shutdown in progress - new transactions are not processed.",
                     task.clientHandle);

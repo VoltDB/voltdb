@@ -87,6 +87,8 @@ public interface VoltDBInterface
      * @return
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
+    public boolean isShuttingdown();
+    public void setShuttingdown(boolean shuttingdown);
 
     boolean isMpSysprocSafeToExecute(long txnId);
 

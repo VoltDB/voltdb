@@ -23,7 +23,7 @@ import com.google_voltpatches.common.base.Charsets;
  * All the operational modes VoltDB can be in
  */
 public enum OperationMode {
-    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN, PRE_SHUTDOWN;
+    INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN;
 
     private final byte [] bytes;
 

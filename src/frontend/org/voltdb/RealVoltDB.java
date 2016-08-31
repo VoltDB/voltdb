@@ -255,6 +255,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // m_safeMpTxnId to prevent the race. The m_safeMpTxnId is updated once in the
     // lifetime of the node to reflect the first MP txn that witnessed the flip of
     // m_rejoinDataPending.
+
+    //This can not be true if server is not PAUSED
+    private boolean m_shuttingdown = false;
+
     private final Object m_safeMpTxnIdLock = new Object();
     private long m_lastSeenMpTxnId = Long.MIN_VALUE;
     private long m_safeMpTxnId = Long.MAX_VALUE;
@@ -322,6 +326,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_rejoinDataPending;
     }
 
+    @Override
+    public boolean isShuttingdown() {
+        return m_shuttingdown;
+    }
+    @Override
+    public void setShuttingdown(boolean shuttingdown){
+        m_shuttingdown = shuttingdown;
+    }
     @Override
     public boolean isMpSysprocSafeToExecute(long txnId)
     {

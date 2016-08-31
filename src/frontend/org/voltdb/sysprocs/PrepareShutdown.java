@@ -56,16 +56,17 @@ public class PrepareShutdown extends VoltSystemProcedure
         // Choose the lowest site ID on this host to actually flip the bit
         if (ctx.isLowestSiteId())
         {
-            VoltDB.instance().setMode(OperationMode.PRE_SHUTDOWN);
             new VoltLogger("HOST").warn("VoltDB is preparing for shutdown.");
+            VoltDB.instance().setMode(OperationMode.PAUSED);
             try {
                 VoltDB.instance().getHostMessenger().getZK().setData(
                         VoltZK.operationMode,
-                        OperationMode.PRE_SHUTDOWN.getBytes(), -1);
-                VoltDB.instance().getHostMessenger().prepareForShutdown();
+                        OperationMode.PAUSED.getBytes(), -1);
+                VoltDB.instance().getHostMessenger().pause();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            VoltDB.instance().setShuttingdown(true);
         }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
