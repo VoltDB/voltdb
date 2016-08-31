@@ -168,8 +168,8 @@ public class TestAllPartitionProcedureCalls extends TestCase {
     public void testSyncCallAllPartitionProcedureWithElasticJoin() throws Exception {
         //add a new node, should get 12 partitions
         cluster.joinOne(2);
-        int wait = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 5000);
-        Thread.sleep(wait + 5000);
+        int wait = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
+        Thread.sleep(wait + 30000);
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
         validateResults(responses, 12);
 
