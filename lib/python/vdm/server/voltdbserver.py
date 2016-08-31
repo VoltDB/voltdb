@@ -368,7 +368,7 @@ class VoltDatabase:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', host_list, '-c',
                               str(host_count), '-D', config_path]
             else:
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', primary, '-c',
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-c',
                               str(host_count), '-D', config_path]
         elif verb == 'add':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), 'start', '--add', '--host=' + server_ip,
