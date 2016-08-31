@@ -120,7 +120,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         @Override
         public String toString() {
-            return "<" + m_txnId + ", " + m_spHandle + ">";
+            return "<" + TxnEgo.txnIdToString(m_txnId) + ", " + TxnEgo.txnIdToString(m_spHandle) + ">";
         }
     };
 
