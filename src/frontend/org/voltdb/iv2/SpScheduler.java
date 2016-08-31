@@ -239,9 +239,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         Collections.sort(doneCounters);
         for (DuplicateCounterKey key : doneCounters) {
             DuplicateCounter counter = m_duplicateCounters.remove(key);
-            m_outstandingTxns.remove(key.m_txnId);
+
+            final TransactionState txn = m_outstandingTxns.get(key.m_txnId);
+            if (txn == null || txn.isDone()) {
+                m_outstandingTxns.remove(key.m_txnId);
+                setRepairLogTruncationHandle(key.m_spHandle);
+            }
+
             VoltMessage resp = counter.getLastResponse();
-            setRepairLogTruncationHandle(key.m_spHandle);
             if (resp != null) {
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
@@ -1042,7 +1047,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
     {
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
         DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
         boolean txnDone = true;
@@ -1057,14 +1061,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         if (txnDone) {
-            m_outstandingTxns.remove(msg.getTxnId());
+            assert !msg.isRestart();
+            final TransactionState txn = m_outstandingTxns.remove(msg.getTxnId());
             m_duplicateCounters.remove(duplicateCounterKey);
 
             if (txn != null) {
                 // Set the truncation handle here instead of when processing
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
-                assert txn.isDone();
+                assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
                 setRepairLogTruncationHandle(txn.m_spHandle);
             }
         }
