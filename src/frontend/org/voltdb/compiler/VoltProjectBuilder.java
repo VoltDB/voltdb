@@ -548,7 +548,7 @@ public class VoltProjectBuilder {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(parameter.length > 1 && Integer.parseInt(parameter[1].trim()) > 0) {
+                if(parameter.length >= 2 && Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
