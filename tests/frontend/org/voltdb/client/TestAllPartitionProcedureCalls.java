@@ -59,9 +59,6 @@ public class TestAllPartitionProcedureCalls extends TestCase {
         cluster.overrideAnyRequestForValgrind();
 
         cluster.setHasLocalServer(false);
-        cluster.setJavaProperty("ELASTIC_TOTAL_TOKENS", "128");
-        cluster.setJavaProperty("ELASTIC_TARGET_THROUGHPUT", "10485760");
-        cluster.setJavaProperty("ELASTIC_TARGET_TRANSFER_TIME_MS", "1000");
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
@@ -163,18 +160,6 @@ public class TestAllPartitionProcedureCalls extends TestCase {
                  assertFalse(resp.response.getStatus() == 1);
             }
         }
-    }
-
-    public void testSyncCallAllPartitionProcedureWithElasticJoin() throws Exception {
-        //add a new node, should get 12 partitions
-        cluster.joinOne(2);
-        int wait = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
-        Thread.sleep(wait + 30000);
-        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
-        validateResults(responses, 12);
-
-        responses = clientWithAffinity.callAllPartitionProcedure("PartitionIntegerTestProc");
-        validateResults(responses, 12);
     }
 
      private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {
