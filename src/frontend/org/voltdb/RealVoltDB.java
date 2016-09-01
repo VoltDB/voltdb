@@ -1075,7 +1075,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // DR overflow directory
-            if (m_config.m_isEnterprise) {
+            if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
                 try {
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
