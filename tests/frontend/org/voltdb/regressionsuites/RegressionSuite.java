@@ -784,13 +784,19 @@ public class RegressionSuite extends TestCase {
 
                 Object expectedObj = expectedRows.get(j,  expectedTy);
                 Object actualObj = actualRows.get(j,  actualTy);
-                String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
-                if (expectedTy != VoltType.FLOAT) {
-                    assertEquals(message, expectedObj, actualObj);
-                }
-                else {
-                    assertNotNull("You pass in an epsilon to compare tables with floating point columns", epsilon);
-                    assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
+                boolean expectedNull = expectedRows.wasNull();
+                boolean actualNull = actualRows.wasNull();
+                assertEquals(colPrefix + "null/not null mismatch", expectedNull, actualNull);
+
+                if (!expectedNull) {
+                    String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
+                    if (expectedTy != VoltType.FLOAT) {
+                        assertEquals(message, expectedObj, actualObj);
+                    }
+                    else {
+                        assertNotNull("You pass in an epsilon to compare tables with floating point columns", epsilon);
+                        assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
+                    }
                 }
             }
 
