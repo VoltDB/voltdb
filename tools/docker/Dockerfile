@@ -28,8 +28,8 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en
 
 # Set timezone
 ENV TZ=America/New_York
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
 
 # Port #                     Default Value         Comments
 # Client Port                   21212       
@@ -46,12 +46,14 @@ WORKDIR $VOLTDB_DIST
 
 # fetch the deployment file
 COPY deployment.xml ${VOLTDB_DIST}
-ENV DEPLOYMENT=$VOLTDB_DIST/deployment.xml
-
-COPY docker-entrypoint.sh .
-RUN chmod +x docker-entrypoint.sh
+ENV DEFAULT_DEPLOYMENT=$VOLTDB_DIST/deployment.xml
+ENV CUSTOM_CONFIG=/tmp/deployment.xml
+ENV LICENSE_FILE=/tmp/license.xml
 
 ENV DIRECTORY_SPEC=/var/voltdb/
 RUN mkdir $DIRECTORY_SPEC
+
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

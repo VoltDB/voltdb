@@ -1,43 +1,46 @@
 #!/bin/bash
-set -e 
+set -e
 
 function init() {
-    bin/voltdb init -C ${DEPLOYMENT} -D ${DIRECTORY_SPEC}
+    if [ -f  ${CUSTOM_CONFIG} ]; then
+        DEPLOYMENT=${CUSTOM_CONFIG}
+        #echo "using custom deployment ${DEPLOYMENT} (${CUSTOM_CONFIG})"
+    else
+        DEPLOYMENT=${DEFAULT_DEPLOYMENT}
+        #echo "using default deployment ${DEPLOYMENT} (${DEFAULT_DEPLOYMENT})"
+
+    fi
+    #cat ${DEPLOYMENT}
+    OPTIONS="-C ${DEPLOYMENT} -D ${DIRECTORY_SPEC}"
+    echo "Run voltdb init $OPTIONS"
+    bin/voltdb init ${OPTIONS}
 }
 
 function execVoltdbStart() {
-    if [ -z "$HOST_COUNT" ] && [ -z "$HOSTS" ]; then
+    if [ -z "${HOST_COUNT}" ] && [ -z "${HOSTS}" ]; then
         echo "To start a Volt cluster, atleast need to provide HOST_COUNT OR list of HOSTS"
         exit
     fi
-    
+
     if [ -n "${HOST_COUNT}" ]; then
         OPTIONS=" -c $HOST_COUNT"
     fi
-    
+
     if [ -n "${HOSTS}" ]; then
         OPTIONS="$OPTIONS -H $HOSTS"
     fi
 
     if [ -n "${DIRECTORY_SPEC}" ]; then
         OPTIONS="$OPTIONS -D ${DIRECTORY_SPEC}"
-        echo $(ls )
-    fi 
+    fi
 
-    #if [ -n "${VOLUMES}" ]; then
-    #OPTIONS="$OPTIONS -v $VOLUMES"
-    #fi
-
-    echo "options to run with $OPTIONS"
-
-    #echo "print environment variables"
-    #printenv
-
-    #for word in "$@"; do echo "$word"; done
-    #for word in "$*"; do echo "$word"; done
+    if [ -f ${LICENSE_FILE} ]; then
+        OPTIONS="$OPTIONS -l ${LICENSE_FILE}"
+    fi
 
     OPTIONS="$OPTIONS --ignore=thp"
 
+    echo "Run voltdb start $OPTIONS"
     exec bin/voltdb start $OPTIONS
 }
 
