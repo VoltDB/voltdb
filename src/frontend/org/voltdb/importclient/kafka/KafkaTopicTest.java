@@ -65,6 +65,7 @@ public class KafkaTopicTest {
         ffactory.create(format, props);
         FormatterBuilder fb = new FormatterBuilder(format, props);
         fb.setFormatterFactory(ffactory);
+        System.out.println("Properties are: " + props);
         Map<URI, ImporterConfig> mmap = factory.createImporterConfigurations(props, fb);
         CountDownLatch cdl = new CountDownLatch(mmap.size());
         for (URI uri : mmap.keySet()) {
