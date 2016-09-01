@@ -31,6 +31,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestAllPartitionProcedureCallWithRejoin {
@@ -64,16 +65,47 @@ public class TestAllPartitionProcedureCallWithRejoin {
         config.setClientAffinity(false);
         Client client = ClientFactory.createClient(config);
         client.createConnection("", cluster.port(0));
-        load(client, "TABLE_INT_PARTITION");
 
         Client clientWithAffinity = ClientFactory.createClient();
         clientWithAffinity.createConnection("", cluster.port(0));
 
-        Thread.sleep(1000);
+        load(client, "TABLE_INT_PARTITION");
+
+        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
+        validateResults(responses, 8);
+
+        responses = clientWithAffinity.callAllPartitionProcedure("PartitionIntegerTestProc");
+        validateResults(responses, 8);
+
         //add a new node, should get 12 partitions
         cluster.joinOne(2);
+
+        long start = System.currentTimeMillis();
+        VoltTable rebalanceProbe = null;
+
+        while ((System.currentTimeMillis() - start) < 60000) {
+            rebalanceProbe = client.callProcedure("@Statistics", "REBALANCE", 0).getResults()[0];
+            if (rebalanceProbe.getRowCount() == 1) break;
+            Thread.sleep(100);
+        }
+
+        assertNotNull(rebalanceProbe);
+        assertEquals(1,rebalanceProbe.getRowCount());
+        assertTrue(rebalanceProbe.advanceRow());
+        assertTrue(rebalanceProbe.getLong(BalancePartitionsStatistics.Constants.TIMESTAMP) > 0);
+
+       int rebalancedPartitionSize = 8;
         Thread.sleep(30000);
-        ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
+        while ((System.currentTimeMillis() - start) < 120000) {
+            VoltTable partitionProbe = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
+            rebalancedPartitionSize = partitionProbe.getRowCount();
+            if (rebalancedPartitionSize == 12) break;
+            Thread.sleep(200);
+        }
+
+        System.out.println("Time to rebalance partitions from 8 to " + rebalancedPartitionSize + ":" + (System.currentTimeMillis() - start));
+        assertEquals(12, rebalancedPartitionSize);
+        responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
         validateResults(responses, 12);
 
         responses = clientWithAffinity.callAllPartitionProcedure("PartitionIntegerTestProc");
