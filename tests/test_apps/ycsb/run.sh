@@ -23,16 +23,27 @@ else
     VOLTDB_LIB="`pwd`/../../../lib"
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
+
 # make sure YCSB_HOME is set
 : ${YCSB_HOME:?"You must set the YCSB_HOME environment variable in order to continue"}
 if [ ! -d "$YCSB_HOME" ]; then
     echo "Directory $YCSB_HOME does not exist"; exit;
 fi
+
+# find YCSB library in either installation or distribution directory.
+if [ -d "$YCSB_HOME/lib" ]; then
+    YCSB_LIB="$YCSB_HOME/lib"
+elif [ -d "$YCSB_HOME/core" ]; then
+    YCSB_LIB="$YCSB_HOME/core/target"
+else
+    echo "YCSB core jar not find, please check your YCSB_HOME"; exit;
+fi
+
 CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-    \ls -1 "$YCSB_HOME"/lib/*.jar; \
+    \ls -1 "$YCSB_LIB"/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
