@@ -53,6 +53,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -396,6 +397,7 @@ public class Cartographer extends StatsSource
     public List<Integer> getIv2PartitionsToReplace(int kfactor, int sitesPerHost)
         throws JSONException
     {
+        Preconditions.checkArgument(sitesPerHost != VoltDB.UNDEFINED);
         List<Integer> partitions = getPartitions();
         hostLog.info("Computing partitions to replace.  Total partitions: " + partitions);
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();

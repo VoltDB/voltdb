@@ -22,7 +22,6 @@ end
 
 begin Deployment javaonly         "Run-time deployment settings"
   int kfactor                     "The required k-safety factor"
-  int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 
