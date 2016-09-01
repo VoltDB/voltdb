@@ -646,9 +646,14 @@ class VoltDatabase:
         host_list = ''
         for host in current_db['members']:
             current_server = HTTPListener.Global.SERVERS.get(int(host))
-            if host_count == 0:
-                host_list = current_server['hostname']
+            if current_server['internal-listener'] != '':
+                host_name = current_server['hostname'] + ':' + current_server['internal-listener']
             else:
-                host_list += ',' + current_server['hostname']
+                host_name = current_server['hostname']
+
+            if host_count == 0:
+                host_list = host_name
+            else:
+                host_list += ',' + host_name
             host_count += 1
         return host_list
