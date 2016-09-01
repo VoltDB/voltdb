@@ -463,7 +463,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                                m_gapTracker.commit(currentOffset);
                          }
                          if (noTransaction) {
-                             System.out.println(m_topicAndPartition + " --> " + line);
+                             System.out.print(".");
                          }
                      } catch (FormatException e){
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);

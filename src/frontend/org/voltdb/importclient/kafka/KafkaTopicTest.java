@@ -53,10 +53,15 @@ public class KafkaTopicTest {
      */
     public static void main(String[] args) {
         Properties props = new Properties();
+        if (args.length < 2) {
+            System.out.println("testkafkaimporter: brokers topic [format]");
+            System.exit(1);
+        }
         props.put("brokers", args[0]);
         props.put("topics", args[1]);
-        String format = args[2];
-        props.put("groupid", args[3]);
+        String format = "csv";
+        if (args.length > 2)
+            format = args[2];
 
         props.put("procedure", "fake");
 
@@ -67,6 +72,7 @@ public class KafkaTopicTest {
         fb.setFormatterFactory(ffactory);
         System.out.println("Properties are: " + props);
         Map<URI, ImporterConfig> mmap = factory.createImporterConfigurations(props, fb);
+        System.out.println("Number of Partitions for topic are: " + mmap.size());
         CountDownLatch cdl = new CountDownLatch(mmap.size());
         for (URI uri : mmap.keySet()) {
             KafkaTopicPartitionImporter importer = new KafkaTopicPartitionImporter((KafkaStreamImporterConfig )mmap.get(uri));
