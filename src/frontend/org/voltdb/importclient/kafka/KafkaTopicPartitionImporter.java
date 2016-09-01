@@ -81,6 +81,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
+    boolean noTransaction = false;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
@@ -455,11 +456,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                                 invocation);
-                         if (!callProcedure(invocation, cb)) {
+                         if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                                }
                                m_gapTracker.commit(currentOffset);
+                         }
+                         if (noTransaction) {
+                             System.out.println(m_topicAndPartition + " --> " + line);
                          }
                      } catch (FormatException e){
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
