@@ -49,7 +49,13 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
          * See ENG-7872
          */
         if (m_groupByColumnCount == 0) {
-            initializeTupleHavingNoGroupBy();
+            /**
+             * There are three cases that this constructor will be called. Two of them are related
+             * to schema change, the other one is in truncate table view creation case.
+             * We do not want to create new UNDO action in either case. Similar like the insert cases.
+             * Creating extra UNDO action will crash the server or leak the memory.
+             */
+            initializeTupleHavingNoGroupBy(false);
         }
         if ( ! srcTable->isPersistentTableEmpty()) {
             TableTuple scannedTuple(srcTable->schema());
@@ -403,7 +409,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         // If there is no group by column, the count() should remain 0 and other functions should
         // have value null. See ENG-7872.
         if (m_groupByColumnCount == 0) {
-            initializeTupleHavingNoGroupBy();
+            initializeTupleHavingNoGroupBy(fallible);
         }
         return;
     }
