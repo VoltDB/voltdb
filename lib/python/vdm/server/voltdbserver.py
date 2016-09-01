@@ -365,17 +365,14 @@ class VoltDatabase:
         host_list = self.get_host_list()
         if verb == 'start':
             if pause.lower() == 'true':
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', host_list, '-c',
-                              str(host_count), '-D', config_path]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-H', host_list, '-D', config_path]
             else:
-                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-c',
-                              str(host_count), '-D', config_path]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-D', config_path]
         elif verb == 'add':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), 'start', '--add', '--host=' + server_ip,
                           '-D', config_path]
         else:
-            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-c',
-                          str(host_count), '-D', config_path]
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-H', host_list, '-D', config_path]
 
         self.build_network_options(server, voltdb_cmd)
 
