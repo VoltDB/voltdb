@@ -19,10 +19,9 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.voltdb.planner.ParsedColInfo;
-import org.voltdb.compiler.VoltXMLElementHelper;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.planner.ParsedColInfo;
 
 /**
  * Tune XMLs for materialized view min/max recalculation queries.
@@ -85,7 +84,7 @@ public class MatViewFallbackQueryXMLGenerator {
                 // Add the column to the parameter list.
                 parameters.add( VoltXMLElementHelper.buildParamElement( nextElementId(), index, valueType ) );
                 // Put together the where conditions for the groupby columns.
-                VoltXMLElement columnParamJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement( "equal", column, lastElementId(), nextElementId() );
+                VoltXMLElement columnParamJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement( "notdistinct", column, lastElementId(), nextElementId() );
                 joincond = VoltXMLElementHelper.mergeTwoElementsUsingOperator( "and", nextElementId(), joincond, columnParamJoincond );
             }
             // Remove the group by columns, they are now in the form of where conditions.

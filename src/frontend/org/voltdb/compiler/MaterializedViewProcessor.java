@@ -729,6 +729,9 @@ public class MaterializedViewProcessor {
                     // there must be some min/max columns.
                     // Only check if the plan uses index scan.
                     if (needsWarningForSingleTableView( getPlanNodeTreeFromCatalogStatement(db, stmt))) {
+                        // If we are using IS NOT DISTINCT FROM as our equality operator (which is necessary
+                        // to get correct answers), then there will often be no index scans in the plan,
+                        // since we cannot optimize IS NOT DISTINCT FROM.
                         m_compiler.addWarn(
                                 "No index found to support UPDATE and DELETE on some of the min() / max() columns " +
                                 "in the materialized view " + mvInfo.getTypeName() +
