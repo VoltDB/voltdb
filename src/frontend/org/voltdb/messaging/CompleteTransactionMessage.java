@@ -141,8 +141,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
-        sb.append(", SP HANDLE: " + getSpHandle() + " as " + TxnEgo.txnIdToString(getSpHandle()));
+        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append("\n SP HANDLE: ");
+        sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
 
         sb.append("\n  HASH: " + String.valueOf(m_hash));

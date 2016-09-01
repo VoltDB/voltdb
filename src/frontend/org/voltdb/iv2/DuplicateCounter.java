@@ -196,7 +196,8 @@ public class DuplicateCounter
     @Override
     public String toString()
     {
-        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,
+        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n",
+               TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
     }
