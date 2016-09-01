@@ -16,7 +16,6 @@
 
 import unittest
 import requests
-import xmlrunner
 from xml.etree import ElementTree
 import socket
 
@@ -291,5 +290,4 @@ class UpdateDeployment(Deployment):
 
 
 if __name__ == '__main__':
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
     unittest.main()

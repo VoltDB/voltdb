@@ -26,7 +26,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-xmlrunner==1.7.7
 Flask==0.10.1
 requests==2.8.1
 Flask-Inputs==0.2.0
