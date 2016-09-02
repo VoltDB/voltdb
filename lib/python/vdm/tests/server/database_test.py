@@ -28,7 +28,6 @@
 
 import unittest
 import requests
-import xmlrunner
 import socket
 
 __host_name__ = socket.gethostname()
@@ -323,5 +322,5 @@ class DeleteDatabase(unittest.TestCase):
             print "The database list is empty"
 
 if __name__ == '__main__':
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
+    # unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
     unittest.main()
