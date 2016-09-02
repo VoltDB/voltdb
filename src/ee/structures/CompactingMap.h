@@ -63,6 +63,7 @@ public:
     }
     // This function does nothing, and is only to offer the same API as PointerKeyValuePair.
     const void *setPointerValue(const void *value) { return NULL; }
+    const void * getKeyPointer() const { return NULL;}
 };
 
 /**
@@ -174,8 +175,9 @@ public:
         const CompactingMap *m_map;
         TreeNode *m_node;
         iterator(const CompactingMap *m, TreeNode* x) : m_map(m), m_node(x) {}
-        const KeyValuePair &pair() { return m_node->kv; }
+        //const KeyValuePair &pair() { return m_node->kv; }
     public:
+        const KeyValuePair &pair() { return m_node->kv; }
         iterator() : m_map(NULL), m_node(NULL) {}
         iterator(const iterator &iter) : m_map(iter.m_map), m_node(iter.m_node) {}
         const Key &key() const { return m_node->key(); }

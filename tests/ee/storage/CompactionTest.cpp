@@ -373,7 +373,7 @@ public:
             m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         }
         else if (type == LRR) {
-            m_table->activateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN, 0, m_tableId);
+            m_table->activateCopyOnWriteContext(TABLE_STREAM_COPY_ON_WRITE_SCAN, 0, m_tableId, "");
         }
 
 

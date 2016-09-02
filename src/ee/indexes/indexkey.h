@@ -940,6 +940,8 @@ public:
         return k.setPointerValue(value);
     }
 
+    const void * getKeyPointer() const { return k.getPointer();}
+
 private:
     first_type k;
 };

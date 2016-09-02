@@ -392,6 +392,216 @@ protected:
     char signature[20];
 };
 
+/**
+ * This tests features added for negative delta tree work
+ * The search key values and data preparation work are all borrowed from the previous
+ * IntsUnique test.
+ */
+TEST_F(IndexTest, NegativeDeltaTreeUnique) {
+    vector<int> ixu_column_indices;
+    vector<ValueType> ixu_column_types;
+    ixu_column_indices.push_back(4);
+    ixu_column_indices.push_back(2);
+    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixu_column_types.push_back(VALUE_TYPE_BIGINT);
+    init("ixu",
+            BALANCED_TREE_INDEX,
+            ixu_column_indices,
+            ixu_column_types,
+            true);
+
+    TableIndex* index = table->index("ixu");
+    EXPECT_TRUE(index != NULL);
+
+    IndexCursor indexCursor(index->getTupleSchema());
+
+    TableTuple tuple(table->schema());
+    TableTuple tuple2(table->schema());
+    const void * keyAddress;
+    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
+    vector<int32_t>
+    keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<bool> keyColumnAllowNull(2, true);
+    TupleSchema* keySchema =
+            TupleSchema::createTupleSchemaForTest(keyColumnTypes,
+                    keyColumnLengths,
+                    keyColumnAllowNull);
+    TableTuple searchkey(keySchema);
+    searchkey.move(new char[searchkey.tupleLength()]);
+
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
+    index->moveToKeyOrGreater(&searchkey, indexCursor);
+
+
+    // valid only for multi-map
+    EXPECT_TRUE((tuple = index->currentValueAtKey(indexCursor)).isNullTuple());
+    EXPECT_TRUE((keyAddress = index->currentKey(indexCursor)) == NULL);
+
+    // cursor should not change when we get the current value
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+
+    // moveToGreaterThanKeyByTuple test
+    index->moveToGreaterThanKeyByTuple(&tuple, indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // moveToLessThanKeyByTuple test
+    index->moveToLessThanKeyByTuple(&tuple, indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(39).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // moveToKeyByTupleAddress test
+    index->moveToKeyByTupleAddr(&tuple, tuple.address(), indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // compare (key, cursor) -1/0/+1
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple2.getNValue(0)).isTrue());
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == -1);
+
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
+            op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == 0);
+
+    index->moveToKeyByTuple(&tuple2, indexCursor);
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == 1);
+
+    // compare (key1, key2) -1/0/+1
+    EXPECT_TRUE(index->compare(&tuple2, &tuple) == -1);
+    EXPECT_TRUE(index->compare(&tuple, &tuple2) == 1);
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(index->compare(&tuple, &tuple2) == 0);
+
+    TupleSchema::freeTupleSchema(keySchema);
+    delete[] searchkey.address();
+}
+
+/*
+TEST_F(IndexTest, NegativeDeltaTreeMulti) {
+    vector<int> ixm_column_indices;
+    vector<ValueType> ixm_column_types;
+    ixm_column_indices.push_back(4);
+    ixm_column_indices.push_back(2);
+    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    ixm_column_types.push_back(VALUE_TYPE_BIGINT);
+    init("ixm2",
+         BALANCED_TREE_INDEX,
+         ixm_column_indices,
+         ixm_column_types,
+         false);
+
+    TableIndex* index = table->index("ixm2");
+    EXPECT_TRUE(index != NULL);
+    IndexCursor indexCursor(index->getTupleSchema());
+
+    TableTuple tuple(table->schema());
+    TableTuple tuple2(table->schema());
+    const void * keyAddress;
+    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
+    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<bool> keyColumnAllowNull(2, true);
+    TupleSchema* keySchema =
+        TupleSchema::createTupleSchemaForTest(keyColumnTypes,
+                                       keyColumnLengths,
+                                       keyColumnAllowNull);
+    TableTuple searchkey(keySchema);
+    searchkey.move(new char[searchkey.tupleLength()]);
+
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
+    //searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
+    //searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
+    EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
+
+    // cursor should not change when we get the current value
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+
+
+    // test multi-map specific lookups
+    EXPECT_FALSE((tuple = index->currentValueAtKey(indexCursor)).isNullTuple());
+    EXPECT_FALSE((keyAddress = index->currentKey(indexCursor)) == NULL);
+    EXPECT_FALSE((tuple = index->nextValueAtKey(indexCursor)).isNullTuple());
+    EXPECT_FALSE((tuple = index->currentValueAtKey(indexCursor)).isNullTuple());
+    EXPECT_FALSE((keyAddress = index->currentKey(indexCursor)) == NULL);
+
+    // reset
+    index->moveToKey(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+
+    // moveToGreaterThanKeyByTuple test
+    index->moveToGreaterThanKeyByTuple(&tuple, indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // moveToLessThanKeyByTuple test
+    index->moveToLessThanKeyByTuple(&tuple, indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(39).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // moveToKeyByTupleAddress test
+    index->moveToKeyByTupleAddr(&tuple, tuple.address(), indexCursor);
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple2.getNValue(0)).isTrue());
+
+    // compare (key, cursor) -1/0/+1
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(40).
+            op_equals(tuple2.getNValue(0)).isTrue());
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == -1);
+
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(41).
+            op_equals(tuple.getNValue(0)).isTrue());
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == 0);
+
+    index->moveToKeyByTuple(&tuple2, indexCursor);
+    EXPECT_TRUE(index->compare(&tuple, indexCursor) == 1);
+
+    // compare (key1, key2) -1/0/+1
+    EXPECT_TRUE(index->compare(&tuple2, &tuple) == -1);
+    EXPECT_TRUE(index->compare(&tuple, &tuple2) == 1);
+    EXPECT_FALSE((tuple = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_FALSE((tuple2 = index->currentValue(indexCursor)).isNullTuple());
+    EXPECT_TRUE(index->compare(&tuple, &tuple2) == 0);
+
+    TupleSchema::freeTupleSchema(keySchema);
+    delete[] searchkey.address();
+}
+*/
+
 TEST_F(IndexTest, IntUnique) {
     vector<int> iu_column_indices;
     vector<ValueType> iu_column_types;
@@ -1112,6 +1322,7 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
+
 
 
 int main()

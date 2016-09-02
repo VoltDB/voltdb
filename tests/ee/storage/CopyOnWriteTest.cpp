@@ -1804,6 +1804,8 @@ public:
 
     virtual bool notifyTupleUpdate(TableTuple &tuple) { return false; }
 
+    virtual bool notifyTuplePostUpdate(TableTuple &tuple) { return false; }
+
     virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
 
     virtual void notifyBlockWasCompactedAway(TBPtr block) {}
@@ -1979,6 +1981,9 @@ public:
     virtual bool notifyTupleUpdate(TableTuple &tuple) {
         return m_context->notifyTupleUpdate(tuple);
     }
+
+
+    virtual bool notifyTuplePostUpdate(TableTuple &tuple) { return false; }
 
     virtual bool notifyTupleDelete(TableTuple &tuple) {
         return m_context->notifyTupleDelete(tuple);

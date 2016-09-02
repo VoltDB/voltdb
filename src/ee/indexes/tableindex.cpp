@@ -177,6 +177,7 @@ void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
 
 void TableIndex::addEntryNegativeDelta(const TableTuple *tuple, const void * address)
 {
+    assert(m_scheme.negativeDelta);
     if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
         // Tuple fails the predicate. Do not add it.
         return;

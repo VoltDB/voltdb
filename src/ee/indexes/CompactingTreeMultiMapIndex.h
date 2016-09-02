@@ -80,7 +80,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
     void addEntryNegativeDeltaDo(const TableTuple *tuple, const void* address)
     {
         ++m_inserts;
-        assert(m_scheme.negativeDelta);
         m_entries.insert(setKeyFromCopyTuple(tuple, address), tuple->address());
     }
 
@@ -298,7 +297,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         TableTuple retval(getKeySchema());
         MapIterator &mapIter = castToIter(cursor);
         if (! mapIter.isEnd()) {
-            return mapIter.key().getPointer();
+            return mapIter.pair().getKeyPointer();
         }
         return NULL;
     }
@@ -435,12 +434,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
     }
 
     std::string getTypeName() const { return "CompactingTreeMultiMapIndex"; };
-
-
-    virtual TableIndex *cloneEmptyNonCountingTreeIndex() const
-    {
-        return new CompactingTreeMultiMapIndex<KeyValuePair, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
-    }
 
     MapIterator findKey(const TableTuple *searchKey) const {
         KeyType tempKey(searchKey);

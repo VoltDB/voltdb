@@ -77,7 +77,6 @@ class CompactingTreeUniqueIndex : public TableIndex
     void addEntryNegativeDeltaDo(const TableTuple *tuple, const void* address)
     {
         ++m_inserts;
-        assert(m_scheme.negativeDelta);
         m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
@@ -172,7 +171,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
     {
-        //cursor.m_forward = true;
+        cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
 
