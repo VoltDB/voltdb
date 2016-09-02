@@ -22,7 +22,7 @@
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
         <delete file="${jar.dir}/client.jar"/>
-        <delete file="${jar.dir}/formatter.jar"/>
+        <delete file="${jar.dir}/exampleformatter.jar"/>
         <delete file="${jar.dir}/sp.jar"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
@@ -73,13 +73,13 @@
     </target>
 
 	<target name="formatter" depends="formatter-compile">
-        <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
+        <jar destfile="exampleformatter.jar" basedir="${formatterclasses.dir}">
             <!--
                  <include name="ExampleFormatter.class"/>
                 <include name="ExampleFormatterFactory.class"/>
              -->
             <manifest>
-                <attribute name="Bundle-Activator" value="formatter.ExampleFormatterFactory" />
+                <attribute name="Bundle-Activator" value="custom_import_formatter.formatter.ExampleFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="Example Formatter OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="ExampleFormatter" />
