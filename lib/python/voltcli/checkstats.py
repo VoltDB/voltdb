@@ -121,7 +121,7 @@ def check_dr(runner, partition_min_host, partition_min, partition_max):
 
 def print_dr_pending(runner, partition_min_host, partition_min, partition_max):
     runner.info('The following partitions have pending DR transactions that the consumer cluster has not processed:')
-    summaryline = "    Partition %i needs acknowledgements for drIds %i to %i on hosts: %s."
+    summaryline = "    Partition %i needs acknowledgement for drIds %i to %i on hosts: %s."
     for pid in partition_min_host:
         runner.info(summaryline % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
 
@@ -167,7 +167,7 @@ def check_export(runner, export_tables_with_data, last_collection_time):
 
 def print_export_pending(runner, export_tables_with_data):
     runner.info('The following export tables have unacknowledged transactions:')
-    summaryline = "    %s needs acknowledgements on host(s) %s for partition(s) %s."
+    summaryline = "    %s needs acknowledgement on host(s) %s for partition(s) %s."
     for table in export_tables_with_data:
         pidlist = set()
         hostlist = list(export_tables_with_data[table].keys())
@@ -175,3 +175,18 @@ def print_export_pending(runner, export_tables_with_data):
             pidlist = pidlist | export_tables_with_data[table][host]
         partlist = reduce(lambda a,x: a+","+str(x), list(pidlist), "")[1:]
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
+
+def check_clients(runner):
+     while True:
+        resp = get_stats(runner, 'LIVECLIENTS')
+        trans = 0
+        bytes = 0
+        msgs  = 0
+        for r in resp.table(0).tuples():
+            bytes += r[6]
+            msgs += r[7]
+            trans += r[8]
+        runner.info('Outstanding transactions=' + str(trans) + ', buffer size=' + str(bytes) + ', response messages=' + str(msgs))
+        if trans == 0 and bytes == 0 and msgs == 0:
+            return
+        time.sleep(1)
