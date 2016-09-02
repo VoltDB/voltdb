@@ -26,11 +26,13 @@ package client.kafkaimporter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 
@@ -49,6 +51,7 @@ public class Producer extends Thread {
     long m_rangemin;
     long m_rangemax;
     boolean m_producerrunning = false;
+    JSONObject m_json_obj;
 
     // Validated CLI config
     KafkaProducerConfig config;
@@ -71,6 +74,8 @@ public class Producer extends Thread {
 
         // create distinct topic name <m_topic><topicnum>
         m_topic = m_topic + topicnum;
+
+        m_json_obj = new JSONObject();
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, m_servers);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -84,6 +89,7 @@ public class Producer extends Thread {
 
     @Override
     public void run() {
+        Random rand = new Random();
         Long rowCnt = new Long(m_rangemin); // starting value for key for each topic producer
 
         final RateLimiter rateLimiter = RateLimiter.create(m_rate);
@@ -93,8 +99,11 @@ public class Producer extends Thread {
             for (long rowsincycle = m_rangemin; rowsincycle < (m_rows/m_cycles+m_rangemin); rowsincycle++) {
                 Long value = System.currentTimeMillis();
                 rateLimiter.acquire();
+
+                SampleRecord record = new SampleRecord(rowCnt, 1000, rand);
                 ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(m_topic, rowCnt.toString(),
-                    rowCnt.toString()+","+value.toString()+","+value.toString());
+                    record.obj.toString());
+                log.info("JSON Row: " + producerRecord.toString());
                 m_producer.send(producerRecord);
                 rowCnt++;
             }
