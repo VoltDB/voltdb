@@ -73,7 +73,7 @@ public interface PathSettings extends Settings {
     }
 
     default File resolve(File path) {
-        return path.isAbsolute() ? path : new VoltFile(getVoltDBRoot(), path.getPath());
+        return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
     }
 
     default NavigableMap<String, File> getManagedArtifactPaths() {
@@ -192,5 +192,8 @@ public interface PathSettings extends Settings {
     default void store() {
         File configFH = new File(Settings.getConfigDir(), "path.properties");
         store(configFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
+
+        File deprectedConfigFH = new File(getVoltDBRoot(),".paths");
+        if (deprectedConfigFH.exists()) deprectedConfigFH.delete();
     }
 }
