@@ -76,8 +76,8 @@ public class ContinuousDeleter implements Runnable {
 
             app.updatePartitionCount(responses.length);
             for (ClientResponseWithPartitionKey resp: responses) {
-                if (resp.getResponse().getStatus() == ClientResponse.SUCCESS) {
-                    long tuplesDeleted = resp.getResponse().getResults()[0].asScalarLong();
+                if (resp.response.getStatus() == ClientResponse.SUCCESS) {
+                    long tuplesDeleted = resp.response.getResults()[0].asScalarLong();
                     app.addToDeletedTuples(tuplesDeleted);
 
                     // If the procedure deleted up to its limit, reduce the time before the deletes process runs again.
