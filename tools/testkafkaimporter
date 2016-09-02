@@ -46,7 +46,7 @@
 # limitations under the License.
 
 
-# The VoltDB CSV Loader script
+# This is a topic consumer tester script that uses VoltDB importer. No offset commits are done.
 #
 # Environment Variables
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
@@ -132,5 +132,4 @@ CLASSPATH=${CLASSPATH}
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.importclient.kafka.KafkaTopicTest"
-echo $CMDVAL "$@"
 exec $CMDVAL "$@"
