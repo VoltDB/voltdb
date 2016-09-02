@@ -420,7 +420,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
     // For MAT view don't optimize, needs more work - ENG-10323.
     if (m_isMaterialized) {
-        deleteAllTuples(true);
+        deleteAllTuples(true, fallible);
         return;
     }
 
@@ -459,7 +459,13 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             destTcd->init(*engine->getDatabase(), *catalogViewTable);
             PersistentTable *destEmptyTable = destTcd->getPersistentTable();
             assert(destEmptyTable);
-            new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+            auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
+            bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
+            new MaterializedViewHandler(destEmptyTable,
+                                        mvHandlerInfo,
+                                        engine,
+                                        populateInitialTuple,
+                                        fallible);
         }
     }
 
