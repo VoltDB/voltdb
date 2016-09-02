@@ -69,7 +69,6 @@ public class ContinuousDeleter implements Runnable {
             if (app.config.historyseconds > 0) {
                 responses = app.client.callAllPartitionProcedure("DeleteAfterDate", dateTarget, app.config.deletechunksize);
             }
-            // Deleting all rows beyond a given rowcount...
             else /* if (app.config.maxrows > 0) */ {
                 responses = app.client.callAllPartitionProcedure("DeleteOldestToTarget", rowTarget, app.config.deletechunksize);
             }
