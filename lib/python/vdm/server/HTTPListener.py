@@ -1290,15 +1290,49 @@ class StopServerAPI(MethodView):
             Status string indicating if the stop request was sent successfully
         """
 
+        try:
+            if 'force' in request.args:
+                force = request.args.get('force').lower()
+            else:
+                force = "false"
+
+            server = voltdbserver.VoltDatabase(database_id)
+            response = server.stop_server(server_id, force)
+            resp_json = json.loads(response.data)
+            if response.status_code == 500:
+                return make_response(jsonify({'status': 500, 'statusString': resp_json['statusString']}), 500)
+            else:
+                return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}), 200)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
+                                 500)
+
+
+class StopLocalServerAPI(MethodView):
+    """Class to handle request to stop a server."""
+
+    @staticmethod
+    def put(database_id):
+        """
+        Stops VoltDB database server on the local server
+        Args:
+            database_id (int): The id of the database that should be stopped
+        Returns:
+            Status string indicating if the stop request was sent successfully
+        """
+
         if 'force' in request.args:
             is_force = request.args.get('force').lower()
         else:
             is_force = 'false'
+        if 'id' in request.args:
+            sid = int(request.args.get('id'))
 
         if is_force == "false":
             try:
                 server = voltdbserver.VoltDatabase(database_id)
-                response = server.kill_server(server_id)
+                response = server.kill_server(sid)
                 if 'Connection broken' in response.data:
                     return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown '
                                                                                  'successfully.'}))
@@ -1311,7 +1345,7 @@ class StopServerAPI(MethodView):
         else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
-                response = server.stop_server(server_id)
+                response = server.stop_db_server(sid)
                 if 'Connection broken' in response:
                     return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
                 else:
@@ -1831,6 +1865,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     VDM_VIEW = VdmAPI.as_view('vdm_api')
     ADD_SERVER_VIEW = AddServerAPI.as_view('add_server_api')
     ADD_LOCAL_SERVER_VIEW = AddLocalServerAPI.as_view('add_local_server_api')
+    STOP_LOCAL_SERVER_VIEW = StopLocalServerAPI.as_view('stop_local_server_api')
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
                      view_func=SERVER_VIEW, methods=['GET', 'POST'])
@@ -1880,6 +1915,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                      methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/add', strict_slashes=False,
                      view_func=ADD_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/stop', strict_slashes=False,
+                     view_func=STOP_LOCAL_SERVER_VIEW, methods=['PUT'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):

@@ -532,7 +532,7 @@ class VoltDatabase:
         else:
             return admins[0]
 
-    def stop_server(self, server_id):
+    def stop_db_server(self, server_id):
         """
         Stops voltdb server running locally for this database
         """
@@ -605,4 +605,34 @@ class VoltDatabase:
             else:
                 return create_response('process not found', 200)
         except Exception, err:
+            return create_response(str(err), 500)
+
+    def stop_server(self, server_id, force):
+        """
+        Sends stop request to the specified server
+        """
+        current_database = HTTPListener.Global.DATABASES.get(self.database_id)
+        if not current_database:
+            return create_response('No database found for id: %u' % self.database_id, 404)
+        else:
+            members = current_database['members']
+
+        if not members or server_id not in members:
+            return create_response(
+                'No server with id %u configured for the database: %u'
+                % (server_id, self.database_id), 404)
+
+        server = HTTPListener.Global.SERVERS.get(server_id)
+        if not server:
+            return create_response('Server details not found for id: %u'
+                                   % server_id, 404)
+        try:
+            url = 'http://%s:%u/api/1.0/databases/%u/servers/stop?id=%u&force=%s' % \
+                              (server['hostname'], HTTPListener.__PORT__, self.database_id, server_id, force)
+            response = requests.put(url)
+            return create_response(json.loads(response.text)['statusString'], response.status_code)
+        except Exception, err:
+            if 'ConnectionError' in str(err):
+                err = "Server " + server['hostname'] + " is currently unreachable."
+            print traceback.format_exc()
             return create_response(str(err), 500)
