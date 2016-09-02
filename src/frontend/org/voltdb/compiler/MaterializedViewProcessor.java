@@ -142,14 +142,15 @@ public class MaterializedViewProcessor {
             List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
             List<AbstractExpression> groupbyExprs = null;
             if (stmt.hasComplexGroupby()) {
-                groupbyExprs = new ArrayList<AbstractExpression>();
+                groupbyExprs = new ArrayList<>();
                 for (ParsedColInfo col: stmt.m_groupByColumns) {
                     groupbyExprs.add(col.expression);
                 }
             }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
-            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
+            boolean isMultiTableView = stmt.m_tableList.size() > 1;
+            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns, isMultiTableView);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
 
             // create an index and constraint for the table
@@ -172,7 +173,7 @@ public class MaterializedViewProcessor {
             }
 
             // Here the code path diverges for different kinds of views (single table view and joined table view)
-            if (stmt.m_tableList.size() > 1) {
+            if (isMultiTableView) {
                 // Materialized view on joined tables
                 // Add mvHandlerInfo to the destTable:
                 MaterializedViewHandlerInfo mvHandlerInfo = destTable.getMvhandlerinfo().add("mvHandlerInfo");
@@ -301,9 +302,9 @@ public class MaterializedViewProcessor {
                         ExpressionType.AGGREGATE_COUNT_STAR, null);
 
                 // prepare info for aggregation columns.
-                List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> aggregationExprs = new ArrayList<>();
                 boolean hasAggregationExprs = false;
-                ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
+                ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
                 for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     AbstractExpression aggExpr = col.expression.getLeft();
@@ -450,7 +451,7 @@ public class MaterializedViewProcessor {
      * @throws VoltCompilerException
      */
     private void checkViewSources(ArrayList<Table> tableList) throws VoltCompilerException {
-        HashSet<String> tableSet = new HashSet<String>();
+        HashSet<String> tableSet = new HashSet<>();
         for (Table tbl : tableList) {
             if (! tableSet.add(tbl.getTypeName())) {
                 String errMsg = "Table " + tbl.getTypeName() + " appeared in the table list more than once: " +
@@ -475,7 +476,7 @@ public class MaterializedViewProcessor {
         StringBuffer msg = new StringBuffer();
         msg.append("Materialized view \"" + viewName + "\" ");
 
-        List <AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
+        List <AbstractExpression> checkExpressions = new ArrayList<>();
 
         int i;
         // First, check the group by columns.  They are at
@@ -880,8 +881,8 @@ public class MaterializedViewProcessor {
             if (!index.getPredicatejson().isEmpty()) {
                 // Additional check for partial indexes to make sure matview WHERE clause
                 // covers the partial index predicate
-                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
-                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> coveringExprs = new ArrayList<>();
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<>();
                 try {
                     String encodedPredicate = matviewinfo.getPredicate();
                     if (!encodedPredicate.isEmpty()) {
