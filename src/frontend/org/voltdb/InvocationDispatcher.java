@@ -261,6 +261,7 @@ public final class InvocationDispatcher {
     }
 
     public final ClientResponseImpl dispatch(StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn, AuthUser user) {
+
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -275,6 +276,14 @@ public final class InvocationDispatcher {
                             );
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
+
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED && VoltDB.instance().isShuttingdown()
+                && !catProc.getAllowedinshutdown()) {
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0], "Server shutdown in progress - new transactions are not processed.",
+                    task.clientHandle);
+        }
+
         // Check for pause mode restrictions before proceeding any further
         if (!allowPauseModeExecution(handler, catProc, task)) {
             return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
@@ -430,7 +439,7 @@ public final class InvocationDispatcher {
 
         // Verify that admin mode sysprocs are called from a client on the
         // admin port, otherwise return a failure
-        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName)) && !handler.isAdmin()) {
+        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName) || "@PrepareShutdown".equals(task.procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
                     task.procName + " is not available to this client",
                     task.clientHandle);
