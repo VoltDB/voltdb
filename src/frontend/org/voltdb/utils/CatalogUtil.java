@@ -598,25 +598,15 @@ public abstract class CatalogUtil {
 
     public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
         String prefix = "Unable to use feature not included in license: ";
-        StringBuilder errMsg = new StringBuilder();
-        errMsg.append(prefix);
+        String errMsg = null;
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        CatalogMap<Table> tables = db.getTables();
-        for (Table t : tables) {
-            if (t.getIsdred() && !licenseApi.isDrReplicationAllowed()) {
-                errMsg.append("\nDR Active-Passive replication");
-                break;
-            }
-        }
-        if (db.getIsactiveactivedred()) {
+        if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
             if (!licenseApi.isDrActiveActiveAllowed()) {
-                errMsg.append("\nDR Active-Active replication");
+                errMsg = prefix + "DR Active-Active replication";
             }
         }
 
-
-        return errMsg.length() > prefix.length() ? errMsg.toString() : null;
+        return errMsg;
     }
 
     public static String compileDeployment(Catalog catalog, String deploymentURL,
