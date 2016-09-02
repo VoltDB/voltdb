@@ -1,7 +1,7 @@
 <project default="build">
     <path id='project.classpath'>
         <!-- Replace this with the path to the VoltDB jars -->
-        <fileset dir='/Users/pshaw/voltdb'>
+        <fileset dir='/home/pshaw/voltdb'>
             <include name='lib/*.jar' />
             <include name='voltdb/*.jar' />
         </fileset>

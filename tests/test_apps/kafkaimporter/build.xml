@@ -1,18 +1,20 @@
 <!-- Simple build file to build kafka stream importer -->
 <project name="kafkastream" basedir="." default="all">
 
-    <property name="procedures.dir"     value="${basedir}/db/procedures"/>
+    <property name="procedures.dir"    value="${basedir}/db/procedures"/>
     <property name="clientsrc.dir"     value="${basedir}/client/kafkaimporter"/>
+    <property name="formattersrc.dir"  value="${basedir}/custom_import_formatter/formatter"/>
 
-    <property name="build.dir"   value="build"/>
-    <property name="classes.dir" value="${build.dir}/classes"/>
-    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
-    <property name="proceduresclasses.dir" value="${build.dir}/cclasses"/>
-    <property name="jar.dir"     value="${basedir}"/>
-    <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
-    <property name="log.dir"     value="${basedir}/log"/>
+    <property name="build.dir"              value="build"/>
+    <property name="classes.dir"            value="${build.dir}/classes"/>
+    <property name="clientclasses.dir"      value="${build.dir}/client/cclasses"/>
+    <property name="proceduresclasses.dir"  value="${build.dir}/procedures/classes"/>
+    <property name="formatterclasses.dir"   value="${build.dir}/formatter/cclasses"/>
+    <property name="jar.dir"                value="${basedir}"/>
+    <property name="voltdbroot.dir"         value="${basedir}/voltdbroot"/>
+    <property name="log.dir"                value="${basedir}/log"/>
 
-    <target name="all" depends="client, procedures"/>
+    <target name="all" depends="client, procedures, formatter"/>
 
     <target name="clean">
         <delete dir="${build.dir}"/>
@@ -20,6 +22,8 @@
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
         <delete file="${jar.dir}/client.jar"/>
+        <delete file="${jar.dir}/formatter.jar"/>
+        <delete file="${jar.dir}/sp.jar"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
 
@@ -61,4 +65,27 @@
         </jar>
     </target>
 
+    <target name="formatter-compile">
+        <mkdir dir="${formatterclasses.dir}"/>
+        <javac debug="on" srcdir="${formattersrc.dir}" destdir="${formatterclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+	<target name="formatter" depends="formatter-compile">
+        <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
+            <!--
+                 <include name="ExampleFormatter.class"/>
+                <include name="ExampleFormatterFactory.class"/>
+             -->
+            <manifest>
+                <attribute name="Bundle-Activator" value="formatter.ExampleFormatterFactory" />
+                <attribute name="Bundle-ManifestVersion" value="2" />
+                <attribute name="Bundle-Name" value="Example Formatter OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="ExampleFormatter" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="DynamicImport-Package" value="*" />
+            </manifest>
+        </jar>
+    </target>
 </project>
