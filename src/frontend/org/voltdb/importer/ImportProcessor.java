@@ -89,6 +89,10 @@ public class ImportProcessor implements ImportDataProcessor {
             m_importerTypeMgr.configure(props, formatterBuilder);
         }
 
+        public int getConfigsCount() {
+            return m_importerTypeMgr.getConfigsCount();
+        }
+
         public void stop() {
             try {
                 //Handler can be null for initial period if shutdown come quickly.
@@ -153,6 +157,17 @@ public class ImportProcessor implements ImportDataProcessor {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);
         }
+    }
+
+    @Override
+    public int getPartitionsCount() {
+        int count = 0;
+        for (BundleWrapper wapper : m_bundles.values()) {
+            if (wapper != null) {
+                count += wapper.getConfigsCount();
+            }
+        }
+        return count;
     }
 
     @Override
