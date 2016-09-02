@@ -32,11 +32,11 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import org.voltdb.common.Constants;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -645,6 +645,10 @@ public class CommandLine extends VoltDB.Configuration
 
         if (m_startAction == StartAction.PROBE && m_safeMode) {
             cmdline.add("safemode");
+        }
+
+        if (m_startAction == StartAction.PROBE && m_enableAdd) {
+            cmdline.add("enableadd");
         }
 
         cmdline.add("host");
