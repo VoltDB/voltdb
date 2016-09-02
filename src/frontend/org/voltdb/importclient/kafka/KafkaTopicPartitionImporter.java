@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
@@ -365,6 +364,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
+        @SuppressWarnings("unchecked")
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
@@ -451,7 +451,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     if (currentOffset > m_currentOffset.get()) {
                         if (isDebugEnabled()) {
                             debug(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
-                          }
+                        }
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
@@ -465,10 +465,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                          if (!callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
-                               }
-                               m_gapTracker.commit(messageAndOffset.nextOffset());
+                              }
+                              m_gapTracker.commit(messageAndOffset.nextOffset());
                          }
-                     } catch (FormatException e){
+                     } catch (FormatException e) {
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
                         m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
@@ -671,7 +671,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            if (!m_dontCommit.get() && response.getStatus() != ClientResponseImpl.SERVER_UNAVAILABLE) {
+            if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
         }
