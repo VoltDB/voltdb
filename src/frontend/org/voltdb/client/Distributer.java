@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
@@ -64,6 +66,7 @@ import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -79,6 +82,7 @@ class Distributer {
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -120,7 +124,10 @@ class Distributer {
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
-    private final List<Integer> m_partitionKeys = new ArrayList<Integer>();
+
+    private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
+    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
+    private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
 
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
@@ -191,20 +198,25 @@ class Distributer {
      */
     class PartitionUpdateCallback implements ProcedureCallback {
 
+        final CountDownLatch m_latch;
+
+        PartitionUpdateCallback(CountDownLatch latch) {
+            m_latch = latch;
+        }
+
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                try {
-                    synchronized (Distributer.this) {
-                        VoltTable results[] = clientResponse.getResults();
-                        if (results != null && results.length > 0) {
-                            updatePartitioning(results[0]);
-                        }
-                    }
+                VoltTable results[] = clientResponse.getResults();
+                if (results != null && results.length > 0) {
+                    updatePartitioning(results[0]);
                 }
-                catch (Exception e) {
-                    e.printStackTrace();
-                }
+            }
+
+            m_partitionUpdateStatus.set(clientResponse);
+
+            if (m_latch != null) {
+                m_latch.countDown();
             }
         }
     }
@@ -1029,14 +1041,7 @@ class Distributer {
             }
 
             //Partition key update
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
-            cxn.createWork(System.nanoTime(),
-                    spi.getHandle(),
-                    spi.getProcName(),
-                    serializeSPI(spi),
-                    new PartitionUpdateCallback(),
-                    true,
-                    USE_DEFAULT_CLIENT_TIMEOUT);
+            refreshPartitionKeys(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1366,6 +1371,8 @@ class Distributer {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
         }
+
+        refreshPartitionKeys(true);
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
@@ -1396,14 +1403,15 @@ class Distributer {
     }
 
     private void updatePartitioning(VoltTable vt) {
-        m_partitionKeys.clear();
+        List<Integer> keySet = new ArrayList<Integer>();
         while (vt.advanceRow()) {
             //check for mock unit test
             if (vt.getColumnCount() == 2) {
                 Integer key = (int)(vt.getLong("PARTITION_KEY"));
-                m_partitionKeys.add(key);
+                keySet.add(key);
             }
         }
+        m_partitionKeys.set(ImmutableSet.copyOf(keySet));
     }
 
     /**
@@ -1449,7 +1457,49 @@ class Distributer {
         return m_procedureCallTimeoutNanos;
     }
 
-   public  List<Integer> getPartitionKeys() {
-        return m_partitionKeys;
+    ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
+        refreshPartitionKeys(false);
+
+        if (m_partitionUpdateStatus.get().getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(m_partitionUpdateStatus.get(), null, null);
+        }
+
+        return m_partitionKeys.get();
+    }
+
+    /**
+     * Set up partitions.
+     * @param topologyUpdate  if true, it is called from topology update
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    private void refreshPartitionKeys(boolean topologyUpdate)  {
+
+        long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
+        if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
+            return;
+        }
+
+        try {
+            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            CountDownLatch latch = null;
+
+            if (!topologyUpdate) {
+                latch = new CountDownLatch(1);
+            }
+            PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
+            if (!queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT)) {
+                m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                        "Fails to queue the partition update query, please try later."));
+            }
+            if (!topologyUpdate) {
+                latch.await();
+            }
+            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
+        } catch (InterruptedException | IOException e) {
+            m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                    "Fails to fetch partition keys from server:" + e.getMessage()));
+        }
     }
 }

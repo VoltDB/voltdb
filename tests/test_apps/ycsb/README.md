@@ -7,7 +7,7 @@ Set Up YCSB
 First you need to download YCSB, which may be done as follows:
 
 		wget https://github.com/brianfrankcooper/YCSB/releases/download/0.10.0/ycsb-0.10.0.tar.gz
-		tar -xfvz ycsb-0.1.4.tar.gz
+		tar -xfvz ycsb-0.10.0.tar.gz
 
 If you want to run YCSB with customized zipfian distribution workload, you can instead do:
 
