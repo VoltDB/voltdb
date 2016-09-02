@@ -554,6 +554,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isBare() {
+        return false;
+    }
+
+    @Override
     public boolean rejoinDataPending() {
         return false;
     }

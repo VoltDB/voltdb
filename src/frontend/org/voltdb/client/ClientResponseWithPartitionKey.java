@@ -26,46 +26,15 @@ import org.voltdb.client.ClientResponse;
  */
 public class ClientResponseWithPartitionKey {
 
-    final Object m_partitionKey;
-    final ClientResponse m_response;
-    final String m_errorMessage;
-    final Exception m_cause;
+    final public Object partitionKey;
+    final public ClientResponse response;
     /**
      *
      * @param partitionKey  A partition key to reach the partition
      * @param response The ClientResponse instance from the procedure execution
      */
     ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response) {
-       this(partitionKey, response, null, null);
+        this.partitionKey = partitionKey;
+        this.response = response;
     }
-
-    /**
-    *
-    * @param partitionKey  A partition key to reach the partition
-    * @param response The ClientResponse instance from the procedure execution
-    * @param errorMessage  Error message
-    * @param cause  The exception
-    */
-   ClientResponseWithPartitionKey(Object partitionKey, ClientResponse response, String errorMessage, Exception cause) {
-       m_partitionKey = partitionKey;
-       m_response = response;
-       m_errorMessage = errorMessage;
-       m_cause = cause;
-   }
-
-   public Object getPartitionKey() {
-       return m_partitionKey;
-   }
-
-   public ClientResponse getResponse() {
-       return m_response;
-   }
-
-   public String getErrorMessage() {
-       return m_errorMessage;
-   }
-
-   public Exception getCause() {
-       return m_cause;
-   }
 }

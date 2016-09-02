@@ -36,6 +36,7 @@ import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import org.voltdb.common.Constants;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -124,7 +125,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_hostCount = m_hostCount;
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
-
+        cl.m_newCli = m_newCli;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -344,6 +345,8 @@ public class CommandLine extends VoltDB.Configuration
 
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
+        if (m_newCli) return this;
+
         this.voltFilePrefix = voltFilePrefix;
         return this;
     }
@@ -562,7 +565,6 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
         cmdline.add("-XX:+CMSClassUnloadingEnabled");
-        cmdline.add("-XX:PermSize=64m");
 
         /*
          * Have RMI not invoke System.gc constantly
@@ -590,10 +592,11 @@ public class CommandLine extends VoltDB.Configuration
         if (includeTestOpts)
         {
             cmdline.add("-DLOG_SEGMENT_SIZE=8");
-            cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
+            if (!m_newCli) {
+                cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
+            }
             cmdline.add("-ea");
             cmdline.add("-XX:MaxDirectMemorySize=2g");
-            cmdline.add("-XX:-UseSplitVerifier");
         }
         else
         {
@@ -653,7 +656,8 @@ public class CommandLine extends VoltDB.Configuration
         if (jarFileName() != null) {
             cmdline.add("catalog"); cmdline.add(jarFileName());
         }
-        if (pathToDeployment() != null) {
+        //Add deployment if its not probe
+        if (pathToDeployment() != null && m_startAction != StartAction.PROBE) {
             cmdline.add("deployment"); cmdline.add(pathToDeployment());
         }
 
@@ -696,6 +700,9 @@ public class CommandLine extends VoltDB.Configuration
         if (m_internalInterface != null && (m_externalInterface != null && !m_externalInterface.isEmpty()))
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
+        }
+        if (m_httpPort != Constants.HTTP_PORT_DISABLED) {
+            cmdline.add("httpport"); cmdline.add(Integer.toString(m_httpPort));
         }
 
         if (m_forceVoltdbCreate)
@@ -748,13 +755,13 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("paused");
         }
 
-        cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
-
+        //Add mesh and hostcount for probe only.
         if (m_startAction == StartAction.PROBE) {
+            cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
             cmdline.add("hostcount"); cmdline.add(Integer.toString(m_hostCount));
         }
 
-        if (m_startAction == StartAction.PROBE || m_startAction == StartAction.INITIALIZE) {
+        if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
 
@@ -1016,5 +1023,12 @@ public class CommandLine extends VoltDB.Configuration
             return sb.toString();
         }
     }
+
+    boolean m_newCli = false;
+    //Return true if we are going to run init and start.
+    boolean isNewCli() {
+        return m_newCli;
+    }
+    public void setNewCli(boolean flag) { m_newCli = flag; };
 
 }

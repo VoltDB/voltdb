@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
@@ -245,7 +244,7 @@ public class MaterializedViewFixInfo {
         NodeSchema aggSchema = new NodeSchema();
 
         // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: scanColumns) {
+        for (SchemaColumn scol: inlineProjSchema.getColumns()) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());

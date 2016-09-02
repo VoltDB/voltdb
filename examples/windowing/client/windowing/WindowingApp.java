@@ -24,20 +24,18 @@
 package windowing;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -65,9 +63,7 @@ public class WindowingApp {
 
     private final AtomicLong deletesSinceLastChecked = new AtomicLong(0);
 
-    // these values are updated by the UpdatePartitionData class each time it is run
-    private final AtomicReference<Map<Long, PartitionInfo>> partitionData =
-            new AtomicReference<Map<Long, PartitionInfo>>(new HashMap<Long, PartitionInfo>());
+    // the value is updated by the UpdatePartitionData class each time it is run
     private final AtomicLong targetRowsPerPartition = new AtomicLong(Long.MAX_VALUE);
 
     /**
@@ -128,30 +124,20 @@ public class WindowingApp {
     // PACKAGE VISIBLE SHARED STATE ACCESS BELOW
     /////
 
-    static final class PartitionInfo {
-        String partitionKey;
-        long tupleCount;
-    }
-
     // Reference to the database connection we will use
     final Client client;
 
     // validated command line configuration
     final WindowingConfig config;
 
-    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
     final long startTS = System.currentTimeMillis();
 
     final ContinuousDeleter deleter;
-    final PartitionDataTracker partitionTracker;
     final RandomDataInserter inserter;
     final MaxTracker maxTracker;
     final Reporter reporter;
-
-    Map<Long, PartitionInfo> getPartitionData() {
-        return partitionData.get();
-    }
 
     long getTargetRowsPerPartition() {
         return targetRowsPerPartition.get();
@@ -162,9 +148,9 @@ public class WindowingApp {
         return new TimestampType(targetTimestampMillis * 1000);
     }
 
-    void updatePartitionInfo(Map<Long, PartitionInfo> partitionData) {
-        this.partitionData.set(partitionData);
-        targetRowsPerPartition.set(config.maxrows / partitionData.size());
+    void updatePartitionCount(long partitionSize) {
+        assert(partitionSize > 0);
+        targetRowsPerPartition.set(config.maxrows / partitionSize);
     }
 
     void addToDeletedTuples(long count) {
@@ -180,7 +166,6 @@ public class WindowingApp {
         try {
             scheduler.awaitTermination(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
@@ -244,7 +229,6 @@ public class WindowingApp {
             e.printStackTrace();
         }
 
-        partitionTracker = new PartitionDataTracker(this);
         deleter = new ContinuousDeleter(this);
         inserter = new RandomDataInserter(this, insertsClient);
         maxTracker = new MaxTracker(this);
@@ -309,6 +293,23 @@ public class WindowingApp {
      * @throws Exception if anything unexpected happens.
      */
     public void run() {
+
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(" Getting initial database partition count");
+        long partitionCount = 0;
+        try {
+            VoltTable results[] = client.callProcedure("@GetPartitionKeys", "integer").getResults();
+            partitionCount = results[0].getRowCount();
+            updatePartitionCount(partitionCount);
+        } catch (IOException | ProcCallException e) {
+            System.out.print(HORIZONTAL_RULE);
+            System.out.println("Could not get partition information. Processing terminated. Error:" + e.getMessage());
+            e.printStackTrace();
+            shutdown();
+            System.out.print(HORIZONTAL_RULE);
+            return;
+        }
+        System.out.println(" Initial database partition count: " + partitionCount);
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Processing");
         System.out.println(HORIZONTAL_RULE);
@@ -317,12 +318,6 @@ public class WindowingApp {
         scheduler.scheduleWithFixedDelay(reporter,
                                                config.displayinterval,
                                                config.displayinterval,
-                                               TimeUnit.SECONDS);
-
-        // Update the partition key set, row counts and redundancy level once per second
-        scheduler.scheduleWithFixedDelay(partitionTracker,
-                                               1,
-                                               1,
                                                TimeUnit.SECONDS);
 
         if (!config.inline) {

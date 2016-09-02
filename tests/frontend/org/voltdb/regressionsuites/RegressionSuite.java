@@ -764,6 +764,10 @@ public class RegressionSuite extends TestCase {
   }
 
     protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows) {
+        assertTablesAreEqual(prefix, expectedRows, actualRows, null);
+    }
+
+    protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows, Double epsilon) {
         assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
                 expectedRows.getColumnCount(), actualRows.getColumnCount());
 
@@ -779,9 +783,21 @@ public class RegressionSuite extends TestCase {
                 assertEquals(colPrefix + "type mismatch", expectedTy, actualTy);
 
                 Object expectedObj = expectedRows.get(j,  expectedTy);
-                Object actualObj = expectedRows.get(j,  actualTy);
-                assertEquals(colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj,
-                        expectedObj, actualObj);
+                Object actualObj = actualRows.get(j,  actualTy);
+                boolean expectedNull = expectedRows.wasNull();
+                boolean actualNull = actualRows.wasNull();
+                assertEquals(colPrefix + "null/not null mismatch", expectedNull, actualNull);
+
+                if (!expectedNull) {
+                    String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
+                    if (expectedTy != VoltType.FLOAT) {
+                        assertEquals(message, expectedObj, actualObj);
+                    }
+                    else {
+                        assertNotNull("You pass in an epsilon to compare tables with floating point columns", epsilon);
+                        assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
+                    }
+                }
             }
 
             i++;

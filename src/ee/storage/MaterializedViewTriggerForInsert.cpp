@@ -341,7 +341,7 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
-            newValue = ValueFactory::getNullValue();
+            newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(aggOffset+aggIndex));
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }

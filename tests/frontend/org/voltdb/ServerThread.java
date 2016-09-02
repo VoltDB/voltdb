@@ -36,7 +36,6 @@ import org.voltdb.utils.MiscUtils;
  */
 public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
-    boolean initialized = false;
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
@@ -60,7 +59,9 @@ public class ServerThread extends Thread {
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
         m_config.m_forceVoltdbCreate = true;
-
+        if (config.m_startAction == StartAction.INITIALIZE) {
+            VoltDB.ignoreCrash = true;
+        }
         setName("ServerThread");
     }
 
@@ -150,6 +151,11 @@ public class ServerThread extends Thread {
     public void run() {
         VoltDB.initialize(m_config);
         VoltDB.instance().run();
+    }
+
+    //Call this if you are doing init only
+    public void initialize() {
+        VoltDB.initialize(m_config);
     }
 
     public void waitForInitialization() {

@@ -68,6 +68,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         Eng798Insert.class, TruncateMatViewDataMP.class
     };
 
+    // For comparing tables with FLOAT columns
+    private static final double EPSILON = 0.000001;
+
     public TestMaterializedViewSuite(String name) {
         super(name);
     }
@@ -188,31 +191,31 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511 ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expL ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2) AS vmin, MAX(v2) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511expL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expR ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(abs(v1)) AS vmax FROM ENG6511 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511expR: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511expLR ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1+1, d2*2, COUNT(*), MIN(v2-1) AS vmin, MAX(v2-1) AS vmax FROM ENG6511 GROUP BY d1+1, d2*2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511expLR: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511C ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(v1) AS vmin, MAX(v1) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511C: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511C: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511TwoIndexes ORDER BY d1, d2;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT d1, d2, COUNT(*), MIN(abs(v1)) AS vmin, MAX(v2) AS vmax FROM ENG6511 WHERE v1 > 4 GROUP BY d1, d2 ORDER BY 1, 2;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511TwoIndexes: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511TwoIndexes: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults()[0];
         tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults()[0];
-        assertTablesAreEqual(prefix + "VENG6511NoGroup: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "VENG6511NoGroup: ", tresult, vresult, EPSILON);
     }
 
     private void runAndVerifyENG6511(Client client, String query) throws IOException, ProcCallException
@@ -1437,27 +1440,27 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_NOPCOL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_COUNT_NOPCOL").getResults()[0];
-        assertTablesAreEqual(prefix + "ORDER_COUNT_NOPCOL: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "ORDER_COUNT_NOPCOL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_COUNT_GLOBAL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_COUNT_GLOBAL").getResults()[0];
-        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "ORDER_COUNT_GLOBAL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_DETAIL_NOPCOL").getResults()[0];
-        assertTablesAreEqual(prefix + "ORDER_DETAIL_NOPCOL: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_NOPCOL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER_DETAIL_WITHPCOL ORDER BY 1, 2;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER_DETAIL_WITHPCOL").getResults()[0];
-        assertTablesAreEqual(prefix + "ORDER_DETAIL_WITHPCOL: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "ORDER_DETAIL_WITHPCOL: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM ORDER2016 ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_ORDER2016").getResults()[0];
-        assertTablesAreEqual(prefix + "ORDER2016: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "ORDER2016: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM QTYPERPRODUCT ORDER BY 1;").getResults()[0];
         tresult = client.callProcedure("PROC_QTYPERPRODUCT").getResults()[0];
-        assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult);
+        assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult, EPSILON);
     }
 
     public void testViewOnJoinQuery() throws IOException, ProcCallException
@@ -1565,6 +1568,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // have the full coverage of all the cases because we are inserting and deleting
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
+        //
+        // For more deterministic debugging, consider doing this:
+        // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing inserting data to the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
@@ -1637,6 +1643,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         // -- 5 -- Test deleting the data from the source tables.
+        //
+        // For more deterministic debugging, consider doing this:
+        // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing deleting data from the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
@@ -1738,6 +1747,130 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 "select * from V16_ENG_11042").getResults()[0];
         assertContentOfTable(new Object[][] {
             {-4, 2, -12}}, vt);
+    }
+
+    public void testEng11043() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-14, 'bouSWVaJwQHtrp', -16078, 5.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-14, 'FOO', -16079, 9.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-14, 'BAR', -16077, 7.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-15, 'NhFmPDULXEFLGI', 29960, 3.59831007623149345953e-01);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-15, 'FOOFOO', 29969, 9.59831007623149345953e-01);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1_ENG_11024 VALUES (-15, 'BARBAR', 29967, 7.59831007623149345953e-01);");
+
+        client.callProcedure("@AdHoc", "UPDATE P2_ENG_11024 SET NUM = 18;");
+
+        VoltTable vtExpected = client.callProcedure("@AdHoc",
+                "SELECT T1.NUM, COUNT(*), MAX(T2.RATIO), MIN(T3.VCHAR) "
+                + "FROM P1_ENG_11024 T1 JOIN P2_ENG_11024 T2 ON T1.ID = T2.ID JOIN R1_ENG_11024 T3 ON T2.ID = T3.ID "
+                + "GROUP BY T1.NUM "
+                + "ORDER BY T1.NUM").getResults()[0];
+        VoltTable vtActual= client.callProcedure("@AdHoc",
+                "select * from v27 order by num").getResults()[0];
+
+        String prefix = "Assertion failed comparing the view content and the AdHoc query result of ";
+        assertTablesAreEqual(prefix + "v27", vtExpected, vtActual, EPSILON);
+    }
+
+    public void testEng11047() throws Exception {
+        Client client = getClient();
+
+        ClientResponse cr;
+        VoltTable      vt;
+
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-1, null, null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-2, null, null, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-3, null, -333, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-4, null, -333, -22.22);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-5, 'eee', null, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-6, 'eee', null, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-7, 'eee', -777, null);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-8, 'eee', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-9, 'jjj', -777, -66.66);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-10, 'jjj', -10, -10);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-11, 'jjj', -11, -11);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-12, 'mmm', -12, -12);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-13, 'mmm', -13, -13);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-14, 'bouSWVaJwQHtrp', -16078, 5.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-14, 'FOO', -16079, 9.88087039394022959016e-02);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (-15, 'NhFmPDULXEFLGI', 29960, 3.59831007623149345953e-01);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (-15, 'BAR', 29967, 7.59831007623149345953e-01);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (1, 'aaa', 1, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (1, 'yyy', 1, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2_ENG_11024 VALUES (2, 'xxx', 2, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2_ENG_11024 VALUES (2, 'zzz', 2, 0);");
+
+        // The answers here and in the next query were determined by
+        // a judicious mix of testing and clever insertion.  The last four
+        // insert statements above give the values in the second test.
+        cr = client.callProcedure("@AdHoc", "SELECT (A.NUM) AS Q5 FROM V21 A WHERE (A.NUM) = (A.ID - 14) ORDER BY 1 LIMIT 82;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(-13, vt.getLong(0));
+
+        cr = client.callProcedure("@AdHoc", "SELECT (A.NUM) AS Q5 FROM V21 A WHERE (A.NUM) = (A.ID) ORDER BY 1 LIMIT 82;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        vt.advanceRow();
+        assertEquals(1, vt.getLong(0));
+
     }
 
     /**
