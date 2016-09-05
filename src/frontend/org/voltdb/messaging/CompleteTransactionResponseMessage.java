@@ -21,22 +21,27 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionResponseMessage extends VoltMessage
 {
-    long m_executionHSId;
     long m_txnId;
+    long m_spHandle;
+    long m_spiHSId;
+    boolean m_isRestart;
+    boolean m_isRecovering = false;
 
     /** Empty constructor for de-serialization */
     CompleteTransactionResponseMessage() {
         super();
     }
 
-    public CompleteTransactionResponseMessage(CompleteTransactionMessage msg,
-                                              long siteId)
+    public CompleteTransactionResponseMessage(CompleteTransactionMessage msg)
     {
-        m_executionHSId = siteId;
         m_txnId = msg.getTxnId();
+        m_spHandle = msg.getSpHandle();
+        m_isRestart = msg.isRestart();
+        m_spiHSId = msg.getCoordinatorHSId();
     }
 
     public long getTxnId()
@@ -44,16 +49,36 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         return m_txnId;
     }
 
-    public long getExecutionSiteId()
+    public long getSpHandle()
     {
-        return m_executionHSId;
+        return m_spHandle;
+    }
+
+    public long getSPIHSId()
+    {
+        return m_spiHSId;
+    }
+
+    public boolean isRestart()
+    {
+        return m_isRestart;
+    }
+
+    public boolean isRecovering()
+    {
+        return m_isRecovering;
+    }
+
+    public void setIsRecovering(boolean recovering)
+    {
+        m_isRecovering = recovering;
     }
 
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8;
+        msgsize += 8 + 8 + 8 + 1 + 1;
         return msgsize;
     }
 
@@ -61,8 +86,11 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public void flattenToBuffer(ByteBuffer buf)
     {
         buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
-        buf.putLong(m_executionHSId);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
+        buf.putLong(m_spiHSId);
+        buf.put((byte) (m_isRestart ? 1 : 0));
+        buf.put((byte) (m_isRecovering ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -70,8 +98,11 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     @Override
     protected void initFromBuffer(ByteBuffer buf)
     {
-        m_executionHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
+        m_spiHSId = buf.getLong();
+        m_isRestart = buf.get() == 1;
+        m_isRecovering = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 
@@ -80,10 +111,16 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         StringBuilder sb = new StringBuilder();
 
         sb.append("COMPLETE_TRANSACTION_RESPONSE");
-        sb.append(" (FROM EXEC SITE: ");
-        sb.append(CoreUtils.hsIdToString(m_executionHSId));
-        sb.append(") FOR TXN ID: ");
-        sb.append(m_txnId);
+        sb.append(" FOR TXN ID: ");
+        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(" SPHANDLE: ");
+        sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(" SPI ");
+        sb.append(CoreUtils.hsIdToString(m_spiHSId));
+        sb.append(" ISRESTART: ");
+        sb.append(m_isRestart);
+        sb.append(" RECOVERING ");
+        sb.append(m_isRecovering);
 
         return sb.toString();
     }

@@ -132,6 +132,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.settings.ClusterSettings;
@@ -305,6 +306,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
+    private boolean m_isBare = false;
+
+    private int m_maxThreadsCount;
 
     @Override
     public boolean isRunningWithOldVerbs() {
@@ -678,6 +682,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_configLogger = null;
             ActivePlanRepository.clear();
 
+            updateMaxThreadsLimit();
+
             // set up site structure
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
@@ -785,6 +791,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
+                setMode(OperationMode.PAUSED);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
@@ -1856,8 +1863,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return !p.isDirectory() || !"log".equals(p.getName());
             }
         });
-        for (File c: allButLog) {
-            MiscUtils.deleteRecursively(c);
+        if (allButLog != null) {
+            for (File c: allButLog) {
+                MiscUtils.deleteRecursively(c);
+            }
         }
     }
 
@@ -2399,6 +2408,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    @Override
+    public boolean isBare() {
+        return m_isBare;
+    }
+    void setBare(boolean flag) {
+        m_isBare = flag;
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -2409,6 +2426,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
+        setBare(bareAtStartup);
 
         final Supplier<Integer> hostCountSupplier = new Supplier<Integer>() {
             @Override
@@ -3095,6 +3113,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
+                checkThreadsSanity();
+
                 return Pair.of(m_catalogContext, csp);
             }
         } finally {
@@ -3350,7 +3370,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
-        m_statusTracker.setNodeState(NodeState.UP);
+        if (!m_joining) {
+            m_statusTracker.setNodeState(NodeState.UP);
+            Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        }
     }
 
     @Override
@@ -3520,9 +3545,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        if (!m_rejoining && !m_joining) {
+            Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        }
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
@@ -3877,6 +3904,68 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
+    }
+
+    private void checkThreadsSanity() {
+        int tableCount = m_catalogContext.tables.size();
+        int partitions = m_iv2Initiators.size() - 1;
+        int replicates = m_configuredReplicationFactor;
+        int importPartitions = ImportManager.getPartitionsCount();
+        int exportTableCount = ExportManager.instance().getExportTablesCount();
+        int exportNonceCount = ExportManager.instance().getConnCount();
+
+        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
+
+        // if the expected number of threads exceeds the limit, update the limit.
+        if (m_maxThreadsCount < expThreadsCount) {
+            updateMaxThreadsLimit();
+        }
+
+        // do insane check again.
+        if (m_maxThreadsCount < expThreadsCount) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates, ", tableCount, partitions, replicates));
+            builder.append(String.format("with importer configuration of %d importer partitions, ", importPartitions));
+            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates, ", exportTableCount, partitions, replicates));
+            builder.append(String.format("approximately requires %d threads.", expThreadsCount));
+            builder.append(String.format("The maximum number of threads to the system is %d. \n", m_maxThreadsCount));
+            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB. \n");
+            consoleLog.warn(builder.toString());
+        }
+    }
+
+    private void updateMaxThreadsLimit() {
+        String[] command = {"bash", "-c" ,"ulimit -u"};
+        String cmd_rst = ShellTools.local_cmd(command);
+        try {
+            m_maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
+        } catch(Exception e) {
+            m_maxThreadsCount = Integer.MAX_VALUE;
+        }
+    }
+
+    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount) {
+        final int clusterBaseCount = 5;
+        final int hostBaseCount = 56;
+        return clusterBaseCount + (hostBaseCount + partitionCount)
+                + computeImporterThreads(importerPartitionCount)
+                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount);
+    }
+
+    private int computeImporterThreads(int importerPartitionCount) {
+        if (importerPartitionCount == 0) {
+            return 0;
+        }
+        int importerBaseCount = 6;
+        return importerBaseCount + importerPartitionCount;
+    }
+
+    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount) {
+        if (exportTableCount == 0) {
+            return 0;
+        }
+        int exporterBaseCount = 1;
+        return exporterBaseCount + partitionCount * exportTableCount + exportNonceCount;
     }
 
     @Override

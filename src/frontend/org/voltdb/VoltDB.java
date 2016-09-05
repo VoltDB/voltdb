@@ -690,7 +690,7 @@ public class VoltDB {
 
         public Map<String,String> asClusterSettingsMap() {
             if (ConfigFactory.getProperty(ClusterSettings.CONFIG_DIR) == null) try {
-                File confDH = new File(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
+                File confDH = new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR).getCanonicalFile();
                 ConfigFactory.setProperty(ClusterSettings.CONFIG_DIR, confDH.getPath());
             } catch (IOException e) {
                 throw new SettingsException("failed to resolve the cluster settings directory", e);
@@ -728,7 +728,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 if (!configCFH.equals(optCFH)) {
-                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment");
+                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment, You specified: " + optCFH);
                     referToDocAndExit();
                 }
             } else {
@@ -799,7 +799,7 @@ public class VoltDB {
                 hostLog.fatal(msg);
             }
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE));
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
             // require deployment file location
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)

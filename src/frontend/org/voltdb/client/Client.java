@@ -422,4 +422,104 @@ public interface Client {
      */
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
+
+    /**
+     * <p>
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values and then execute the stored procedure
+     * one partition at a time, and return an aggregated response. Blocks until results are available.
+     * </p><p>
+     * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
+     * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database if the cached set is more than 1 second old. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to a partition zero time or multiple times, exactly once per partition will not be guaranteed.
+     * </p><p>There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes. For example, multiple smaller single partition procedures are
+     * particularly useful to age out large stale data where strong global consistency is not required.
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
+     * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
+     * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(String, Object...)} instead.
+     *
+     * When creating a class stored procedure, the first argument in the procedure's run method must be the partition key, which matches the partition column type, followed by the
+     * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
+     * </p><p>
+     * Example: A stored procedure with a parameter of long type and partition column of string type
+     *</P><pre>
+     *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
+     *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);
+     *   PARTITION TABLE tableWithStringPartition ON COLUMN value_string;
+     *   CREATE PROCEDURE FROM CLASS example.Everywhere;
+     *   PARTITION PROCEDURE Everywhere ON TABLE tableWithStringPartition COLUMN value_string;
+     * </pre><pre>
+     *    public class Everywhere extends VoltProcedure {
+     *         public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM tableWithStringPartition where value1 &gt; ?;");
+     *         public VoltTable[] run(String partitionKey, long value1) {
+     *              voltQueueSQL(stmt, value1);
+     *              return voltExecuteSQL(true);
+     *         }
+     *    }
+     * </pre><p>
+     * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
+     * </p>
+     * @param procedureName <code>class</code> name (not qualified by package) of the partitioned java procedure to execute.
+     * @param params  vararg list of procedure's parameter values.
+     * @return {@link ClientResponseWithPartitionKey} instances of procedure call results.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
+            throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>
+     * The method uses system procedure <strong>@GetPartitionKeys</strong> to get a set of partition values which are used to reach every partition, and then asynchronously
+     * executes the stored procedure across partitions. When results return from all partitions, the provided callback will be invoked.
+     * If there is backpressure, a call to a partition will block until the invocation on the partition is queued. If configureBlocking(false) is invoked
+     * then the execution on the partition will return immediately. Check the return values to determine if queueing actually took place on each partition.
+     * </p><p>
+     * The set of partition values is cached to avoid repeated requests to fetch them. However the database partitions may be changed. The cached set of partition values will
+     * be updated when the client affinity feature {@link ClientConfig#setClientAffinity(boolean)} is enabled and database cluster topology is updated.
+     * If the client affinity is not enabled, the cached set of partition values will be synchronized with the database if the cached set is more than 1 second old. The database partitions are usually pretty static.
+     * But when the cached set of partition values is out sync with the database, a procedure execution may be routed to a partition zero time or multiple times, exactly once per partition will not be guaranteed.
+     * </p><p>
+     * There may be undesirable impact on latency and throughput as a result of running a multi-partition procedure. This is particularly true for longer running procedures.
+     * Using multiple, smaller procedures can also help reducing latency and increasing throughput, for queries that modify large volumes of data, such as large deletes. For example, multiple smaller single partition procedures are
+     * particularly useful to age out large stale data where strong global consistency is not required.
+     * </p><p>
+     * When creating a single-partitioned procedure, you can use <strong>PARAMETER</strong> clause to specify the partitioning parameter which is used to determine the target partition.
+     * The <strong>PARAMETER</strong> should not be specified in the stored procedure used in this call since the stored procedure will be executed on every partition. If you only want to
+     * execute the procedure in the partition as designated with <strong>PARAMETER</strong>, use {@link #callProcedure(ProcedureCallback, String, Object...)} instead.
+     *
+     * When creating a class stored procedure, the first argument in the procedure's run method must be the partition key, which matches the partition column type, followed by the
+     * parameters as declared in the procedure. The argument partition key, not part of procedure's parameters,  is assigned during the iteration of the partition set.
+     * </P><p>
+     * Example: A stored procedure with a parameter of long type and partition column of string type
+     * </p><pre>
+     *   CREATE TABLE tableWithStringPartition (id bigint NOT NULL,value_string varchar(50) NOT NULL,
+     *                                          value1 bigint NOT NULL,value2 bigint NOT NULL);
+     *   PARTITION TABLE tableWithStringPartition ON COLUMN value_string;
+     *   CREATE PROCEDURE FROM CLASS example.Everywhere;
+     *   PARTITION PROCEDURE Everywhere ON TABLE tableWithStringPartition COLUMN value_string;
+     * </pre><pre>
+     *    public class Everywhere extends VoltProcedure {
+     *         public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM tableWithStringPartition where value1 &gt; ?;");
+     *         public VoltTable[] run(String partitionKey, long value1) {
+     *              voltQueueSQL(stmt, value1);
+     *              return voltExecuteSQL(true);
+     *         }
+     *    }
+     * </pre><p>
+     * The execution of the stored procedure may fail on one or more partitions. Thus check the status of the response on every partition.
+     * </p>
+     * @param callback {@link AllPartitionProcedureCallback} that will be invoked with procedure results.
+     * @param procedureName class name (not qualified by package) of the partitioned java procedure to execute.
+     * @param params  vararg list of procedure's parameter values.
+     * @return <code>false</code> if the procedures on all partition are not queued and <code>true</code> otherwise.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     * @throws ProcCallException on any VoltDB specific failure.
+     */
+    boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName, Object... params)
+            throws IOException, NoConnectionsException, ProcCallException;
 }

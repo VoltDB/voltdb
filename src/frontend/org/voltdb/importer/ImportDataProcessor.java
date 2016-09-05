@@ -54,4 +54,6 @@ public interface ImportDataProcessor  {
      */
     public void setProcessorConfig(CatalogContext context, Map<String, ImportConfiguration> config);
 
+    public int getPartitionsCount();
+
 }

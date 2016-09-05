@@ -28,6 +28,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.logging.Level;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importer.AbstractImporter;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
+
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
@@ -50,16 +59,6 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
-import org.voltcore.logging.Level;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
-
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
  */
@@ -81,12 +80,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
+    private final FetchRequestBuilder m_fetchRequestBuilder;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
         m_config = config;
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
+        m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID);
     }
 
     @Override
@@ -129,6 +130,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         return returnMetaData;
     }
 
+    private int nextCorrelationId() {
+        FetchRequest fr = m_fetchRequestBuilder.addFetch(m_topicAndPartition.topic(),
+                m_topicAndPartition.partition(), 1L, m_config.getFetchSize())
+                .build();
+        return fr.correlationId();
+    }
+
     //Find leader for this topic partition.
     private HostAndPort findNewLeader() {
         for (int i = 0; i < 3; i++) {
@@ -156,7 +164,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     public void getOffsetCoordinator() {
         KafkaStreamImporterException probeException = null;
-        int correlationId = 0;
 
         OUTER: for (int attempts = 0; attempts < 3; ++attempts) {
             for (HostAndPort hp: m_config.getBrokers()) {
@@ -172,7 +179,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     channel.send(new ConsumerMetadataRequest(
                             m_config.getGroupId(),
                             ConsumerMetadataRequest.CurrentVersion(),
-                            correlationId++,
+                            nextCorrelationId(),
                             KafkaStreamImporterConfig.CLIENT_ID
                             ));
                     ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
@@ -252,17 +259,16 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     private OffsetFetchResponse getClientTopicOffset() {
         final short version = 1;
-        final int correlationId = m_topicAndPartition.partition();
-        final OffsetFetchRequest rq = new OffsetFetchRequest(
-                m_config.getGroupId(),
-                singletonList(m_topicAndPartition),
-                version, correlationId,
-                KafkaStreamImporterConfig.CLIENT_ID
-                );
         OffsetFetchResponse rsp = null;
         Throwable fault = null;
 
         for (int attempts = 0; attempts < 3; ++attempts) try {
+            final OffsetFetchRequest rq = new OffsetFetchRequest(
+                    m_config.getGroupId(),
+                    singletonList(m_topicAndPartition),
+                    version, nextCorrelationId(),
+                    KafkaStreamImporterConfig.CLIENT_ID
+                    );
             BlockingChannel channel = m_offsetManager.get();
             channel.send(rq.underlying());
             rsp = OffsetFetchResponse.readFrom(channel.receive().buffer());
@@ -358,6 +364,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
+        @SuppressWarnings("unchecked")
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
@@ -392,8 +399,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 long currentFetchCount = 0;
                 //Build fetch request of we have a valid offset and not too many are pending.
-                FetchRequest req = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID)
-                        .addFetch(m_topicAndPartition.topic(),
+                FetchRequest req = m_fetchRequestBuilder.addFetch(m_topicAndPartition.topic(),
                                 m_topicAndPartition.partition(), m_currentOffset.get(), m_config.getFetchSize())
                                 .build();
                 FetchResponse fetchResponse = null;
@@ -445,12 +451,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     if (currentOffset > m_currentOffset.get()) {
                         if (isDebugEnabled()) {
                             debug(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
-                          }
+                        }
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    try{
+                    try {
+                        m_gapTracker.submit(messageAndOffset.nextOffset());
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
@@ -458,12 +465,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                          if (!callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
-                               }
-                               m_gapTracker.commit(currentOffset);
+                              }
+                              m_gapTracker.commit(messageAndOffset.nextOffset());
                          }
-                     } catch (FormatException e){
+                     } catch (FormatException e) {
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
-                        m_gapTracker.commit(currentOffset);
+                        m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
                     submitCount++;
                     m_currentOffset.set(messageAndOffset.nextOffset());
@@ -504,19 +511,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     public boolean commitOffset() {
-        final int correlationId = m_topicAndPartition.partition();
         final short version = 1;
 
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
             long now = System.currentTimeMillis();
-            OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
-                    m_config.getGroupId(),
-                    singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
-                    correlationId,
-                    KafkaStreamImporterConfig.CLIENT_ID,
-                    version
-                    );
             OffsetCommitResponse offsetCommitResponse = null;
             try {
                 BlockingChannel channel = null;
@@ -527,9 +526,16 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
+                    OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
+                            m_config.getGroupId(),
+                            singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
+                            nextCorrelationId(),
+                            KafkaStreamImporterConfig.CLIENT_ID,
+                            version
+                            );
                     channel.send(offsetCommitRequest.underlying());
                     offsetCommitResponse = OffsetCommitResponse.readFrom(channel.receive().buffer());
-                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                    final short code = ((Short)offsetCommitResponse.errors().get(m_topicAndPartition)).shortValue();
                     if (code == ErrorMapping.NotCoordinatorForConsumerCode() || code == ErrorMapping.ConsumerCoordinatorNotAvailableCode()) {
                         info(null, "Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
                         getOffsetCoordinator();
@@ -547,7 +553,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 return false;
             }
-            final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+            final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition)).shortValue();
             if (code != ErrorMapping.NoError()) {
                 final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition;
                 rateLimitedLog(Level.ERROR, ErrorMapping.exceptionFor(code), msg);
@@ -658,7 +664,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             m_cbcnt = cbcnt;
             m_tracker = tracker;
             m_dontCommit = dontCommit;
-            m_tracker.submit(m_offset);
             m_invocation = invocation;
         }
 
@@ -666,7 +671,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            if (!m_dontCommit.get() && response.getStatus() != ClientResponseImpl.SERVER_UNAVAILABLE) {
+            if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
         }

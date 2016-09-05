@@ -445,6 +445,7 @@ if whichtests in ("${eetestsuite}", "memleaktests"):
    CTX.TESTS['memleaktests'] = """
      definite_losses
      indirect_losses
+     no_losses
      still_reachable_losses
      possible_losses
      rw_deleted

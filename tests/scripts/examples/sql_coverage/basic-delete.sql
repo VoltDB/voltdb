@@ -40,4 +40,3 @@ INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test arithmetic operators (+, -, *, /) with comparison ops
 DELETE FROM @dmltable WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant
-

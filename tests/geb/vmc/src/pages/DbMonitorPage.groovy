@@ -91,8 +91,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         avgrows                         { $("#AVG_ROWS") }
         tabletype                       { $("#TABLE_TYPE") }
 
-        ascending                       { $(class:"sorttable_sorted") }
-        descending                      { $(class:"sorttable_sorted_reverse") }
+        ascending                       (required: false) { $(class:"sorttable_sorted") }
+        descending                      (required: false) { $(class:"sorttable_sorted_reverse") }
 
         alertThreshold                  { $("#threshold") }
         saveThreshold                   { $("#saveThreshold") }
@@ -980,7 +980,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         if ( descending.displayed )
             return true
         else
-            return falsez
+            return false
     }
 
     /*

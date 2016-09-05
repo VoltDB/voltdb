@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<valgrindoutput>
+
+<protocolversion>4</protocolversion>
+<protocoltool>memcheck</protocoltool>
+
+<preamble>
+  <line>Memcheck, a memory error detector</line>
+  <line>Copyright (C) 2002-2015, and GNU GPL'd, by Julian Seward et al.</line>
+  <line>Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info</line>
+  <line>Command: /home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/no_losses</line>
+</preamble>
+
+<pid>12950</pid>
+<ppid>12949</ppid>
+<tool>memcheck</tool>
+
+<args>
+  <vargv>
+    <exe>/usr/bin/valgrind.bin</exe>
+    <arg>--leak-check=full</arg>
+    <arg>--show-reachable=yes</arg>
+    <arg>--error-exitcode=-1</arg>
+    <arg>--suppressions=/home/bwhite/workspaces/workspace.vdb/voltdb/tests/ee/test_utils/vdbsuppressions.supp</arg>
+    <arg>--xml=yes</arg>
+    <arg>--xml-file=/home/bwhite/workspaces/workspace.vdb/voltdb/tests/frontend/org/voltdb/utils/valgrind_test_files/3.11.0_no_losses.xml</arg>
+  </vargv>
+  <argv>
+    <exe>/home/bwhite/workspaces/workspace.vdb/voltdb/obj/debug/cpptests/memleaktests/no_losses</exe>
+  </argv>
+</args>
+
+<status>
+  <state>RUNNING</state>
+  <time>00:00:00:00.050 </time>
+</status>
+
+
+<status>
+  <state>FINISHED</state>
+  <time>00:00:00:00.551 </time>
+</status>
+
+<errorcounts>
+</errorcounts>
+
+<suppcounts>
+  <pair>
+    <count>1</count>
+    <name>stl:u16.04</name>
+  </pair>
+</suppcounts>
+
+</valgrindoutput>
+
