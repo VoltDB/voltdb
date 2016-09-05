@@ -69,15 +69,14 @@ public class ContinuousDeleter implements Runnable {
             if (app.config.historyseconds > 0) {
                 responses = app.client.callAllPartitionProcedure("DeleteAfterDate", dateTarget, app.config.deletechunksize);
             }
-            // Deleting all rows beyond a given rowcount...
             else /* if (app.config.maxrows > 0) */ {
                 responses = app.client.callAllPartitionProcedure("DeleteOldestToTarget", rowTarget, app.config.deletechunksize);
             }
 
             app.updatePartitionCount(responses.length);
             for (ClientResponseWithPartitionKey resp: responses) {
-                if (resp.getResponse().getStatus() == ClientResponse.SUCCESS) {
-                    long tuplesDeleted = resp.getResponse().getResults()[0].asScalarLong();
+                if (resp.response.getStatus() == ClientResponse.SUCCESS) {
+                    long tuplesDeleted = resp.response.getResults()[0].asScalarLong();
                     app.addToDeletedTuples(tuplesDeleted);
 
                     // If the procedure deleted up to its limit, reduce the time before the deletes process runs again.
