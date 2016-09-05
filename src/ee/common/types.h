@@ -156,16 +156,16 @@ enum SortDirectionType {
 };
 
 // ------------------------------------------------------------------
-// Union Type
+// SetOp Type
 // ------------------------------------------------------------------
-enum UnionType {
-    UNION_TYPE_NOUNION          = 0,
-    UNION_TYPE_UNION            = 1,
-    UNION_TYPE_UNION_ALL        = 2,
-    UNION_TYPE_INTERSECT        = 3,
-    UNION_TYPE_INTERSECT_ALL    = 4,
-    UNION_TYPE_EXCEPT_ALL       = 5,
-    UNION_TYPE_EXCEPT           = 6
+enum SetopType {
+    SETOP_TYPE_NOUNION          = 0,
+    SETOP_TYPE_UNION            = 1,
+    SETOP_TYPE_UNION_ALL        = 2,
+    SETOP_TYPE_INTERSECT        = 3,
+    SETOP_TYPE_INTERSECT_ALL    = 4,
+    SETOP_TYPE_EXCEPT_ALL       = 5,
+    SETOP_TYPE_EXCEPT           = 6
 };
 
 // ------------------------------------------------------------------

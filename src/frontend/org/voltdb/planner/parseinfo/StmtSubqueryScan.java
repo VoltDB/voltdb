@@ -32,7 +32,7 @@ import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.planner.ParsedSetOpStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.SchemaColumn;
@@ -62,9 +62,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         m_subqueryStmt = subqueryStmt;
 
         // A union or other set operator uses the output columns of its left-most leaf child statement.
-        while (subqueryStmt instanceof ParsedUnionStmt) {
-            assert( ! ((ParsedUnionStmt)subqueryStmt).m_children.isEmpty());
-            subqueryStmt = ((ParsedUnionStmt)subqueryStmt).m_children.get(0);
+        while (subqueryStmt instanceof ParsedSetOpStmt) {
+            assert( ! ((ParsedSetOpStmt)subqueryStmt).m_children.isEmpty());
+            subqueryStmt = ((ParsedSetOpStmt)subqueryStmt).m_children.get(0);
         }
         assert (subqueryStmt instanceof ParsedSelectStmt);
 
@@ -322,7 +322,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         // This gets immediately reset if it passes all the tests.
         m_failedSingleFragmentTest = true;
 
-        if (m_subqueryStmt instanceof ParsedUnionStmt) {
+        if (m_subqueryStmt instanceof ParsedSetOpStmt) {
             // Union are just returned
             return false;
         }

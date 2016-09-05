@@ -43,10 +43,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "unionexecutor.h"
+#include "setopexecutor.h"
 
 #include "common/tabletuple.h"
-#include "plannodes/unionnode.h"
+#include "plannodes/setopnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
@@ -74,7 +74,7 @@ struct SetOperator {
 
     virtual bool processTuples() = 0;
 
-    static SetOperator* getSetOperator(UnionPlanNode* node);
+    static SetOperator* getSetOperator(SetopPlanNode* node);
 
     // for debugging - may be unused
     static void printTupleMap(const char* nonce, TupleMap &tuples);
@@ -275,44 +275,44 @@ void ExceptIntersectSetOperator::intersectTupleMaps(TupleMap& map_a, TupleMap& m
     }
 }
 
-SetOperator* SetOperator::getSetOperator(UnionPlanNode* node)
+SetOperator* SetOperator::getSetOperator(SetopPlanNode* node)
 {
-    UnionType unionType = node->getUnionType();
-    switch (unionType) {
-        case UNION_TYPE_UNION_ALL:
+    SetopType setopType = node->getSetopType();
+    switch (setopType) {
+        case SETOP_TYPE_UNION_ALL:
             return new UnionSetOperator(node->getInputTableRefs(), node->getTempOutputTable(), true);
-        case UNION_TYPE_UNION:
+        case SETOP_TYPE_UNION:
             return new UnionSetOperator(node->getInputTableRefs(), node->getTempOutputTable(), false);
-        case UNION_TYPE_EXCEPT_ALL:
+        case SETOP_TYPE_EXCEPT_ALL:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 true, true);
-        case UNION_TYPE_EXCEPT:
+        case SETOP_TYPE_EXCEPT:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 false, true);
-        case UNION_TYPE_INTERSECT_ALL:
+        case SETOP_TYPE_INTERSECT_ALL:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 true, false);
-        case UNION_TYPE_INTERSECT:
+        case SETOP_TYPE_INTERSECT:
             return new ExceptIntersectSetOperator(node->getInputTableRefs(), node->getTempOutputTable(),
                 false, false);
         default:
-            VOLT_ERROR("Unsupported tuple set operation '%d'.", unionType);
+            VOLT_ERROR("Unsupported tuple set operation '%d'.", setopType);
             return NULL;
     }
 }
 
 } // namespace detail
 
-UnionExecutor::UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+SetopExecutor::SetopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node)
 { }
 
-bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
+bool SetopExecutor::p_init(AbstractPlanNode* abstract_node,
                            TempTableLimits* limits)
 {
     VOLT_TRACE("init Union Executor");
 
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(abstract_node);
+    SetopPlanNode* node = dynamic_cast<SetopPlanNode*>(abstract_node);
     assert(node);
 
     //
@@ -372,7 +372,7 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool UnionExecutor::p_execute(const NValueArray &params) {
+bool SetopExecutor::p_execute(const NValueArray &params) {
     return m_setOperator->processTuples();
 }
 

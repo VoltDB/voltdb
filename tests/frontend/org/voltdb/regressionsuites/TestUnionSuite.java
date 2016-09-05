@@ -536,6 +536,148 @@ public class TestUnionSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0,2});
     }
 
+    /**
+     * (A.PKEY) union (E.PC except F.PC)
+     * PKEY and PC are partitioning columns for A, E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMultipleSetOperations6()
+    throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt;
+
+        client.callProcedure("InsertA", 0, 0); // in A, so IN final result.
+        client.callProcedure("InsertA", 1, 1); // in A, so IN final result.
+        client.callProcedure("InsertE", 0, 0); // in E and F. Eliminated by inner EXCEPT, so not IN final result.
+        client.callProcedure("InsertE", 1, 1); // not in F, but also in A so not IN final result.
+        client.callProcedure("InsertE", 4, 4); // in E and F. Eliminated by inner EXCEPT, so not IN final result.
+        client.callProcedure("InsertE", 5, 5); // not in F and not in A. so IN final result.
+        client.callProcedure("InsertE", 8, 8); // not in F and not in A. so IN final result.
+        client.callProcedure("InsertF", 0, 0); // not IN final result.
+        client.callProcedure("InsertF", 2, 2); // not IN final result.
+        client.callProcedure("InsertF", 4, 4); // not IN final result.
+        client.callProcedure("InsertF", 6, 6); // not IN final result.
+        vt = client.callProcedure("@AdHoc", "(SELECT PKEY FROM A) UNION (SELECT PC FROM E EXCEPT SELECT PC FROM F) order by PKEY;")
+                .getResults()[0];
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0,1, 5, 8});
+        vt = client.callProcedure("@Explain", "(SELECT PKEY FROM A) UNION (SELECT PC FROM E EXCEPT SELECT PC FROM F) order by PKEY;")
+                .getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION"));
+    }
+
+    /**
+     * A.PKEY intersect all (E.PC except all F.PC)
+     * PKEY and PC are partitioning columns for A, E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMultipleSetOperations7() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+        client.callProcedure("InsertA", 0, 0); // in A but not in E-F. Eliminated by final INTERSECT
+        client.callProcedure("InsertA", 1, 1); // in A and in E-F. In final result set
+        client.callProcedure("InsertA", 2, 1); // in A and in E-F. In final result set
+        client.callProcedure("InsertA", 3, 2); // in A but not in E-F. Eliminated by final INTERSECT
+        client.callProcedure("InsertA", 4, 2); // in A and in E-F. In final result set
+        client.callProcedure("InsertA", 5, 2); // in A but not in E-F. Eliminated by final INTERSECT
+        client.callProcedure("InsertE", 1, 0); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertE", 1, 0); // in E and in E-F.
+        client.callProcedure("InsertE", 2, 1); // in E and in E-F and in A. In final result set
+        client.callProcedure("InsertE", 3, 2); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertE", 4, 2); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertE", 4, 3); // in A and in E-F. In final result set
+        client.callProcedure("InsertF", 1, 1); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertF", 3, 0); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertF", 4, 3); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertF", 5, 3); // not in E. Eliminated by E-F
+        String sql = "SELECT PKEY FROM A INTERSECT ALL "
+                + "(SELECT PC FROM E EXCEPT ALL SELECT PC FROM F) ORDER BY PKEY;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{1,2,4});
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP INTERSECT_ALL"));
+
+    }
+
+    /**
+     * (E.PC, C.PKEY WHERE E.PC = C.PKEY) union (F.PC)
+     * PC is a partitioning column for E, and F tables. C is repliacte
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMPSetOperationsWithJoin()
+            throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt;
+
+        client.callProcedure("InsertE", 0, 1); // In E,C join and final result set
+        client.callProcedure("InsertE", 0, 2); // In E,C join. Eliminated by UNION
+        client.callProcedure("InsertE", 1, 3); // In E,C join and final result set
+        client.callProcedure("InsertE", 1, 4); // In E,C join. Eliminated by UNION
+        client.callProcedure("InsertE", 8, 5); // Eliminated by E, C join
+        client.callProcedure("InsertC", 0, 0);
+        client.callProcedure("InsertC", 1, 0);
+        client.callProcedure("InsertF", 0, 0); // In final result set
+        client.callProcedure("InsertF", 1, 1); // Eliminated by UNION
+        client.callProcedure("InsertF", 1, 2); // In final result set
+        client.callProcedure("InsertF", 6, 3); // In final result set
+        client.callProcedure("InsertF", 6, 4); // Eliminated by UNION
+        String sql = "(SELECT PC FROM E, C WHERE E.PC = C.PKEY) UNION (SELECT PC FROM F ) order by PC;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 1, 6});
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION"));
+    }
+
+    /**
+     * (E.PC, COUNT(*)) union (F.PC, COUNT(*))
+     * PC is a partitioning column for E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMPSetOperationsWithAggregate()
+    throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt;
+
+        client.callProcedure("InsertE", 0, 1);
+        client.callProcedure("InsertE", 0, 2);
+        client.callProcedure("InsertE", 1, 3);
+        client.callProcedure("InsertE", 1, 4);
+        client.callProcedure("InsertE", 8, 5);
+        client.callProcedure("InsertF", 0, 0);
+        client.callProcedure("InsertF", 1, 1);
+        client.callProcedure("InsertF", 1, 2);
+        client.callProcedure("InsertF", 6, 3);
+        client.callProcedure("InsertF", 6, 4);
+        String sql = "(SELECT PC, COUNT(*) CNT FROM E GROUP BY PC) UNION ALL " +
+                "(SELECT PC, COUNT(*) FROM F GROUP BY PC) order by PC, CNT;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(6, vt.getRowCount());
+        validateTableOfLongs(vt, new long[][]{{0, 1}, {0, 2}, {1, 2}, {1, 2}, {6, 2}, {8, 1}});
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION"));
+    }
+
     public void testStoredProcUnionWithParams()
     throws NoConnectionsException, IOException, ProcCallException {
         // Test that parameterized query with union can be invoked.
@@ -771,6 +913,8 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
         project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
+        project.addStmtProcedure("InsertE", "INSERT INTO E VALUES(?, ?);");
+        project.addStmtProcedure("InsertF", "INSERT INTO F VALUES(?, ?);");
         // Test that parameterized query with union compiles properly.
         project.addStmtProcedure("UnionBCD",
                 "((SELECT I FROM B WHERE PKEY = ?) UNION " +
