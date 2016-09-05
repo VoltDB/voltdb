@@ -64,8 +64,8 @@
 #include "plannodes/receivenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
+#include "plannodes/setopnode.h"
 #include "plannodes/tuplescannode.h"
-#include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/partitionbynode.h"
 
@@ -159,7 +159,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // Union
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_SETOP):
-            ret = new voltdb::UnionPlanNode();
+            ret = new voltdb::SetopPlanNode();
             break;
         // ------------------------------------------------------------------
         // OrderBy

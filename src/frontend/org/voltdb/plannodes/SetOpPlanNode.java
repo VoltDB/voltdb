@@ -25,27 +25,26 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.types.SetOpType;
 
 public class SetOpPlanNode extends AbstractPlanNode {
 
     public enum Members {
-        UNION_TYPE
+        SETOP_TYPE
     }
 
     // Union Type
-    private ParsedUnionStmt.UnionType m_unionType;
+    private SetOpType m_unionType;
 
     public SetOpPlanNode() {
         super();
-        m_unionType = ParsedUnionStmt.UnionType.NOUNION;
+        m_unionType = SetOpType.NOUNION;
     }
 
-    public SetOpPlanNode(ParsedUnionStmt.UnionType unionType) {
+    public SetOpPlanNode(SetOpType unionType) {
         super();
         m_unionType = unionType;
     }
@@ -66,7 +65,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
         }
     }
 
-    public ParsedUnionStmt.UnionType getUnionType() {
+    public SetOpType getSetOpType() {
         return m_unionType;
     }
 
@@ -120,7 +119,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.UNION_TYPE.name()).value(m_unionType.name());
+        stringer.key(Members.SETOP_TYPE.name()).value(m_unionType.name());
     }
 
     @Override
@@ -131,7 +130,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_unionType = UnionType.valueOf(jobj.getString(Members.UNION_TYPE.name()));
+        m_unionType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE.name()));
     }
 
     @Override

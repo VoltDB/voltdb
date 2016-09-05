@@ -175,7 +175,7 @@ public abstract class AbstractParsedStmt {
            retval = new ParsedSelectStmt(paramValues, db);
        }
        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-           retval = new ParsedUnionStmt(paramValues, db);
+           retval = new ParsedSetOpStmt(paramValues, db);
        }
        else {
            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -782,7 +782,7 @@ public abstract class AbstractParsedStmt {
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
-            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
+            expr = ParsedSetOpStmt.breakUpSetOpSubquery(expr);
         }
         else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);

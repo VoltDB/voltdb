@@ -43,32 +43,37 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREUNIONNODE_H
-#define HSTOREUNIONNODE_H
+#ifndef HSTOREUNIONEXECUTOR_H
+#define HSTOREUNIONEXECUTOR_H
 
-#include "abstractplannode.h"
+#include "boost/shared_ptr.hpp"
+
+#include "common/common.h"
+#include "common/valuevector.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+namespace detail {
+    struct SetOperator;
+}
 
 /**
  *
  */
-class UnionPlanNode : public AbstractPlanNode {
-public:
-    UnionPlanNode() : m_unionType(UNION_TYPE_NOUNION) { }
-    ~UnionPlanNode();
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string &spacer) const;
+class SetopExecutor : public AbstractExecutor {
+    public:
+        SetopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
-    UnionType getUnionType() const { return m_unionType; }
+    protected:
+        bool p_init(AbstractPlanNode*,
+                    TempTableLimits* limits);
+        bool p_execute(const NValueArray &params);
 
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
-
-private:
-   UnionType m_unionType;
+    private:
+        boost::shared_ptr<detail::SetOperator> m_setOperator;
 };
 
-} // namespace voltdb
+}
 
 #endif

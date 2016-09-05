@@ -38,18 +38,9 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.SetOpType;
 
-public class ParsedUnionStmt extends AbstractParsedStmt {
-
-    public enum UnionType {
-        NOUNION,
-        UNION,
-        UNION_ALL,
-        INTERSECT,
-        INTERSECT_ALL,
-        EXCEPT_ALL,
-        EXCEPT
-    };
+public class ParsedSetOpStmt extends AbstractParsedStmt {
 
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
@@ -57,14 +48,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    public UnionType m_unionType = UnionType.NOUNION;
+    public SetOpType m_unionType = SetOpType.NOUNION;
 
     /**
     * Class constructor
     * @param paramValues
     * @param db
     */
-    public ParsedUnionStmt(String[] paramValues, Database db) {
+    public ParsedSetOpStmt(String[] paramValues, Database db) {
         super(paramValues, db);
     }
 
@@ -72,7 +63,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     void parse(VoltXMLElement stmtNode) {
         String type = stmtNode.attributes.get("uniontype");
         // Set operation type
-        m_unionType = UnionType.valueOf(type);
+        m_unionType = SetOpType.valueOf(type);
 
         int idx = 0;
         VoltXMLElement limitElement = null, offsetElement = null, orderbyElement = null;
@@ -128,7 +119,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 childStmt.setParentAsUnionClause();
 
             } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(m_paramValues, m_db);
+                childStmt = new ParsedSetOpStmt(m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
             } else {
@@ -232,7 +223,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
         }
         else {
-            ParsedUnionStmt setOpStmt = (ParsedUnionStmt) stmt;
+            ParsedSetOpStmt setOpStmt = (ParsedSetOpStmt) stmt;
             switch (setOpStmt.m_unionType) {
             case EXCEPT:
             case EXCEPT_ALL:
@@ -349,8 +340,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         if (firstChild instanceof ParsedSelectStmt) {
             return (ParsedSelectStmt) firstChild;
         } else {
-            assert(firstChild instanceof ParsedUnionStmt);
-            return ((ParsedUnionStmt)firstChild).getLeftmostSelectStmt();
+            assert(firstChild instanceof ParsedSetOpStmt);
+            return ((ParsedSetOpStmt)firstChild).getLeftmostSelectStmt();
         }
     }
 
@@ -409,20 +400,20 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             return expr;
         }
         AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
-        if (!(subquery instanceof ParsedUnionStmt)) {
+        if (!(subquery instanceof ParsedSetOpStmt)) {
             return expr;
         }
-        ParsedUnionStmt setOpStmt = (ParsedUnionStmt) subquery;
-        if (UnionType.EXCEPT == setOpStmt.m_unionType || UnionType.EXCEPT_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.EXCEPT;
+        ParsedSetOpStmt setOpStmt = (ParsedSetOpStmt) subquery;
+        if (SetOpType.EXCEPT == setOpStmt.m_unionType || SetOpType.EXCEPT_ALL == setOpStmt.m_unionType) {
+            setOpStmt.m_unionType = SetOpType.EXCEPT;
             return expr;
         }
-        if (UnionType.UNION_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.UNION;
-        } else if (UnionType.INTERSECT_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.INTERSECT;
+        if (SetOpType.UNION_ALL == setOpStmt.m_unionType) {
+            setOpStmt.m_unionType = SetOpType.UNION;
+        } else if (SetOpType.INTERSECT_ALL == setOpStmt.m_unionType) {
+            setOpStmt.m_unionType = SetOpType.INTERSECT;
         }
-        ExpressionType conjuctionType = (setOpStmt.m_unionType == UnionType.UNION) ?
+        ExpressionType conjuctionType = (setOpStmt.m_unionType == SetOpType.UNION) ?
                 ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
         AbstractExpression retval = null;
         AbstractParsedStmt parentStmt = subquery.m_parentStmt;
@@ -451,7 +442,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 newExpr.setLeft(childSubqueryExpr);
             }
             // Recurse
-            newExpr = ParsedUnionStmt.breakUpSetOpSubquery(newExpr);
+            newExpr = ParsedSetOpStmt.breakUpSetOpSubquery(newExpr);
             if (retval == null) {
                 retval = newExpr;
             } else {
