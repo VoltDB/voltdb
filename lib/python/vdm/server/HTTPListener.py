@@ -1197,8 +1197,12 @@ class StartDatabaseAPI(MethodView):
             else:
                 is_pause = "false"
 
+            if 'force' in request.args:
+                is_force = request.args.get('force')
+            else:
+                is_force = "false"
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(is_pause)
+            response = database.start_database(is_pause, is_force)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1226,7 +1230,7 @@ class RecoverDatabaseAPI(MethodView):
                 pause = "false"
 
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(True, pause)
+            response = database.start_database(pause, False)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1376,12 +1380,13 @@ class StartServerAPI(MethodView):
             else:
                 pause = "false"
 
-            if 'blocking' in request.args:
-                is_blocking = int(request.args.get('blocking'))
+            if 'force' in request.args:
+                is_force = request.args.get('force')
             else:
-                is_blocking = -1
+                is_force = "false"
+
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, pause, False, is_blocking)
+            response = server.start_server(server_id, pause, is_force)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': 500, 'statusString': resp_json['statusString']}), 500)
@@ -1411,14 +1416,14 @@ class StartLocalServerAPI(MethodView):
             if 'pause' in request.args:
                 pause = request.args.get('pause')
 
+            if 'force' in request.args:
+                force = request.args.get('force')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
-            if 'blocking' in request.args:
-                is_blocking = int(request.args.get('blocking'))
-            else:
-                is_blocking = -1
+
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, pause, database_id, False, is_blocking)
+            return server.check_and_start_local_server(sid, pause, database_id, force, False)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1441,12 +1446,14 @@ class RecoverServerAPI(MethodView):
         try:
             sid = -1
             if 'pause' in request.args:
-                pause = request.args.get('pause')
+                is_pause = request.args.get('pause').lower()
+            else:
+                is_pause = "false"
 
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, pause, database_id, True)
+            response = server.check_and_start_local_server(sid, is_pause, database_id, False)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1468,7 +1475,7 @@ class AddServerAPI(MethodView):
         """
         try:
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, 'false', False, -1, True)
+            response = server.start_server(server_id, 'false', 'false', True)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
@@ -1498,7 +1505,7 @@ class AddLocalServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, 'False', database_id, False, -1, True)
+            return server.check_and_start_local_server(sid, 'false', database_id, 'false', True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
