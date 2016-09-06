@@ -21,10 +21,12 @@
 
 using namespace voltdb;
 
+#define ALLOCATOR_BLOCKSIZE 2097152
+
 ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
     : m_count(0),
       m_allocationSize(allocSize),
-      m_numberAllocationsPerBlock(chunkSize),
+      m_numberAllocationsPerBlock((ALLOCATOR_BLOCKSIZE - sizeof(Buffer)) / allocSize),
       m_tail(NULL),
       m_blockCount(0),
       m_cachedBuffer(0) {}
@@ -32,11 +34,11 @@ ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
 ContiguousAllocator::~ContiguousAllocator() {
     while (m_tail) {
         Buffer *buf = m_tail->prev;
-        free(m_tail);
+        ThreadLocalPool::freeExactSizedObject(ALLOCATOR_BLOCKSIZE, m_tail);
         m_tail = buf;
     }
     if (m_cachedBuffer != NULL) {
-        free(m_cachedBuffer);
+        ThreadLocalPool::freeExactSizedObject(ALLOCATOR_BLOCKSIZE, m_cachedBuffer);
     }
 }
 
@@ -53,7 +55,7 @@ void *ContiguousAllocator::alloc() {
             memory = static_cast<void *>(m_cachedBuffer);
             m_cachedBuffer = NULL;
         } else {
-            memory = static_cast<void *>(malloc(sizeof(Buffer) + m_allocationSize * m_numberAllocationsPerBlock));
+            memory = static_cast<void *>(ThreadLocalPool::allocateExactSizedObject(ALLOCATOR_BLOCKSIZE));
         }
 
         Buffer *buf = reinterpret_cast<Buffer*>(memory);
@@ -97,10 +99,10 @@ void ContiguousAllocator::trim() {
     if (blockOffset == 0) {
         Buffer *buf = m_tail->prev;
         m_blockCount--;
-        if (m_blockCount == 0) {
+        if (m_cachedBuffer == NULL) {
             m_cachedBuffer = m_tail;
         } else {
-            free(m_tail);
+            ThreadLocalPool::freeExactSizedObject(ALLOCATOR_BLOCKSIZE, m_tail);
         }
         m_tail = buf;
     }

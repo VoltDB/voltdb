@@ -1915,11 +1915,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     public final void convertToHeapBuffer() {
         if (m_buffer.isDirect()) {
+            // Either this was allocated by the stored procedure as a direct buffer cached
+            // from the EE. If the second, we need to make a copy so the EE can reuse the
+            // buffer fir the next stored procedure.
             ByteBuffer heapBuffer = ByteBuffer.allocate(m_buffer.limit());
             m_buffer.position(0);
             heapBuffer.put(m_buffer);
             heapBuffer.position(heapBuffer.limit());
-            m_buffer = heapBuffer.asReadOnlyBuffer();
         }
     }
 

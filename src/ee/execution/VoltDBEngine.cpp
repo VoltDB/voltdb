@@ -523,7 +523,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // the result buffer
     if (last) {
         m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
-        m_resultOutput.writeIntAt(m_startOfResultBuffer, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t) + 1);
+        m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
     }
 
     return ENGINE_ERRORCODE_SUCCESS;
