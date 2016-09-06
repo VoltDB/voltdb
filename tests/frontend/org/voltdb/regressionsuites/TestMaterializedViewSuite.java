@@ -1890,6 +1890,51 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{2, "bar"}}, vt);
     }
 
+    // Repro for ENG-11080
+    public void testEng11080() throws Exception {
+        Client client = getClient();
+
+        // ID, VCHAR, NUM, RATIO
+        String[] stmts = {
+                "INSERT INTO R1_ENG_11024 VALUES (100, null, 50,  null)",
+                "INSERT INTO R1_ENG_11024 VALUES (1000, null, 50,  null)",
+                "INSERT INTO R2_ENG_11024 VALUES (100, null, 50,  null)"
+        };
+
+        for (String stmt : stmts) {
+            client.callProcedure("@AdHoc", stmt);
+        }
+
+        VoltTable vt;
+
+        // SELECT list of both views is:
+        //   VCHAR, COUNT(*), MAX(ID)
+        // At this point both views have just one group, where the GB key is NULL.
+        // Both views should have the same content because the view with the join
+        // is just joining to one row.
+
+        Object[][] expectedBeforeDelete = new Object[][] {{null, 2, 1000}};
+        Object[][] expectedAfterDelete = new Object[][] {{null, 1, 100}};
+
+        vt = client.callProcedure("@AdHoc", "select * from v_eng_11080 order by 1, 2, 3").getResults()[0];
+        assertContentOfTable(expectedBeforeDelete, vt);
+
+        vt = client.callProcedure("@AdHoc", "select * from vjoin_eng_11080 order by 1, 2, 3").getResults()[0];
+        assertContentOfTable(expectedBeforeDelete, vt);
+
+        // This deletes the current MAX value for both views
+        client.callProcedure("@AdHoc", "delete from r1_eng_11024 where id = 1000");
+
+        // In this bug we had trouble finding the new MAX or MIN for groups with
+        // NULL GB keys.  Ensure that the views are still correct.
+
+        vt = client.callProcedure("@AdHoc", "select * from v_eng_11080 order by 1, 2, 3").getResults()[0];
+        assertContentOfTable(expectedAfterDelete, vt);
+
+        vt = client.callProcedure("@AdHoc", "select * from vjoin_eng_11080 order by 1, 2, 3").getResults()[0];
+        assertContentOfTable(expectedAfterDelete, vt);
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

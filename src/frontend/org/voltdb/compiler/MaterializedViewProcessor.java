@@ -150,7 +150,8 @@ public class MaterializedViewProcessor {
             }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
-            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
+            boolean isMultiTableView = stmt.m_tableList.size() > 1;
+            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns, isMultiTableView);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
 
             // create an index and constraint for the table
@@ -173,7 +174,7 @@ public class MaterializedViewProcessor {
             }
 
             // Here the code path diverges for different kinds of views (single table view and joined table view)
-            if (stmt.m_tableList.size() > 1) {
+            if (isMultiTableView) {
                 // Materialized view on joined tables
                 // Add mvHandlerInfo to the destTable:
                 MaterializedViewHandlerInfo mvHandlerInfo = destTable.getMvhandlerinfo().add("mvHandlerInfo");
@@ -718,6 +719,9 @@ public class MaterializedViewProcessor {
                     // there must be some min/max columns.
                     // Only check if the plan uses index scan.
                     if (needsWarningForSingleTableView( getPlanNodeTreeFromCatalogStatement(db, stmt))) {
+                        // If we are using IS NOT DISTINCT FROM as our equality operator (which is necessary
+                        // to get correct answers), then there will often be no index scans in the plan,
+                        // since we cannot optimize IS NOT DISTINCT FROM.
                         m_compiler.addWarn(
                                 "No index found to support UPDATE and DELETE on some of the min() / max() columns " +
                                 "in the materialized view " + mvInfo.getTypeName() +

@@ -794,7 +794,7 @@ public class RegressionSuite extends TestCase {
                         assertEquals(message, expectedObj, actualObj);
                     }
                     else {
-                        assertNotNull("You pass in an epsilon to compare tables with floating point columns", epsilon);
+                        assertNotNull("Please pass in an epsilon to compare tables with floating point columns", epsilon);
                         assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
                     }
                 }
