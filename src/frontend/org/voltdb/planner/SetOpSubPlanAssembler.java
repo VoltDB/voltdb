@@ -115,7 +115,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             // in case of multi partitioned query. For this to happen all children  must
             // satisfy the following conditions:
             //  - each statement must be a MP statement with a trivial coordinator fragment
-            //  - each statement must contain at least one partitioning column from its distributed table
+            //  - each statement output must contain at least one partitioning column from its distributed tables
             //  - all statements must agree on the position of at least one partitioning column
             //    in their respective output schemas
             // The above requirements guarantee that the given set op can be run disjointly on each
@@ -151,8 +151,8 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 if ((partitioning.requiresTwoFragments() && !canPushSetOpDown)
                         || statementPartitionExpression != null) {
                     // If two child statements need to use a second fragment,
-                    // it can't currently be a two-fragment plan.
-                    // The coordinator expects a single-table result from each partition.
+                    // the set op node must be pushed down to the partition fragments.
+                    // Otherwise, the coordinator expects a single-table result from each partition.
                     // Also, currently the coordinator of a two-fragment plan is not allowed to
                     // target a particular partition, so neither can the union of the coordinator
                     // and a statement that wants to run single-partition.
@@ -195,7 +195,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * Return positions for all partitioning columns from a given node from the output schema.
+     * Return positions for all partitioning columns for a given plan from its output schema.
      *
      * @param rootNode A root node for a set op child query
      * @return Set<Integer>
@@ -206,7 +206,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         NodeSchema outputSchema = null;
         AbstractPlanNode nodeWithOutputSchema = rootNode;
         // Find the first node that has not null output schema. It may be an inline projection or aggregation node
-        // like the case of "SELECT PART_COLUMN, COUNT(*) FROM T GROUP BY PART_COLUMN";
+        // like in the case of "SELECT PART_COLUMN, COUNT(*) FROM T GROUP BY PART_COLUMN";
         while (outputSchema == null) {
             outputSchema = nodeWithOutputSchema.getOutputSchema();
             if (outputSchema == null) {
@@ -224,7 +224,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 }
             }
         }
-        // There should be an output schema, right?
+        // There must be an output schema, right?
         assert (outputSchema != null);
 
         ArrayList<SchemaColumn> outputColumns = outputSchema.getColumns();
@@ -238,10 +238,10 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 continue;
             }
             // A table scan can have only one partitioning column
-            // A subquery scan could have multiple partitioning columns but it in this case
+            // A subquery scan could have multiple partitioning columns but in this case
             // the hasTrivialCoordinator would have returned FALSE (not a trivial coordinator fragment
             // containing a scan node) and we shouldn't get there
-            assert(scanPartitioningColumns.size() < 2);
+            assert(scanPartitioningColumns.size() == 1);
             SchemaColumn scanPartitioningColumn = scanPartitioningColumns.get(0);
             // Ideally, the column differentiator should be used to identify the partitioning column
             // position. But it not always set if the schema is taken from an inline aggregate
@@ -295,6 +295,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                     // Keep the child projection by adding it directly under the Set Op node
                     setOpPlanNode.addAndLinkChild(selectPlan.rootPlanGraph);
                     // Detach the rest of the child plan
+                    assert(selectPlan.rootPlanGraph.getChildCount() == 1);
                     childPlan = selectPlan.rootPlanGraph.getChild(0);
                     selectPlan.rootPlanGraph.clearChildren();
                     // Reset child parent to be its own projection node
