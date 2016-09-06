@@ -49,7 +49,7 @@ public enum TxnId2Utils {;
                 if (proc == "@AdHoc")
                     cr = client.callProcedure("@AdHoc", (String) parms[0]);
                 else
-                    cr = client.callProcedure(proc);
+                    cr = client.callProcedure(proc, parms);
                 if (cr.getStatus() == ClientResponse.SUCCESS) {
                     Benchmark.txnCount.incrementAndGet();
                     return cr;
