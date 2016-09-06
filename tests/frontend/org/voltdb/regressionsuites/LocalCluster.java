@@ -1102,6 +1102,9 @@ public class LocalCluster implements VoltServerConfig {
 
     public void joinOne(int hostId) {
         try {
+            if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                initLocalServer(hostId, true);
+            }
             startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN);
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
