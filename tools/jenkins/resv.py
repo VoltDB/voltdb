@@ -188,20 +188,41 @@ class Resv() :
             # the name returned is not the name to lookup when
             # dealing with master :/
             name = str(node['displayName'])
+            executing = ""
+            owner = ""
             if node['displayName'] == 'master':
                 name = '(master)'
                 continue
+
             try:
                 busy,isBusyController = self.isBusy(name)
 
-                offlineCause = node['offlineCause'];
-                #offlineCauseReason = node['offlineCauseReason'];
+                if busy == NODE_STATE_BUSY:
+                    if node['executors'][0]['currentExecutable'] != None :
+                        executing = node['executors'][0]['currentExecutable']['fullDisplayName']
+
+                        # figure out who's branch started the build, we are assuming it's using
+                        # org.jenkinsci.plugins.multiplescms.MultiSCMChangeLogSet and hudson.plugins.git.GitChangeSet
+                        # and the first change in this list is from the owner
+                        if node['executors'][0]['currentExecutable']['changeSet'] != None and len(node['executors'][0]['currentExecutable']['changeSet']['items']) > 0:
+                            owner = node['executors'][0]['currentExecutable']['changeSet']['items'][0]['author']['fullName']
+
+                        # if we don't have the changeset owner, culprits will give us a list of people
+                        # who had checkin's, but it's not necessarily the branch owner.
+                        if owner == "" and len(node['executors'][0]['currentExecutable']['culprits']) > 0:
+                            owner = node['executors'][0]['currentExecutable']['culprits'][0]['fullName']
+                    else:
+                        if str(executing) == "":
+                            if not isBusyController:
+                                executing = "idle="+str(node['executors'][0]['idle'])
 
                 reason = node['offlineCauseReason']
+                if str(reason) == "" and node['offlineCause'] != None :
+                    reason = node['offlineCause']['description']
                 if str(reason) == "" and isBusyController :
                     reason = "busy controller"
 
-                print("%50s %-10s %-20s" % (name,busy,reason))
+                print("%50s %-10s %-20s %-10s %-20s" % (name,busy,reason,executing,owner))
             except Exception as e:
                 # Jenkins may 500 on depth >0. If the node info comes back
                 # at depth 0 treat it as a node not running any jobs.
@@ -287,7 +308,7 @@ class Resv() :
 
         for nodeName in str.split(nodeNames,",") :
             busy,isBusyController = self.isBusy(nodeName)
-            if  busy == NODE_STATE_BUSY :
+            if  busy == NODE_STATE_BUSY:
                 print("Can't reserve "+nodeName+" it's busy");
                 continue;
             else :
