@@ -35,7 +35,9 @@ import org.voltdb.VoltType;
 public class TruncateTables extends VoltProcedure {
 
     public final SQLStmt captureview1 = new SQLStmt("SELECT * FROM ORDER_COUNT_GLOBAL;");
-    public final SQLStmt captureview2 = new SQLStmt("SELECT * FROM ORDER_COUNT_NOPCOL;");
+    public final SQLStmt captureview2 = new SQLStmt("SELECT * FROM ORDER_COUNT_NOPCOL ORDER BY NAME;");
+    public final SQLStmt captureview3 = new SQLStmt("SELECT * FROM ORDER_DETAIL_NOPCOL ORDER BY NAME;");
+    public final SQLStmt captureview4 = new SQLStmt("SELECT * FROM ORDER2016 ORDER BY NAME;");
 
     public final SQLStmt validateview1 = new SQLStmt("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
     public final SQLStmt validateview2 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
@@ -138,12 +140,10 @@ public class TruncateTables extends VoltProcedure {
                     truncateTable3,
                     truncateTable4);
 
-            voltQueueSQL(captureview1);
-            voltQueueSQL(captureview2);
-            VoltTable[] afterViews = voltExecuteSQL();
+            VoltTable[] afterViews = executeViewScans();
             int ii = 0;
             for (VoltTable afterView : afterViews){
-                diff = compareTables("View " + ii + " after " + truncationCount +
+                diff = compareTables("View " + (ii + 1) + " after " + truncationCount +
                         " truncate(s) and restore(s), ",
                         beforeViews[ii], afterView, 0.01);
                 ++ii;
@@ -165,6 +165,8 @@ public class TruncateTables extends VoltProcedure {
     private VoltTable[] executeViewScans() {
         voltQueueSQL(captureview1);
         voltQueueSQL(captureview2);
+        voltQueueSQL(captureview3);
+        voltQueueSQL(captureview4);
         return voltExecuteSQL();
     }
 
@@ -236,10 +238,10 @@ public class TruncateTables extends VoltProcedure {
             }
             return prefix + "row count mismatch.  Expected: " + expectedRows.getRowCount() + " actual: " + actualRows.getRowCount();
         }
-        int ii = 0;
+        int ii = 1;
         while (expectedRows.advanceRow()) {
             if (! actualRows.advanceRow()) {
-                return prefix + "too few actual rows; expected more than " + (ii + 1);
+                return prefix + "too few actual rows; expected more than " + ii;
             }
             for (int j = 0; j < actualRows.getColumnCount(); j++) {
                 String columnName = actualRows.getColumnName(j);
@@ -290,7 +292,7 @@ public class TruncateTables extends VoltProcedure {
                     }
                 }
             }
-            ii++;
+            ++ii;
         }
         return "";
     }
