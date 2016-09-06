@@ -1825,15 +1825,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         try {
             ZooKeeper zk = m_messenger.getZK();
             byte deploymentBytes[] = null;
-            byte originalDeploymentBytes[] = null;
 
             try {
                 deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
             } catch (Exception ex) {
                 //Let us get bytes from ZK
             }
+            byte originalDeploymentBytes[] = deploymentBytes;
+            DeploymentType originalDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
             DeploymentType deployment = null;
-            DeploymentType originalDeployment = null;
             try {
                 if (deploymentBytes != null) {
                     CatalogUtil.writeCatalogToZK(zk,
@@ -1845,8 +1845,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                             // this to be of zero length until we have a real catalog.
                             null,
                             deploymentBytes);
-                    originalDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
-                    originalDeploymentBytes = deploymentBytes;
+
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {
                     CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
