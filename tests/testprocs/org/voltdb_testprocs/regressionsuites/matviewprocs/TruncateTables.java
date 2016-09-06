@@ -41,6 +41,8 @@ public class TruncateTables extends VoltProcedure {
 
     public final SQLStmt validateview1 = new SQLStmt("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
     public final SQLStmt validateview2 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
+    public final SQLStmt validateview3 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
+    public final SQLStmt validateview4 = new SQLStmt("SELECT COUNT(*) FROM ORDER2016;");
 
     public final SQLStmt clearcache1 = new SQLStmt("TRUNCATE TABLE WAS_CUSTOMERS;");
     public final SQLStmt clearcache2 = new SQLStmt("TRUNCATE TABLE WAS_ORDERS;");
@@ -114,25 +116,13 @@ public class TruncateTables extends VoltProcedure {
                 return wrapResult(""); // success
             }
 
+            voltExecuteSQL();
+
             executeTruncationChecks(
                     truncateTable1,
                     truncateTable2,
                     truncateTable3,
                     truncateTable4);
-
-            voltQueueSQL(validateview1);
-            voltQueueSQL(validateview2);
-            VoltTable[] clearViews = voltExecuteSQL();
-
-            int jj = 0;
-            for (VoltTable cleared : clearViews) {
-                if (cleared.asScalarLong() != 0) {
-                    System.out.println(
-                            "DEBUG Truncate failed to delete all rows of view " + jj +
-                            ", leaving: " + cleared.asScalarLong());
-                }
-                ++jj;
-            }
 
             executeRenewBases(
                     truncateTable1,
@@ -182,6 +172,11 @@ public class TruncateTables extends VoltProcedure {
                 int truncateTable2,
                 int truncateTable3,
                 int truncateTable4) {
+        voltQueueSQL(validateview1);
+        voltQueueSQL(validateview2);
+        voltQueueSQL(validateview3);
+        voltQueueSQL(validateview4);
+
         if (truncateTable1 != 0) {
             voltQueueSQL(validatebase1); // ("SELECT COUNT(*) FROM CUSTOMERS;");
         }
@@ -194,7 +189,17 @@ public class TruncateTables extends VoltProcedure {
         if (truncateTable4 != 0) {
             voltQueueSQL(validatebase4); // ("SELECT COUNT(*) FROM PRODUCTS;");
         }
-        voltExecuteSQL();
+        VoltTable[] empties = voltExecuteSQL();
+
+        int jj = 1;
+        for (VoltTable cleared : empties) {
+            if (cleared.asScalarLong() != 0) {
+                System.out.println(
+                        "DEBUG Truncate failed to delete all rows of table/view " + jj +
+                        " of " + empties.length + ", leaving: " + cleared.asScalarLong());
+            }
+            ++jj;
+        }
     }
 
     private void executeRenewBases(
