@@ -1873,6 +1873,23 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     }
 
+    // Regression test for ENG-11074
+    public void testEng11074() throws Exception {
+        Client client = getClient();
+        VoltTable      vt;
+
+        client.callProcedure("P1_ENG_11074.Insert", 0, "foo", "bar", "baz", 6.66);
+        client.callProcedure("P1_ENG_11074.Insert", 1, "baz", "foo", "bar", 6.66);
+        client.callProcedure("P2_ENG_11074.Insert", 0, "alpha", "beta", "gamma", 6.66);
+        client.callProcedure("P2_ENG_11074.Insert", 1, "aleph", "beth", "gimel", 6.66);
+
+        vt = client.callProcedure("@AdHoc", "select * from vjoin_eng_11074").getResults()[0];
+        assertContentOfTable(new Object[][] {{2, "gamma"}}, vt);
+
+        vt = client.callProcedure("@AdHoc", "select * from v1_eng_11074").getResults()[0];
+        assertContentOfTable(new Object[][] {{2, "bar"}}, vt);
+    }
+
     // Repro for ENG-11080
     public void testEng11080() throws Exception {
         Client client = getClient();
