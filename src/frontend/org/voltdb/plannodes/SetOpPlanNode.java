@@ -41,7 +41,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
 
     public SetOpPlanNode() {
         super();
-        m_unionType = SetOpType.NOUNION;
+        m_unionType = SetOpType.NONE;
     }
 
     public SetOpPlanNode(SetOpType unionType) {

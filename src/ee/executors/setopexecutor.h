@@ -61,9 +61,9 @@ namespace detail {
 /**
  *
  */
-class SetopExecutor : public AbstractExecutor {
+class SetOpExecutor : public AbstractExecutor {
     public:
-        SetopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        SetOpExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
     protected:
         bool p_init(AbstractPlanNode*,

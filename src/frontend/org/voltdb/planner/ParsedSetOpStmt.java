@@ -48,7 +48,7 @@ public class ParsedSetOpStmt extends AbstractParsedStmt {
     private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    public SetOpType m_unionType = SetOpType.NOUNION;
+    public SetOpType m_unionType = SetOpType.NONE;
 
     /**
     * Class constructor

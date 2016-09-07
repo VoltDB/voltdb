@@ -158,8 +158,8 @@ enum SortDirectionType {
 // ------------------------------------------------------------------
 // SetOp Type
 // ------------------------------------------------------------------
-enum SetopType {
-    SETOP_TYPE_NOUNION          = 0,
+enum SetOpType {
+    SETOP_TYPE_NONE             = 0,
     SETOP_TYPE_UNION            = 1,
     SETOP_TYPE_UNION_ALL        = 2,
     SETOP_TYPE_INTERSECT        = 3,
