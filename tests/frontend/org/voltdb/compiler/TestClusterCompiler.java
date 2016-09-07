@@ -27,22 +27,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltdb.VoltDB;
+
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 
 import junit.framework.TestCase;
-import org.voltdb.VoltDB;
 
 public class TestClusterCompiler extends TestCase
 {
     public void testNonZeroReplicationFactor() throws Exception
     {
-        ClusterConfig config = new ClusterConfig(3, 1, 2);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 1);
+        sphMap.put(1, 1);
+        sphMap.put(2, 1);
+        ClusterConfig config = new ClusterConfig(3, sphMap, 2);
         Map<Integer, String> topology = Maps.newHashMap();
         topology.put(0, "0");
         topology.put(1, "0");
@@ -77,7 +82,10 @@ public class TestClusterCompiler extends TestCase
     {
         // 2 hosts, 6 sites per host, 2 copies of each partition.
         // there are sufficient execution sites, but insufficient hosts
-        ClusterConfig config = new ClusterConfig(2, 6, 2);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 6);
+        sphMap.put(1, 6);
+        ClusterConfig config = new ClusterConfig(2, sphMap, 2);
         try
         {
             if (!config.validate()) {
@@ -96,7 +104,9 @@ public class TestClusterCompiler extends TestCase
 
     public void testAddHostToNonKsafe() throws JSONException
     {
-        ClusterConfig config = new ClusterConfig(1, 6, 0);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 6);
+        ClusterConfig config = new ClusterConfig(1, sphMap, 0);
         Map<Integer, String> topology = Maps.newHashMap();
         topology.put(0, "0");
         JSONObject topo = config.getTopology(topology);
@@ -112,7 +122,10 @@ public class TestClusterCompiler extends TestCase
 
     public void testAddHostsToNonKsafe() throws JSONException
     {
-        ClusterConfig config = new ClusterConfig(2, 6, 0);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 6);
+        sphMap.put(1, 6);
+        ClusterConfig config = new ClusterConfig(2, sphMap, 0);
         Map<Integer, String> topology = Maps.newHashMap();
         topology.put(0, "0");
         topology.put(1, "0");
@@ -131,7 +144,10 @@ public class TestClusterCompiler extends TestCase
 
     public void testAddHostsToKsafe() throws JSONException
     {
-        ClusterConfig config = new ClusterConfig(2, 6, 1);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 6);
+        sphMap.put(1, 6);
+        ClusterConfig config = new ClusterConfig(2, sphMap, 1);
         Map<Integer, String> topology = Maps.newHashMap();
         topology.put(0, "0");
         topology.put(1, "0");
@@ -148,7 +164,10 @@ public class TestClusterCompiler extends TestCase
 
     public void testAddMoreThanKsafeHosts() throws JSONException
     {
-        ClusterConfig config = new ClusterConfig(2, 6, 1);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        sphMap.put(0, 6);
+        sphMap.put(1, 6);
+        ClusterConfig config = new ClusterConfig(2, sphMap, 1);
         Map<Integer, String> topology = Maps.newHashMap();
         topology.put(0, "0");
         topology.put(1, "0");
@@ -272,7 +291,11 @@ public class TestClusterCompiler extends TestCase
         }
 
         for (int sites = 1; sites <= maxSites; sites++) {
-            final ClusterConfig config = new ClusterConfig(hostGroups.size(), sites, kfactor);
+            Map<Integer, Integer> sphMap = Maps.newHashMap();
+            for (int host = 0; host < hostGroups.size(); host++) {
+                sphMap.put(host, sites);
+            }
+            final ClusterConfig config = new ClusterConfig(hostGroups.size(), sphMap, kfactor);
             System.out.println("Running config " + sites + " sitesperhost, k=" + kfactor);
             if (config.validate()) {
                 final JSONObject topo = config.getTopology(hostGroups);
@@ -289,7 +312,7 @@ public class TestClusterCompiler extends TestCase
     private static void verifyTopology(Map<Integer, String> hostGroups, JSONObject topo) throws JSONException
     {
         final int hostCount = new ClusterConfig(topo).getHostCount();
-        final int sitesPerHost = new ClusterConfig(topo).getSitesPerHost();
+        final Map<Integer, Integer> sitesPerHostMap = new ClusterConfig(topo).getSitesPerHostMap();
         final int partitionCount = new ClusterConfig(topo).getPartitionCount();
         final int minMasterCount = partitionCount / hostCount;
         final int maxMasterCount = minMasterCount + 1;
@@ -301,6 +324,8 @@ public class TestClusterCompiler extends TestCase
         for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
             final List<Integer> hostPartitions = ClusterConfig.partitionsForHost(topo, entry.getKey());
             final List<Integer> hostMasters = ClusterConfig.partitionsForHost(topo, entry.getKey(), true);
+            assertNotNull(sitesPerHostMap.get(entry.getKey()));
+            int sitesPerHost = sitesPerHostMap.get(entry.getKey());
             assertEquals(sitesPerHost, hostPartitions.size());
             // Make sure a host only has unique partitions
             assertEquals(hostPartitions.size(), Sets.newHashSet(hostPartitions).size());
@@ -321,7 +346,11 @@ public class TestClusterCompiler extends TestCase
         }
 
         for (Map.Entry<String, Collection<Integer>> ghEntry : groupHosts.asMap().entrySet()) {
-            if (ghEntry.getValue().size() * sitesPerHost < partitionCount) {
+            int sitesCount = 0;
+            for(Integer hostId : ghEntry.getValue()) {
+                sitesCount += sitesPerHostMap.get(hostId);
+            }
+            if (sitesCount < partitionCount) {
                 // Non-optimal topology, no need to verify the rest
                 System.out.println("Group " + ghEntry.getKey() + " only has " + ghEntry.getValue().size() + " hosts");
                 return;

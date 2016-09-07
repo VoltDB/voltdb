@@ -790,6 +790,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     managedPathsEmptyCheck(config);
             }
 
+            // Write local sitesPerHost to ZK
             int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
             registerSitesPerHostToZK(sitesperhost);
 
@@ -907,8 +908,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
+                    int sitesPerHost = clusterConfig.getSitesPerHostMap().get(m_messenger.getHostId());
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          clusterConfig.getSitesPerHost());
+                                                                          sitesPerHost);
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -2449,15 +2451,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (m_myHostId == 0) {
             m_clusterSettings.store(m_messenger.getZK());
         }
-        ClusterConfig config = new ClusterConfig(
-                m_clusterSettings.get().hostcount(),
-                clusterType.getSitesperhost(),
-                clusterType.getKfactor()
-                );
-
-        if (!config.validate()) {
-            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
-        }
+//        ClusterConfig config = new ClusterConfig(
+//                m_clusterSettings.get().hostcount(),
+//                clusterType.getSitesperhost(),
+//                clusterType.getKfactor()
+//                );
+//
+//        if (!config.validate()) {
+//            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
+//        }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
     }

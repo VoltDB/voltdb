@@ -209,7 +209,7 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
-            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 
