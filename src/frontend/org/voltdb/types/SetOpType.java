@@ -18,7 +18,7 @@
 package org.voltdb.types;
 
 public enum SetOpType {
-    NOUNION,
+    NONE,
     UNION,
     UNION_ALL,
     INTERSECT,

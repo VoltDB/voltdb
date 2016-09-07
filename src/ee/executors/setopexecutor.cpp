@@ -74,7 +74,7 @@ struct SetOperator {
 
     virtual bool processTuples() = 0;
 
-    static SetOperator* getSetOperator(SetopPlanNode* node);
+    static SetOperator* getSetOperator(SetOpPlanNode* node);
 
     // for debugging - may be unused
     static void printTupleMap(const char* nonce, TupleMap &tuples);
@@ -275,9 +275,9 @@ void ExceptIntersectSetOperator::intersectTupleMaps(TupleMap& map_a, TupleMap& m
     }
 }
 
-SetOperator* SetOperator::getSetOperator(SetopPlanNode* node)
+SetOperator* SetOperator::getSetOperator(SetOpPlanNode* node)
 {
-    SetopType setopType = node->getSetopType();
+    SetOpType setopType = node->getSetOpType();
     switch (setopType) {
         case SETOP_TYPE_UNION_ALL:
             return new UnionSetOperator(node->getInputTableRefs(), node->getTempOutputTable(), true);
@@ -303,16 +303,16 @@ SetOperator* SetOperator::getSetOperator(SetopPlanNode* node)
 
 } // namespace detail
 
-SetopExecutor::SetopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+SetOpExecutor::SetOpExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node)
 { }
 
-bool SetopExecutor::p_init(AbstractPlanNode* abstract_node,
+bool SetOpExecutor::p_init(AbstractPlanNode* abstract_node,
                            TempTableLimits* limits)
 {
     VOLT_TRACE("init Union Executor");
 
-    SetopPlanNode* node = dynamic_cast<SetopPlanNode*>(abstract_node);
+    SetOpPlanNode* node = dynamic_cast<SetOpPlanNode*>(abstract_node);
     assert(node);
 
     //
@@ -372,7 +372,7 @@ bool SetopExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool SetopExecutor::p_execute(const NValueArray &params) {
+bool SetOpExecutor::p_execute(const NValueArray &params) {
     return m_setOperator->processTuples();
 }
 

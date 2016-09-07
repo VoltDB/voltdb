@@ -50,18 +50,18 @@
 
 namespace voltdb {
 
-SetopPlanNode::~SetopPlanNode() { }
+SetOpPlanNode::~SetOpPlanNode() { }
 
-PlanNodeType SetopPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
+PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
 
-std::string SetopPlanNode::debugInfo(const std::string &spacer) const
+std::string SetOpPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
     buffer << spacer << "SetOpType[" << m_setopType << "]\n";
     return buffer.str();
 }
 
-void SetopPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     std::string setopTypeStr = obj.valueForKey("SETOP_TYPE").asStr();
     if (setopTypeStr == "UNION") {
@@ -76,8 +76,8 @@ void SetopPlanNode::loadFromJSONObject(PlannerDomValue obj)
         m_setopType = SETOP_TYPE_EXCEPT;
     } else if (setopTypeStr == "EXCEPT_ALL") {
         m_setopType = SETOP_TYPE_EXCEPT_ALL;
-    } else if (setopTypeStr == "NOUNION") {
-        m_setopType = SETOP_TYPE_NOUNION;
+    } else if (setopTypeStr == "NONE") {
+        m_setopType = SETOP_TYPE_NONE;
     } else {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "SetopPlanNode::loadFromJSONObject:"

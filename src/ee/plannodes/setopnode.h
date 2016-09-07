@@ -53,20 +53,20 @@ namespace voltdb {
 /**
  *
  */
-class SetopPlanNode : public AbstractPlanNode {
+class SetOpPlanNode : public AbstractPlanNode {
 public:
-    SetopPlanNode() : m_setopType(SETOP_TYPE_NOUNION) { }
-    ~SetopPlanNode();
+    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE) { }
+    ~SetOpPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 
-    SetopType getSetopType() const { return m_setopType; }
+    SetOpType getSetOpType() const { return m_setopType; }
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
 private:
-   SetopType m_setopType;
+   SetOpType m_setopType;
 };
 
 } // namespace voltdb

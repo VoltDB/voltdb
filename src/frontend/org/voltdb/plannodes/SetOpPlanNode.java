@@ -27,8 +27,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.types.SortDirectionType;
 import org.voltdb.types.SetOpType;
+import org.voltdb.types.SortDirectionType;
 
 public class SetOpPlanNode extends AbstractPlanNode {
 
@@ -41,7 +41,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
 
     public SetOpPlanNode() {
         super();
-        m_setOpType = SetOpType.NOUNION;
+        m_setOpType = SetOpType.NONE;
     }
 
     public SetOpPlanNode(SetOpType setOpType) {
@@ -130,7 +130,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_setOpType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE.name()));
+        m_setOpType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE));
     }
 
     @Override
