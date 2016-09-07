@@ -65,9 +65,7 @@ public interface VoltDBInterface
     public String getExportOverflowPath();
     public String getDROverflowPath();
 
-    public String getPath(String name);
     public boolean isBare();
-
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.

@@ -554,10 +554,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public String getPath(String name) {
-        return "";
-    }
-    @Override
     public boolean isBare() {
         return false;
     }
