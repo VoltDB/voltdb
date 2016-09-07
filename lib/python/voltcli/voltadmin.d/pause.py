@@ -39,5 +39,5 @@ def pause(runner):
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
-        # check the dr stats
+        #check the dr stats
         checkstats.check_export_dr(runner)

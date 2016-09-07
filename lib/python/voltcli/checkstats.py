@@ -90,8 +90,7 @@ def check_dr(runner, partition_min_host, partition_min, partition_max):
             last_acked = r[9]
         # check TOTALBYTES
         if r[5] > 0:
-            # track the highest seen drId for each partition
-            # use last queued to get the upper bound
+            # track the highest seen drId for each partition. use last queued to get the upper bound
             if pid in partition_max:
                 partition_max[pid] = max(last_queued, partition_max[pid])
             else:
