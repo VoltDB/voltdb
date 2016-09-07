@@ -277,10 +277,12 @@ public final class InvocationDispatcher {
         }
         // Check for pause mode restrictions before proceeding any further
         if (!allowPauseModeExecution(handler, catProc, task)) {
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Server is paused and is available in read-only mode - please try again later.",
-                    task.clientHandle);
-        }
+            String msg = "Server is paused and is available in read-only mode - please try again later.";
+            if (VoltDB.instance().isShuttingdown()) {
+                msg = "Server shutdown in progress - new transactions are not processed.";
+            }
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg,task.clientHandle);
+         }
 
         ClientResponseImpl error = null;
         //Check permissions
@@ -430,7 +432,7 @@ public final class InvocationDispatcher {
 
         // Verify that admin mode sysprocs are called from a client on the
         // admin port, otherwise return a failure
-        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName)) && !handler.isAdmin()) {
+        if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName) || "@PrepareShutdown".equals(task.procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
                     task.procName + " is not available to this client",
                     task.clientHandle);
@@ -501,6 +503,11 @@ public final class InvocationDispatcher {
     }
 
     private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED && VoltDB.instance().isShuttingdown()
+                && !procedure.getAllowedinshutdown()) {
+            return false;
+        }
+
         if (VoltDB.instance().getMode() != OperationMode.PAUSED || handler.isAdmin()) {
             return true;
         }
