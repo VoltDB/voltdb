@@ -1988,7 +1988,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                     + "order by 1, 2, 3").getResults()[0];
             VoltTable actual = client.callProcedure("@AdHoc",
                     "select * "
-                    + "from v24_eng_11100 "
+                    + "from v_eng_11100 "
                     + "order by 1, 2, 3;").getResults()[0];
             assertTablesAreEqual("Query and view after stmt: " + stmt, expected, actual);
         }
