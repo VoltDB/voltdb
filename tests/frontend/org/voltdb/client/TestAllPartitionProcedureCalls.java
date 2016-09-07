@@ -22,7 +22,9 @@
  */
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -167,7 +169,8 @@ public class TestAllPartitionProcedureCalls {
     }
 
     private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {
-        assertTrue (responses.length == partitionCount);
+        assertNotNull("responses are null", responses);
+        assertEquals ("response array size is not equal to the number of partitions", partitionCount, responses.length);
         long total = 0;
         for (ClientResponseWithPartitionKey resp: responses) {
             VoltTable results = resp.response.getResults()[0];
@@ -203,7 +206,7 @@ public class TestAllPartitionProcedureCalls {
 
         @Override
         public void clientCallback(ClientResponseWithPartitionKey[] responses) throws Exception {
-            assertTrue(responses.length == m_partitionCount);
+            assertEquals("response array size is not equal to the number of partitions", m_partitionCount, responses.length);
             long total = 0;
             try {
                 for (ClientResponseWithPartitionKey resp: responses) {
