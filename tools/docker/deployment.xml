@@ -4,12 +4,4 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <!--paths>
-       <snapshots path="/opt/voltdb/voltdbroot/snapshots" />
-       <commandlog path="/opt/voltdb/voltdbroot/commandlog" />
-       <commandlogsnapshot path="/opt/voltdb/voltdbroot/commandlog_snapshot" />
-       <droverflow path="/opt/voltdb/voltdbroot/droverflow" />
-       <exportoverflow path="/opt/voltdb/voltdbroot/exportoverflow" />
-    </paths-->
-
 </deployment>
