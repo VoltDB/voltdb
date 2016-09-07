@@ -17,6 +17,7 @@
 import unittest
 import requests
 import socket
+import xmlrunner
 
 
 __host_name__ = socket.gethostname()
@@ -265,4 +266,4 @@ def GetLastDbId():
     return last_db_id
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

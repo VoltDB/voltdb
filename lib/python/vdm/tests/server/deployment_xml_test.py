@@ -18,6 +18,7 @@ import unittest
 import requests
 from xml.etree import ElementTree
 import socket
+import xmlrunner
 
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
@@ -290,4 +291,4 @@ class UpdateDeployment(Deployment):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
