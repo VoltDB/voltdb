@@ -585,10 +585,14 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
-    // Insert the tuple into the delta table first.
-    insertTupleIntoDeltaTable(source, fallible);
-
     try {
+        // Insert the tuple into the delta table first.
+        //
+        // (Note: we may hit a NOT NULL constraint violation,
+        // in which case, we want to clean up by calling
+        // deleteTupleStorage, below)
+        insertTupleIntoDeltaTable(source, fallible);
+
         insertTupleCommon(source, target, fallible);
     }
     catch (ConstraintFailureException &e) {
@@ -811,6 +815,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views, we first insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
+    //
+    // Note that this is guaranteed to succeed, since we are inserting an existing tuple
+    // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
@@ -888,6 +895,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    // Note that inserting into the delta table is guaranteed to
+    // succeed, since we checked constraints above.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
@@ -990,6 +999,9 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
+    //
+    // Note that this is guaranteed to succeed, since we are inserting an existing tuple
+    // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(target, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(target);
