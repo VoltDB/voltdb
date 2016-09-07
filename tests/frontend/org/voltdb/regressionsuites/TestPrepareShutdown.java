@@ -28,9 +28,12 @@ import java.util.Map;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestPrepareShutdown extends RegressionSuite
@@ -41,18 +44,61 @@ public class TestPrepareShutdown extends RegressionSuite
 
     public void testPrepareShutdown() throws Exception {
 
+        final Client client2 = this.getClient();
+        for (int i = 0; i < 50; i++) {
+            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 30000);
+        }
         final Client client = getAdminClient();
-        Thread.sleep(5000);
         ClientResponse resp = client.callProcedure("@PrepareShutdown");
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
 
-        resp = client.callProcedure("@Statistics", "liveclients", 0);
-        assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-
+        //test sys proc that is not allowed.
         try {
-            client.callProcedure("@SystemInformation", "OVERVIEW");
-            fail();
+            client2.callProcedure("@SystemInformation", "OVERVIEW");
+            fail("Unallowed sys proc is executed.");
         } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@SystemInformation:" + e.getMessage());
+        }
+
+        //test query that is not allowed
+        try {
+            client2.callProcedure("ArbitraryDurationProc", 0);
+            fail("Unallowed proc is executed.");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("ArbitraryDurationProc:" + e.getMessage());
+        }
+        long sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            resp = client2.callProcedure("@Statistics", "liveclients", 0);
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = resp.getResults()[0];
+            long trxn=0, bytes=0, msg=0;
+            if (t.advanceRow()) {
+                trxn = t.getLong(6);
+                bytes = t.getLong(7);
+                msg = t.getLong(8);
+                sum =  trxn + bytes + msg;
+            }
+            System.out.printf("Outstanding transactions: %d, buffer bytes :%d, response messages:%d\n", trxn, bytes, msg);
+            Thread.sleep(2000);
+        }
+        assertTrue (sum == 0);
+        try {
+            client2.callProcedure("@Shutdown");
+            fail("Unallowed Shutdown is executed.");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@Shutdown:" + e.getMessage() + " please shutdown via admin mode");
+        }
+
+        try{
+            client.callProcedure("@Shutdown");
+            fail("@Shutdown fails via admin mode");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
         }
     }
 
@@ -61,6 +107,8 @@ public class TestPrepareShutdown extends RegressionSuite
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestPrepareShutdown.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
         VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
+        project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
 
         LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
@@ -70,5 +118,12 @@ public class TestPrepareShutdown extends RegressionSuite
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;
+    }
+
+    class Callback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            assertTrue(clientResponse.getStatus() == ClientResponse.SUCCESS);
+        }
     }
 }

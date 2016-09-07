@@ -316,14 +316,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_isRunningWithOldVerb;
      };
 
-     @Override
-     public boolean isShuttingdown() {
-         return m_shuttingdown;
-     }
-     @Override
-     public void setShuttingdown(boolean shuttingdown){
-         m_shuttingdown = shuttingdown;
-     }
+    @Override
+    public boolean isShuttingdown() {
+        return m_shuttingdown;
+    }
+    @Override
+    public void setShuttingdown(boolean shuttingdown) {
+        m_shuttingdown = shuttingdown;
+    }
 
     @Override
     public boolean rejoining() {

@@ -36,10 +36,12 @@ def shutdown(runner):
         if status <> 0:
             runner.error('The cluster has failed to be quiesce with status: %d' % status)
             return
-        runner.info('Completing export and DR transactions...')
+        runner.info('Completing outstanding export and DR transactions...')
         checkstats.check_export_dr(runner)
-        runner.info('Completing pending client transactions.')
+        runner.info('Completing outstanding client transactions.')
         checkstats.check_clients(runner)
+        runner.info('Completing outstanding importer requests.')
+        checkstats.check_importer(runner)
         runner.info('Cluster is ready for shutdown')
     runner.info('Cluster shutdown in progress.')
     response = runner.call_proc('@Shutdown', [], [], check_status = False)

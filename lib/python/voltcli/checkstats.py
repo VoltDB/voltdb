@@ -16,6 +16,7 @@
 
 import time
 import voltdbclient
+from test import outstanding_bugs
 
 def check_export_dr(runner):
         partition_min_host = dict()
@@ -61,7 +62,7 @@ def get_stats(runner, component):
         status = response.status()
         if status <> 1 and "timeout" in response.statusString:
             if retry == 0:
-                runner.error('Unable to collect statistics from the cluster')
+                runner.error("Unable to collect %s statistics from the cluster" % component)
             else:
                 sleep(1)
                 retry -= 1
@@ -185,7 +186,18 @@ def check_clients(runner):
             bytes += r[6]
             msgs += r[7]
             trans += r[8]
-        runner.info('Outstanding transactions=' + str(trans) + ', buffer size=' + str(bytes) + ', response messages=' + str(msgs))
+        runner.info('Outstanding transactions=%d, Outstanding buffer bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
+            return
+        time.sleep(1)
+
+def check_importer(runner):
+     while True:
+        resp = get_stats(runner, 'IMPORTER')
+        outstanding = 0
+        for r in resp.table(0).tuples():
+            outstanding += r[8]
+        runner.info('Outstanding importer requests=%d' %(outstanding))
+        if outstanding == 0:
             return
         time.sleep(1)
