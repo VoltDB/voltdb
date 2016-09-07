@@ -110,9 +110,12 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("COMPLETE_TRANSACTION_RESPONSE");
+        sb.append("COMPLETE_TRANSACTION_RESPONSE (FROM ");
+        sb.append(CoreUtils.hsIdToString(m_sourceHSId));
+        sb.append(" TO ");
+        sb.append(CoreUtils.hsIdToString(m_spiHSId));
         sb.append(" FOR TXN ID: ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(m_txnId);
         sb.append(" SPHANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
         sb.append(" SPI ");
