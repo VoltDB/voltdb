@@ -940,8 +940,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
          @Override
         public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
-             m_latch.countDown();
              m_responses = clientResponse;
+             m_latch.countDown();
         }
 
         public ClientResponseWithPartitionKey[] getResponse() {

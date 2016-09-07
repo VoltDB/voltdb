@@ -26,8 +26,6 @@ package org.voltdb.catalog;
 import java.io.File;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ServerThread;
 import org.voltdb.TableHelper;
@@ -43,6 +41,8 @@ import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestLiveTableSchemaMigration extends TestCase {
 
@@ -86,9 +86,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
             byte[] catBytes2 = MiscUtils.fileToBytes(new File(catPath2));
 
             DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
-            depBuilder.setVoltRoot("/tmp/foobar");
+            depBuilder.setVoltRoot("/tmp/rootbar");
             // disable logging
-            depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
+            depBuilder.configureLogging("/tmp/foobar", "/tmp/goobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
@@ -162,10 +162,10 @@ public class TestLiveTableSchemaMigration extends TestCase {
             String catPath1 = catalogPathForTable(t1, "t1.jar");
 
             DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
-            depBuilder.setVoltRoot("/tmp/foobar");
+            depBuilder.setVoltRoot("/tmp/rootbar");
             depBuilder.setUseDDLSchema(true);
             // disable logging
-            depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
+            depBuilder.configureLogging("/tmp/foobar", "/tmp/goobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
             File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
 
