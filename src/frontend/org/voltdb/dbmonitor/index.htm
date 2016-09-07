@@ -775,8 +775,9 @@
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>
-                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
+                                        <a href="javascript:void(0);" id="addNewImportConfigLink" class="plusAdd" style="display: block;" title="Add Import Configuration">&nbsp;</a>
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
+                                        <a href="#addImportConfigPopup" id="addImportConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
@@ -1704,6 +1705,24 @@
         </div>
     </div>
     <!--Update error Popup-->
+    <!--Update Import Configuration error Popup-->
+    <div style="display: none"><a href="#updateImportErrorPopup" id="updateImportErrorPopupLink">Update Error</a></div>
+    <div id="updateImportErrorPopup" style="display: none">
+        <div id="updateImportInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateImportErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnImportUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
     <!--Update error Auto Snapshot Popup-->
     <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
     <div id="updateSnapshotErrorPopup" style="display: none">
@@ -1848,6 +1867,32 @@
         </div>
     </div>
     <!--Add Disk Limit Popup-->
+    <!--Add Import Configuration Popup-->
+    <div id="addImportConfigPopup" style="display: none">
+        <div id="addImportConfigInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addImportConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteImportConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+            <div id="addImportConfigControls">
+                <div class="clear"></div>
+                <form id="formAddImportConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addImportConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddImportConfigSave" class="btn">Save</a> <a id="btnAddImportConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveImportConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="importSaveConfigText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveImportConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveImportConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--Add Import Configuration Popup-->
     <div id="addDiskLimitPopup" style="display: none">
         <div id="addDiskLimitInnerPopup">
             <div class="overlay-title icon-alert">
