@@ -1043,6 +1043,7 @@ var loadPage = function (serverName, portid) {
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
                 $("#addNewConfigLink").hide();
+                //$("#addNewImportConfigLink").hide();
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
             }

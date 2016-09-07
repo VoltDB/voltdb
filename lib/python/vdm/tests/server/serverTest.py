@@ -16,7 +16,6 @@
 
 import unittest
 import requests
-import xmlrunner
 import socket
 
 
@@ -1097,5 +1096,4 @@ def check_invalid_value(self, field, data, url, request_type):
     self.assertEqual(response.status_code, 200)
 
 if __name__ == '__main__':
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
     unittest.main()
