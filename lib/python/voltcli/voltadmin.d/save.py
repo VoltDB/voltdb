@@ -32,24 +32,41 @@ import urllib
                               default = None),
         VOLT.StringListOption(None, '--skiptables', 'skip_tables',
                               'tables to skip in the snapshot',
-                              default = None)
-    ),
-    arguments = (
-        VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
-        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+                              default = None),
+        VOLT.StringOption('-n', '--nonce', 'nonce', 'the unique snapshot identifier (nonce)', default = None),
+        VOLT.StringOption('-d', '--directory', 'directory', 'the snapshot server directory', default = None)
     )
 )
 def save(runner):
-    uri = 'file://%s' % urllib.quote(runner.opts.directory)
-    nonce = runner.opts.nonce.replace('"', '\\"')
+    uri = None
+    if runner.opts.directory != None:
+        uri = 'file://%s' % urllib.quote(runner.opts.directory)
+    nonce = None
+    if runner.opts.nonce != None:
+        nonce = runner.opts.nonce.replace('"', '\\"')
     if runner.opts.blocking:
         blocking = 'true'
     else:
         blocking = 'false'
-    raw_json_opts = ['uripath:"%s"' % (uri),
-                     'nonce:"%s"' % (nonce),
-                     'block:%s' % (blocking),
-                     'format:"%s"' % (runner.opts.format)]
+    if uri != None:
+        if nonce != None:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'nonce:"%s"' % (nonce),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+        else:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+    else:
+        if nonce != None:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'nonce:"%s"' % (nonce),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+        else:
+            raw_json_opts = ['block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
     if runner.opts.tables:
         raw_json_opts.append('tables:%s' % (runner.opts.tables))
     if runner.opts.skip_tables:

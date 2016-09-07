@@ -37,6 +37,7 @@ public class SnapshotInitiationInfo
     private String m_data;
     private boolean m_truncationRequest;
     private SnapshotPathType m_stype;
+    private static final String MAGIC_NONCE_PREFIX = "_VOLTDB";
 
     /**
      * Construct the object given the parameters directly.
@@ -65,20 +66,22 @@ public class SnapshotInitiationInfo
         m_format = SnapshotFormat.NATIVE;
         m_data = null;
         m_truncationRequest = false;
+        boolean checkNonceValidity = true;
+        switch (params.length) {
+            case 3:
+                parseLegacyParams(params);
+                break;
+            case 1:
+                parseJsonParams(params);
+                break;
+            default:
+                m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
+                m_stype = SnapshotPathType.SNAP_AUTO;
+                break;
+        }
 
-        if (params.length == 3) {
-            parseLegacyParams(params);
-        }
-        else if (params.length == 1) {
-            parseJsonParams(params);
-        }
-        else {
-            throw new Exception("@SnapshotSave requires 3 parameters " +
-                    "(Path, nonce, and blocking) or alternatively a single JSON blob. ");
-        }
-
-        if (m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(","))) {
-            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,)");
+        if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",")) && m_nonce.startsWith(MAGIC_NONCE_PREFIX)) {
+            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
         }
     }
 
@@ -168,9 +171,14 @@ public class SnapshotInitiationInfo
         }
 
         m_stype = SnapshotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString()));
-        m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
-        if (m_path.isEmpty()) {
-            throw new Exception("uripath cannot be empty");
+        if (jsObj.has(SnapshotUtil.JSON_URIPATH)) {
+            m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
+            if (m_path.isEmpty()) {
+                throw new Exception("uripath cannot be empty");
+            }
+        } else {
+            m_stype = SnapshotPathType.SNAP_AUTO;
+            m_path = "file:///" + SnapshotUtil.getRealPath(m_stype, null);
         }
         URI pathURI = new URI(m_path);
         String pathURIScheme = pathURI.getScheme();
@@ -182,10 +190,13 @@ public class SnapshotInitiationInfo
                     " if this is a file path then you must prepend file://");
         }
         m_path = pathURI.getPath();
-
-        m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-        if (m_nonce.isEmpty()) {
-            throw new Exception("nonce cannot be empty");
+        if (jsObj.has(SnapshotUtil.JSON_NONCE)) {
+            m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+            if (m_nonce.isEmpty()) {
+                throw new Exception("nonce cannot be empty");
+            }
+        } else {
+            m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
         }
 
         Object blockingObj = false;
