@@ -238,6 +238,77 @@ class Overview extends Module {
 
         errorExportConnectorClass   { $("#errorExportConnectorClass") }
 
+
+        //Import
+        textImportType              { $("#txtImportType")}
+        txtImportFormat             { $("#txtImportFormat") }
+        importAddConfigPopupTitle   { $("#addImportConfigHeader") }
+        addImportProperty           { $("#lnkAddNewImportProperty") }
+        saveImport                  { $("#btnAddImportConfigSave", text:"Save") }
+        cancelImport                { $("#btnAddImportConfigCancel", text:"Cancel") }
+
+        errorFormat                 { $("#errorImportFormat") }
+
+        //KAFKA
+        txtTopics                   { $("#txtTopics") }
+        txtProcedure                { $("#txtProcedure") }
+        txtBrokers                  { $("#txtBrokers") }
+
+        txtTopicsValue              { $("#txtTopicsValue") }
+        txtProcedureValue           { $("#txtProcedureValue") }
+        txtBrokersValue             { $("#txtBrokersValue") }
+
+        errorTopicValue             { $("#errorTopicValue") }
+        errorProcedureValue         { $("#errorProcedureValue") }
+        errorBrokersValue           { $("#errorBrokersValue") }
+
+        //KINESIS
+        txtRegion                   { $("#txtRegion") }
+        txtSecretKey                { $("#txtSecretKey") }
+        txtAccessKey                { $("#txtAccessKey") }
+        txtStreamName               { $("#txtStreamName") }
+        txtProcedureKi              { $("#txtProcedureKi") }
+        txtAppName                  { $("#txtAppName") }
+
+        txtRegionValue              { $("#txtRegionValue") }
+        txtSecretKeyValue           { $("#txtSecretKeyValue") }
+        txtAccessKeyValue           { $("#txtAccessKeyValue") }
+        txtStreamNameValue          { $("#txtStreamNameValue") }
+        txtProcedureKiValue         { $("#txtProcedureKiValue") }
+        txtAppNameValue             { $("#txtAppNameValue") }
+
+        errorRegionValue            { $("#errorRegionValue") }
+        errorSecretKeyValue         { $("#errorSecretKeyValue") }
+        errorAccessKeyValue         { $("#errorAccessKeyValue") }
+        errorStreamNameValue        { $("#errorStreamNameValue") }
+        errorProcedureKiValue       { $("#errorProcedureKiValue") }
+        errorAppNameValue           { $("#errorAppNameValue") }
+
+
+        btnSaveImportConfigOk       { $("#btnSaveImportConfigOk") }
+        btnSaveImportConfigCancel   { $("#btnSaveImportConfigCancel") }
+
+        KafkaImportName             { $(class:"labelCollapsed", text: "KAFKA") }
+        KinesisImportName           { $(class:"labelCollapsed", text: "KINESIS") }
+        deleteImportConfiguration   { $("#deleteImportConfig > a") }
+
+        newImportTextField          { $("#txtImportName1") }
+        newImportValueField         { $("#txtImportValue1") }
+        deleteFirstImportProperty   { $("#deleteFirstImportProperty") }
+
+        errorImportName1            { $("#errorImportName1") }
+        errorImportValue1           { $("#errorImportValue1") }
+        // EXPORT EXPANSION
+
+        importConfig                { $(class:"labelCollapsed", text:"Import") }
+        importExpanded              { $(class:"labelCollapsed labelExpanded", text:"Import") }
+        importNoConfigAvailable     { $("#noConfigImport") }
+        importConfiguration         { $("#importConfiguration") }
+
+        editImportConfiguration     { $("#importEdit0") }
+
+        //
+
         // ADVANCED EXPANSION
 
         maxJavaHeap             { $(class:"configLabel", text:"Max Java Heap") }
@@ -327,6 +398,7 @@ class Overview extends Module {
         errorPropertyValue1 {$("#errorValue1")}
 
         addconfig           { $("#addNewConfigLink")}
+        addImportConfig     { $("#addNewImportConfigLink") }
     }
 
     int numberOfTrials = 10
@@ -682,7 +754,21 @@ class Overview extends Module {
             count++
             try {
                 addconfig.click()
-                waitFor(waitTime) { exportAddConfigPopupTitle.isDisplayed() }
+                waitFor(waitTime) { imp.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+    }
+
+    def openAddImportConfigurationPopup() {
+        waitFor(waitTime) { addImportConfig.isDisplayed() }
+        int count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                addImportConfig.click()
+                waitFor(waitTime) { importAddConfigPopupTitle.isDisplayed() }
                 break
             } catch(geb.waiting.WaitTimeoutException e) {
             }
@@ -846,6 +932,14 @@ class Overview extends Module {
             export.click()
     }
 
+    /**
+     * Click import to expand, if already it is not expanded
+     */
+    def boolean expandImport() {
+        if (checkIfImportIsExpanded() == false)
+            importConfig.click()
+    }
+
      /**
      * Click export to collapse, if already it is expanded
      */
@@ -859,7 +953,7 @@ class Overview extends Module {
      */
      def boolean checkIfExportIsExpanded() {
         try {
-            exportExpanded.isDisplayed()
+            importExpanded.isDisplayed()
             return true
         } catch(geb.error.RequiredPageContentNotPresent e) {
             return false
@@ -868,6 +962,19 @@ class Overview extends Module {
         }
      }
 
+    /**
+     * Check if import is expanded or not
+     */
+    def boolean checkIfImportIsExpanded() {
+        try {
+            importExpanded.isDisplayed()
+            return true
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+            return false
+        } catch(org.openqa.selenium.StaleElementReferenceException e) {
+            return true
+        }
+    }
 
      def boolean checkIfDiskLimitIsExpanded() {
         try {
