@@ -2059,6 +2059,67 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertContentOfTable(expectedAfterDelete, vt);
     }
 
+
+    public void testEng11100() throws Exception {
+        Client client = getClient();
+        String[] stmts = {
+                "INSERT INTO P1_ENG_11074 VALUES (-2,   null,  null, 'bbb', -22.22);",
+                "INSERT INTO R1_ENG_11074 VALUES (-2,   null,  null, 'bbb', -22.22);",
+                // Note: following two statements violate NOT NULL constraints on rightmost column.
+                "INSERT INTO P1_ENG_11074 VALUES (-3,   null, 'ccc',  null,  null);",
+                "INSERT INTO R1_ENG_11074 VALUES (-3,   null, 'ccc',  null,  null);",
+                "INSERT INTO P1_ENG_11074 VALUES (-4,   null, 'ccc', 'bbb', -22.22);",
+                "INSERT INTO R1_ENG_11074 VALUES (-4,   null, 'ccc', 'bbb', -22.22);",
+                "INSERT INTO P1_ENG_11074 VALUES (-6,  'eee',  null, 'fff', -66.66);",
+                "INSERT INTO R1_ENG_11074 VALUES (-6,  'eee',  null, 'fff', -66.66);",
+                "INSERT INTO P1_ENG_11074 VALUES (-8,  'eee', 'ggg', 'fff', -66.66);",
+                "INSERT INTO R1_ENG_11074 VALUES (-8,  'eee', 'ggg', 'fff', -66.66);",
+                "INSERT INTO P1_ENG_11074 VALUES (-9,  'jjj', 'ggg', 'fff', -66.66);",
+                "INSERT INTO R1_ENG_11074 VALUES (-9,  'jjj', 'ggg', 'fff', -66.66);",
+                "INSERT INTO P1_ENG_11074 VALUES (-10, 'jjj', 'jjj', 'jjj', -10);",
+                "INSERT INTO R1_ENG_11074 VALUES (-10, 'jjj', 'jjj', 'jjj', -10);",
+                "INSERT INTO P1_ENG_11074 VALUES (-11, 'klm', 'klm', 'klm', -11);",
+                "INSERT INTO R1_ENG_11074 VALUES (-11, 'klm', 'klm', 'klm', -11);",
+                "INSERT INTO P1_ENG_11074 VALUES (-12, 'lll', 'lll', 'lll', -12);",
+                "INSERT INTO R1_ENG_11074 VALUES (-12, 'lll', 'lll', 'lll', -12);",
+                "INSERT INTO P1_ENG_11074 VALUES (-13, 'mmm', 'mmm', 'mmm', -13);",
+                "INSERT INTO R1_ENG_11074 VALUES (-13, 'mmm', 'mmm', 'mmm', -13);",
+            };
+
+        int numExc = 0;
+        for (String stmt : stmts) {
+            try {
+                client.callProcedure("@AdHoc", stmt);
+            }
+            catch (ProcCallException pce) {
+                String expectedMessage;
+                if (isHSQL()) {
+                    expectedMessage = "integrity constraint violation";
+                }
+                else {
+                    expectedMessage = "Constraint Type NOT_NULL";
+                }
+
+                assertTrue("Unexpected message: " + pce.getMessage(),
+                        pce.getMessage().contains(expectedMessage));
+                ++numExc;
+            }
+
+            VoltTable expected = client.callProcedure("@AdHoc",
+                    "SELECT   T1.VCHAR_INLINE_MAX,   COUNT(*),   MIN(T2.VCHAR_INLINE_MAX)   "
+                    + "FROM P1_ENG_11074 T1 JOIN R1_ENG_11074 T2 ON T1.ID  <  T2.ID "
+                    + "GROUP BY T1.VCHAR_INLINE_MAX "
+                    + "order by 1, 2, 3").getResults()[0];
+            VoltTable actual = client.callProcedure("@AdHoc",
+                    "select * "
+                    + "from v_eng_11100 "
+                    + "order by 1, 2, 3;").getResults()[0];
+            assertTablesAreEqual("Query and view after stmt: " + stmt, expected, actual);
+        }
+
+        assertEquals(numExc, 2);
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
