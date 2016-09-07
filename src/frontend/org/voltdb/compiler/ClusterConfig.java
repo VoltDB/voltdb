@@ -29,19 +29,20 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
-import com.google_voltpatches.common.collect.Lists;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
-
-import com.google_voltpatches.common.collect.Multimap;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Sets;
 
 public class ClusterConfig
 {
@@ -124,10 +125,10 @@ public class ClusterConfig
         }
     }
 
-    public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)
+    public ClusterConfig(int hostCount, Map<Integer, Integer> sitesPerHostMap, int replicationFactor)
     {
         m_hostCount = hostCount;
-        m_sitesPerHost = sitesPerHost;
+        m_sitesPerHostMap = sitesPerHostMap;
         m_replicationFactor = replicationFactor;
         m_errorMsg = "Config is unvalidated";
     }
@@ -138,7 +139,14 @@ public class ClusterConfig
     public ClusterConfig(JSONObject topo) throws JSONException
     {
         m_hostCount = topo.getInt("hostcount");
-        m_sitesPerHost = topo.getInt("sites_per_host");
+        m_sitesPerHostMap = Maps.newHashMap();
+        JSONArray sphMap = topo.getJSONArray("host_id_to_sph");
+        for (int i = 0; i < sphMap.length(); i++) {
+            JSONObject entry = sphMap.getJSONObject(i);
+            int hostId = entry.getInt("host_id");
+            int sph = entry.getInt("sites_per_host");
+            m_sitesPerHostMap.put(hostId, sph);
+        }
         m_replicationFactor = topo.getInt("kfactor");
         m_errorMsg = "Config is unvalidated";
     }
@@ -148,9 +156,9 @@ public class ClusterConfig
         return m_hostCount;
     }
 
-    public int getSitesPerHost()
+    public Map<Integer, Integer> getSitesPerHostMap()
     {
-        return m_sitesPerHost;
+        return m_sitesPerHostMap;
     }
 
     public int getReplicationFactor()
@@ -158,9 +166,17 @@ public class ClusterConfig
         return m_replicationFactor;
     }
 
+    public int getTotalSitesCount() {
+        int totalSites = 0;
+        for (Map.Entry<Integer, Integer> entry : m_sitesPerHostMap.entrySet()) {
+            totalSites += entry.getValue();
+        }
+        return totalSites;
+    }
+
     public int getPartitionCount()
     {
-        return (m_hostCount * m_sitesPerHost) / (m_replicationFactor + 1);
+        return getTotalSitesCount() / (m_replicationFactor + 1);
     }
 
     public String getErrorMsg()
@@ -175,10 +191,11 @@ public class ClusterConfig
             m_errorMsg = "The number of hosts must be > 0.";
             return false;
         }
-        if (m_sitesPerHost <= 0)
-        {
-            m_errorMsg = "The number of sites per host must be > 0.";
-            return false;
+        for (Map.Entry<Integer, Integer> entry : m_sitesPerHostMap.entrySet()) {
+            if (entry.getValue() <= 0) {
+                m_errorMsg = "The number of sites per host must be > 0.";
+                return false;
+            }
         }
         if (m_hostCount <= m_replicationFactor)
         {
@@ -192,10 +209,10 @@ public class ClusterConfig
                                        m_replicationFactor);
             return false;
         }
-        if ((m_hostCount * m_sitesPerHost) % (m_replicationFactor + 1) > 0)
+        if (getTotalSitesCount() % (m_replicationFactor + 1) > 0)
         {
             m_errorMsg = "The cluster has more hosts and sites per hosts than required for the " +
-                "requested k-safety value. The number of total sites (sitesPerHost * hostCount) must be a " +
+                "requested k-safety value. The number of total sites must be a " +
                 "whole multiple of the number of copies of the database (k-safety + 1)";
             return false;
         }
@@ -488,9 +505,17 @@ public class ClusterConfig
             List<Integer> hostIds,
             int hostCount,
             int partitionCount,
-            int sitesPerHost) throws JSONException{
+            Map<Integer, Integer> sitesPerHostMap) throws JSONException{
         // add all the sites
         int partitionCounter = -1;
+
+        // build the assignment map
+        TreeMap<Integer, Integer> sitesToHostId = Maps.newTreeMap();
+        int sitesCounter = 0;
+        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
+            sitesCounter += entry.getValue();
+            sitesToHostId.put(sitesCounter, entry.getKey());
+        }
 
         HashMap<Integer, ArrayList<Integer>> partToHosts =
             new HashMap<Integer, ArrayList<Integer>>();
@@ -499,12 +524,11 @@ public class ClusterConfig
             ArrayList<Integer> hosts = new ArrayList<Integer>();
             partToHosts.put(i, hosts);
         }
-        for (int i = 0; i < sitesPerHost * hostCount; i++) {
-
+        for (int i = 0; i < getTotalSitesCount(); i++) {
             // serially assign partitions to execution sites.
             int partition = (++partitionCounter) % partitionCount;
-            int hostForSite = hostIds.get(i / sitesPerHost);
-            partToHosts.get(partition).add(hostForSite);
+            int hostId = sitesToHostId.floorEntry(i).getValue();
+            partToHosts.get(partition).add(hostId);
         }
 
         // We need to sort the hostID lists for each partition so that
@@ -517,7 +541,14 @@ public class ClusterConfig
         stringer.object();
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
-        stringer.key("sites_per_host").value(sitesPerHost);
+        stringer.key("host_id_to_sph").array();
+        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
+            stringer.object();
+            stringer.key("host_id").value(entry.getKey());
+            stringer.key("sites_per_host").value(entry.getValue());
+            stringer.endObject();
+        }
+        stringer.endArray();
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {
@@ -554,7 +585,7 @@ public class ClusterConfig
     JSONObject groupAwarePlacementStrategy(
             Map<Integer, String> hostGroups,
             int partitionCount,
-            int sitesPerHost) throws JSONException {
+            Map<Integer, Integer> sitesPerHostMap) throws JSONException {
         final PhysicalTopology phys = new PhysicalTopology(hostGroups);
         final List<Node> allNodes = MiscUtils.zip(phys.getAllHosts());
 
@@ -593,7 +624,7 @@ public class ClusterConfig
                 while (needed-- > 0 && groupIter.hasNext()) {
                     final Deque<Node> nextGroup = groupIter.next();
                     for (Node nextNode : nextGroup) {
-                        if (nextNode.partitionCount() < sitesPerHost) {
+                        if (nextNode.partitionCount() < sitesPerHostMap.get(nextNode.m_hostId)) {
                             assert p.m_master != nextNode;
                             assert !nextNode.m_replicaPartitions.contains(p);
                             firstReplicaNodes.add(nextNode);
@@ -602,7 +633,7 @@ public class ClusterConfig
                     }
                 }
 
-                assignReplicas(sitesPerHost, phys, p, firstReplicaNodes);
+                assignReplicas(sitesPerHostMap, phys, p, firstReplicaNodes);
             }
 
             // Step 3. Assign the remaining replicas. Make sure each partition
@@ -613,7 +644,7 @@ public class ClusterConfig
                     nodesLeft.remove(p.m_master);
                     final List<Node> sortedNodesLeft =
                         MiscUtils.zip(sortByConnectionsToNode(p.m_master, Collections.singletonList(nodesLeft)));
-                    assignReplicas(sitesPerHost, phys, p, sortedNodesLeft);
+                    assignReplicas(sitesPerHostMap, phys, p, sortedNodesLeft);
                 }
             }
         }
@@ -621,7 +652,7 @@ public class ClusterConfig
         // Sanity check to make sure each node has enough partitions and each
         // partition has enough replicas.
         for (Node n : allNodes) {
-            if (n.partitionCount() != sitesPerHost) {
+            if (n.partitionCount() != sitesPerHostMap.get(n.m_hostId)) {
                 throw new RuntimeException("Unable to assign partitions using the new placement algorithm");
             }
         }
@@ -635,7 +666,14 @@ public class ClusterConfig
         stringer.object();
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
-        stringer.key("sites_per_host").value(sitesPerHost);
+        stringer.key("host_id_to_sph").array();
+        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
+            stringer.object();
+            stringer.key("host_id").value(entry.getKey());
+            stringer.key("sites_per_host").value(entry.getValue());
+            stringer.endObject();
+        }
+        stringer.endArray();
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {
@@ -664,12 +702,12 @@ public class ClusterConfig
      * first few. If there are less, the given partition will not be fully
      * replicated.
      */
-    private static void assignReplicas(int sitesPerHost, PhysicalTopology phys, Partition p, Collection<Node> nodes) {
+    private static void assignReplicas(Map<Integer, Integer> sitesPerHostMap, PhysicalTopology phys, Partition p, Collection<Node> nodes) {
         final Iterator<Node> nodeIter = nodes.iterator();
         while (p.m_neededReplicas > 0 && nodeIter.hasNext()) {
             final Node replica = nodeIter.next();
 
-            if (replica.partitionCount() == sitesPerHost) {
+            if (replica.partitionCount() == sitesPerHostMap.get(replica.m_hostId)) {
                 phys.m_root.removeHost(replica);
                 continue;
             }
@@ -740,7 +778,7 @@ public class ClusterConfig
     {
         int hostCount = getHostCount();
         int partitionCount = getPartitionCount();
-        int sitesPerHost = getSitesPerHost();
+        Map<Integer, Integer> sitesPerHostMap = getSitesPerHostMap();
 
         if (hostCount != hostGroups.size()) {
             throw new RuntimeException("Provided " + hostGroups.size() + " host ids when host count is " + hostCount);
@@ -749,15 +787,15 @@ public class ClusterConfig
         JSONObject topo;
         if (Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"))) {
             topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
-                                             hostCount, partitionCount, sitesPerHost);
+                                             hostCount, partitionCount, sitesPerHostMap);
         } else {
             try {
-                topo = groupAwarePlacementStrategy(hostGroups, partitionCount, sitesPerHost);
+                topo = groupAwarePlacementStrategy(hostGroups, partitionCount, sitesPerHostMap);
             } catch (Exception e) {
                 hostLog.error("Unable to use optimal replica placement strategy. " +
                               "Falling back to a less optimal strategy that may result in worse performance");
                 topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
-                                                 hostCount, partitionCount, sitesPerHost);
+                                                 hostCount, partitionCount, sitesPerHostMap);
             }
         }
 
@@ -766,7 +804,7 @@ public class ClusterConfig
     }
 
     private final int m_hostCount;
-    private final int m_sitesPerHost;
+    private final Map<Integer, Integer> m_sitesPerHostMap;
     private final int m_replicationFactor;
 
     private String m_errorMsg;

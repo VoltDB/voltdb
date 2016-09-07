@@ -36,6 +36,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -150,6 +151,7 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
@@ -787,6 +789,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
             }
+
+            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
+            registerSitesPerHostToZK(sitesperhost);
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -1553,6 +1558,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    private void registerSitesPerHostToZK(int sitesperhost) {
+        try {
+            ZKUtil.addIfMissing(m_messenger.getZK(), VoltZK.sitesPerHost, CreateMode.PERSISTENT, new byte[0]);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to create " + VoltZK.sitesPerHost + " node to Zookeeper, dying", false, e);
+        }
+        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, "host_" + m_messenger.getHostId());
+        try {
+            ByteBuffer b = ByteBuffer.allocate(4);
+            b.putInt(sitesperhost);
+            m_messenger.getZK().create(path, b.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            hostLog.info("Zookeeper node " + path + "already exists");
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to write sitePerHost to ZK, dying", false, e);
+        }
+    }
+
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
     private JSONObject getTopology(StartAction startAction, Map<Integer, String> hostGroups,
@@ -1564,10 +1587,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             topo = joinCoordinator.getTopology();
         }
         else if (!startAction.doesRejoin()) {
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
+            Map<Integer, Integer> sphMap = Maps.newHashMap();
+            try {
+                List<String> children;
+                    children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
+                for (String child : children) {
+                    byte[] payload = m_messenger.getZK().getData(
+                            ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, new Stat());
+                    int sitesperhost = ByteBuffer.wrap(payload).getInt();
+                    int hostId = Integer.parseInt(child.split("_")[1]);
+                    sphMap.put(hostId, sitesperhost);
+                }
+            } catch (Exception e) {
+                VoltDB.crashGlobalVoltDB("Unable to get sitesperhost from Zookeeper", false, e);
+            }
             int hostcount = m_clusterSettings.get().hostcount();
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sphMap, kfactor);
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
