@@ -18,6 +18,7 @@ import unittest
 import requests
 import socket
 import time
+import xmlrunner
 import json
 
 __host_name__ = socket.gethostname()
@@ -400,4 +401,4 @@ def CheckServerStatus(self, last_db_id, status):
         assert False
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
