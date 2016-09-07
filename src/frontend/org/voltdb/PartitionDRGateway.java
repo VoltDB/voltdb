@@ -26,7 +26,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine.EventType;
-import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -89,14 +88,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                                  ProducerDRGateway producerGateway,
                                                  StartAction startAction)
     {
-        final VoltDBInterface vdb = VoltDB.instance();
-        LicenseApi api = vdb.getLicenseApi();
-        final boolean licensedToDR = api.isDrReplicationAllowed();
-
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR && producerGateway != null) {
+        if (producerGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {

@@ -904,7 +904,8 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
-            cmdln.m_hostCount = m_hostCount;
+            cmdln.enableAdd(startAction == StartAction.JOIN);
+            cmdln.hostCount(m_hostCount);
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);
             //For new CLI dont pass deployment for probe.
@@ -1101,7 +1102,10 @@ public class LocalCluster implements VoltServerConfig {
 
     public void joinOne(int hostId) {
         try {
-            startOne(hostId, true, ReplicationRole.NONE, isNewCli ? StartAction.PROBE : StartAction.JOIN);
+            if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                initLocalServer(hostId, true);
+            }
+            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN);
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
         }

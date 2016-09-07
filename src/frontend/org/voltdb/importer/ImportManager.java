@@ -222,6 +222,13 @@ public class ImportManager implements ChannelChangeCallback {
         }
     }
 
+    public static int getPartitionsCount() {
+        if (m_self.m_processor.get() != null) {
+            return m_self.m_processor.get().getPartitionsCount();
+        }
+        return 0;
+    }
+
     public synchronized void shutdown() {
         close();
         if (m_distributer != null) {

@@ -22,11 +22,18 @@
  */
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
 import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -34,25 +41,23 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
 
-import junit.framework.TestCase;
-
 /**
  *  Test client all partition calls
  *
  */
-public class TestAllPartitionProcedureCalls extends TestCase {
+public class TestAllPartitionProcedureCalls {
 
     static final int  ROWS = 1000;
     private LocalCluster cluster;
     private Client client;
     private Client clientWithAffinity;
-    @Override
+
+    @Before
     public void setUp() throws Exception
     {
         VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
-        super.setUp();
 
         if (TheHashinator.getConfiguredHashinatorType() != TheHashinator.HashinatorType.ELASTIC) return;
         cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI);
@@ -89,7 +94,6 @@ public class TestAllPartitionProcedureCalls extends TestCase {
         clientWithAffinity.createConnection("", cluster.port(0));
     }
 
-    @Override
     @After
     public void tearDown() throws Exception {
 
@@ -106,7 +110,7 @@ public class TestAllPartitionProcedureCalls extends TestCase {
         }
     }
 
-
+    @Test
     public void testSyncCallAllPartitionProcedureWithIntPartition() throws Exception {
 
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionIntegerTestProc");
@@ -117,12 +121,14 @@ public class TestAllPartitionProcedureCalls extends TestCase {
      }
 
 
+    @Test
     public void testAsyncCallAllPartitionProcedureWithIntPartition() throws Exception {
         asyncTest(client, "PartitionIntegerTestProc");
         asyncTest(clientWithAffinity, "PartitionIntegerTestProc");
      }
 
 
+    @Test
     public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {
 
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionStringTestProc");
@@ -143,13 +149,13 @@ public class TestAllPartitionProcedureCalls extends TestCase {
         }
     }
 
-
+    @Test
     public void testAsyncCallAllPartitionProcedureWithStringPartition() throws Exception{
         asyncTest(client, "PartitionStringTestProc");
         asyncTest(clientWithAffinity, "PartitionStringTestProc");
     }
 
-
+    @Test
     public void testCallAllPartitionProcedureFailuerProc() throws Exception {
         ClientResponseWithPartitionKey[]  responses = client.callAllPartitionProcedure("PartitionFailureTestProc");
         for (ClientResponseWithPartitionKey resp: responses) {
@@ -162,8 +168,9 @@ public class TestAllPartitionProcedureCalls extends TestCase {
         }
     }
 
-     private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {
-        assertTrue (responses.length == partitionCount);
+    private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {
+        assertNotNull("responses are null", responses);
+        assertEquals ("response array size is not equal to the number of partitions", partitionCount, responses.length);
         long total = 0;
         for (ClientResponseWithPartitionKey resp: responses) {
             VoltTable results = resp.response.getResults()[0];
@@ -199,7 +206,7 @@ public class TestAllPartitionProcedureCalls extends TestCase {
 
         @Override
         public void clientCallback(ClientResponseWithPartitionKey[] responses) throws Exception {
-            assertTrue(responses.length == m_partitionCount);
+            assertEquals("response array size is not equal to the number of partitions", m_partitionCount, responses.length);
             long total = 0;
             try {
                 for (ClientResponseWithPartitionKey resp: responses) {
