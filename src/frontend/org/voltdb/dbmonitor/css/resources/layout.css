@@ -611,7 +611,7 @@ ul.rightShowhideList {
         }
 
 .preBtn {
-    float: right;
+    float: left;
     padding: 6px 0 0 10px;
 }
 
@@ -620,8 +620,9 @@ ul.rightShowhideList {
 }
 
     .viewSelect label {
-        font-weight: bold;
         font-size: 14px;
+        position:relative;
+        top:2px;
     }
 
     .viewSelect select {
@@ -665,22 +666,22 @@ ul.rightShowhideList {
 }
 
     .chartHeader h1 {
-        padding: 15px 0 0 20px;
+        padding: 18px 0 0 20px;
     }
 
     .chartHeader span {
         position: absolute;
         max-width: 150px;
         display: block;
-        right: 20px;
+        right: 40px;
         text-align: right;
-        top: 15px;
+        top: 18px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-
+.chartLeft { float:left;}
 
 /*accordion*/
 .menu_list {
@@ -3281,6 +3282,11 @@ a.restoreBtn {
         .configurTbl tr td input[type="text"] {
         }
 
+
+.configureImportTbl tr td{
+    border: none;
+    padding: 5px 2px;
+}
 .propertiesAlign {
     margin: 10px 0 0 0;
     border-top: 1px solid #CCCCCC;
@@ -3371,6 +3377,12 @@ a.drTblBtn {
 
 
 .loadExport {
+    position: relative;
+    left: 3px;
+    top: 5px;
+}
+
+.loadImport {
     position: relative;
     left: 3px;
     top: 5px;
@@ -3783,12 +3795,96 @@ label.errorTimeOut {
 .clsQueryWrapper {float:right;}
 .queryTimeClass {float:left;}
 .clsQueryBtns { float:right;}
+.sliderGraph { float:left; margin:8px 30px 0 0;}
+.labelSlider { float:left; position:relative;right:208px;}
+@-moz-document url-prefix() {.labelSlider {right:214px; top:-2px;}}
+.labelSlider label {font-size: 14px;}
+.sliderGraph .ui-slider .ui-widget-header { background:#ccc}
+.sliderGraph .ui-slider .ui-slider-handle {outline:none; border-radius:1px; top:-3px; border:1px solid #ccc!important; }
+.sliderMain { position:relative; top:3px;}
+.downloadBtnChart { float: right;margin-right: 10px;position: relative; top: -4px;}
+#timeInterval {border:0; color:#222; font-weight:bold; width:24px;}
+@-moz-document url-prefix() {#timeInterval {width:28px;}}
+.errorMsgLocalStorageFull { background:#fff; padding:10px 20px; margin-bottom:10px; position:relative;}
+.errorMsgLocalWrapper{ float:left; padding-right:5px; width:20px;}
+.textMsgLocalWrapper { float:left; width:95%;}
+.textMsgLocalWrapper p {color:#ff0000; font-weight:bold; position:relative; top:2px; font-size:13px;}
+.crossIconMsg { }
+/*.sliderPop {margin-bottom: 10px;}
+.sliderControl { margin:0; padding:0;}
+.sliderControl .ui-slider .ui-slider-handle {outline:none; border-radius:1px; border:1px solid #ccc!important; }
+.slideContent { float:left;}
+.slideContent input[type="text"] { width:22px;}
+.sliderMain { float:left; width:58%; margin:0 0 0 10px;}
+fieldset { border:1px solid #ccc; padding:20px;}
+.chartContent {float: left; width: 34px; margin: 68px 0 0 27px;}
+.chartDataContent { float: right;padding: 0 45px 0 0;width: 240px;}
+.chartDataContent ul li { line-height:20px;}
+.chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
+.chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
 /********************jquery us css override end*****************/
 .errorHeightFix { line-height:12px!important; position:relative; top:-6px;}
 
+.formatImport {
+    position: relative;
+    width: 175px;
+    margin-bottom: 0;
+}
+
+.drop-down-list {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    position: absolute;
+    left: 0;
+    top: 30px;
+    width: 173px;
+    display: none;
+}
+.input-group {
+    position: relative;
+    display: table;
+    border-collapse: separate;
+}
+.formatImport > .input-group > .formatHeight {
+    height: 30px;
+    border: 1px solid #ccc;
+    width: 140px;
+    padding: 0 0 0 5px;
+}
+.input-group-addon:last-child {
+    border-left: 0;
+}
+.input-group-addon {
+    padding: 6px 9px;
+    font-size: 14px;
+    font-weight: normal;
+    line-height: 1;
+    color: #555;
+    text-align: center;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    }
+.input-group-addon, .input-group-btn {
+    width: 1%;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.input-group-addon, .input-group-btn, .input-group .form-control {
+    display: table-cell;
+}
+.downImg { background: url(images/drop_down_arrow.png) no-repeat; width:16px; height:16px; display:block;}
+
+.drop-down-list li {
+    padding: 6px 10px;
+}
+.drop-down-list li:hover {
+    background-color: #3A89FF;
+    color: #fff;
+}
 
 /*********************************************media Qu********************/
 
@@ -3818,6 +3914,7 @@ label.errorTimeOut {
 
 @media (min-width: 320px) and (max-width:360px) {
 
+
       .server-info-heading .server {
   float: left;
   display: block;
@@ -3842,6 +3939,8 @@ label.errorTimeOut {
     /*.serverNameAlign { width: 22%;}*/
 	.headLeft .logo{ margin-right:0;}
 
+
+
 }
 @media (max-width: 360px) {
     .headerAdminContent {
@@ -3855,6 +3954,7 @@ label.errorTimeOut {
     ul.drList li {
         margin-left: 0;
     }
+    .chartLeft {float:left; width: 146px; position: relative;top: -10px;}
 }
 
 @media (max-width: 479px) {
@@ -3868,7 +3968,7 @@ label.errorTimeOut {
     }
 
     .displayPre {
-        height: 115px;
+        height: 172px;
     }
 
     ul.rightShowhideList {
@@ -4213,6 +4313,13 @@ label.errorTimeOut {
     .drHeightIndividual {
         min-height: 150px;
     }
+
+}
+@media (max-width: 1024px) {
+        .sliderGraph,.labelSlider { float:none;}
+        .labelSlider { right:0;}
+        .sliderMain { margin-bottom:10px;}
+
 }
 
 @media (min-width: 480px) and (max-width:540px) {
@@ -4412,6 +4519,7 @@ label.errorTimeOut {
 	.clsQueryWrapper { float:none;}
 	.queryTimeClass { float:none;}
 	.clsQueryBtns { float:none;}
+
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
@@ -4474,6 +4582,9 @@ label.errorTimeOut {
     overflow: auto;
     width: auto;
 }
+}
+@media (max-width: 629px) {
+.textMsgLocalWrapper { width:91%;}
 }
 
 @media (max-width: 980px) {
@@ -4642,3 +4753,4 @@ label.errorTimeOut {
 
     }
 }
+

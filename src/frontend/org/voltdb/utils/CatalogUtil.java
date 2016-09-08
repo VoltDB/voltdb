@@ -133,6 +133,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -1064,6 +1065,18 @@ public abstract class CatalogUtil {
         return ImmutableMap.<String,String>builder()
                 .put(ClusterSettings.HOST_COUNT, Integer.toString(depl.getCluster().getHostcount()))
                 .put(ClusterSettings.CANGAMANGA, Integer.toString(depl.getSystemsettings().getQuery().getTimeout()))
+                .build();
+    }
+
+    public final static Map<String,String> asPathSettingsMap(DeploymentType depl) {
+        PathsType paths = depl.getPaths();
+        return ImmutableMap.<String,String>builder()
+                .put(PathSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
+                .put(PathSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
+                .put(PathSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
+                .put(PathSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
+                .put(PathSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
+                .put(PathSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
                 .build();
     }
 

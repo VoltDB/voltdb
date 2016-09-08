@@ -386,12 +386,13 @@ public class TestVoltMessageSerialization extends TestCase {
                                            true, false, true);
 
         CompleteTransactionResponseMessage ctrm =
-            new CompleteTransactionResponseMessage(ctm, Long.MAX_VALUE - 4);
+            new CompleteTransactionResponseMessage(ctm);
 
         CompleteTransactionResponseMessage ctrm2 =
             (CompleteTransactionResponseMessage) checkVoltMessage(ctrm);
-        assertEquals(ctrm.getExecutionSiteId(), ctrm.getExecutionSiteId());
         assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
+        assertEquals(ctrm.getSpHandle(), ctrm2.getSpHandle());
+        assertEquals(ctrm.isRestart(), ctrm2.isRestart());
     }
 
     public void testIv2RepairLogRequestMessage() throws IOException

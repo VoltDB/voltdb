@@ -27,12 +27,25 @@ import java.util.Properties;
 import java.util.UUID;
 
 import org.aeonbits.owner.Accessible;
+import org.aeonbits.owner.ConfigFactory;
+import org.voltdb.VoltDB;
 import org.voltdb.utils.Digester;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 public interface Settings extends Accessible {
+    public final static String CONFIG_DIR = "org.voltdb.config.dir";
+
+    public static void initialize(File voltdbroot) {
+        if (ConfigFactory.getProperty(Settings.CONFIG_DIR) == null) try {
+            File confDH = new VoltFile(voltdbroot, VoltDB.CONFIG_DIR).getCanonicalFile();
+            ConfigFactory.setProperty(Settings.CONFIG_DIR, confDH.getPath());
+        } catch (IOException e) {
+            throw new SettingsException("failed to resolve the cluster settings directory", e);
+        }
+    }
 
     default NavigableMap<String, String> asMap() {
         ImmutableSortedMap.Builder<String, String> mb = ImmutableSortedMap.naturalOrder();
@@ -83,5 +96,24 @@ public interface Settings extends Accessible {
             throw new SettingsException("failed to convert properties to a byte array",e);
         }
         return bytes;
+    }
+
+    static File getConfigDir() {
+        final String configDN = ConfigFactory.getProperty(CONFIG_DIR).intern();
+        if (configDN == null || configDN.trim().isEmpty()) {
+            throw new IllegalStateException("property " + CONFIG_DIR + " must be defined");
+        }
+        File configDH = new File(configDN);
+        if (!configDH.exists() && !configDH.mkdirs()) {
+            throw new SettingsException("failed to create " + configDN);
+        }
+        if (   !configDH.isDirectory()
+            || !configDH.canRead()
+            || !configDH.canWrite()
+            || !configDH.canExecute())
+        {
+            throw new SettingsException("cannot access " + configDN);
+        }
+        return configDH;
     }
 }

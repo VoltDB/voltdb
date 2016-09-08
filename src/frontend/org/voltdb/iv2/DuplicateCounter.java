@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -182,6 +183,11 @@ public class DuplicateCounter
         return checkCommon(0, message.isRecovering(), null, message);
     }
 
+    int offer(CompleteTransactionResponseMessage message)
+    {
+        return checkCommon(0, message.isRecovering(), null, message);
+    }
+
     VoltMessage getLastResponse()
     {
         return m_lastResponse;
@@ -190,7 +196,8 @@ public class DuplicateCounter
     @Override
     public String toString()
     {
-        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n", m_txnId,
+        String msg = String.format("DuplicateCounter: txnId: %s, outstanding HSIds: %s\n",
+               TxnEgo.txnIdToString(m_txnId),
                CoreUtils.hsIdCollectionToString(m_expectedHSIds));
         return msg;
     }

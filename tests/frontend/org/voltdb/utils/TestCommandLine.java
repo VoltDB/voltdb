@@ -79,7 +79,6 @@ public class TestCommandLine
         cl.javaExecutable("megajava");
         cl.jmxPort(909);
         cl.jmxHost("notreal");
-
         CommandLine cl2 = cl.makeCopy();
         assertEquals(cl.toString(), cl2.toString());
     }

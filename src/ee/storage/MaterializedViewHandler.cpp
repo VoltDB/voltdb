@@ -290,34 +290,57 @@ namespace voltdb {
         // COUNT(*)
         NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
         NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
-        m_updatedTuple.setNValue(m_groupByColumnCount, existingCount.op_subtract(deltaCount));
-        // Aggregations
+        NValue newCount = existingCount.op_subtract(deltaCount);
+        m_updatedTuple.setNValue(m_groupByColumnCount, newCount);
         int aggOffset = m_groupByColumnCount + 1;
-        int minMaxColumnIndex = 0;
-        for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
-            NValue existingValue = m_existingTuple.getNValue(columnIndex);
-            NValue deltaValue = deltaTuple.getNValue(columnIndex);
-            NValue newValue = existingValue;
-            if (! deltaValue.isNull()) {
-                switch(m_aggTypes[aggIndex]) {
-                    case EXPRESSION_TYPE_AGGREGATE_SUM:
-                    case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                        newValue = existingValue.op_subtract(deltaValue);
-                        break;
-                    case EXPRESSION_TYPE_AGGREGATE_MIN:
-                    case EXPRESSION_TYPE_AGGREGATE_MAX:
-                        if (existingValue.compare(deltaValue) == 0) {
-                            // re-calculate MIN / MAX
-                            newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
-                        }
-                        minMaxColumnIndex++;
-                        break;
-                    default:
-                        assert(false); // Should have been caught when the matview was loaded.
-                        // no break
+        NValue newValue;
+        if (newCount.isZero()) {
+            // no group by key, no rows, aggs will be null except for count().
+            for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                    newValue = ValueFactory::getBigIntValue(0);
                 }
+                else {
+                    newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(columnIndex));
+                }
+                m_updatedTuple.setNValue(columnIndex, newValue);
             }
-            m_updatedTuple.setNValue(columnIndex, newValue);
+        }
+        else {
+            // Aggregations
+            int minMaxColumnIndex = 0;
+            for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+                NValue existingValue = m_existingTuple.getNValue(columnIndex);
+                NValue deltaValue = deltaTuple.getNValue(columnIndex);
+                newValue = existingValue;
+                ExpressionType aggType = m_aggTypes[aggIndex];
+
+                if (! deltaValue.isNull()) {
+                    switch(aggType) {
+                        case EXPRESSION_TYPE_AGGREGATE_SUM:
+                        case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                            newValue = existingValue.op_subtract(deltaValue);
+                            break;
+                        case EXPRESSION_TYPE_AGGREGATE_MIN:
+                        case EXPRESSION_TYPE_AGGREGATE_MAX:
+                            if (existingValue.compare(deltaValue) == 0) {
+                                // re-calculate MIN / MAX
+                                newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
+                            }
+                            break;
+                        default:
+                            assert(false); // Should have been caught when the matview was loaded.
+                            // no break
+                    }
+                }
+
+                if (aggType == EXPRESSION_TYPE_AGGREGATE_MIN
+                    || aggType == EXPRESSION_TYPE_AGGREGATE_MAX) {
+                    minMaxColumnIndex++;
+                }
+
+                m_updatedTuple.setNValue(columnIndex, newValue);
+            }
         }
     }
 
@@ -374,11 +397,13 @@ namespace voltdb {
             if (existingCount.compare(deltaCount) == 0 && m_groupByColumnCount > 0) {
                 m_destTable->deleteTuple(m_existingTuple, fallible);
             }
-            mergeTupleForDelete(deltaTuple);
-            // Shouldn't need to update group-key-only indexes such as the primary key
-            // since their keys shouldn't ever change, but do update other indexes.
-            m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                        m_updatableIndexList, fallible);
+            else {
+                mergeTupleForDelete(deltaTuple);
+                // Shouldn't need to update group-key-only indexes such as the primary key
+                // since their keys shouldn't ever change, but do update other indexes.
+                m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                            m_updatableIndexList, fallible);
+            }
         }
         ec->cleanupExecutorsForSubquery(executorList);
     }
