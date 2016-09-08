@@ -62,6 +62,7 @@ import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -1270,6 +1271,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
+        hostLog.warn("[SpScheduler] current truncation handle: " + m_repairLogTruncationHandle
+                + " (" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + ")");
     }
 
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
@@ -1285,12 +1288,32 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_repairLogTruncationHandle;
     }
 
+    private final List<Exception> m_ll = new LinkedList<>();
     private void setRepairLogTruncationHandle(long newHandle)
     {
+        if (newHandle < m_repairLogTruncationHandle) {
+            hostLog.error("Is leader: " + m_isLeader + ", Invalid spHandle, new " + TxnEgo.txnIdToString(newHandle) +
+                    " old " + TxnEgo.txnIdToString(m_repairLogTruncationHandle));
+            for (Exception e : m_ll) {
+                hostLog.error(Throwables.getStackTraceAsString(e));
+            }
+            throw new RuntimeException("Updating truncation point from " +
+                    TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                    "to" + TxnEgo.txnIdToString(newHandle));
+        }
+        // TODO(xin): DELETE this tracking methods before release.
+        m_ll.add(new RuntimeException("Updating truncation point from " +
+                TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                "to" + TxnEgo.txnIdToString(newHandle)));
+
         assert newHandle >= m_repairLogTruncationHandle : "new handle: " + newHandle + ", repairLog:" + m_repairLogTruncationHandle;
+
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
 
+            // We have to advance the local truncation point on the replica. It's important for
+            // node promotion when there are no missing repair log transactions on the replica.
+            // Because we still want to release the reads if no following writes will come to this replica.
             if (! m_isLeader) {
                 return;
             }
