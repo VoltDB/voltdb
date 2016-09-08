@@ -73,8 +73,8 @@ function start() {
 
     echo "Host list: " ${NODE_LIST}
 
-    # image to run
-    DOCKER_IMAGE="voltdb/voltdb-community"
+    # image to run, if not defined use the latest community image
+    DOCKER_IMAGE=${DOCKER_IMAGE:-"voltdb/voltdb-community"}
 
     # fetch paths used for voltdbroot, custom config and license file in container based on docker image
     DOCKER_DATA_STORE=$(echo $(docker inspect --format '{{range  .Config.Env}}{{println .}}{{end}}' $DOCKER_IMAGE) |  tr ' ' '\n' | grep DIRECTORY_SPEC | sed 's/^.*=//')
