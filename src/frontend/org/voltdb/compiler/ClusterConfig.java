@@ -509,12 +509,13 @@ public class ClusterConfig
         // add all the sites
         int partitionCounter = -1;
 
-        // build the assignment map
+        // build the assignment map, each entry has the lower bound of partition range as key,
+        // the host id as value.
         TreeMap<Integer, Integer> sitesToHostId = Maps.newTreeMap();
         int sitesCounter = 0;
         for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
-            sitesCounter += entry.getValue();
             sitesToHostId.put(sitesCounter, entry.getKey());
+            sitesCounter += entry.getValue();
         }
 
         HashMap<Integer, ArrayList<Integer>> partToHosts =
@@ -527,7 +528,7 @@ public class ClusterConfig
         for (int i = 0; i < getTotalSitesCount(); i++) {
             // serially assign partitions to execution sites.
             int partition = (++partitionCounter) % partitionCount;
-            int hostId = sitesToHostId.floorEntry(i).getValue();
+            int hostId = sitesToHostId.get(sitesToHostId.floorKey(i));
             partToHosts.get(partition).add(hostId);
         }
 

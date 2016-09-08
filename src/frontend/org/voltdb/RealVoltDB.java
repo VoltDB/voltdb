@@ -151,7 +151,6 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
-import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
@@ -791,7 +790,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // Write local sitesPerHost to ZK
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
+            int sitesperhost = readDepl.deployment.getCluster().getSitesperhost();
             registerSitesPerHostToZK(sitesperhost);
 
             if (!isRejoin && !m_joining) {
@@ -1589,7 +1588,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             topo = joinCoordinator.getTopology();
         }
         else if (!startAction.doesRejoin()) {
-            Map<Integer, Integer> sphMap = Maps.newHashMap();
+            Map<Integer, Integer> sphMap = new HashMap<>();
             try {
                 List<String> children;
                     children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
@@ -1869,8 +1868,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception ex) {
                 //Let us get bytes from ZK
             }
-            byte originalDeploymentBytes[] = deploymentBytes;
-            DeploymentType originalDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
             DeploymentType deployment = null;
             try {
                 if (deploymentBytes != null) {
@@ -2072,11 +2069,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // Any other non-enterprise deployment errors will be caught and handled here
                 // (such as <= 0 host count)
                 VoltDB.crashLocalVoltDB(result);
-            }
-
-            if (originalDeployment != null &&
-                    deployment.getCluster().getSitesperhost() != originalDeployment.getCluster().getSitesperhost()) {
-                deploymentBytes = originalDeploymentBytes;
             }
 
             m_catalogContext = new CatalogContext(
