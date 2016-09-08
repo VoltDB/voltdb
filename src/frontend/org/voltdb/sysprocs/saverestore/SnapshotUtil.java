@@ -180,12 +180,12 @@ public class SnapshotUtil {
             JSONStringer stringer = new JSONStringer();
             try {
                 stringer.object();
-                stringer.key("version").value(1);
-                stringer.key("clusterid").value(clusterId);
-                stringer.key("txnId").value(txnId);
-                stringer.key("timestamp").value(timestamp);
-                stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
-                stringer.key("newPartitionCount").value(newPartitionCount);
+                stringer.keySymbolValuePair("version", 1);
+                stringer.keySymbolValuePair("clusterid", clusterId);
+                stringer.keySymbolValuePair("txnId", txnId);
+                stringer.keySymbolValuePair("timestamp", timestamp);
+                stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -198,12 +198,13 @@ public class SnapshotUtil {
                 }
                 stringer.endObject();
 
-                stringer.key("catalogCRC").value(catalogCRC);
+                stringer.keySymbolValuePair("catalogCRC", catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
 
                 extraSnapshotData.writeToSnapshotDigest(stringer);
                 stringer.endObject();
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 throw new IOException(e);
             }
 
@@ -223,18 +224,22 @@ public class SnapshotUtil {
                 public void run() {
                     try {
                         fos.getChannel().force(true);
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e) {
                         throw new RuntimeException(e);
-                    } finally {
+                    }
+                    finally {
                         try {
                             fos.close();
-                        } catch (IOException e) {
+                        }
+                        catch (IOException e) {
                             throw new RuntimeException(e);
                         }
                     }
                 }
             };
-        } finally {
+        }
+        finally {
             if (!success) {
                 f.delete();
             }

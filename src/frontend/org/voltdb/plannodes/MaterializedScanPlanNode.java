@@ -140,7 +140,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         stringer.endObject();
 
         if (m_sortDirection == SortDirectionType.DESC) {
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+            stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(), m_sortDirection.toString());
         }
     }
 

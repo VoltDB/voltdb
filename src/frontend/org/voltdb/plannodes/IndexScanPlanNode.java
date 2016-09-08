@@ -708,12 +708,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
+        stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(), m_sortDirection.toString());
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
-            stringer.key(Members.PURPOSE.name()).value(m_purpose);
+            stringer.keySymbolValuePair(Members.PURPOSE.name(), m_purpose);
         }
-        stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
+        stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
         if (m_searchkeyExpressions.size() > 0) {
             stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
         }

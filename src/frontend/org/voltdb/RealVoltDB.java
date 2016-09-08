@@ -1487,8 +1487,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 JSONStringer stringer = new JSONStringer();
                 stringer.object();
 
-                stringer.key("workingDir").value(System.getProperty("user.dir"));
-                stringer.key("pid").value(CLibrary.getpid());
+                stringer.keySymbolValuePair("workingDir", System.getProperty("user.dir"));
+                stringer.keySymbolValuePair("pid", CLibrary.getpid());
 
                 stringer.key("log4jDst").array();
                 Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
@@ -1496,9 +1496,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Appender appender = (Appender) appenders.nextElement();
                     if (appender instanceof FileAppender){
                         stringer.object();
-                        stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
+                        stringer.keySymbolValuePair("path", new File(((FileAppender) appender).getFile()).getCanonicalPath());
                         if (appender instanceof DailyRollingFileAppender) {
-                            stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                            stringer.keySymbolValuePair("format", ((DailyRollingFileAppender)appender).getDatePattern());
                         }
                         stringer.endObject();
                     }
@@ -1512,9 +1512,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Appender appender = (Appender) appenders.nextElement();
                         if (appender instanceof FileAppender){
                             stringer.object();
-                            stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
+                            stringer.keySymbolValuePair("path", new File(((FileAppender) appender).getFile()).getCanonicalPath());
                             if (appender instanceof DailyRollingFileAppender) {
-                                stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                                stringer.keySymbolValuePair("format", ((DailyRollingFileAppender)appender).getDatePattern());
                             }
                             stringer.endObject();
                         }
@@ -2321,20 +2321,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 stringer.endArray();
             }
-            stringer.key("clientPort").value(m_config.m_port);
-            stringer.key("clientInterface").value(m_config.m_clientInterface);
-            stringer.key("adminPort").value(m_config.m_adminPort);
-            stringer.key("adminInterface").value(m_config.m_adminInterface);
-            stringer.key("httpPort").value(m_config.m_httpPort);
-            stringer.key("httpInterface").value(m_config.m_httpPortInterface);
-            stringer.key("internalPort").value(m_config.m_internalPort);
-            stringer.key("internalInterface").value(m_config.m_internalInterface);
+            stringer.keySymbolValuePair("clientPort", m_config.m_port);
+            stringer.keySymbolValuePair("clientInterface", m_config.m_clientInterface);
+            stringer.keySymbolValuePair("adminPort", m_config.m_adminPort);
+            stringer.keySymbolValuePair("adminInterface", m_config.m_adminInterface);
+            stringer.keySymbolValuePair("httpPort", m_config.m_httpPort);
+            stringer.keySymbolValuePair("httpInterface", m_config.m_httpPortInterface);
+            stringer.keySymbolValuePair("internalPort", m_config.m_internalPort);
+            stringer.keySymbolValuePair("internalInterface", m_config.m_internalInterface);
             String[] zkInterface = m_config.m_zkInterface.split(":");
-            stringer.key("zkPort").value(zkInterface[1]);
-            stringer.key("zkInterface").value(zkInterface[0]);
-            stringer.key("drPort").value(VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
-            stringer.key("drInterface").value(VoltDB.getDefaultReplicationInterface());
-            stringer.key("publicInterface").value(m_config.m_publicInterface);
+            stringer.keySymbolValuePair("zkPort", zkInterface[1]);
+            stringer.keySymbolValuePair("zkInterface", zkInterface[0]);
+            stringer.keySymbolValuePair("drPort", VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+            stringer.keySymbolValuePair("drInterface", VoltDB.getDefaultReplicationInterface());
+            stringer.keySymbolValuePair("publicInterface", m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
@@ -3631,8 +3631,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 JSONStringer js = new JSONStringer();
                 js.object();
                 // Replication role should the be same across the cluster
-                js.key("role").value(getReplicationRole().ordinal());
-                js.key("active").value(m_replicationActive.get());
+                js.keySymbolValuePair("role", getReplicationRole().ordinal());
+                js.keySymbolValuePair("active", m_replicationActive.get());
                 js.endObject();
 
                 getHostMessenger().getZK().setData(VoltZK.replicationconfig,

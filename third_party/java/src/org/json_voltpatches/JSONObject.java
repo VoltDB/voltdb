@@ -134,7 +134,7 @@ public class JSONObject {
     /**
      * The map where the JSONObject's properties are kept.
      */
-    private final Map<String, Object> map = new HashMap<>();
+    private final Map<String, Object> m_map = new HashMap<>();
 
 
     /**
@@ -243,7 +243,7 @@ public class JSONObject {
             return;
         }
         for (Entry<String, Object> entry : map.entrySet()) {
-            this.map.put(entry.getKey(), wrap(entry.getValue()));
+            m_map.put(entry.getKey(), wrap(entry.getValue()));
         }
     }
 
@@ -428,11 +428,13 @@ public class JSONObject {
                 ((String)o).equalsIgnoreCase("false"))) {
             return false;
         }
+
         if (o.equals(Boolean.TRUE) ||
                 (o instanceof String &&
                 ((String)o).equalsIgnoreCase("true"))) {
             return true;
         }
+
         throw new JSONException("JSONObject[" + quote(key) +
                 "] is not a Boolean.");
     }
@@ -549,7 +551,7 @@ public class JSONObject {
         if (length == 0) {
             return null;
         }
-        String[] names = jo.map.keySet().toArray(new String[length]);
+        String[] names = jo.m_map.keySet().toArray(new String[length]);
         return names;
     }
 
@@ -595,7 +597,7 @@ public class JSONObject {
      * @return      true if the key exists in the JSONObject.
      */
     public boolean has(String key) {
-        return this.map.containsKey(key);
+        return m_map.containsKey(key);
     }
 
 
@@ -650,7 +652,7 @@ public class JSONObject {
      * @return An iterator of the keys.
      */
     public Iterator<String> keys() {
-        return this.map.keySet().iterator();
+        return m_map.keySet().iterator();
     }
 
 
@@ -660,7 +662,7 @@ public class JSONObject {
      * @return The number of keys in the JSONObject.
      */
     public int length() {
-        return this.map.size();
+        return m_map.size();
     }
 
 
@@ -672,7 +674,7 @@ public class JSONObject {
      */
     public JSONArray names() {
         JSONArray ja = new JSONArray();
-        for (String key : this.map.keySet()) {
+        for (String key : m_map.keySet()) {
             ja.put(key);
         }
         return ja.length() == 0 ? null : ja;
@@ -712,7 +714,7 @@ public class JSONObject {
      * @return      An object which is the value, or null if there is no value.
      */
     public Object opt(String key) {
-        return key == null ? null : this.map.get(key);
+        return key == null ? null : m_map.get(key);
     }
 
 
@@ -942,7 +944,7 @@ public class JSONObject {
                         }
 
                         Object result = method.invoke(bean, (Object[])null);
-                        map.put(key, wrap(result));
+                        m_map.put(key, wrap(result));
                     }
                 }
             }
@@ -961,7 +963,10 @@ public class JSONObject {
      * @throws JSONException If the key is null.
      */
     public JSONObject put(String key, boolean value) throws JSONException {
-        put(key, value ? Boolean.TRUE : Boolean.FALSE);
+        if (key == null) {
+            throw new JSONException("Null key.");
+        }
+        m_map.put(key, value);
         return this;
     }
 
@@ -1053,7 +1058,7 @@ public class JSONObject {
         }
         if (value != null) {
             testValidity(value);
-            this.map.put(key, value);
+            m_map.put(key, value);
         }
         else {
             remove(key);
@@ -1098,42 +1103,73 @@ public class JSONObject {
         return this;
     }
 
-
-    /**
-     * Produce a string in double quotes with backslash sequences in all the
-     * right places. A backslash will be inserted within </, allowing JSON
-     * text to be delivered in HTML. In JSON text, a string cannot contain a
-     * control character or an unescaped quote or backslash.
-     * @param string A String
-     * @return  A String correctly formatted for insertion in a JSON text.
-     */
-    public static String quote(String string) {
-        if (string == null || string.length() == 0) {
-            return "\"\"";
+    public static String quotable(String string) {
+        if (string == null) {
+            return "";
         }
-
-        char         b;
-        char         c = 0;
+        char         prior = 0;
+        char         current = 0;
         int          i;
         int          len = string.length();
-        StringBuffer sb = new StringBuffer(len + 4);
-        String       t;
 
-        sb.append('"');
-        for (i = 0; i < len; i += 1) {
-            b = c;
-            c = string.charAt(i);
-            switch (c) {
+        // Optimize for the common cases where string contains only
+        // simple text characters -- no escape characters needed --
+        // or at least a long initial run of simple text characters.
+        for (i = 0; i < len; ++i) {
+            prior = current;
+            current = string.charAt(i);
+            if (current < ' ' || (current >= '\u0080' && current < '\u00a0') ||
+                    (current >= '\u2000' && current < '\u2100')) {
+                break;
+            }
+            if (current == '/') {
+                if (prior == '<') {
+                    break;
+                }
+                continue;
+            }
+            switch (current) {
+            default:
+                continue;
+            case '\\':
+            case '"':
+            case '\b':
+            case '\t':
+            case '\n':
+            case '\f':
+            case '\r':
+            }
+            break;
+        }
+
+        if (i == len) {
+            // a string of all simple characters can be
+            // written as is.
+            return string;
+        }
+
+        StringBuilder sb = new StringBuilder(len + 2);
+
+        if (i > 0) {
+            // a non-zero prefix of simple characters can be
+            // appended in bulk.
+            sb.append(string.substring(0, i));
+        }
+        current = prior;
+        for (; i < len; ++i) {
+            prior = current;
+            current = string.charAt(i);
+            switch (current) {
             case '\\':
             case '"':
                 sb.append('\\');
-                sb.append(c);
+                sb.append(current);
                 break;
             case '/':
-                if (b == '<') {
+                if (prior == '<') {
                     sb.append('\\');
                 }
-                sb.append(c);
+                sb.append(current);
                 break;
             case '\b':
                 sb.append("\\b");
@@ -1151,18 +1187,31 @@ public class JSONObject {
                 sb.append("\\r");
                 break;
             default:
-                if (c < ' ' || (c >= '\u0080' && c < '\u00a0') ||
-                               (c >= '\u2000' && c < '\u2100')) {
-                    t = "000" + Integer.toHexString(c);
+                if (current < ' ' || (current >= '\u0080' && current < '\u00a0') ||
+                               (current >= '\u2000' && current < '\u2100')) {
+                    String t = "000" + Integer.toHexString(current);
                     sb.append("\\u" + t.substring(t.length() - 4));
-                } else {
-                    sb.append(c);
+                }
+                else {
+                    sb.append(current);
                 }
             }
         }
-        sb.append('"');
         return sb.toString();
     }
+
+    /**
+     * Produce a string in double quotes with backslash sequences in all the
+     * right places. A backslash will be inserted within </, allowing JSON
+     * text to be delivered in HTML. In JSON text, a string cannot contain a
+     * control character or an unescaped quote or backslash.
+     * @param string A String
+     * @return the string correctly formatted inside double quotes
+     * for insertion in a JSON text.
+     */
+    public static String quote(String string) {
+        return "\"" + quotable(string) + "\"";
+}
 
     /**
      * Remove a name and its value, if present.
@@ -1171,7 +1220,7 @@ public class JSONObject {
      * or null if there was no value.
      */
     public Object remove(String key) {
-        return this.map.remove(key);
+        return m_map.remove(key);
     }
 
     /**
@@ -1181,7 +1230,7 @@ public class JSONObject {
      * @return An ordered set of the keys.
      */
     public Set<String> sortedKeySet() {
-        return new TreeSet<String>(this.map.keySet());
+        return new TreeSet<>(m_map.keySet());
     }
 
     /**
@@ -1310,17 +1359,19 @@ public class JSONObject {
     @Override
     public String toString() {
         try {
-            Iterator<String> keys = keys();
-            StringBuffer sb = new StringBuffer("{");
-
-            while (keys.hasNext()) {
-                if (sb.length() > 1) {
-                    sb.append(',');
-                }
-                Object o = keys.next();
-                sb.append(quote(o.toString()));
-                sb.append(':');
-                sb.append(valueToString(this.map.get(o)));
+            if (m_map.isEmpty()) {
+                return "{}";
+            }
+            StringBuffer sb = new StringBuffer();
+            // This prefix value applies to the first key only
+            String keyprefix = "{\"";
+            for (String key : m_map.keySet()) {
+                sb.append(keyprefix);
+                sb.append(quotable(key));
+                sb.append("\":");
+                sb.append(valueToString(m_map.get(key)));
+                // This prefix value applies to all subsequent keys
+                keyprefix = ",\"";
             }
             sb.append('}');
             return sb.toString();
@@ -1362,43 +1413,37 @@ public class JSONObject {
      * @throws JSONException If the object contains an invalid number.
      */
     String toString(int indentFactor, int indent) throws JSONException {
-        int j;
         int n = length();
         if (n == 0) {
             return "{}";
         }
-        Iterator<String> keys = sortedKeys();
-        StringBuffer sb = new StringBuffer("{");
-        int          newindent = indent + indentFactor;
-        Object       o;
+        Set<Entry<String, Object> > entries = m_map.entrySet();
         if (n == 1) {
-            o = keys.next();
-            sb.append(quote(o.toString()));
-            sb.append(": ");
-            sb.append(valueToString(this.map.get(o), indentFactor,
-                    indent));
-        } else {
-            while (keys.hasNext()) {
-                o = keys.next();
-                if (sb.length() > 1) {
-                    sb.append(",\n");
-                } else {
-                    sb.append('\n');
-                }
-                for (j = 0; j < newindent; j += 1) {
-                    sb.append(' ');
-                }
-                sb.append(quote(o.toString()));
-                sb.append(": ");
-                sb.append(valueToString(this.map.get(o), indentFactor,
-                        newindent));
+            Entry<String, Object> entry = entries.iterator().next();
+            return "{\"" + entry.getKey() + "\": " +
+                    valueToString(entry.getValue(), indentFactor, indent) +
+                    "}";
+        }
+
+        StringBuffer sb = new StringBuffer();
+        int newindent = indent + indentFactor;
+        // This prefix value applies to the first key only
+        String keyprefix = "{\n";
+        for (String key : sortedKeySet()) {
+            sb.append(keyprefix);
+            for (int j = 0; j < newindent; j += 1) {
+                sb.append(' ');
             }
-            if (sb.length() > 1) {
-                sb.append('\n');
-                for (j = 0; j < indent; j += 1) {
-                    sb.append(' ');
-                }
-            }
+            sb.append('"');
+            sb.append(quotable(key));
+            sb.append("\": ");
+            sb.append(valueToString(m_map.get(key), indentFactor, newindent));
+            // This prefix value applies to all subsequent keys
+            keyprefix = ",\n";
+        }
+        sb.append('\n');
+        for (int j = 0; j < indent; j += 1) {
+            sb.append(' ');
         }
         sb.append('}');
         return sb.toString();
@@ -1579,18 +1624,17 @@ public class JSONObject {
       */
      public Writer write(Writer writer) throws JSONException {
         try {
-            boolean  b = false;
-            Iterator<String> keys = keys();
-            writer.write('{');
-
-            while (keys.hasNext()) {
-                if (b) {
-                    writer.write(',');
-                }
-                Object k = keys.next();
-                writer.write(quote(k.toString()));
-                writer.write(':');
-                Object v = this.map.get(k);
+            if (m_map.isEmpty()) {
+                writer.write("{}");
+                return writer;
+            }
+            // This prefix value applies to the first key only
+            String keyprefix = "{\"";
+            for (Entry<String, Object> entry : m_map.entrySet()) {
+                writer.write(keyprefix);
+                writer.write(quotable(entry.getKey()));
+                writer.write("\":");
+                Object v = entry.getValue();
                 if (v instanceof JSONObject) {
                     ((JSONObject)v).write(writer);
                 }
@@ -1600,7 +1644,8 @@ public class JSONObject {
                 else {
                     writer.write(valueToString(v));
                 }
-                b = true;
+                // This prefix value applies to all subsequent keys
+                keyprefix = ",\"";
             }
             writer.write('}');
             return writer;

@@ -33,9 +33,10 @@ import org.voltdb.types.ExpressionType;
  */
 public class TupleValueExpression extends AbstractValueExpression {
 
-    public enum Members {
-        COLUMN_IDX,
-        TABLE_IDX,  // for JOIN queries only, 0 for outer table, 1 for inner table
+    private static class Members {
+        static final String COLUMN_IDX = "COLUMN_IDX";
+        // used for JOIN queries only, 0 for outer table, 1 for inner table
+        static final String TABLE_IDX = "TABLE_IDX";
     }
 
     private int m_columnIndex = -1;
@@ -358,18 +359,18 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
+        stringer.keySymbolValuePair(Members.COLUMN_IDX, m_columnIndex);
         if (m_tableIdx > 0) {
-            stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
+            stringer.keySymbolValuePair(Members.TABLE_IDX, m_tableIdx);
         }
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan)
             throws JSONException {
-        m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
-        if (obj.has(Members.TABLE_IDX.name())) {
-            m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
+        m_columnIndex = obj.getInt(Members.COLUMN_IDX);
+        if (obj.has(Members.TABLE_IDX)) {
+            m_tableIdx = obj.getInt(Members.TABLE_IDX);
         }
         if (tableScan != null) {
             m_tableAlias = tableScan.getTableAlias();
