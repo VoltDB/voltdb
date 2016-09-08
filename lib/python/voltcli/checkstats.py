@@ -186,7 +186,7 @@ def check_clients(runner):
             bytes += r[6]
             msgs += r[7]
             trans += r[8]
-        runner.info('Outstanding transactions=%d, Outstanding buffer bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
+        runner.info('Outstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         time.sleep(1)
