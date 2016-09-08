@@ -117,7 +117,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         sb.append(" FOR TXN ID: ");
         sb.append(m_txnId);
         sb.append(" SPHANDLE: ");
-        sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(TxnEgo.debugTxnId(m_spHandle));
         sb.append(" SPI ");
         sb.append(CoreUtils.hsIdToString(m_spiHSId));
         sb.append(" ISRESTART: ");

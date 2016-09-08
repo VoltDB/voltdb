@@ -174,6 +174,10 @@ final public class TxnEgo {
             TxnEgo.getPartitionId(txnId) + ")";
     }
 
+    public static String debugTxnId(long txnId) {
+        return txnId + TxnEgo.txnIdToString(txnId);
+    }
+
     public static String txnIdCollectionToString(Collection<Long> ids) {
         List<String> idstrings = new ArrayList<String>();
         for (Long id : ids) {

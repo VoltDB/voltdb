@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.TxnEgo;
 
 /**
  * Message from an execution site which is participating in a transaction
@@ -265,7 +266,7 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
         sb.append(", SP HANDLE: ");
-        sb.append(m_spHandle);
+        sb.append(TxnEgo.debugTxnId(m_spHandle));
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");

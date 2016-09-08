@@ -143,7 +143,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append(") FOR TXN ");
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append("\n SP HANDLE: ");
-        sb.append(TxnEgo.txnIdToString(getSpHandle()));
+        sb.append(TxnEgo.debugTxnId(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
 
         sb.append("\n  HASH: " + String.valueOf(m_hash));

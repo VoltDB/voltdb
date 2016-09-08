@@ -19,7 +19,9 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -30,22 +32,25 @@ public class BufferedReadLog
     public static class Item {
         final InitiateResponseMessage m_initiateMsg;
         final FragmentResponseMessage m_fragmentMsg;
+        final long m_txnId;
 
         Item(InitiateResponseMessage msg) {
             m_initiateMsg = msg;
             m_fragmentMsg = null;
+            m_txnId = Long.MIN_VALUE;
         }
 
-        Item(FragmentResponseMessage msg) {
+        Item(FragmentResponseMessage msg, long txnId) {
             m_initiateMsg = null;
             m_fragmentMsg = msg;
+            m_txnId = txnId;
         }
 
-        long getSpHandle() {
+        long getTxnId() {
             if (m_initiateMsg != null) {
                 return m_initiateMsg.getSpHandle();
             }
-            return m_fragmentMsg.getSpHandle();
+            return m_txnId;
         }
 
         long getResponseHSId() {
@@ -65,9 +70,9 @@ public class BufferedReadLog
         @Override
         public String toString() {
             if (m_initiateMsg != null) {
-                return "Item: Init";
+                return "Buffered read msg: " + m_initiateMsg.toString();
             }
-            return "Item: Frag";
+            return "Buffered read msg: " + m_fragmentMsg.toString();
         }
     }
 
@@ -85,9 +90,9 @@ public class BufferedReadLog
         offerInternal(mailbox, new Item(msg), handle);
     }
 
-    public void offer(Mailbox mailbox, FragmentResponseMessage msg, long handle)
+    public void offer(Mailbox mailbox, FragmentResponseMessage msg, long txnId, long handle)
     {
-        offerInternal(mailbox, new Item(msg), handle);
+        offerInternal(mailbox, new Item(msg, txnId), handle);
     }
 
     //  SPI offers a new message.
@@ -99,11 +104,10 @@ public class BufferedReadLog
 
     public void releaseBufferedReads(Mailbox mailbox, long spHandle)
     {
-
         Deque<Item> deq = m_bufferedReads;
         Item item = null;
         while ((item = deq.peek()) != null) {
-            if (item.getSpHandle() <= spHandle) {
+            if (item.getTxnId() <= spHandle) {
                 // when the sp reads' handle is less equal than truncation handle
                 // we know any previous write has been confirmed and it's safe to release.
                 mailbox.send(item.getResponseHSId(), item.getMessage());
@@ -112,5 +116,16 @@ public class BufferedReadLog
                 break;
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("BufferedReadLog contents:");
+        Iterator<Item> itr = m_bufferedReads.iterator();
+        for(int i = 0; itr.hasNext(); i++)  {
+            sb.append("           ").append(i).append(":").append(itr.next().toString()).append("\n");
+        }
+        return sb.toString();
     }
 }
