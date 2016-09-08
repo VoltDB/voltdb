@@ -1,4 +1,4 @@
-package custom_import_formatter.formatter;
+package custom_formatter.formatter;
 
 import java.util.Properties;
 

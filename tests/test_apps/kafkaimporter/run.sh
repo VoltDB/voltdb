@@ -60,7 +60,8 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     ant all
-    cp exampleformatter.jar $VOLTDB_BASE/bundles
+    cp formatter.jar $VOLTDB_BASE/bundles
+    cp formatter.jar ~/workspace/voltdb/bundles
 }
 
 # compile the procedure and client jarfiles if they don't exist

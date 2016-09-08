@@ -1,15 +1,11 @@
-package custom_import_formatter.formatter;
+package custom_formatter.formatter;
 
 import java.util.Properties;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.importer.formatter.Formatter;
-//import org.json.simple.JSONObject;
-//import org.json.simple.JSONArray;
-//import org.json.simple.parser.ParseException;
-//import org.json.simple.parser.JSONParser;
 import org.voltdb.importer.formatter.FormatException;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
 public class ExampleFormatter implements Formatter<String> {
     /**
@@ -31,33 +27,39 @@ public class ExampleFormatter implements Formatter<String> {
      */
     @Override
     public Object[] transform(String sourceData) throws FormatException {
+        Object[] objs = {"", "", "", "", ""};
 
-//        obj = new JSONObject();
-//        try {
-//            obj.put("seq", seq);
-//            obj.put("instance_id", instance_id);
-//            obj.put("event_type_id", event_type_id);
-//            obj.put("event_date", event_date);
-//            obj.put("trans",  trans);
-
+        JSONParser parser = new JSONParser();
         JSONObject jsonObj = null;
-        String seq = null;
-        String instance_id = null;
-        String event_type_id = null;
-        String event_date = null;
-        String trans = null;
+        Object seq = null;
+        Object instance_id = null;
+        Object event_type_id = null;
+        Object event_date = null;
+        Object trans = null;
+        System.out.println(sourceData);
         try {
-            jsonObj = new JSONObject(sourceData);
-             seq = (String) jsonObj.get("seq");
-             instance_id = (String) jsonObj.get("instance_id");
-             event_type_id = (String) jsonObj.get("event_type_id");
-             event_date = (String) jsonObj.get("event_date");
-             trans = (String) jsonObj.get("trans");
-        } catch (JSONException e) {
-            // TODO Auto-generated catch block
+            Object obj = parser.parse(sourceData);
+            jsonObj = (JSONObject) obj;
+            //jsonObj = new JSONObject(sourceData);
+            seq = jsonObj.get("seq");
+            instance_id =  jsonObj.get("instance_id");
+            event_type_id = jsonObj.get("event_type_id");
+            event_date = jsonObj.get("event_date");
+            trans = jsonObj.get("trans");
+            System.out.println(sourceData);
+            System.out.println("\t" + seq);
+            System.out.println("\t" + instance_id);
+            System.out.println("\t" + event_type_id);
+            System.out.println("\t" + event_date);
+            System.out.println("\t" + trans);
+            objs[0] = seq;
+            objs[1] = instance_id;
+            objs[2] = event_type_id;
+            objs[3] = event_date;
+            objs[4] = trans;
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        Object[] objs = {seq, instance_id, event_type_id, event_date, trans};
-        return objs;
+		return objs;
     }
 }

@@ -3,7 +3,7 @@
 
     <property name="procedures.dir"    value="${basedir}/db/procedures"/>
     <property name="clientsrc.dir"     value="${basedir}/client/kafkaimporter"/>
-    <property name="formattersrc.dir"  value="${basedir}/custom_import_formatter/formatter"/>
+    <property name="formattersrc.dir"  value="${basedir}/custom_formatter/formatter"/>
 
     <property name="build.dir"              value="build"/>
     <property name="classes.dir"            value="${build.dir}/classes"/>
@@ -22,7 +22,7 @@
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
         <delete file="${jar.dir}/client.jar"/>
-        <delete file="${jar.dir}/exampleformatter.jar"/>
+        <delete file="${jar.dir}/formatter.jar"/>
         <delete file="${jar.dir}/sp.jar"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
@@ -33,9 +33,13 @@
          <include name="voltdb*.jar"/>
        </fileset>
        <fileset dir="${basedir}/../../../lib">
-           <!-- <include name="voltdbclient*.jar"/> -->
-           <!-- <include name="kafka-clients-0.8.2.1.jar"/> -->
            <include name="*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}">
+           <include name="gson-2.2.2.jar"/>
+       </fileset>
+       <fileset dir="${basedir}">
+           <include name="json-simple-1.1.1.jar"/>
        </fileset>
     </path>
 
@@ -73,13 +77,10 @@
     </target>
 
 	<target name="formatter" depends="formatter-compile">
-        <jar destfile="exampleformatter.jar" basedir="${formatterclasses.dir}">
-            <!--
-                 <include name="ExampleFormatter.class"/>
-                <include name="ExampleFormatterFactory.class"/>
-             -->
+        <!-- <copy file="gson-classes" todir="${formatterclasses.dir}"/> -->
+        <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
             <manifest>
-                <attribute name="Bundle-Activator" value="custom_import_formatter.formatter.ExampleFormatterFactory" />
+                <attribute name="Bundle-Activator" value="custom_formatter.formatter.ExampleFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="Example Formatter OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="ExampleFormatter" />
@@ -87,5 +88,7 @@
                 <attribute name="DynamicImport-Package" value="*" />
             </manifest>
         </jar>
+        <copy file="formatter.jar" todir="${basedir}/../../../bundles"/>
+        <copy file="formatter.jar" todir="${basedir}/../../../../pro/obj/pro/voltdb-ent-6.6/bundles"/>
     </target>
 </project>
