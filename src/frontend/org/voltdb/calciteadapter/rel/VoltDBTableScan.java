@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.rel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,22 +11,26 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.RexConverter;
+import org.voltdb.calciteadapter.VoltDBConvention;
+import org.voltdb.calciteadapter.VoltDBTable;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 
-class VoltDBTableScan extends TableScan implements VoltDBRel {
+public class VoltDBTableScan extends TableScan implements VoltDBRel {
 
     private final VoltDBTable m_voltDBTable;
     private final RexProgram m_program;
 
-    protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
+    public VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable) {
           super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
           this.m_voltDBTable = voltDBTable;
           m_program = null;
     }
+
     protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,
             VoltDBTable voltDBTable, RexProgram program) {
           super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
@@ -58,7 +62,7 @@ class VoltDBTableScan extends TableScan implements VoltDBRel {
         SeqScanPlanNode sspn = new SeqScanPlanNode();
         List<String> qualName = table.getQualifiedName();
         sspn.setTargetTableAlias(qualName.get(0));
-        sspn.setTargetTableName(m_voltDBTable.m_catTable.getTypeName());
+        sspn.setTargetTableName(m_voltDBTable.getCatTable().getTypeName());
         List<AbstractExpression> predList = new ArrayList<>();
         RexLocalRef condition = m_program.getCondition();
         if (condition != null) {

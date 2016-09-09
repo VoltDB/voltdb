@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.rel;
 
 import java.util.Set;
 
@@ -14,6 +14,7 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -23,7 +24,7 @@ public class VoltDBJoin extends Join implements VoltDBRel {
 
     final RexProgram m_program;
 
-    protected VoltDBJoin(
+    public VoltDBJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode left,

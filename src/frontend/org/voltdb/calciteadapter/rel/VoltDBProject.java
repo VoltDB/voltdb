@@ -1,4 +1,4 @@
-package org.voltdb.calciteadapter;
+package org.voltdb.calciteadapter.rel;
 
 import java.util.List;
 
@@ -13,12 +13,14 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.Util;
+import org.voltdb.calciteadapter.RexConverter;
+import org.voltdb.calciteadapter.VoltDBConvention;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
 import com.google.common.base.Supplier;
 
-class VoltDBProject extends Project implements VoltDBRel {
+public class VoltDBProject extends Project implements VoltDBRel {
 
     public VoltDBProject(
             RelOptCluster cluster,

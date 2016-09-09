@@ -1,6 +1,5 @@
 package org.voltdb.calciteadapter;
 
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,16 +15,18 @@ import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.Schema.TableType;
-import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
+import org.voltdb.calciteadapter.rel.VoltDBPartitionedTableScan;
+import org.voltdb.calciteadapter.rel.VoltDBTableScan;
+import org.voltdb.calciteadapter.rel.VoltDBTableScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
 
-class VoltDBTable implements TranslatableTable {
+public class VoltDBTable implements TranslatableTable {
 
-    org.voltdb.catalog.Table m_catTable;
+    final private org.voltdb.catalog.Table m_catTable;
 
     public VoltDBTable(org.voltdb.catalog.Table table) {
         m_catTable = table;
@@ -54,7 +55,7 @@ class VoltDBTable implements TranslatableTable {
     @Override
     public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         FieldInfoBuilder builder = typeFactory.builder();
-        List<Column> columns = CatalogUtil.getSortedCatalogItems(m_catTable.getColumns(), "index");
+        List<Column> columns = CatalogUtil.getSortedCatalogItems(getCatTable().getColumns(), "index");
         for (Column catColumn : columns) {
             VoltType vt = VoltType.get((byte)catColumn.getType());
             RelDataType rdt = toRelDataType(typeFactory, vt, catColumn.getSize());
@@ -93,6 +94,14 @@ class VoltDBTable implements TranslatableTable {
 
     @Override
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
-        return new VoltDBTableScan(context.getCluster(), relOptTable, this);
+        if (getCatTable().getIsreplicated()) {
+            return new VoltDBTableScan(context.getCluster(), relOptTable, this);
+        }
+
+        return new VoltDBPartitionedTableScan(context.getCluster(), relOptTable, this);
+    }
+
+    public org.voltdb.catalog.Table getCatTable() {
+        return m_catTable;
     }
 }

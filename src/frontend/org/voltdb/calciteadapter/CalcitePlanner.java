@@ -1,28 +1,8 @@
 package org.voltdb.calciteadapter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalCalc;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.rules.CalcMergeRule;
-import org.apache.calcite.rel.rules.FilterCalcMergeRule;
-import org.apache.calcite.rel.rules.FilterToCalcRule;
-import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -30,7 +10,8 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.Programs;
-import org.apache.calcite.util.Pair;
+import org.voltdb.calciteadapter.rel.VoltDBRel;
+import org.voltdb.calciteadapter.rules.VoltDBRules;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -49,165 +30,6 @@ public class CalcitePlanner {
         }
 
         return rootSchema;
-    }
-
-    // unneeded for now???
-    static class VoltDBProjectRule extends ConverterRule {
-
-        private static final VoltDBProjectRule INSTANCE = new VoltDBProjectRule();
-
-        private VoltDBProjectRule() {
-          super(LogicalProject.class, RelOptUtil.PROJECT_PREDICATE, Convention.NONE,
-              VoltDBConvention.INSTANCE, "VoltDBProjectRule");
-        }
-
-        @Override
-        public RelNode convert(RelNode rel) {
-          final LogicalProject project = (LogicalProject) rel;
-          return VoltDBProject.create(
-              convert(project.getInput(),
-                  project.getInput().getTraitSet()
-                      .replace(VoltDBConvention.INSTANCE)),
-              project.getProjects(),
-              project.getRowType());
-        }
-      }
-
-    private static class VoltDBCalcScanMergeRule extends RelOptRule {
-
-        public static final VoltDBCalcScanMergeRule INSTANCE = new VoltDBCalcScanMergeRule();
-
-        private VoltDBCalcScanMergeRule() {
-            super(operand(LogicalCalc.class, operand(VoltDBTableScan.class, none())));
-        }
-
-        @Override
-        public void onMatch(RelOptRuleCall call) {
-            LogicalCalc calc = call.rel(0);
-            VoltDBTableScan scan = call.rel(1);
-            call.transformTo(scan.copy(calc.getProgram()));
-        }
-    }
-
-    static class VoltDBJoinRule extends ConverterRule {
-
-        public static final VoltDBJoinRule INSTANCE = new VoltDBJoinRule();
-
-        VoltDBJoinRule() {
-            super(
-                    LogicalJoin.class,
-                    Convention.NONE,
-                    VoltDBConvention.INSTANCE,
-                    "VoltDBJoinRule");
-        }
-
-        @Override public RelNode convert(RelNode rel) {
-            LogicalJoin join = (LogicalJoin) rel;
-            List<RelNode> newInputs = new ArrayList<>();
-            for (RelNode input : join.getInputs()) {
-              if (!(input.getConvention() instanceof VoltDBConvention)) {
-                input =
-                    convert(
-                        input,
-                        input.getTraitSet()
-                            .replace(VoltDBConvention.INSTANCE));
-              }
-              newInputs.add(input);
-            }
-            final RelOptCluster cluster = join.getCluster();
-            final RelTraitSet traitSet =
-                join.getTraitSet().replace(VoltDBConvention.INSTANCE);
-            final RelNode left = newInputs.get(0);
-            final RelNode right = newInputs.get(1);
-            if (join.getJoinType() != JoinRelType.INNER) {
-                return null;
-            }
-            RelNode newRel;
-              newRel = new VoltDBJoin(
-                  cluster,
-                  traitSet,
-                  left,
-                  right,
-//                  join.getInput(0),
-//                  join.getInput(1),
-                  join.getCondition(),
-                  join.getVariablesSet(),
-                  join.getJoinType());
-            return newRel;
-          }
-      }
-
-
-    private static class VoltDBProjectJoinMergeRule extends RelOptRule {
-
-        public static final VoltDBProjectJoinMergeRule INSTANCE = new VoltDBProjectJoinMergeRule();
-
-        private VoltDBProjectJoinMergeRule() {
-            super(operand(VoltDBProject.class, operand(VoltDBJoin.class, any())));
-        }
-
-        @Override
-        public void onMatch(RelOptRuleCall call) {
-            VoltDBProject proj= call.rel(0);
-            VoltDBJoin join = call.rel(1);
-
-            RexBuilder rexBuilder = proj.getCluster().getRexBuilder();
-            RexProgramBuilder rpb = new RexProgramBuilder(join.getRowType(), rexBuilder);
-
-            int i = 0;
-            for (Pair<RexNode, String> item : proj.getNamedProjects()) {
-                rpb.addProject(item.left, item.right);
-            }
-            call.transformTo(join.copy(rpb.getProgram()));
-        }
-
-    }
-
-  private static class VoltDBCalcJoinMergeRule extends RelOptRule {
-
-      public static final VoltDBCalcJoinMergeRule INSTANCE = new VoltDBCalcJoinMergeRule();
-
-      private VoltDBCalcJoinMergeRule() {
-          super(operand(LogicalCalc.class, operand(VoltDBJoin.class, any())));
-      }
-
-      @Override
-      public void onMatch(RelOptRuleCall call) {
-          LogicalCalc calc = call.rel(0);
-          VoltDBJoin join = call.rel(1);
-
-          call.transformTo(join.copy(calc.getProgram()));
-      }
-
-  }
-
-  private static class VoltDBRules {
-        //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
-        //public static final RelOptRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectScanMergeRule();
-
-        public static List<RelOptRule> getRules() {
-            List<RelOptRule> rules = new ArrayList<>();
-
-            rules.add(VoltDBCalcScanMergeRule.INSTANCE);
-            rules.add(VoltDBProjectRule.INSTANCE);
-            rules.add(VoltDBProjectRule.INSTANCE);
-            rules.add(VoltDBJoinRule.INSTANCE);
-
-            rules.add(VoltDBCalcJoinMergeRule.INSTANCE);
-
-            // We don't actually handle this.
-            //rules.add(VoltDBProjectJoinMergeRule.INSTANCE);
-
-            rules.add(CalcMergeRule.INSTANCE);
-            rules.add(FilterCalcMergeRule.INSTANCE);
-            rules.add(FilterToCalcRule.INSTANCE);
-            rules.add(ProjectCalcMergeRule.INSTANCE);
-            rules.add(ProjectToCalcRule.INSTANCE);
-            rules.add(ProjectToCalcRule.INSTANCE);
-
-
-            return rules;
-        }
     }
 
     private static Planner getPlanner(SchemaPlus schema) {

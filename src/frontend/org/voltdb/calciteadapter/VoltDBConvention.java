@@ -6,8 +6,9 @@ import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.RelTraitSet;
+import org.voltdb.calciteadapter.rel.VoltDBRel;
 
-enum VoltDBConvention implements Convention {
+public enum VoltDBConvention implements Convention {
     INSTANCE;
 
     /** Cost of an VoltDB node versus implementing an equivalent node in a
