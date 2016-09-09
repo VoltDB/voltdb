@@ -267,7 +267,7 @@ label.ccErrorMsg {
 	font-size: 16px;
 	width: 73px;
 }
-.clusterDBName {
+.clusterDBName, .serverDBName {
 	font-weight: bold;
 	font-size: 16px;
 	color: #68A81A;
@@ -612,7 +612,7 @@ table td.tdROle label.error {
   overflow-y:auto;
 	height:211px;
 }
-.clusterConfig {
+.clusterConfig,.serverConfig {
 	background: #e4e4e4;
 	margin: 0 15px 0 15px;
 	padding-bottom: 15px;
@@ -620,7 +620,7 @@ table td.tdROle label.error {
 	border-right: 1px solid #CCCCCC;
 	border-bottom: 1px solid #CCCCCC;
 }
-.clusterConfigLeft {
+.clusterConfigLeft,.serverConfigWrap {
 	padding: 0 0 0 5px;
 }
 .clusterConfigRight {
@@ -751,7 +751,7 @@ ul.addServerList li:nth-child(1) {
 	position: relative;
 	top: -2px;
 }
-.clusterConfigWrapper {
+.clusterConfigWrapper, .serverConfigWrapper {
 	background-color: #f5f6f6;
 	padding: 15px 20px;
 	margin: 15px 0 0 0;
@@ -822,7 +822,8 @@ ul.addServerList li:nth-child(1) {
 	height: 53px;
 	position: relative;
 	background: #fbfbfb;
-	border-bottom: 1px solid #aaa;
+	border: 1px solid #aaa;
+	border-bottom:none;
 }
 .mainContent h1 {
 	padding: 18px 0 0 20px;
@@ -843,6 +844,7 @@ ul.addServerList li:nth-child(1) {
 .adminTbl tr {
 	border-bottom: 1px solid #CCCCCC;
 }
+.adminTbl tr:last-child {border-bottom:none;}
 .adminTbl th {
 	margin: 0;
 	padding: 15px 25px 15px 20px;
@@ -1749,6 +1751,14 @@ color: grey;
  }
 
 /**************Server List Ends******************/
+
+/******************* Database Configuration ***************************/
+.wrapOverview {overflow: hidden;padding: 20px;background: #F1F1F1; border:1px solid #CCCCCC;	}
+.mainTblLeft {float: left; width: 49%; background: #FFF; border:1px solid #CCCCCC;}
+.mainTblRight { float:right; background:#fff;width:49%; border:1px solid #CCCCCC;}
+.serverHeadText {font-weight: bold; font-size: 16px; }
+.serverDB { float: left;cursor: pointer; margin-left:5px;}
+/******************* Database Configuration end ***************************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
 .form-horizontal .control-label {
@@ -1798,7 +1808,7 @@ ul.nav li:nth-child(1) {
 
 }
 @media (max-width: 991px) {
-.clusterConfigLeft {
+.clusterConfigLeft,.serverConfigWrap {
 	padding: 0;
 }
 .clusterConfigRight {
