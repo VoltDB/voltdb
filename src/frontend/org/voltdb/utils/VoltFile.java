@@ -16,7 +16,6 @@
  */
 package org.voltdb.utils;
 
-import com.google_voltpatches.common.base.Throwables;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -26,6 +25,8 @@ import java.nio.channels.FileChannel;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /*
  * Extend the File class and override its constructors to allow a property to be specified
@@ -84,7 +85,7 @@ public class VoltFile extends File {
             throw new IOException("\"" + m_root + "\" exists but is not writable");
         }
         if (!m_root.canExecute()) {
-            throw new IOException("\"" + m_root + "\" exists but is not writable");
+            throw new IOException("\"" + m_root + "\" exists but is not executable");
         }
     }
 
