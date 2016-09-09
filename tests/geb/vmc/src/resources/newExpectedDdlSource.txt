@@ -1,0 +1,9 @@
+# Expected DDL Source: (when running the default GEB VMC
+# test server; see ../../server/run_voltdb_server.sh)
+
+file -inlinebatch END_OF_BATCH
+CREATE TABLE NAMENAME (
+   NAME integer
+);
+
+END_OF_BATCH
