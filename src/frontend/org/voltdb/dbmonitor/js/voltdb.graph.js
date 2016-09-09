@@ -1080,10 +1080,13 @@
             var memoryDetailsArrMin = []
             var memoryDetailsArrDay = []
 
+            if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             if(localStorage.memoryDetailsMin != undefined){
                 memoryDetailsArrMin = JSON.parse(localStorage.memoryDetailsMin)
             } else {
-                memoryDetailsArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemMin, 'timestamp', 'physicalMemory'))
+                memoryDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemMin, 'timestamp', 'physicalMemory'))
                 memoryDetailsArrMin = JSON.parse(memoryDetailsArrMin)
             }
 
@@ -1105,7 +1108,7 @@
             if(monitor.memFirstData){
                 dataMem = []
                 for(var i = 0; i< memoryDetailsArr.length; i++){
-                    sliceFirstData(monitor.memData, dataView.Seconds);
+                    sliceFirstData(dataMem, dataView.Seconds);
                     dataMem.push({"x": new Date(memoryDetailsArr[i].timestamp),
                         "y": memoryDetailsArr[i].physicalMemory
                     })
@@ -1113,7 +1116,7 @@
 
                 dataMemMin = []
                 for(var j = 0; j< memoryDetailsArrMin.length; j++){
-                    sliceFirstData(monitor.memDataMin, dataView.Minutes);
+                    sliceFirstData(dataMemMin, dataView.Minutes);
                     dataMemMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
                         "y": memoryDetailsArrMin[j].physicalMemory
                     })
@@ -1121,15 +1124,14 @@
 
                 dataMemDay = []
                 for(var k = 0; k< memoryDetailsArrDay.length; k++){
-                    sliceFirstData(monitor.memDataDay, dataView.Days);
+                    sliceFirstData(dataMemDay, dataView.Days);
                     dataMemDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
                         "y": memoryDetailsArrDay[k].physicalMemory
                     })
                 }
             }
 
-            if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
-                return;
+
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
             if (memTimeStamp >= monitor.memMaxTimeStamp) {
@@ -1251,7 +1253,6 @@
                         "y": transDetailsArr[i].transaction
                     })
                 }
-
                 datatransMin = []
                 for(var j = 0; j< transDetailsArrMin.length; j++){
                     sliceFirstData(datatransMin, dataView.Minutes);
@@ -1319,17 +1320,17 @@
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsMin = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
+                        transDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                     }
-                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
 
                 if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsDay = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
+                        transDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                     }
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
@@ -1778,6 +1779,7 @@
                 drDetailsArrDay =  JSON.stringify(MonitorGraphUI.convertDataFormat(drDataDay, 'timestamp', 'outstandingTxn'))
                 drDetailsArrDay = JSON.parse(drDetailsArrDay)
             }
+
             if(localStorage.drDetails != undefined){
                 drDetailsArr = JSON.parse(localStorage.drDetails)
             } else {
@@ -1916,6 +1918,7 @@
             if(monitor.cmdLogFirstData){
                 cmdLogData = []
                 for(var i = 0; i< cmdLogArr.length; i++){
+                    sliceFirstData(cmdLogData, dataView.Seconds);
                     cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
                         "y": cmdLogArr[i].outstandingTxn
                     })
@@ -1923,6 +1926,7 @@
 
                 cmdLogDataMin = []
                 for(var j = 0; j< cmdLogArrMin.length; j++){
+                    sliceFirstData(cmdLogDataMin, dataView.Minutes);
                     cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
                         "y": cmdLogArrMin[j].outstandingTxn
                     })
@@ -1930,6 +1934,7 @@
 
                 cmdLogDataDay = []
                 for(var k = 0; k< cmdLogArrDay.length; k++){
+                    sliceFirstData(cmdLogDataDay, dataView.Days);
                     cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
                         "y": cmdLogArrDay[k].outstandingTxn
                     })
