@@ -168,7 +168,8 @@
         <p>Could not connect to the host</p>
 
 		</div>
-       
+        <!--<div class="btnSpelled">-->
+    <!--<button id="" type="button" class="btn">OK</button></div>-->
  </div>
     </div>
   </div>
@@ -182,7 +183,9 @@
                           <span class="serverIcon">Servers</span>
                           </div>
                           <div class="addServer ContentServerRight">
-                             <button id="btnAddServerOption" class="btnAddServer" type="button" data-toggle="modal" data-target="#addServer">
+                          <!--<a class="addServer" id="btnAddServer" href="javascript:void(0);"data-toggle="modal" data-target="#addServer"> <span class="plus"></span>Add Server</a> </div>-->
+                          <div class="dropdown">
+                              <button id="btnAddServerOption" class="btnAddServer" type="button" data-toggle="modal" data-target="#addServer">
                               <span class="plus"></span> Add Server
                               </button>
                           </div>
@@ -201,8 +204,7 @@
         <div class="clear"></div>
       </div>
 
-            
-            <div class="row">
+ <div class="row">
             <div class="col-md-12">
             <div class="clusterConfigWrapper" style="">
             
@@ -413,6 +415,7 @@
               </tr>
               <tr class="child-row-5 subLabelRow">
                 <td class="configLabel">Heartbeat time out </td>
+
                 <td align="right" class="heartBeatTd">
                   <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
                   <input id="txtHeartbeatTimeout" name="txtHeartbeatTimeout" type="text" value="" class="overviewInputText">
@@ -580,7 +583,7 @@
            
             </div>
             </div>
-      </div>	
+      </div>
     </div>
   </div>
 <div class="footer" id="mainFooter">
@@ -705,7 +708,6 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Create Database End --> 
-
 <!-- Create Server -->
 <div id="createServer" class="modal custom fade" role="dialog">
   <div class="modal-dialog modal-dialog-center modifiedModalCreateDB"> 
@@ -725,7 +727,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
     </div>
   </div>
 </div>
-<!-- Create Server End -->         
+<!-- Create Server End -->           
 
 <!-- Add Server -->
 <div id="addServer" class="modal custom fade" role="dialog" data-serverid="">
