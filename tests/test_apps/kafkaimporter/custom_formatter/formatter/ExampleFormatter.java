@@ -36,22 +36,21 @@ public class ExampleFormatter implements Formatter<String> {
         Object event_type_id = null;
         Object event_date = null;
         Object trans = null;
-        System.out.println(sourceData);
+
         try {
             Object obj = parser.parse(sourceData);
             jsonObj = (JSONObject) obj;
-            //jsonObj = new JSONObject(sourceData);
             seq = jsonObj.get("seq");
             instance_id =  jsonObj.get("instance_id");
             event_type_id = jsonObj.get("event_type_id");
             event_date = jsonObj.get("event_date");
             trans = jsonObj.get("trans");
-            System.out.println(sourceData);
-            System.out.println("\t" + seq);
-            System.out.println("\t" + instance_id);
-            System.out.println("\t" + event_type_id);
-            System.out.println("\t" + event_date);
-            System.out.println("\t" + trans);
+            // System.out.println(sourceData);
+            // System.out.println("\t" + seq);
+            // System.out.println("\t" + instance_id);
+            // System.out.println("\t" + event_type_id);
+            // System.out.println("\t" + event_date);
+            // System.out.println("\t" + trans);
             objs[0] = seq;
             objs[1] = instance_id;
             objs[2] = event_type_id;

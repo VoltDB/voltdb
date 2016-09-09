@@ -21,6 +21,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/*
+ * Write n rows of random data (per schema) to m topics, one thread per topic.
+ *
+ * Lots of options to control number of topics, number of rows, cycles, etc.
+ * See options below rather than depend on a soon to be out of date comment.
+ */
+
 package client.kafkaimporter;
 
 import java.util.ArrayList;
@@ -187,7 +194,6 @@ public class Producer extends Thread {
                 p.join();
             }
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

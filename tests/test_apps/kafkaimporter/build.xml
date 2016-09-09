@@ -77,7 +77,7 @@
     </target>
 
 	<target name="formatter" depends="formatter-compile">
-        <!-- <copy file="gson-classes" todir="${formatterclasses.dir}"/> -->
+        <copy file="json-simple-1.1.1.jar" todir="${formatterclasses.dir}"/>
         <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
             <manifest>
                 <attribute name="Bundle-Activator" value="custom_formatter.formatter.ExampleFormatterFactory" />
@@ -86,6 +86,7 @@
                 <attribute name="Bundle-SymbolicName" value="ExampleFormatter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
+                <attribute name="Bundle-Classpath" value=".,json-simple-1.1.1.jar"/>
             </manifest>
         </jar>
         <copy file="formatter.jar" todir="${basedir}/../../../bundles"/>

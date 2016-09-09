@@ -1,4 +1,3 @@
--- This is the import table into which a single value will be pushed by kafkaimporter.
 
 LOAD classes sp.jar;
 
@@ -6,10 +5,10 @@ file -inlinebatch END_OF_BATCH
 
 ------- Kafka Importer Tables -------
 
-CREATE TABLE kafkaimporttable0 
+CREATE TABLE kafkaimporttable0
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -17,10 +16,10 @@ CREATE TABLE kafkaimporttable0
 );
 PARTITION TABLE kafkaimporttable0 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable1 
+CREATE TABLE kafkaimporttable1
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -28,10 +27,10 @@ CREATE TABLE kafkaimporttable1
 );
 PARTITION TABLE kafkaimporttable1 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable2 
+CREATE TABLE kafkaimporttable2
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -39,10 +38,12 @@ CREATE TABLE kafkaimporttable2
 );
 PARTITION TABLE kafkaimporttable2 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable3 
+
+
+CREATE TABLE kafkaimporttable3
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -50,10 +51,12 @@ CREATE TABLE kafkaimporttable3
 );
 PARTITION TABLE kafkaimporttable3 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable4 
+
+
+CREATE TABLE kafkaimporttable4
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -61,10 +64,12 @@ CREATE TABLE kafkaimporttable4
 );
 PARTITION TABLE kafkaimporttable4 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable5 
+
+
+CREATE TABLE kafkaimporttable5
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -72,10 +77,12 @@ CREATE TABLE kafkaimporttable5
 );
 PARTITION TABLE kafkaimporttable5 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable6 
+
+
+CREATE TABLE kafkaimporttable6
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -83,10 +90,12 @@ CREATE TABLE kafkaimporttable6
 );
 PARTITION TABLE kafkaimporttable6 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable7 
+
+
+CREATE TABLE kafkaimporttable7
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -94,10 +103,12 @@ CREATE TABLE kafkaimporttable7
 );
 PARTITION TABLE kafkaimporttable7 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable8 
+
+
+CREATE TABLE kafkaimporttable8
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -105,10 +116,12 @@ CREATE TABLE kafkaimporttable8
 );
 PARTITION TABLE kafkaimporttable8 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable9 
+
+
+CREATE TABLE kafkaimporttable9
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -116,10 +129,12 @@ CREATE TABLE kafkaimporttable9
 );
 PARTITION TABLE kafkaimporttable9 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable10 
+
+
+CREATE TABLE kafkaimporttable10
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -127,10 +142,12 @@ CREATE TABLE kafkaimporttable10
 );
 PARTITION TABLE kafkaimporttable10 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable11 
+
+
+CREATE TABLE kafkaimporttable11
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -138,10 +155,12 @@ CREATE TABLE kafkaimporttable11
 );
 PARTITION TABLE kafkaimporttable11 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable12 
+
+
+CREATE TABLE kafkaimporttable12
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -149,10 +168,12 @@ CREATE TABLE kafkaimporttable12
 );
 PARTITION TABLE kafkaimporttable12 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable13 
+
+
+CREATE TABLE kafkaimporttable13
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -160,10 +181,12 @@ CREATE TABLE kafkaimporttable13
 );
 PARTITION TABLE kafkaimporttable13 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable14 
+
+
+CREATE TABLE kafkaimporttable14
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -171,10 +194,12 @@ CREATE TABLE kafkaimporttable14
 );
 PARTITION TABLE kafkaimporttable14 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable15 
+
+
+CREATE TABLE kafkaimporttable15
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -182,10 +207,12 @@ CREATE TABLE kafkaimporttable15
 );
 PARTITION TABLE kafkaimporttable15 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable16 
+
+
+CREATE TABLE kafkaimporttable16
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -193,10 +220,12 @@ CREATE TABLE kafkaimporttable16
 );
 PARTITION TABLE kafkaimporttable16 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable17 
+
+
+CREATE TABLE kafkaimporttable17
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -204,10 +233,12 @@ CREATE TABLE kafkaimporttable17
 );
 PARTITION TABLE kafkaimporttable17 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable18 
+
+
+CREATE TABLE kafkaimporttable18
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -215,10 +246,12 @@ CREATE TABLE kafkaimporttable18
 );
 PARTITION TABLE kafkaimporttable18 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable19 
+
+
+CREATE TABLE kafkaimporttable19
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -226,10 +259,12 @@ CREATE TABLE kafkaimporttable19
 );
 PARTITION TABLE kafkaimporttable19 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable20 
+
+
+CREATE TABLE kafkaimporttable20
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -237,10 +272,12 @@ CREATE TABLE kafkaimporttable20
 );
 PARTITION TABLE kafkaimporttable20 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable21 
+
+
+CREATE TABLE kafkaimporttable21
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -248,10 +285,12 @@ CREATE TABLE kafkaimporttable21
 );
 PARTITION TABLE kafkaimporttable21 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable22 
+
+
+CREATE TABLE kafkaimporttable22
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -259,10 +298,12 @@ CREATE TABLE kafkaimporttable22
 );
 PARTITION TABLE kafkaimporttable22 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable23 
+
+
+CREATE TABLE kafkaimporttable23
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -270,10 +311,12 @@ CREATE TABLE kafkaimporttable23
 );
 PARTITION TABLE kafkaimporttable23 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable24 
+
+
+CREATE TABLE kafkaimporttable24
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -281,10 +324,12 @@ CREATE TABLE kafkaimporttable24
 );
 PARTITION TABLE kafkaimporttable24 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable25 
+
+
+CREATE TABLE kafkaimporttable25
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -292,10 +337,12 @@ CREATE TABLE kafkaimporttable25
 );
 PARTITION TABLE kafkaimporttable25 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable26 
+
+
+CREATE TABLE kafkaimporttable26
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -303,10 +350,12 @@ CREATE TABLE kafkaimporttable26
 );
 PARTITION TABLE kafkaimporttable26 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable27 
+
+
+CREATE TABLE kafkaimporttable27
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -314,10 +363,12 @@ CREATE TABLE kafkaimporttable27
 );
 PARTITION TABLE kafkaimporttable27 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable28 
+
+
+CREATE TABLE kafkaimporttable28
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -325,10 +376,12 @@ CREATE TABLE kafkaimporttable28
 );
 PARTITION TABLE kafkaimporttable28 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable29 
+
+
+CREATE TABLE kafkaimporttable29
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -336,10 +389,12 @@ CREATE TABLE kafkaimporttable29
 );
 PARTITION TABLE kafkaimporttable29 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable30 
+
+
+CREATE TABLE kafkaimporttable30
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -347,10 +402,12 @@ CREATE TABLE kafkaimporttable30
 );
 PARTITION TABLE kafkaimporttable30 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable31 
+
+
+CREATE TABLE kafkaimporttable31
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -358,10 +415,12 @@ CREATE TABLE kafkaimporttable31
 );
 PARTITION TABLE kafkaimporttable31 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable32 
+
+
+CREATE TABLE kafkaimporttable32
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -369,10 +428,12 @@ CREATE TABLE kafkaimporttable32
 );
 PARTITION TABLE kafkaimporttable32 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable33 
+
+
+CREATE TABLE kafkaimporttable33
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -380,10 +441,12 @@ CREATE TABLE kafkaimporttable33
 );
 PARTITION TABLE kafkaimporttable33 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable34 
+
+
+CREATE TABLE kafkaimporttable34
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -391,10 +454,12 @@ CREATE TABLE kafkaimporttable34
 );
 PARTITION TABLE kafkaimporttable34 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable35 
+
+
+CREATE TABLE kafkaimporttable35
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -402,10 +467,12 @@ CREATE TABLE kafkaimporttable35
 );
 PARTITION TABLE kafkaimporttable35 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable36 
+
+
+CREATE TABLE kafkaimporttable36
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -413,10 +480,12 @@ CREATE TABLE kafkaimporttable36
 );
 PARTITION TABLE kafkaimporttable36 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable37 
+
+
+CREATE TABLE kafkaimporttable37
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -424,10 +493,12 @@ CREATE TABLE kafkaimporttable37
 );
 PARTITION TABLE kafkaimporttable37 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable38 
+
+
+CREATE TABLE kafkaimporttable38
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -435,10 +506,12 @@ CREATE TABLE kafkaimporttable38
 );
 PARTITION TABLE kafkaimporttable38 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable39 
+
+
+CREATE TABLE kafkaimporttable39
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -446,10 +519,12 @@ CREATE TABLE kafkaimporttable39
 );
 PARTITION TABLE kafkaimporttable39 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable40 
+
+
+CREATE TABLE kafkaimporttable40
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -457,10 +532,12 @@ CREATE TABLE kafkaimporttable40
 );
 PARTITION TABLE kafkaimporttable40 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable41 
+
+
+CREATE TABLE kafkaimporttable41
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -468,10 +545,12 @@ CREATE TABLE kafkaimporttable41
 );
 PARTITION TABLE kafkaimporttable41 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable42 
+
+
+CREATE TABLE kafkaimporttable42
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -479,10 +558,12 @@ CREATE TABLE kafkaimporttable42
 );
 PARTITION TABLE kafkaimporttable42 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable43 
+
+
+CREATE TABLE kafkaimporttable43
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -490,10 +571,12 @@ CREATE TABLE kafkaimporttable43
 );
 PARTITION TABLE kafkaimporttable43 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable44 
+
+
+CREATE TABLE kafkaimporttable44
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -501,10 +584,12 @@ CREATE TABLE kafkaimporttable44
 );
 PARTITION TABLE kafkaimporttable44 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable45 
+
+
+CREATE TABLE kafkaimporttable45
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -512,10 +597,12 @@ CREATE TABLE kafkaimporttable45
 );
 PARTITION TABLE kafkaimporttable45 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable46 
+
+
+CREATE TABLE kafkaimporttable46
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -523,10 +610,12 @@ CREATE TABLE kafkaimporttable46
 );
 PARTITION TABLE kafkaimporttable46 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable47 
+
+
+CREATE TABLE kafkaimporttable47
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -534,10 +623,12 @@ CREATE TABLE kafkaimporttable47
 );
 PARTITION TABLE kafkaimporttable47 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable48 
+
+
+CREATE TABLE kafkaimporttable48
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -545,10 +636,12 @@ CREATE TABLE kafkaimporttable48
 );
 PARTITION TABLE kafkaimporttable48 ON COLUMN instance_id;
 
-CREATE TABLE kafkaimporttable49 
+
+
+CREATE TABLE kafkaimporttable49
 (
-  SEQ                BIGINT,
   INSTANCE_ID        BIGINT NOT NULL,
+  SEQ                BIGINT,
   EVENT_TYPE_ID      INTEGER,
   EVENT_DATE         TIMESTAMP default now,
   TRANS              VARCHAR(1000),
@@ -557,7 +650,8 @@ CREATE TABLE kafkaimporttable49
 PARTITION TABLE kafkaimporttable49 ON COLUMN instance_id;
 
 
-CREATE PROCEDURE ImportCountMinMax as select count(instance_id), min(instance_id), max(instance_id) from kafkaimporttable1;
+
+CREATE PROCEDURE ImportCountMinMax as select count(instance_id), min(instance_id), max(instance_id) from kafkaimporttable0;
 
 CREATE PROCEDURE InsertOnly0 as upsert into KAFKAIMPORTTABLE0 VALUES(?, ?, ?, ?, ?);
 PARTITION PROCEDURE InsertOnly0 ON TABLE Kafkaimporttable0 COLUMN instance_id;
