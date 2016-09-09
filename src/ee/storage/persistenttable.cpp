@@ -384,7 +384,41 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
-    if (isPersistentTableEmpty() == true) {
+    if (isPersistentTableEmpty()) {
+        return;
+    }
+
+    // For a materialized view don't optimize truncate,
+    // this needs more work - ENG-10323.
+    if (m_isMaterialized) {
+        /* // enable to debug
+        std::cout << "DEBUG: truncating view table (retail) "
+                  << activeTupleCount()
+                  << " tuples in " << name() << std::endl;
+        // */
+        deleteAllTuples(true, fallible);
+        return;
+    }
+
+    // SHORT TERM NOTE: Remove this comment when it no longer applies.
+    // For the source table of a joined materialized view don't optimize
+    // truncate, this needs more work - ENG-11017.
+    // This guard disables much of the code currently being changed
+    // on Ethan's and Paul's branches as it relates to truncate
+    // and its undo actions for this new case.
+    // The guard allowed v6.6 to ship prior to the perfection of those changes.
+    // In other words, there are known bugs in the code paths we are
+    // disabling here, but we are not bothering to strip out the (dead)
+    // buggy code paths from v6.6.  That will just cause merge conflicts
+    // with the rework that is currently in progress but will land after
+    // v6.6.
+    if ( ! m_viewHandlers.empty()) {
+        /* // enable to debug
+        std::cout << "DEBUG: truncating source of join view table (retail) "
+                  << activeTupleCount()
+                  << " tuples in " << name() << std::endl;
+        // */
+        deleteAllTuples(true, fallible);
         return;
     }
 
@@ -392,15 +426,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     // table by iteratively deleting table rows. Evalute if this is the case
     // based on the block and tuple block load factor
     if (m_data.size() == 1) {
-        // threshold cutoff in terms of block load factor at which truncate is
-        // better than tuple-by-tuple delete. Cut-off values are based on worst
+        // Determine a threshold cutoff in terms of block load factor beyond
+        // which wholesale truncate is estimated to be preferable to
+        // tuple-by-tuple retail delete. Cut-off values are based on worst
         // case scenarios with intent to improve performance and to avoid
-        // performance regression by not getting too greedy for performance -
-        // in here cut-off have been lowered to favor truncate instead of
-        // tuple-by-tuple delete. Cut-off numbers were obtained from benchmark
-        // tests performing inserts and truncate under different scenarios outline
-        // and comparing them for deleting all rows with a predicate that's always
-        // true. Following are scenarios based on which cut-off were obtained:
+        // performance regressions. Cut-off numbers were obtained from
+        // benchmark tests of a few scenarios:
         // - varying table schema - effect of tables having more columns
         // - varying number of views on table
         // - tables with more varchar columns with size below and above 16
@@ -408,20 +439,22 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
         // cut-off for table with no views
         const double tableWithNoViewLFCutoffForTrunc = 0.105666;
-        //cut-off for table with views
+        // cut-off for table with views
         const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
-        const double blockLoadFactor = m_data.begin().data()->loadFactor();
-        if ((!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) ||
-            (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) {
+        bool noView = m_views.empty() && m_viewHandlers.empty();
+        const double cutoff = noView ? tableWithNoViewLFCutoffForTrunc
+                                     : tableWithViewsLFCutoffForTrunc;
+        double blockLoadFactor = m_data.begin().data()->loadFactor();
+        if (blockLoadFactor <= cutoff) {
+            /* // enable to debug
+            std::cout << "DEBUG: truncating (retail) "
+                      << activeTupleCount()
+                      << " tuples in " << name() << std::endl;
+            // */
             deleteAllTuples(true, fallible);
             return;
         }
-    }
-    // For MAT view don't optimize, needs more work - ENG-10323.
-    if (m_isMaterialized) {
-        deleteAllTuples(true);
-        return;
     }
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
@@ -459,7 +492,13 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             destTcd->init(*engine->getDatabase(), *catalogViewTable);
             PersistentTable *destEmptyTable = destTcd->getPersistentTable();
             assert(destEmptyTable);
-            new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+            auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
+            bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
+            new MaterializedViewHandler(destEmptyTable,
+                                        mvHandlerInfo,
+                                        engine,
+                                        populateInitialTuple,
+                                        fallible);
         }
     }
 
@@ -585,10 +624,14 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     //
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
-    // Insert the tuple into the delta table first.
-    insertTupleIntoDeltaTable(source, fallible);
-
     try {
+        // Insert the tuple into the delta table first.
+        //
+        // (Note: we may hit a NOT NULL constraint violation,
+        // in which case, we want to clean up by calling
+        // deleteTupleStorage, below)
+        insertTupleIntoDeltaTable(source, fallible);
+
         insertTupleCommon(source, target, fallible);
     }
     catch (ConstraintFailureException &e) {
@@ -811,6 +854,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views, we first insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
     // (Cannot do in reversed order because the pending delete flag will also be copied)
+    //
+    // Note that this is guaranteed to succeed, since we are inserting an existing tuple
+    // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
@@ -888,6 +934,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    // Note that inserting into the delta table is guaranteed to
+    // succeed, since we checked constraints above.
     insertTupleIntoDeltaTable(targetTupleToUpdate, fallible);
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
@@ -990,6 +1038,9 @@ void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
+    //
+    // Note that this is guaranteed to succeed, since we are inserting an existing tuple
+    // (soon to be deleted) into the delta table.
     insertTupleIntoDeltaTable(target, fallible);
     {
         SetAndRestorePendingDeleteFlag setPending(target);
