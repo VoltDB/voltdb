@@ -792,8 +792,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Outstanding requests may actually still be at large
              */
             ClientInterfaceHandleManager cihm = m_cihm.remove(connectionId());
-            cihm.freeOutstandingTxns();
-            cihm.m_acg.removeMember(this);
+            // might be null if closing the interface in prep for self-kill / graceful shutdown
+            if (cihm != null) {
+                cihm.freeOutstandingTxns();
+                cihm.m_acg.removeMember(this);
+            }
+            // if null, check to ensure this CI is stopping
+            else if (m_isAcceptingConnections.get()) {
+                log.error("NULL ClientInterfaceHandleManager for active ClientInterface unexepected.");
+            }
+
             m_notifier.removeConnection(c);
         }
 
@@ -1947,8 +1955,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return false;
         }
         finally {
+            m_isAcceptingConnections.set(false);
             // this feels like an unclean thing to do... but should work
-            // for the purposes of cutting all responses right before we deliberatly
+            // for the purposes of cutting all responses right before we deliberately
             // end the process
             // m_cihm itself is threadsafe, and the regular shutdown code won't
             // care if it's empty... so... this.
