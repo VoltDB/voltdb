@@ -152,22 +152,34 @@ public class JSONWriter {
     }
 
     /**
-     * Begin appending a new array. All values until the balancing
-     * <code>endArray</code> will be appended to this array. The
-     * <code>endArray</code> method must be called to mark the array's end.
-     * @return this
-     * @throws JSONException If the nesting is too deep, or if the object is
-     * started in the wrong place (for example as a key or after the end of the
-     * outermost array or object).
+     * Push an array or object scope.
+     * @param c The scope to open.
+     * @throws JSONException If nesting is too deep.
      */
-    public JSONWriter array() throws JSONException {
-        if (m_mode == 'i' || m_mode == 'o' || m_mode == 'a') {
-            push(null);
-            append("[");
-            m_comma = false;
-            return this;
+    private void push(JSONObject jo) throws JSONException {
+        if (m_top >= MAX_DEPTH) {
+            throw new JSONException("Nesting too deep.");
         }
-        throw new JSONException("Misplaced array.");
+        m_scopeStack[m_top] = jo;
+        m_mode = jo == null ? 'a' : 'k';
+        m_top += 1;
+    }
+
+    /**
+     * Pop an array or object scope.
+     * @param mode The mode of the popped scope.
+     * @throws JSONException If nesting is wrong.
+     */
+    private void pop(char mode) throws JSONException {
+        if (m_top <= 0) {
+            throw new JSONException("Nesting error.");
+        }
+        char expected = m_scopeStack[m_top - 1] == null ? 'a' : 'k';
+        if (expected != mode) {
+            throw new JSONException("Nesting error.");
+        }
+        m_top -= 1;
+        m_mode = m_top == 0 ? 'd' : m_scopeStack[m_top - 1] == null ? 'a' : 'k';
     }
 
     /**
@@ -192,6 +204,25 @@ public class JSONWriter {
     }
 
     /**
+     * Begin appending a new array. All values until the balancing
+     * <code>endArray</code> will be appended to this array. The
+     * <code>endArray</code> method must be called to mark the array's end.
+     * @return this
+     * @throws JSONException If the nesting is too deep, or if the object is
+     * started in the wrong place (for example as a key or after the end of the
+     * outermost array or object).
+     */
+    public JSONWriter array() throws JSONException {
+        if (m_mode == 'i' || m_mode == 'o' || m_mode == 'a') {
+            push(null);
+            append("[");
+            m_comma = false;
+            return this;
+        }
+        throw new JSONException("Misplaced array.");
+    }
+
+    /**
      * End an array. This method most be called to balance calls to
      * <code>array</code>.
      * @return this
@@ -200,6 +231,29 @@ public class JSONWriter {
     public JSONWriter endArray() throws JSONException {
         end('a', ']');
         return this;
+    }
+
+    /**
+     * Begin appending a new object. All keys and values until the balancing
+     * <code>endObject</code> will be appended to this object. The
+     * <code>endObject</code> method must be called to mark the object's end.
+     * @return this
+     * @throws JSONException If the nesting is too deep, or if the object is
+     * started in the wrong place (for example as a key or after the end of the
+     * outermost array or object).
+     */
+    public JSONWriter object() throws JSONException {
+        if (m_mode == 'i') {
+            m_mode = 'o';
+        }
+        if (m_mode == 'o' || m_mode == 'a') {
+            append("{");
+            push(new JSONObject());
+            m_comma = false;
+            return this;
+        }
+        throw new JSONException("Misplaced object.");
+
     }
 
     /**
@@ -244,63 +298,6 @@ public class JSONWriter {
         throw new JSONException("Misplaced key.");
     }
 
-
-    /**
-     * Begin appending a new object. All keys and values until the balancing
-     * <code>endObject</code> will be appended to this object. The
-     * <code>endObject</code> method must be called to mark the object's end.
-     * @return this
-     * @throws JSONException If the nesting is too deep, or if the object is
-     * started in the wrong place (for example as a key or after the end of the
-     * outermost array or object).
-     */
-    public JSONWriter object() throws JSONException {
-        if (m_mode == 'i') {
-            m_mode = 'o';
-        }
-        if (m_mode == 'o' || m_mode == 'a') {
-            append("{");
-            push(new JSONObject());
-            m_comma = false;
-            return this;
-        }
-        throw new JSONException("Misplaced object.");
-
-    }
-
-
-    /**
-     * Pop an array or object scope.
-     * @param mode The mode of the popped scope.
-     * @throws JSONException If nesting is wrong.
-     */
-    private void pop(char mode) throws JSONException {
-        if (m_top <= 0) {
-            throw new JSONException("Nesting error.");
-        }
-        char expected = m_scopeStack[m_top - 1] == null ? 'a' : 'k';
-        if (expected != mode) {
-            throw new JSONException("Nesting error.");
-        }
-        m_top -= 1;
-        m_mode = m_top == 0 ? 'd' : m_scopeStack[m_top - 1] == null ? 'a' : 'k';
-    }
-
-    /**
-     * Push an array or object scope.
-     * @param c The scope to open.
-     * @throws JSONException If nesting is too deep.
-     */
-    private void push(JSONObject jo) throws JSONException {
-        if (m_top >= MAX_DEPTH) {
-            throw new JSONException("Nesting too deep.");
-        }
-        m_scopeStack[m_top] = jo;
-        m_mode = jo == null ? 'a' : 'k';
-        m_top += 1;
-    }
-
-
     /**
      * Append either the value <code>true</code> or the value
      * <code>false</code>.
@@ -335,7 +332,6 @@ public class JSONWriter {
         return this;
     }
 
-
     /**
      * Append an object value.
      * @param o The object to append. It can be null, or a Boolean, Number,
@@ -348,4 +344,5 @@ public class JSONWriter {
         append(JSONObject.valueToString(o));
         return this;
     }
+
 }
