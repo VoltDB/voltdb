@@ -37,9 +37,11 @@ import org.voltdb.types.PlanNodeType;
  *
  */
 public class PlanNodeTree implements JSONString {
-    private static final String PLAN_NODES_MEMBER_NAME = "PLAN_NODES";
-    private static final String PLAN_NODES_LISTS_MEMBER_NAME = "PLAN_NODES_LISTS";
-    private static final String STATEMENT_ID_MEMBER_NAME = "STATEMENT_ID";
+    private static class Members {
+        private static final String PLAN_NODES = "PLAN_NODES";
+        private static final String PLAN_NODES_LISTS = "PLAN_NODES_LISTS";
+        private static final String STATEMENT_ID = "STATEMENT_ID";
+    }
 
     // Subquery ID / subquery plan node list map. The top level statement always has id = 0
     protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<Integer, List<AbstractPlanNode>>();
@@ -92,23 +94,15 @@ public class PlanNodeTree implements JSONString {
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
         if (m_planNodesListMap.size() == 1) {
-            stringer.key(PLAN_NODES_MEMBER_NAME).array();
-            for (AbstractPlanNode node : m_planNodesListMap.get(0)) {
-                assert (node instanceof JSONString);
-                stringer.value(node);
-            }
-            stringer.endArray(); //end entries
-        } else {
-            stringer.key(PLAN_NODES_LISTS_MEMBER_NAME).array();
+            stringer.key(Members.PLAN_NODES).array(m_planNodesListMap.get(0));
+        }
+        else {
+            stringer.key(Members.PLAN_NODES_LISTS).array();
             for (Map.Entry<Integer, List<AbstractPlanNode>> planNodes : m_planNodesListMap.entrySet()) {
-                stringer.object().key(STATEMENT_ID_MEMBER_NAME).
-                    value(planNodes.getKey());
-                stringer.key(PLAN_NODES_MEMBER_NAME).array();
-                for (AbstractPlanNode node : planNodes.getValue()) {
-                    assert (node instanceof JSONString);
-                    stringer.value(node);
-                }
-                stringer.endArray().endObject(); //end entries
+                stringer.object();
+                stringer.key(Members.STATEMENT_ID).value(planNodes.getKey());
+                stringer.key(Members.PLAN_NODES).array(planNodes.getValue());
+                stringer.endObject();
             }
             stringer.endArray(); //end entries
         }
@@ -126,19 +120,19 @@ public class PlanNodeTree implements JSONString {
      * @throws JSONException
      */
     public void loadFromJSONPlan(JSONObject jobj, Database db)  throws JSONException {
-        if (jobj.has(PLAN_NODES_LISTS_MEMBER_NAME)) {
-            JSONArray jplanNodesArray = jobj.getJSONArray(PLAN_NODES_LISTS_MEMBER_NAME);
+        if (jobj.has(Members.PLAN_NODES_LISTS)) {
+            JSONArray jplanNodesArray = jobj.getJSONArray(Members.PLAN_NODES_LISTS);
             for (int i = 0; i < jplanNodesArray.length(); ++i) {
                 JSONObject jplanNodesObj = jplanNodesArray.getJSONObject(i);
-                JSONArray jplanNodes = jplanNodesObj.getJSONArray(PLAN_NODES_MEMBER_NAME);
-                int stmtId = jplanNodesObj.getInt(STATEMENT_ID_MEMBER_NAME);
+                JSONArray jplanNodes = jplanNodesObj.getJSONArray(Members.PLAN_NODES);
+                int stmtId = jplanNodesObj.getInt(Members.STATEMENT_ID);
                 loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
             }
         }
         else {
             // There is only one statement in the plan. Its id is set to 0 by default
             int stmtId = 0;
-            JSONArray jplanNodes = jobj.getJSONArray(PLAN_NODES_MEMBER_NAME);
+            JSONArray jplanNodes = jobj.getJSONArray(Members.PLAN_NODES);
             loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
         }
 

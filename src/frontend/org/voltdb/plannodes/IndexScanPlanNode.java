@@ -29,7 +29,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
@@ -716,12 +715,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         if (m_searchkeyExpressions.size() > 0) {
-            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-            for (AbstractExpression ae : m_searchkeyExpressions) {
-                assert (ae instanceof JSONString);
-                stringer.value(ae);
-            }
-            stringer.endArray();
+            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
         }
         if (m_endExpression != null) {
             stringer.key(Members.END_EXPRESSION.name());

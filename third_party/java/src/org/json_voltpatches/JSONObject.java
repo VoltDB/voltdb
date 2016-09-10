@@ -1414,16 +1414,16 @@ public class JSONObject {
             return "null";
         }
         if (value instanceof JSONString) {
-            Object o;
             try {
-                o = ((JSONString)value).toJSONString();
-            } catch (Exception e) {
+                String asString = ((JSONString)value).toJSONString();
+                if (asString == null) {
+                    throw new JSONException("Unexpected null from toJSONString");
+                }
+                return asString;
+            }
+            catch (Exception e) {
                 throw new JSONException(e);
             }
-            if (o instanceof String) {
-                return (String)o;
-            }
-            throw new JSONException("Bad value from toJSONString: " + o);
         }
         if (value instanceof Number) {
             return numberToString((Number) value);
