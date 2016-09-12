@@ -962,21 +962,21 @@
             if(monitor.latFirstData){
                 dataLat = []
                 for(var i = 0; i< latencyArr.length; i++){
-                    sliceFirstData(dataLat, dataView.Seconds);
+                    dataLat = sliceFirstData(dataLat, dataView.Seconds);
                     dataLat.push({"x": new Date(latencyArr[i].timestamp),
                         "y": latencyArr[i].latency
                     })
                 }
                 dataLatMin = []
                 for(var j = 0; j< latencyArrMin.length; j++){
-                    sliceFirstData(dataLatMin, dataView.Minutes);
+                    dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
                     dataLatMin.push({"x": new Date(latencyArrMin[j].timestamp),
                         "y": latencyArrMin[j].latency
                     })
                 }
                 dataLatDay = []
                 for(var k = 0; k < latencyArrDay.length; k++){
-                    sliceFirstData(dataLatDay, dataView.Days);
+                    dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
                     dataLatDay.push({"x": new Date(latencyArrDay[k].timestamp),
                         "y": latencyArrDay[k].latency
                     })
@@ -1108,7 +1108,7 @@
             if(monitor.memFirstData){
                 dataMem = []
                 for(var i = 0; i< memoryDetailsArr.length; i++){
-                    sliceFirstData(dataMem, dataView.Seconds);
+                    dataMem = sliceFirstData(dataMem, dataView.Seconds);
                     dataMem.push({"x": new Date(memoryDetailsArr[i].timestamp),
                         "y": memoryDetailsArr[i].physicalMemory
                     })
@@ -1116,7 +1116,7 @@
 
                 dataMemMin = []
                 for(var j = 0; j< memoryDetailsArrMin.length; j++){
-                    sliceFirstData(dataMemMin, dataView.Minutes);
+                    dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
                     dataMemMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
                         "y": memoryDetailsArrMin[j].physicalMemory
                     })
@@ -1124,7 +1124,7 @@
 
                 dataMemDay = []
                 for(var k = 0; k< memoryDetailsArrDay.length; k++){
-                    sliceFirstData(dataMemDay, dataView.Days);
+                    dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
                     dataMemDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
                         "y": memoryDetailsArrDay[k].physicalMemory
                     })
@@ -1248,14 +1248,14 @@
             if(monitor.tpsFirstData){
                 datatrans = []
                 for(var i = 0; i< transDetailsArr.length; i++){
-                    sliceFirstData(datatrans, dataView.Seconds);
+                    datatrans = sliceFirstData(datatrans, dataView.Seconds);
                     datatrans.push({"x": new Date(transDetailsArr[i].timestamp),
                         "y": transDetailsArr[i].transaction
                     })
                 }
                 datatransMin = []
                 for(var j = 0; j< transDetailsArrMin.length; j++){
-                    sliceFirstData(datatransMin, dataView.Minutes);
+                    datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     datatransMin.push({"x": new Date(transDetailsArrMin[j].timestamp),
                         "y": transDetailsArrMin[j].transaction
                     })
@@ -1263,7 +1263,7 @@
 
                 datatransDay = []
                 for(var k = 0; k< transDetailsArrDay.length; k++){
-                    sliceFirstData(datatransDay, dataView.Day);
+                    datatransDay = sliceFirstData(datatransDay, dataView.Day);
                     datatransDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
                         "y": transDetailsArrDay[k].transaction
                     })
@@ -1436,21 +1436,21 @@
             if(monitor.cpuFirstData){
                 cpuData = []
                 for(var i = 0; i< cpuDetailsArr.length; i++){
-                    sliceFirstData(cpuData, dataView.Seconds);
+                    cpuData = sliceFirstData(cpuData, dataView.Seconds);
                     cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
                         "y": cpuDetailsArr[i].percentUsed
                     })
                 }
                 cpuDataMin = []
                 for(var j = 0; j< cpuDetailsArrMin.length; j++){
-                    sliceFirstData(cpuDataMin, dataView.Minutes);
+                    cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
                     cpuDataMin.push({"x": new Date(cpuDetailsArrMin[j].timestamp),
                         "y": cpuDetailsArrMin[j].percentUsed
                     })
                 }
                 cpuDataDay = []
                 for(var k = 0; k< cpuDetailsArrDay.length; k++){
-                    sliceFirstData(cpuDataDay, dataView.Days );
+                    cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days );
                     cpuDataDay.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
                         "y": cpuDetailsArrDay[k].percentUsed
                     })
@@ -1641,6 +1641,7 @@
                     keyIndexSec =  i;
                     partitionData[keyIndexSec]["values"] = []
                     for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
+                        partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
                         partitionData[keyIndexSec]["values"].push({"x": new Date(partitionDetailsArr[i]["values"][b].x), "y": partitionDetailsArr[i]["values"][b].y})
                     }
                 }
@@ -1649,6 +1650,7 @@
                     keyIndexMin =  j;
                     partitionDataMin[keyIndexMin]["values"] = []
                     for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
+                        partitionDataMin[keyIndexMin]["values"] = sliceFirstData(partitionDataMin[keyIndexMin]["values"], dataView.Minutes)
                         partitionDataMin[keyIndexMin]["values"].push({"x": new Date(partitionDetailsArrMin[j]["values"][a].x), "y": partitionDetailsArrMin[j]["values"][a].y})
                     }
                 }
@@ -1657,6 +1659,7 @@
                     keyIndexDay = k;
                     partitionDataDay[keyIndexMin]["values"] = []
                     for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
+                        partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days)
                         partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrDay[k]["values"][c].y})
                     }
                 }
@@ -1790,7 +1793,7 @@
             if(monitor.drFirstData){
                 drData = []
                 for(var i = 0; i< drDetailsArr.length; i++){
-                    sliceFirstData(drData, dataView.Seconds);
+                    drData = sliceFirstData(drData, dataView.Seconds);
                     drData.push({"x": new Date(drDetailsArr[i].timestamp),
                         "y": drDetailsArr[i].replicationRate
                     })
@@ -1798,7 +1801,7 @@
 
                 drDataMin = []
                 for(var j = 0; j< drDetailsArrMin.length; j++){
-                    sliceFirstData(drDataMin, dataView.Minutes);
+                    drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                     drDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
                         "y": drDetailsArrMin[j].replicationRate
                     })
@@ -1806,7 +1809,7 @@
 
                 drDataDay = []
                 for(var k = 0; k< drDetailsArrDay.length; k++){
-                    sliceFirstData(drDataDay, dataView.Days );
+                    drDataDay = sliceFirstData(drDataDay, dataView.Days );
                     drDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
                         "y": drDetailsArrDay[k].replicationRate
                     })
@@ -1918,7 +1921,7 @@
             if(monitor.cmdLogFirstData){
                 cmdLogData = []
                 for(var i = 0; i< cmdLogArr.length; i++){
-                    sliceFirstData(cmdLogData, dataView.Seconds);
+                    cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
                     cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
                         "y": cmdLogArr[i].outstandingTxn
                     })
@@ -1926,7 +1929,7 @@
 
                 cmdLogDataMin = []
                 for(var j = 0; j< cmdLogArrMin.length; j++){
-                    sliceFirstData(cmdLogDataMin, dataView.Minutes);
+                    cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
                     cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
                         "y": cmdLogArrMin[j].outstandingTxn
                     })
@@ -1934,7 +1937,7 @@
 
                 cmdLogDataDay = []
                 for(var k = 0; k< cmdLogArrDay.length; k++){
-                    sliceFirstData(cmdLogDataDay, dataView.Days);
+                    cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
                     cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
                         "y": cmdLogArrDay[k].outstandingTxn
                     })
