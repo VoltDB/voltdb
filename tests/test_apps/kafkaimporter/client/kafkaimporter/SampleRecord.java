@@ -157,17 +157,6 @@ public class SampleRecord
         Random rand = new Random();
 
         SampleRecord record = new SampleRecord(111, 1000, rand);
-//        JSONObject obj = new JSONObject();
-//
-//        try {
-//            obj.put("seq", 111);
-//            obj.put("instancd_id", record.instance_id);
-//            obj.put("event_type_id", record.event_type_id);
-//            obj.put("event_date", record.event_date);
-//            obj.put("trans",  record.trans);
-//        } catch (JSONException e) {
-//            e.printStackTrace();
-//        }
 
         System.out.println(record.obj);
     }

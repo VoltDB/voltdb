@@ -110,7 +110,7 @@ public class Producer extends Thread {
                 SampleRecord record = new SampleRecord(rowCnt, 1000, rand);
                 ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>(m_topic, rowCnt.toString(),
                     record.obj.toString());
-                log.info("JSON Row: " + producerRecord.toString());
+                // log.info("JSON Row: " + producerRecord.toString());
                 m_producer.send(producerRecord);
                 rowCnt++;
             }
@@ -120,7 +120,6 @@ public class Producer extends Thread {
                 Thread.sleep(m_pausetime*1000);
                 m_producerrunning = true;
             } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }

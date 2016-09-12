@@ -443,7 +443,7 @@ public class KafkaImportBenchmark {
             importStatValues = MatchChecks.getImportValues(client);
             if (!config.streamtest) mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
             importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
-            importRowCount = MatchChecks.getImportRowCount(client);
+            // importRowCount = MatchChecks.getImportRowCount(client);
         }
 
         // some counts that might help debugging....
