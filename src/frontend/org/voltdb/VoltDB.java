@@ -323,6 +323,42 @@ public class VoltDB {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
+
+            /*
+             *  PORT REMAPPING -- to allow explicit overrides, find and handle port remapping
+             *  first, then ignore it when we find it during sequential processing.
+             */
+
+            for (int i=0; i < args.length; ++i) {
+               if (args[i].equals("remap")) {
+                    Integer portRemapValue = Integer.parseInt(args[++i]);
+                    if (portRemapValue < 0) {
+                            // Not allowed. Generate an error.
+                       System.err.println("FATAL: Port remap value cannot be negative: " + Integer.toString(portRemapValue));
+                       referToDocAndExit();
+                    } else {
+                           // remap all the ports.
+                       m_port += (portRemapValue) * 2;   // Must increment client and admin ports by 2
+                       m_adminPort = DEFAULT_ADMIN_PORT + (portRemapValue * 2);   // Must increment client and admin ports by 2
+                       m_internalPort += portRemapValue;
+                       m_drAgentPortStart = DEFAULT_DR_PORT + portRemapValue;
+                       m_httpPort = DEFAULT_HTTP_PORT +portRemapValue;
+                       Integer tmp_zkPort = Integer.parseInt(m_zkInterface.substring(m_zkInterface.indexOf(':')+1));
+                       tmp_zkPort += portRemapValue;
+                       m_zkInterface = "127.0.0.1:" + Integer.toString(tmp_zkPort);
+                       System.err.println("INFO: The default ports have been remapped:"
+                       +  "\n   Client:      " + m_port
+                       +  "\n   Admin:       " + m_adminPort
+                       +  "\n   Internal:    " + m_internalPort
+                       +  "\n   Replication: " + m_drAgentPortStart
+                       +  "\n   http:        " + m_httpPort
+                       +  "\n   ZooKeeper:   " + m_zkInterface
+                       );
+                    }
+               }
+            }
+
+            // Now back to our regular programming
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
@@ -367,7 +403,13 @@ public class VoltDB {
                     m_quietAdhoc = true;
                 }
                 // handle from the command line as two strings <catalog> <filename>
-                else if (arg.equals("port")) {
+
+                // Ignore remap and its argument.
+                else if (arg.equals("remap")) {
+                    ++i;
+
+
+               } else if (arg.equals("port")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
@@ -1228,6 +1270,7 @@ public class VoltDB {
     public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
+
     }
 
     /**

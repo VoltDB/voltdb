@@ -34,6 +34,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
     options = (
         VOLT.StringListOption('-H', '--host', 'server_list', server_list_help, default = ''),
         VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster'),
+        VOLT.IntegerOption(None,'--portremap', 'remap_increment', 'Increment all port numbers by the specified value'),
         VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None),
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
@@ -48,6 +49,8 @@ def start(runner):
     runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
     if runner.opts.hostcount:
         runner.args.extend(['hostcount', runner.opts.hostcount])
+    if runner.opts.remap_increment:
+        runner.args.extend(['remap', runner.opts.remap_increment])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
     runner.go()
