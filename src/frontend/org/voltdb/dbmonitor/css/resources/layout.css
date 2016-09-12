@@ -3017,7 +3017,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
     .overviewTbl table td {
-        white-space: nowrap !important;
+       /* white-space: nowrap !important;*/
     }
 
 .confirmationHeight {
@@ -3822,6 +3822,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .chartDataContent ul li { line-height:20px;}
 .chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
 .chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
+ .wordBreak{word-break: break-all; line-height:22px!important; padding-right:20px!important;}
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}

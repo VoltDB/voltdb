@@ -4314,10 +4314,8 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td align="right">' + value + '</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
+                                '   <td class="wordBreak" colspan="4">' + value + '</td>' +
+
                                 '</tr>';
                         }
 
@@ -4388,9 +4386,7 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td align="right">' + value + '</td>' +
-                                '   <td>&nbsp;</td>' +
-                                '   <td>&nbsp;</td>' +
+                                '   <td class="wordBreak" colspan="3">' + value + '</td>' +
                                 '</tr>';
                         }
 
@@ -4457,9 +4453,7 @@ function loadAdminPage() {
                         result += '' +
                             '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
                             '   <td class="configLabe2">' + name + '</td>' +
-                            '   <td align="right">' + value + ' ' + unit + '</td>' +
-                            '   <td>&nbsp;</td>' +
-                            '   <td>&nbsp;</td>' +
+                            '   <td class="wordBreak" colspan="3">' + value + ' ' + unit + '</td>' +
                             '</tr>';
                     }
 
