@@ -77,6 +77,7 @@ public class SnapshotInitiationInfo
             default:
                 m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
                 m_stype = SnapshotPathType.SNAP_AUTO;
+                m_path = VoltDB.instance().getSnapshotPath();
                 break;
         }
 
