@@ -64,7 +64,6 @@ public class RandomMsgGenerator
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(ps);
-        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         if (binaryLog) {
             when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, Long.MIN_VALUE, null});
             if (!isMp) {

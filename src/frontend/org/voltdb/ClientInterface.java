@@ -1607,7 +1607,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         Procedure catProc = sysProc.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.procName = procedureName;
+        spi.setProcName(procedureName);
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
@@ -1858,7 +1858,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (ex != null) {
             exMsg = ex.getMessage();
         }
-        String errorMessage = "Error sending procedure " + task.procName
+        String errorMessage = "Error sending procedure " + task.getProcName()
                 + " to the correct partition. Make sure parameter values are correct."
                 + " Parameter value " + invocationParameter
                 + ", partition column " + catProc.getPartitioncolumn().getName()
