@@ -935,7 +935,7 @@ class SchemaPageTest extends TestBase {
         when: 'check if text is present'
         page.textTable.isDisplayed()
         then: 'check if text is correct'
-        if (page.textTable.text().contains("tables whose row data is expected to use about")) {
+        if (page.textTable.text().contains("tables whose row data is expected to use")) {
             println("Size Worksheet Tab:Check Size Analysis Summary values for tables-Text Correct")
         }
         else {
