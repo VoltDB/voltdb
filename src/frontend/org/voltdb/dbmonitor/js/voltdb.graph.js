@@ -939,21 +939,21 @@
             var latencyArrDay = []
 
             if(localStorage.latencyMin != undefined){
-                latencyArrMin = JSON.parse(localStorage.latencyMin)
+                latencyArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
             } else{
                 latencyArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLatMin, 'timestamp', 'latency'))
                 latencyArrMin = JSON.parse(latencyArrMin)
             }
 
             if(localStorage.latency != undefined){
-                latencyArr = JSON.parse(localStorage.latency)
+                latencyArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latency))
             } else {
                 latencyArr = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLat, 'timestamp', 'latency'))
                 latencyArr = JSON.parse(latencyArr)
             }
 
             if(localStorage.latencyDay != undefined){
-                latencyArrDay = JSON.parse(localStorage.latencyDay)
+                latencyArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyDay))
             } else {
                 latencyArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLatDay, 'timestamp', 'latency'))
                 latencyArrDay = JSON.parse(latencyArrDay)
@@ -1084,7 +1084,7 @@
                 return;
 
             if(localStorage.memoryDetailsMin != undefined){
-                memoryDetailsArrMin = JSON.parse(localStorage.memoryDetailsMin)
+                memoryDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsMin))
             } else {
                 memoryDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemMin, 'timestamp', 'physicalMemory'))
                 memoryDetailsArrMin = JSON.parse(memoryDetailsArrMin)
@@ -1092,14 +1092,14 @@
 
 
             if(localStorage.memoryDetails != undefined){
-                memoryDetailsArr = JSON.parse(localStorage.memoryDetails)
+                memoryDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetails))
             } else {
                 memoryDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMem, 'timestamp', 'physicalMemory'))
                 memoryDetailsArr = JSON.parse(memoryDetailsArr)
             }
 
             if(localStorage.memoryDetailsDay != undefined){
-                memoryDetailsArrDay = JSON.parse(localStorage.memoryDetailsDay)
+                memoryDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsDay))
             } else {
                 memoryDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemDay, 'timestamp', 'physicalMemory'))
                 memoryDetailsArrDay = JSON.parse(memoryDetailsArrDay)
@@ -1225,21 +1225,21 @@
                 return;
 
             if(localStorage.transDetailsMin != undefined){
-                transDetailsArrMin = JSON.parse(localStorage.transDetailsMin)
+                transDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsMin))
             } else {
                 transDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(datatransMin, 'timestamp', 'transaction'))
                 transDetailsArrMin = JSON.parse(transDetailsArrMin)
             }
 
             if(localStorage.transDetails != undefined){
-                transDetailsArr = JSON.parse(localStorage.transDetails)
+                transDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetails))
             } else {
                 transDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormat(datatrans, 'timestamp', 'transaction'))
                 transDetailsArr = JSON.parse(transDetailsArr)
             }
 
             if(localStorage.transDetailsDay != undefined){
-                transDetailsArrDay = JSON.parse(localStorage.transDetailsDay)
+                transDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsDay))
             } else {
                 transDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(datatransDay, 'timestamp', 'transaction'))
                 transDetailsArrDay = JSON.parse(transDetailsArrDay)
@@ -1413,21 +1413,21 @@
                 return;
 
             if(localStorage.cpuDetailsMin != undefined)
-                cpuDetailsArrMin = JSON.parse(localStorage.cpuDetailsMin)
+                cpuDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
             else{
                 cpuDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(cpuDataMin))
                 cpuDetailsArrMin = JSON.parse(cpuDetailsArrMin)
             }
 
             if(localStorage.cpuDetailsDay != undefined)
-                cpuDetailsArrDay = JSON.parse(localStorage.cpuDetailsDay)
+                cpuDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsDay))
             else {
                 cpuDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(cpuDataDay))
                 cpuDetailsArrDay = JSON.parse(cpuDetailsArrDay)
             }
 
             if(localStorage.cpuDetails != undefined){
-                cpuDetailsArr = JSON.parse(localStorage.cpuDetails)
+                cpuDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
             } else{
                 cpuDetailsArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cpuData))
                 cpuDetailsArr =  JSON.parse(cpuDetailsArr)
@@ -1566,6 +1566,43 @@
             return dataArr;
         }
 
+        this.getFormattedDataFromLocalStorage = function(rawDataArr){
+            var interval_end = new Date()
+            var interval_start = new Date()
+            var interval = $( "#slider-range-min" ).slider( "value" )
+            interval_end.setMinutes(interval_end.getMinutes() - interval);
+            dataArr = [];
+            for(var i = 0; i < rawDataArr.length; i++){
+                timeStamp =  new Date(rawDataArr[i].timestamp);
+                if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
+                    dataArr.push(rawDataArr[i])
+                }
+            }
+            return dataArr;
+        }
+
+        this.getFormattedPartitionDataFromLocalStorage = function(rawDataArr){
+            var interval_end = new Date()
+            var interval_start = new Date()
+            var interval = $( "#slider-range-min" ).slider( "value" )
+            interval_end.setMinutes(interval_end.getMinutes() - interval);
+            partitionData = []
+            for(var i = 0; i< rawDataArr.length; i++){
+                var keyIndex =  i;
+                partitionData[keyIndex] = {}
+                partitionData[keyIndex]["values"] = []
+                partitionData[keyIndex]["key"] = rawDataArr[keyIndex]["key"]
+                partitionData[keyIndex]["color"] = rawDataArr[keyIndex]["color"]
+                for(var b = 0; b < rawDataArr[i]["values"].length; b++){
+                    timeStamp =  new Date(rawDataArr[i]["values"][b].x);
+                    if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
+                        partitionData[keyIndex]["values"].push(rawDataArr[i]["values"][b])
+                    }
+                }
+            }
+            return partitionData;
+        }
+
         this.savePartitionDataToLocalStorage = function(data, newItem, keyIndex){
             var interval_end = new Date()
             var interval_start = new Date()
@@ -1615,22 +1652,21 @@
             var partitionDetailsArrMin = [];
             var partitionDetailsArrDay = [];
 
-
             if(localStorage.partitionDetailsMin != undefined){
-                partitionDetailsArrMin = JSON.parse(localStorage.partitionDetailsMin)
+                partitionDetailsArrMin = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsMin))
             } else {
                 partitionDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionDataMin))
                 partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
             }
 
             if(localStorage.partitionDetailsDay != undefined){
-                partitionDetailsArrDay = JSON.parse(localStorage.partitionDetailsDay)
+                partitionDetailsArrDay = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsDay))
             } else {
                 partitionDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionDataDay))
                 partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
             }
             if(localStorage.partitionDetails != undefined){
-                partitionDetailsArr = JSON.parse(localStorage.partitionDetails)
+                partitionDetailsArr = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetails))
             } else {
                 partitionDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionData))
                 partitionDetailsArr = JSON.parse(partitionDetailsArr)
@@ -1770,21 +1806,21 @@
                 return;
 
             if(localStorage.drDetailsMin != undefined){
-                drDetailsArrMin = JSON.parse(localStorage.drDetailsMin)
+                drDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsMin))
             } else {
                 drDetailsArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(drDataMin, 'timestamp', 'outstandingTxn'))
                 drDetailsArrMin = JSON.parse(drDetailsArrMin)
             }
 
             if(localStorage.drDetailsDay != undefined){
-                drDetailsArrDay = JSON.parse(localStorage.drDetailsDay)
+                drDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsDay))
             } else {
                 drDetailsArrDay =  JSON.stringify(MonitorGraphUI.convertDataFormat(drDataDay, 'timestamp', 'outstandingTxn'))
                 drDetailsArrDay = JSON.parse(drDetailsArrDay)
             }
 
             if(localStorage.drDetails != undefined){
-                drDetailsArr = JSON.parse(localStorage.drDetails)
+                drDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetails))
             } else {
                 drDetailsArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(drData, 'timestamp', 'outstandingTxn'))
                 drDetailsArr = JSON.parse(drDetailsArr)
@@ -1895,21 +1931,23 @@
             var overlayDataArr = []
 
             if(localStorage.cmdLogMin != undefined)
-                cmdLogArrMin = JSON.parse(localStorage.cmdLogMin)
+                cmdLogArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogMin))
             else{
                 cmdLogArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataMin))
                 cmdLogArrMin = JSON.parse(cmdLogArrMin)
             }
             if(localStorage.cmdLogDay != undefined)
-                cmdLogArrDay = JSON.parse(localStorage.cmdLogDay)
+                cmdLogArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogDay))
             else {
                 cmdLogArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataDay))
                 cmdLogArrDay = JSON.parse(cmdLogArrDay)
             }
 
             if(localStorage.cmdLog != undefined)
-                cmdLogArr = JSON.parse(localStorage.cmdLog)
+                cmdLogArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLog))
             else{
+                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
+                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.parse(cmdLogArr)
             }
