@@ -42,6 +42,11 @@
             maxMinPartition: "#4C76B0",
             multiPartition: "#FF8C00"
         }
+        this.enumMaxTimeGap = {
+            secGraph: 300000,
+            minGraph: 1800000,
+            dayGraph: 27000000
+        }
         this.GetPartitionDetailData = function (partitionDetails) {
             dataParitionDetails = partitionDetails;
         };
@@ -927,6 +932,12 @@
             return dataArray;
         }
 
+        var currentTime = new Date();
+
+        this.setStartTime = function(){
+            currentTime = new Date()
+        }
+
         this.RefreshLatency = function (latency, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataLat = monitor.latData;
@@ -960,26 +971,34 @@
             }
 
             if(monitor.latFirstData){
-                dataLat = []
-                for(var i = 0; i< latencyArr.length; i++){
-                    dataLat = sliceFirstData(dataLat, dataView.Seconds);
-                    dataLat.push({"x": new Date(latencyArr[i].timestamp),
-                        "y": latencyArr[i].latency
-                    })
+                //var currentTime = new Date();
+                if(latencyArr.length > 0 && !(currentTime.getTime() - (new Date(latencyArr[latencyArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    dataLat = []
+                    for(var i = 0; i< latencyArr.length; i++){
+                        dataLat = sliceFirstData(dataLat, dataView.Seconds);
+                        dataLat.push({"x": new Date(latencyArr[i].timestamp),
+                            "y": latencyArr[i].latency
+                        })
+                    }
                 }
-                dataLatMin = []
-                for(var j = 0; j< latencyArrMin.length; j++){
-                    dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
-                    dataLatMin.push({"x": new Date(latencyArrMin[j].timestamp),
-                        "y": latencyArrMin[j].latency
-                    })
+                if(latencyArrMin.length > 0 && !(currentTime.getTime() - (new Date(latencyArrMin[latencyArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    dataLatMin = []
+                    for(var j = 0; j< latencyArrMin.length; j++){
+                        dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
+                        dataLatMin.push({"x": new Date(latencyArrMin[j].timestamp),
+                            "y": latencyArrMin[j].latency
+                        })
+                    }
                 }
-                dataLatDay = []
-                for(var k = 0; k < latencyArrDay.length; k++){
-                    dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
-                    dataLatDay.push({"x": new Date(latencyArrDay[k].timestamp),
-                        "y": latencyArrDay[k].latency
-                    })
+
+                if(latencyArrDay.length > 0 && !(currentTime.getTime() - (new Date(latencyArrMin[latencyArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    dataLatDay = []
+                    for(var k = 0; k < latencyArrDay.length; k++){
+                        dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
+                        dataLatDay.push({"x": new Date(latencyArrDay[k].timestamp),
+                            "y": latencyArrDay[k].latency
+                        })
+                    }
                 }
             }
 
@@ -1106,31 +1125,35 @@
             }
 
             if(monitor.memFirstData){
-                dataMem = []
-                for(var i = 0; i< memoryDetailsArr.length; i++){
-                    dataMem = sliceFirstData(dataMem, dataView.Seconds);
-                    dataMem.push({"x": new Date(memoryDetailsArr[i].timestamp),
-                        "y": memoryDetailsArr[i].physicalMemory
-                    })
+                if(memoryDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(memoryDetailsArr[memoryDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    dataMem = []
+                    for(var i = 0; i< memoryDetailsArr.length; i++){
+                        dataMem = sliceFirstData(dataMem, dataView.Seconds);
+                        dataMem.push({"x": new Date(memoryDetailsArr[i].timestamp),
+                            "y": memoryDetailsArr[i].physicalMemory
+                        })
+                    }
+                }
+                if(memoryDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(memoryDetailsArrMin[memoryDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    dataMemMin = []
+                    for(var j = 0; j< memoryDetailsArrMin.length; j++){
+                        dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
+                        dataMemMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
+                            "y": memoryDetailsArrMin[j].physicalMemory
+                        })
+                    }
                 }
 
-                dataMemMin = []
-                for(var j = 0; j< memoryDetailsArrMin.length; j++){
-                    dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
-                    dataMemMin.push({"x": new Date(memoryDetailsArrMin[j].timestamp),
-                        "y": memoryDetailsArrMin[j].physicalMemory
-                    })
-                }
-
-                dataMemDay = []
-                for(var k = 0; k< memoryDetailsArrDay.length; k++){
-                    dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
-                    dataMemDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
-                        "y": memoryDetailsArrDay[k].physicalMemory
-                    })
+                if(memoryDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(memoryDetailsArrDay[memoryDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    dataMemDay = []
+                    for(var k = 0; k< memoryDetailsArrDay.length; k++){
+                        dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
+                        dataMemDay.push({"x": new Date(memoryDetailsArrDay[k].timestamp),
+                            "y": memoryDetailsArrDay[k].physicalMemory
+                        })
+                    }
                 }
             }
-
 
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
@@ -1246,27 +1269,34 @@
             }
 
             if(monitor.tpsFirstData){
-                datatrans = []
-                for(var i = 0; i< transDetailsArr.length; i++){
-                    datatrans = sliceFirstData(datatrans, dataView.Seconds);
-                    datatrans.push({"x": new Date(transDetailsArr[i].timestamp),
-                        "y": transDetailsArr[i].transaction
-                    })
-                }
-                datatransMin = []
-                for(var j = 0; j< transDetailsArrMin.length; j++){
-                    datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    datatransMin.push({"x": new Date(transDetailsArrMin[j].timestamp),
-                        "y": transDetailsArrMin[j].transaction
-                    })
+                if(transDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArr[transDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    datatrans = []
+                    for(var i = 0; i< transDetailsArr.length; i++){
+                        datatrans = sliceFirstData(datatrans, dataView.Seconds);
+                        datatrans.push({"x": new Date(transDetailsArr[i].timestamp),
+                            "y": transDetailsArr[i].transaction
+                        })
+                    }
                 }
 
-                datatransDay = []
-                for(var k = 0; k< transDetailsArrDay.length; k++){
-                    datatransDay = sliceFirstData(datatransDay, dataView.Day);
-                    datatransDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
-                        "y": transDetailsArrDay[k].transaction
-                    })
+                if(transDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArrMin[transDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    datatransMin = []
+                    for(var j = 0; j< transDetailsArrMin.length; j++){
+                        datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
+                        datatransMin.push({"x": new Date(transDetailsArrMin[j].timestamp),
+                            "y": transDetailsArrMin[j].transaction
+                        })
+                    }
+                }
+
+                if(transDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(transDetailsArrDay[transDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    datatransDay = []
+                    for(var k = 0; k< transDetailsArrDay.length; k++){
+                        datatransDay = sliceFirstData(datatransDay, dataView.Day);
+                        datatransDay.push({"x": new Date(transDetailsArrDay[k].timestamp),
+                            "y": transDetailsArrDay[k].transaction
+                        })
+                    }
                 }
             }
 
@@ -1434,28 +1464,35 @@
             }
 
             if(monitor.cpuFirstData){
-                cpuData = []
-                for(var i = 0; i< cpuDetailsArr.length; i++){
-                    cpuData = sliceFirstData(cpuData, dataView.Seconds);
-                    cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
-                        "y": cpuDetailsArr[i].percentUsed
-                    })
-                }
-                cpuDataMin = []
-                for(var j = 0; j< cpuDetailsArrMin.length; j++){
-                    cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
-                    cpuDataMin.push({"x": new Date(cpuDetailsArrMin[j].timestamp),
-                        "y": cpuDetailsArrMin[j].percentUsed
-                    })
-                }
-                cpuDataDay = []
-                for(var k = 0; k< cpuDetailsArrDay.length; k++){
-                    cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days );
-                    cpuDataDay.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
-                        "y": cpuDetailsArrDay[k].percentUsed
-                    })
+                if(cpuDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(cpuDetailsArr[cpuDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    cpuData = []
+                    for(var i = 0; i< cpuDetailsArr.length; i++){
+                        cpuData = sliceFirstData(cpuData, dataView.Seconds);
+                        cpuData.push({"x": new Date(cpuDetailsArr[i].timestamp),
+                            "y": cpuDetailsArr[i].percentUsed
+                        })
+                    }
                 }
 
+                if(cpuDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(cpuDetailsArrMin[cpuDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    cpuDataMin = []
+                    for(var j = 0; j< cpuDetailsArrMin.length; j++){
+                        cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
+                        cpuDataMin.push({"x": new Date(cpuDetailsArrMin[j].timestamp),
+                            "y": cpuDetailsArrMin[j].percentUsed
+                        })
+                    }
+                }
+
+                if(cpuDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(cpuDetailsArrDay[cpuDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    cpuDataDay = []
+                    for(var k = 0; k< cpuDetailsArrDay.length; k++){
+                        cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days );
+                        cpuDataDay.push({"x": new Date(cpuDetailsArrDay[k].timestamp),
+                            "y": cpuDetailsArrDay[k].percentUsed
+                        })
+                    }
+                }
             }
 
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
@@ -1675,28 +1712,34 @@
             if(monitor.partitionFirstData){
                 for(var i = 0; i< partitionDetailsArr.length; i++){
                     keyIndexSec =  i;
-                    partitionData[keyIndexSec]["values"] = []
-                    for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
-                        partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
-                        partitionData[keyIndexSec]["values"].push({"x": new Date(partitionDetailsArr[i]["values"][b].x), "y": partitionDetailsArr[i]["values"][b].y})
+                    if(partitionDetailsArr[i]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArr[i]["values"][partitionDetailsArr[i]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                        partitionData[keyIndexSec]["values"] = []
+                        for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
+                            partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
+                            partitionData[keyIndexSec]["values"].push({"x": new Date(partitionDetailsArr[i]["values"][b].x), "y": partitionDetailsArr[i]["values"][b].y})
+                        }
                     }
                 }
 
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
                     keyIndexMin =  j;
-                    partitionDataMin[keyIndexMin]["values"] = []
-                    for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
-                        partitionDataMin[keyIndexMin]["values"] = sliceFirstData(partitionDataMin[keyIndexMin]["values"], dataView.Minutes)
-                        partitionDataMin[keyIndexMin]["values"].push({"x": new Date(partitionDetailsArrMin[j]["values"][a].x), "y": partitionDetailsArrMin[j]["values"][a].y})
+                    if(partitionDetailsArrMin[j]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArrMin[j]["values"][partitionDetailsArrMin[j]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                        partitionDataMin[keyIndexMin]["values"] = []
+                        for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
+                            partitionDataMin[keyIndexMin]["values"] = sliceFirstData(partitionDataMin[keyIndexMin]["values"], dataView.Minutes)
+                            partitionDataMin[keyIndexMin]["values"].push({"x": new Date(partitionDetailsArrMin[j]["values"][a].x), "y": partitionDetailsArrMin[j]["values"][a].y})
+                        }
                     }
                 }
 
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
                     keyIndexDay = k;
-                    partitionDataDay[keyIndexMin]["values"] = []
-                    for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
-                        partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days)
-                        partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrDay[k]["values"][c].y})
+                    if(partitionDetailsArrDay[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArrDay[k]["values"][partitionDetailsArrDay[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                        partitionDataDay[keyIndexMin]["values"] = []
+                        for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
+                            partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days)
+                            partitionDataDay[keyIndexDay]["values"].push({"x": new Date(partitionDetailsArrDay[k]["values"][c].x), "y": partitionDetailsArrDay[k]["values"][c].y})
+                        }
                     }
                 }
             }
@@ -1827,30 +1870,35 @@
             }
 
             if(monitor.drFirstData){
-                drData = []
-                for(var i = 0; i< drDetailsArr.length; i++){
-                    drData = sliceFirstData(drData, dataView.Seconds);
-                    drData.push({"x": new Date(drDetailsArr[i].timestamp),
-                        "y": drDetailsArr[i].replicationRate
-                    })
+                if(drDetailsArr.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArr[drDetailsArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    drData = []
+                    for(var i = 0; i< drDetailsArr.length; i++){
+                        drData = sliceFirstData(drData, dataView.Seconds);
+                        drData.push({"x": new Date(drDetailsArr[i].timestamp),
+                            "y": drDetailsArr[i].replicationRate
+                        })
+                    }
                 }
 
-                drDataMin = []
-                for(var j = 0; j< drDetailsArrMin.length; j++){
-                    drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-                    drDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
-                        "y": drDetailsArrMin[j].replicationRate
-                    })
+                if(drDetailsArrMin.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrMin[drDetailsArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    drDataMin = []
+                    for(var j = 0; j< drDetailsArrMin.length; j++){
+                        drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                        drDataMin.push({"x": new Date(drDetailsArrMin[j].timestamp),
+                            "y": drDetailsArrMin[j].replicationRate
+                        })
+                    }
                 }
 
-                drDataDay = []
-                for(var k = 0; k< drDetailsArrDay.length; k++){
-                    drDataDay = sliceFirstData(drDataDay, dataView.Days );
-                    drDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
-                        "y": drDetailsArrDay[k].replicationRate
-                    })
+                if(drDetailsArrDay.length > 0 && !(currentTime.getTime() - (new Date(drDetailsArrDay[drDetailsArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    drDataDay = []
+                    for(var k = 0; k< drDetailsArrDay.length; k++){
+                        drDataDay = sliceFirstData(drDataDay, dataView.Days );
+                        drDataDay.push({"x": new Date(drDetailsArrDay[k].timestamp),
+                            "y": drDetailsArrDay[k].replicationRate
+                        })
+                    }
                 }
-
             }
 
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
@@ -1952,36 +2000,42 @@
                 cmdLogArr =  JSON.parse(cmdLogArr)
             }
 
-
             if(localStorage.SnapshotOverlayData != undefined)
                 overlayDataArr =  JSON.parse(localStorage.SnapshotOverlayData)
 
             if(monitor.cmdLogFirstData){
-                cmdLogData = []
-                for(var i = 0; i< cmdLogArr.length; i++){
-                    cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
-                    cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
-                        "y": cmdLogArr[i].outstandingTxn
-                    })
+                if(cmdLogArr.length > 0 && !(currentTime.getTime() - (new Date(cmdLogArr[cmdLogArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                    cmdLogData = []
+                    for(var i = 0; i< cmdLogArr.length; i++){
+                        cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
+                        cmdLogData.push({"x": new Date(cmdLogArr[i].timestamp),
+                            "y": cmdLogArr[i].outstandingTxn
+                        })
+                    }
                 }
 
-                cmdLogDataMin = []
-                for(var j = 0; j< cmdLogArrMin.length; j++){
-                    cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
-                    cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
-                        "y": cmdLogArrMin[j].outstandingTxn
-                    })
+                if(cmdLogArrMin.length > 0 && !(currentTime.getTime() - (new Date(cmdLogArrMin[cmdLogArrMin.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    cmdLogDataMin = []
+                    for(var j = 0; j< cmdLogArrMin.length; j++){
+                        cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
+                        cmdLogDataMin.push({"x": new Date(cmdLogArrMin[j].timestamp),
+                            "y": cmdLogArrMin[j].outstandingTxn
+                        })
+                    }
                 }
 
-                cmdLogDataDay = []
-                for(var k = 0; k< cmdLogArrDay.length; k++){
-                    cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
-                    cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
-                        "y": cmdLogArrDay[k].outstandingTxn
-                    })
+                if(cmdLogArrDay.length > 0 && !(currentTime.getTime() - (new Date(cmdLogArrDay[cmdLogArrDay.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    cmdLogDataDay = []
+                    for(var k = 0; k< cmdLogArrDay.length; k++){
+                        cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
+                        cmdLogDataDay.push({"x": new Date(cmdLogArrDay[k].timestamp),
+                            "y": cmdLogArrDay[k].outstandingTxn
+                        })
+                    }
                 }
 
-                if(overlayDataArr.length != 0){
+                overlayData = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
+                if(overlayDataArr.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                     cmdLogOverlay = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
                 }
             }
