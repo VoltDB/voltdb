@@ -38,6 +38,8 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -57,8 +59,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
-
-import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -767,42 +767,68 @@ public class RegressionSuite extends TestCase {
         assertTablesAreEqual(prefix, expectedRows, actualRows, null);
     }
 
+    private static final long TOO_MUCH_INFO = 100;
     protected void assertTablesAreEqual(String prefix, VoltTable expectedRows, VoltTable actualRows, Double epsilon) {
         assertEquals(prefix + "column count mismatch.  Expected: " + expectedRows.getColumnCount() + " actual: " + actualRows.getColumnCount(),
                 expectedRows.getColumnCount(), actualRows.getColumnCount());
-
-        int i = 0;
-        while(expectedRows.advanceRow()) {
-            assertTrue(prefix + "too few actual rows; expected more than " + (i + 1), actualRows.advanceRow());
-
+        if (expectedRows.getRowCount() != actualRows.getRowCount()) {
+            long expRowCount = expectedRows.getRowCount();
+            long actRowCount = actualRows.getRowCount();
+            if (expRowCount + actRowCount < TOO_MUCH_INFO) {
+                System.out.println("Expected: " + expectedRows);
+                System.out.println("Actual:   " + actualRows);
+            }
+            else {
+                System.out.println("Expected: " + expRowCount + " rows");
+                System.out.println("Actual:   " + actRowCount + " rows");
+            }
+            fail(prefix + "row count mismatch.  Expected: " + expectedRows.getRowCount() + " actual: " + actualRows.getRowCount());
+        }
+        int rowNum = 1;
+        while (expectedRows.advanceRow()) {
+            if (! actualRows.advanceRow()) {
+                fail(prefix + "too few actual rows; expected more than " + rowNum);
+            }
             for (int j = 0; j < actualRows.getColumnCount(); j++) {
                 String columnName = actualRows.getColumnName(j);
-                String colPrefix = prefix + "row " + i + ": column: " + columnName + ": ";
-                VoltType actualTy = actualRows.getColumnType(j);
-                VoltType expectedTy = expectedRows.getColumnType(j);
-                assertEquals(colPrefix + "type mismatch", expectedTy, actualTy);
+                String colPrefix = prefix + "row " + rowNum + ": column: " + columnName + ": ";
+                VoltType actualType = actualRows.getColumnType(j);
+                VoltType expectedType = expectedRows.getColumnType(j);
+                assertEquals(colPrefix + "type mismatch", expectedType, actualType);
 
-                Object expectedObj = expectedRows.get(j,  expectedTy);
-                Object actualObj = actualRows.get(j,  actualTy);
-                boolean expectedNull = expectedRows.wasNull();
-                boolean actualNull = actualRows.wasNull();
-                assertEquals(colPrefix + "null/not null mismatch", expectedNull, actualNull);
-
-                if (!expectedNull) {
-                    String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
-                    if (expectedTy != VoltType.FLOAT) {
-                        assertEquals(message, expectedObj, actualObj);
+                Object expectedObj = expectedRows.get(j, expectedType);
+                Object actualObj = actualRows.get(j, actualType);
+                if (expectedRows.wasNull()) {
+                    if (actualRows.wasNull()) {
+                        continue;
                     }
-                    else {
-                        assertNotNull("You pass in an epsilon to compare tables with floating point columns", epsilon);
-                        assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
+                    fail(colPrefix + "expected null, got non null value: " + actualObj);
+                }
+                else {
+                    assertFalse(colPrefix + "expected the value " + expectedObj +
+                            ", got a null value.",
+                            actualRows.wasNull());
+                    String message = colPrefix + "values not equal: ";
+                    if (expectedType == VoltType.FLOAT) {
+                        if (epsilon != null) {
+                            assertEquals(message, (Double)expectedObj, (Double)actualObj, epsilon);
+                            continue;
+                        }
+                        // With no epsilon provided, fall through to take
+                        // a chance on an exact value match, but helpfully
+                        // annotate any false positive that results.
+                        message += ". NOTE: You may want to pass a" +
+                                " non-null epsilon value >= " +
+                                Math.abs((Double)expectedObj - (Double)actualObj) +
+                                " to the table comparison test " +
+                                " if nearly equal FLOAT values are " +
+                                " causing a false mismatch.";
                     }
+                    assertEquals(message, expectedObj, actualObj);
                 }
             }
-
-            i++;
+            rowNum++;
         }
-        assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
 
     public static void assertEquals(String msg, GeographyPointValue expected, GeographyPointValue actual) {

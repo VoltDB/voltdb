@@ -329,7 +329,7 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 
 }
 
-void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
+void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
     // COUNT(*) column will be zero.
@@ -345,7 +345,7 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-    m_target->insertPersistentTuple(m_updatedTuple, true);
+    m_target->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {

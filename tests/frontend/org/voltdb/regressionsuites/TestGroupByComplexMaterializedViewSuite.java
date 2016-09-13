@@ -838,7 +838,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             fail();
         } catch (Exception exc) {
             assertTrue(exc.toString().contains("The size 2050 of the value"));
-            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048) column"));
+            assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048 BYTES) column"));
         }
     }
 
