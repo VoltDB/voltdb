@@ -60,7 +60,10 @@ public class ExampleFormatter implements Formatter<String> {
      *  @param prop - Properties for configuring the formatter; in deployment file this is designated with
      *                <format-property ...>...</format-property> below the specification of importer properties.
      */
+    Properties m_prop;
     ExampleFormatter (String formatName, Properties prop) {
+        // System.out.println("+++ ExampleFormatter properties: " + prop.propertyNames());
+        m_prop = prop;
     }
 
     /**
@@ -71,6 +74,8 @@ public class ExampleFormatter implements Formatter<String> {
     @Override
     public Object[] transform(String sourceData) throws FormatException {
         Object[] objs = {"", "", "", "", ""};
+        Object[] badobjs1 = {"abc", "def", "123", "", "this one is ok"};
+        Object[] badobjs2 = {"", "", "", "", "", ""};
 
         JSONParser parser = new JSONParser();
         JSONObject jsonObj = null;
@@ -80,6 +85,15 @@ public class ExampleFormatter implements Formatter<String> {
         Object event_date = null;
         Object trans = null;
 
+        String percentErrors = m_prop.getProperty("errorrate", "1").trim();
+        int badinject = 1;
+        try {
+            badinject = Integer.parseInt(percentErrors);
+        } catch (NumberFormatException e1) {
+            e1.printStackTrace();
+            badinject = 1;
+        }
+
         try {
             Object obj = parser.parse(sourceData);
             jsonObj = (JSONObject) obj;
@@ -88,12 +102,6 @@ public class ExampleFormatter implements Formatter<String> {
             event_type_id = jsonObj.get("event_type_id");
             event_date = jsonObj.get("event_date");
             trans = jsonObj.get("trans");
-            // System.out.println(sourceData);
-            // System.out.println("\t" + seq);
-            // System.out.println("\t" + instance_id);
-            // System.out.println("\t" + event_type_id);
-            // System.out.println("\t" + event_date);
-            // System.out.println("\t" + trans);
             objs[0] = seq;
             objs[1] = instance_id;
             objs[2] = event_type_id;
@@ -101,6 +109,14 @@ public class ExampleFormatter implements Formatter<String> {
             objs[4] = trans;
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        double r = Math.random();
+        if (r < (badinject/100.0)) {
+            if (r < 1.0/3.0)         // randomize the choice of bad outcomes
+                return badobjs1;
+            else if (r >= 1.0/3.0 && r < 2.0/3.0)
+                return badobjs2;
+            throw new FormatException();
         }
         return objs;
     }

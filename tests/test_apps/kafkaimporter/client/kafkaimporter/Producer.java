@@ -72,7 +72,7 @@ public class Producer extends Thread {
         m_servers = config.brokers;
         m_rate = config.producerrate;
         m_cycletime = config.cycletime;
-        m_pausetime = config.pausetime;
+        m_pausetime = (int) (config.pausetime * Math.random()); // let each thread have its own wait time between 0 and pausetime
         m_rows = config.totalrows;
         long possiblecycles = m_rows / (m_rate * m_cycletime);
         m_cycles = (possiblecycles > config.cycles) ? possiblecycles : config.cycles;
@@ -189,11 +189,15 @@ public class Producer extends Thread {
             producers.add(producer);
         }
         try {
+            int t = 0;
             for (Producer p : producers) {
                 p.join();
+                System.out.println("Thread " + t + " done.");
+                t++;
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        System.out.println("All threads done.");
     }
 }
