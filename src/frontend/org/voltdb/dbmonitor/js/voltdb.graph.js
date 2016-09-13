@@ -2035,7 +2035,7 @@
                 }
 
                 overlayData = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
-                if(overlayDataArr.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
+                if(overlayData.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                     cmdLogOverlay = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
                 }
             }
