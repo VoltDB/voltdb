@@ -2609,9 +2609,8 @@ class DbMonitorTest extends TestBase {
         page.savePreferences()
         report "after_save"
 
-        waitFor(10){
         println("Stored Procedure table is displayed")
-        page.clickMinLatency()}
+        page.clickMinLatency()
 
         then: 'check if max rows is in ascending'
             if (page.tableInAscendingOrder())
@@ -2752,7 +2751,7 @@ class DbMonitorTest extends TestBase {
         when: 'click close button'
         page.savePreferences()
 
-        waitFor(20){page.clickTimeOfExecution()}
+        page.clickTimeOfExecution()
         then: 'check if type is in ascending'
         if ( page.tableInAscendingOrder() )
             before = "ascending"
@@ -3080,7 +3079,7 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Partition Idle Time and again add Partition Idle Time"() {
+    def clickDisplayPreferencesRemovePartitionIdleTimeAndAgainAddPartitionIdleTime() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3103,7 +3102,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        !page.partitionIdleTimeDisplayed()
+//        !page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3127,7 +3126,7 @@ class DbMonitorTest extends TestBase {
         page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
+    def clickDisplayPreferencesRemoveStoredProceduresAndAgainAddStoredProcedures() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3138,44 +3137,50 @@ class DbMonitorTest extends TestBase {
         page.savePreferencesBtnDisplayed()
         page.popupCloseDisplayed()
 
-        when: 'Stored Procedures checkbox is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Remove Stored Procedures'
-        page.storedProceduresCheckboxClick()
+        when:
+        if(!page.storedProceduresCheckboxDisplayed()) {
 
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Stored Procedures displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        !page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
+            when: 'Stored Procedures checkbox is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Remove Stored Procedures'
+            page.storedProceduresCheckboxClick()
 
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
+            when: 'click close button'
+            page.savePreferences()
+            then: 'no Stored Procedures displayed'
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.storedProceduresDisplayed()
+            page.dataTablesDisplayed()
 
-        when: 'Stored Procedures is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Add Stored Procedures'
-        page.storedProceduresCheckboxClick()
+            when: 'click Display Preference button'
+            waitFor(10) { page.openDisplayPreference() }
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
 
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Stored Procedures displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
+            when: 'Stored Procedures is displayed'
+            page.storedProceduresCheckboxDisplayed()
+            then: 'Add Stored Procedures'
+            page.storedProceduresCheckboxClick()
+
+            when: 'click close button'
+            page.savePreferences()
+            then: 'Stored Procedures displayed along with others'
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            page.storedProceduresDisplayed()
+            page.dataTablesDisplayed()
+
+        }
+        then:
+            println("passed")
     }
 
     def "click display preferences remove Data Tables and again add Data Tables"() {
