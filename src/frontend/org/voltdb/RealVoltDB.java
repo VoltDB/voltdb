@@ -62,6 +62,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.Multimap;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -790,12 +792,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            final int numberOfNodes;
-            if (!isRejoin && !m_joining) {
-                numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
-            } else {
-                numberOfNodes = m_messenger.getLiveHostIds().size();
-            }
+            readDeploymentAndCreateStarterCatalogContext(config);
+            final int numberOfNodes = m_messenger.getLiveHostIds().size();
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
@@ -1584,9 +1582,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             try {
-                topo = clusterConfig.getTopology(hostGroups,
-                                                 m_cartographer.getReplicasForPartitions(m_cartographer.getPartitions()),
-                                                 m_cartographer.getHSIdsForSinglePartitionMasters());
+                final Multimap<Integer, Long> replicas = m_cartographer.getReplicasForPartitions(m_cartographer.getPartitions());
+                final Map<Integer, Long> masters = m_cartographer.getHSIdsForSinglePartitionMasters();
+                replicas.removeAll(MpInitiator.MP_INIT_PID);
+                masters.remove(MpInitiator.MP_INIT_PID);
+                topo = clusterConfig.getTopology(hostGroups, replicas, masters);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);
             }
@@ -1826,7 +1826,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
+    void readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2049,8 +2049,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             null,
                             deploymentBytes,
                             0);
-
-            return m_clusterSettings.get().hostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

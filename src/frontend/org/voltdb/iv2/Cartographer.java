@@ -238,7 +238,7 @@ public class Cartographer extends StatsSource
      */
     public Map<Integer, Long> getHSIdsForSinglePartitionMasters()
     {
-        return m_iv2Masters.pointInTimeCache();
+        return new HashMap<>(m_iv2Masters.pointInTimeCache());
     }
 
     /**
