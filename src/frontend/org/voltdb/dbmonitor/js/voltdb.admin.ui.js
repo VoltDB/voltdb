@@ -4314,8 +4314,9 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td class="wordBreak" colspan="4">' + value + '</td>' +
-
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
                                 '</tr>';
                         }
 
@@ -4386,7 +4387,9 @@ function loadAdminPage() {
                             result += '' +
                                 '<tr class="childprop-' + rowId + ' subLabelRow" ' + style + '>' +
                                 '   <td class="configLabe2">' + name + '</td>' +
-                                '   <td class="wordBreak" colspan="3">' + value + '</td>' +
+                                '   <td class="wordBreak" align="right">' + value + '</td>' +
+                                '<td>&nbsp;</td>' +
+                                '<td>&nbsp;</td>' +
                                 '</tr>';
                         }
 
