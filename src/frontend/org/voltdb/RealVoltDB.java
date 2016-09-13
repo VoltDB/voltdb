@@ -62,7 +62,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.HashMultimap;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -903,14 +902,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
+            m_configuredReplicationFactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
+                                              m_catalogContext.cluster.getNetworkpartition());
             JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
-                m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
-                m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
-                        m_catalogContext.cluster.getNetworkpartition());
                 List<Integer> partitions;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
@@ -1585,7 +1584,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             try {
-                topo = clusterConfig.getTopology(hostGroups, HashMultimap.create(), new HashMap<>());
+                topo = clusterConfig.getTopology(hostGroups,
+                                                 m_cartographer.getReplicasForPartitions(m_cartographer.getPartitions()),
+                                                 m_cartographer.getHSIdsForSinglePartitionMasters());
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);
             }
