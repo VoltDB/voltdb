@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.HashMultimap;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -52,7 +51,9 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 
+import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -62,7 +63,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private final int NUM_AGREEMENT_SITES = 1;
     private ClusterConfig m_config = null;
     private Set<Integer> m_hostIds;
-    private Map<Integer, String> m_hostGroups;
+    private Map<Integer, ExtensibleGroupTag> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
@@ -116,7 +117,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
-            m_hostGroups.put(i, "0");
+            m_hostGroups.put(i, new ExtensibleGroupTag("0", "0"));
         }
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);

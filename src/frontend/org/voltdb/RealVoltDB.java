@@ -62,8 +62,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.HashMultimap;
-import com.google_voltpatches.common.collect.Multimap;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -103,6 +101,7 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -159,6 +158,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -799,7 +799,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     managedPathsEmptyCheck(config);
             }
 
-            final Map<Integer, String> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
+            final Map<Integer, ExtensibleGroupTag> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
                 setMode(OperationMode.PAUSED);
@@ -1562,7 +1562,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(StartAction startAction, Map<Integer, String> hostGroups,
+    private JSONObject getTopology(StartAction startAction, Map<Integer, ExtensibleGroupTag> hostGroups,
                                    JoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
@@ -2360,7 +2360,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         if (m_config.m_placementGroup != null) {
-            hmconfig.group = m_config.m_placementGroup;
+            hmconfig.rackAwarenessgroup = m_config.m_placementGroup;
+        }
+        if (m_config.m_buddyGroup != null) {
+            hmconfig.buddyGroup = m_config.m_buddyGroup;
         }
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;

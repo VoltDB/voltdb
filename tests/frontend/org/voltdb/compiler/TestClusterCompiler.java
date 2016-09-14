@@ -29,28 +29,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.HashMultimap;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Multimap;
-import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-
-import junit.framework.TestCase;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
+
+import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Sets;
+
+import junit.framework.TestCase;
 
 public class TestClusterCompiler extends TestCase
 {
     public void testNonZeroReplicationFactor() throws Exception
     {
         ClusterConfig config = new ClusterConfig(3, 1, 2);
-        Map<Integer, String> topology = Maps.newHashMap();
-        topology.put(0, "0");
-        topology.put(1, "0");
-        topology.put(2, "0");
+        Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
+        topology.put(0, new ExtensibleGroupTag("0", "0"));
+        topology.put(1, new ExtensibleGroupTag("0", "0"));
+        topology.put(2, new ExtensibleGroupTag("0", "0"));
         JSONObject obj = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
         config.validate();
         System.out.println(obj.toString(4));
@@ -101,8 +103,8 @@ public class TestClusterCompiler extends TestCase
     public void testAddHostToNonKsafe() throws JSONException
     {
         ClusterConfig config = new ClusterConfig(1, 6, 0);
-        Map<Integer, String> topology = Maps.newHashMap();
-        topology.put(0, "0");
+        Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
+        topology.put(0, new ExtensibleGroupTag("0", "0"));
         JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
         assertEquals(1, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
@@ -117,9 +119,9 @@ public class TestClusterCompiler extends TestCase
     public void testAddHostsToNonKsafe() throws JSONException
     {
         ClusterConfig config = new ClusterConfig(2, 6, 0);
-        Map<Integer, String> topology = Maps.newHashMap();
-        topology.put(0, "0");
-        topology.put(1, "0");
+        Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
+        topology.put(0, new ExtensibleGroupTag("0", "0"));
+        topology.put(1, new ExtensibleGroupTag("0", "0"));
         JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
@@ -136,9 +138,9 @@ public class TestClusterCompiler extends TestCase
     public void testAddHostsToKsafe() throws JSONException
     {
         ClusterConfig config = new ClusterConfig(2, 6, 1);
-        Map<Integer, String> topology = Maps.newHashMap();
-        topology.put(0, "0");
-        topology.put(1, "0");
+        Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
+        topology.put(0, new ExtensibleGroupTag("0", "0"));
+        topology.put(1, new ExtensibleGroupTag("0", "0"));
         JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
@@ -153,9 +155,9 @@ public class TestClusterCompiler extends TestCase
     public void testAddMoreThanKsafeHosts() throws JSONException
     {
         ClusterConfig config = new ClusterConfig(2, 6, 1);
-        Map<Integer, String> topology = Maps.newHashMap();
-        topology.put(0, "0");
-        topology.put(1, "0");
+        Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
+        topology.put(0, new ExtensibleGroupTag("0", "0"));
+        topology.put(1, new ExtensibleGroupTag("0", "0"));
         JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
@@ -171,54 +173,54 @@ public class TestClusterCompiler extends TestCase
 
     public void testRejoinOneNode() throws JSONException
     {
-        ImmutableMap<Integer, String> topology =
-        ImmutableMap.of(0, "0",
-                        1, "0");
+        ImmutableMap<Integer, ExtensibleGroupTag> topology =
+        ImmutableMap.of(0, new ExtensibleGroupTag("0", "0"),
+                        1, new ExtensibleGroupTag("0", "0"));
         killAndRejoinNodes(topology, 1, 1);
     }
 
     public void testRejoinTwoNodes() throws JSONException
     {
-        ImmutableMap<Integer, String> topology =
-        ImmutableMap.of(0, "0",
-                        1, "1",
-                        2, "2");
+        ImmutableMap<Integer, ExtensibleGroupTag> topology =
+        ImmutableMap.of(0, new ExtensibleGroupTag("0", "0"),
+                        1, new ExtensibleGroupTag("1", "0"),
+                        2, new ExtensibleGroupTag("2", "0"));
         killAndRejoinNodes(topology, 2, 2);
     }
 
     public void testRejoinTwoNodesToTwo() throws JSONException
     {
-        ImmutableMap<Integer, String> topology = new ImmutableMap.Builder<Integer, String>()
-                                                 .put(0, "0")
-                                                 .put(1, "0")
-                                                 .put(2, "1")
-                                                 .put(3, "1")
-                                                 .put(4, "2")
-                                                 .put(5, "2")
+        ImmutableMap<Integer, ExtensibleGroupTag> topology = new ImmutableMap.Builder<Integer, ExtensibleGroupTag>()
+                                                 .put(0, new ExtensibleGroupTag("0", "0"))
+                                                 .put(1, new ExtensibleGroupTag("0", "0"))
+                                                 .put(2, new ExtensibleGroupTag("1", "0"))
+                                                 .put(3, new ExtensibleGroupTag("1", "0"))
+                                                 .put(4, new ExtensibleGroupTag("2", "0"))
+                                                 .put(5, new ExtensibleGroupTag("2", "0"))
                                                  .build();
         killAndRejoinNodes(topology, 1, 2);
     }
 
     public void testRejoinThreeNodesToFour() throws JSONException
     {
-        ImmutableMap<Integer, String> topology = new ImmutableMap.Builder<Integer, String>()
-                                                 .put(0, "0")
-                                                 .put(1, "0")
-                                                 .put(2, "0")
-                                                 .put(3, "0")
-                                                 .put(4, "1")
-                                                 .put(5, "1")
-                                                 .put(6, "1")
+        ImmutableMap<Integer, ExtensibleGroupTag> topology = new ImmutableMap.Builder<Integer, ExtensibleGroupTag>()
+                                                 .put(0, new ExtensibleGroupTag("0", "0"))
+                                                 .put(1, new ExtensibleGroupTag("0", "0"))
+                                                 .put(2, new ExtensibleGroupTag("0", "0"))
+                                                 .put(3, new ExtensibleGroupTag("0", "0"))
+                                                 .put(4, new ExtensibleGroupTag("1", "0"))
+                                                 .put(5, new ExtensibleGroupTag("1", "0"))
+                                                 .put(6, new ExtensibleGroupTag("1", "0"))
                                                  .build();
         killAndRejoinNodes(topology, 2, 3);
     }
 
-    private static void killAndRejoinNodes(ImmutableMap<Integer, String> fullHostGroup, int kfactor, int nodesToKill)
+    private static void killAndRejoinNodes(ImmutableMap<Integer, ExtensibleGroupTag> fullHostGroup, int kfactor, int nodesToKill)
     throws JSONException
     {
         final int maxSph = 20;
         for (int sph = 1; sph < maxSph; sph++) {
-            final Map<Integer, String> rejoinHostGroup = new HashMap<>(fullHostGroup);
+            final Map<Integer, ExtensibleGroupTag> rejoinHostGroup = new HashMap<>(fullHostGroup);
             final ClusterConfig initialConfig = new ClusterConfig(rejoinHostGroup.size(), sph, kfactor);
             if (!initialConfig.validate()) {
                 // Invalid config, skip
@@ -251,7 +253,7 @@ public class TestClusterCompiler extends TestCase
             // Remove all partitions and masters from the failed nodes, migrate masters to remaining nodes
             final Multimap<Integer, Integer> expectedRejoinHostPartitions = HashMultimap.create();
             final HashSet<Integer> liveHosts = new HashSet<>(hostPartitions.keySet());
-            final Map<Integer, String> rejoinHostGroups = new HashMap<>();
+            final Map<Integer, ExtensibleGroupTag> rejoinHostGroups = new HashMap<>();
             for (int toKill : hostIdsToKill) {
                 liveHosts.remove(toKill);
                 for (int masterToRedistribute : hostMasters.get(toKill)) {
@@ -278,7 +280,7 @@ public class TestClusterCompiler extends TestCase
             }
 
             // Rejoin one node at a time and verify that they have the correct partitions
-            for (Map.Entry<Integer, String> rejoin : rejoinHostGroups.entrySet()) {
+            for (Map.Entry<Integer, ExtensibleGroupTag> rejoin : rejoinHostGroups.entrySet()) {
                 System.out.println("Rejoining " + rejoin.getKey() + " in group " + rejoin.getValue());
                 rejoinHostGroup.put(rejoin.getKey(), rejoin.getValue());
                 final JSONObject rejoinTopo = initialConfig.getTopology(rejoinHostGroup, replicas, masters);
@@ -288,7 +290,7 @@ public class TestClusterCompiler extends TestCase
                 // at least one replica in a different group.
                 if (fullHostGroup.values().stream().distinct().count() > 1) {
                     for (int partitionOnRejoined : partitionsOnRejoinHost) {
-                        final String rejoinedHostGroup = rejoin.getValue();
+                        final ExtensibleGroupTag rejoinedHostGroup = rejoin.getValue();
                         boolean foundHostInOtherGroup = false;
                         for (long hsId : replicas.get(partitionOnRejoined)) {
                             if (!rejoinHostGroup.get(CoreUtils.getHostIdFromHSId(hsId)).equals(rejoinedHostGroup)) {
@@ -318,7 +320,7 @@ public class TestClusterCompiler extends TestCase
         }
     }
 
-    private static Set<Integer> pickNodesInDiffGroupsToKill(ImmutableMap<Integer, String> topo,
+    private static Set<Integer> pickNodesInDiffGroupsToKill(ImmutableMap<Integer, ExtensibleGroupTag> topo,
                                                             Multimap<Integer, Integer> hostPartitions,
                                                             int kfactor,
                                                             int nodesToKill)
@@ -362,111 +364,111 @@ public class TestClusterCompiler extends TestCase
 
     public void testFourNodesOneGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "0");
-        hostGroups.put(3, "0");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("0", "0"));
         runConfigAndVerifyTopology(hostGroups, 1);
     }
 
     public void testFourNodesTwoGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "1");
-        hostGroups.put(3, "1");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("1", "0"));
         runConfigAndVerifyTopology(hostGroups, 1);
     }
 
     public void testFourNodesTwoGroupsNonoptimal() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "0");
-        hostGroups.put(3, "1");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("1", "0"));
         runConfigAndVerifyTopology(hostGroups, 1);
     }
 
     public void testThreeNodesThreeGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "1");
-        hostGroups.put(2, "2");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("2", "0"));
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
     public void testSixNodesThreeGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "1");
-        hostGroups.put(3, "1");
-        hostGroups.put(4, "2");
-        hostGroups.put(5, "2");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(4, new ExtensibleGroupTag("2", "0"));
+        hostGroups.put(5, new ExtensibleGroupTag("2", "0"));
         runConfigAndVerifyTopology(hostGroups, 1);
     }
 
     public void testFiveNodesTwoGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "1");
-        hostGroups.put(3, "1");
-        hostGroups.put(4, "1");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(4, new ExtensibleGroupTag("1", "0"));
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
     public void testEightNodesTwoLevelsOfGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0.0");
-        hostGroups.put(1, "0.0");
-        hostGroups.put(2, "0.1");
-        hostGroups.put(3, "0.1");
-        hostGroups.put(4, "1.0");
-        hostGroups.put(5, "1.0");
-        hostGroups.put(6, "1.1");
-        hostGroups.put(7, "1.1");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0.0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0.0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("0.1", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("0.1", "0"));
+        hostGroups.put(4, new ExtensibleGroupTag("1.0", "0"));
+        hostGroups.put(5, new ExtensibleGroupTag("1.0", "0"));
+        hostGroups.put(6, new ExtensibleGroupTag("1.1", "0"));
+        hostGroups.put(7, new ExtensibleGroupTag("1.1", "0"));
         runConfigAndVerifyTopology(hostGroups, 3);
     }
 
     public void testFifteenNodesTwoGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, "0");
-        hostGroups.put(1, "0");
-        hostGroups.put(2, "0");
-        hostGroups.put(3, "0");
-        hostGroups.put(4, "0");
-        hostGroups.put(5, "0");
-        hostGroups.put(6, "0");
-        hostGroups.put(7, "0");
-        hostGroups.put(8, "1");
-        hostGroups.put(9, "1");
-        hostGroups.put(10, "1");
-        hostGroups.put(11, "1");
-        hostGroups.put(12, "1");
-        hostGroups.put(13, "1");
-        hostGroups.put(14, "1");
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(4, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(5, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(6, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(7, new ExtensibleGroupTag("0", "0"));
+        hostGroups.put(8, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(9, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(10, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(11, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(12, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(13, new ExtensibleGroupTag("1", "0"));
+        hostGroups.put(14, new ExtensibleGroupTag("1", "0"));
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
     public void testFiftNodesInThreeGroups() throws JSONException
     {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
         for (int i = 0; i < 50; i++) {
-            hostGroups.put(i, String.valueOf(i % 3));
+            hostGroups.put(i, new ExtensibleGroupTag(String.valueOf(i % 3), "0"));
         }
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
-    private static void runConfigAndVerifyTopology(Map<Integer, String> hostGroups, int kfactor) throws JSONException
+    private static void runConfigAndVerifyTopology(Map<Integer, ExtensibleGroupTag> hostGroups, int kfactor) throws JSONException
     {
         final int maxSites = 20;
         int invalidConfigCount = 0;
@@ -490,7 +492,8 @@ public class TestClusterCompiler extends TestCase
         assertEquals(expectedInvalidConfigs, invalidConfigCount);
     }
 
-    private static void verifyTopology(Map<Integer, String> hostGroups, JSONObject topo) throws JSONException
+    // TODO: add buddy group verification
+    private static void verifyTopology(Map<Integer, ExtensibleGroupTag> hostGroups, JSONObject topo) throws JSONException
     {
         final int hostCount = new ClusterConfig(topo).getHostCount();
         final int sitesPerHost = new ClusterConfig(topo).getSitesPerHost();
@@ -500,9 +503,11 @@ public class TestClusterCompiler extends TestCase
         final int nodesWithMaxMasterCount = partitionCount % hostCount;
 
         Multimap<Integer, Integer> masterCountToHost = HashMultimap.create();
-        Multimap<String, Integer> groupHosts = HashMultimap.create();
-        Multimap<String, Integer> groupPartitions = HashMultimap.create();
-        for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
+        Multimap<String, Integer> raGroupHosts = HashMultimap.create();
+        Multimap<String, Integer> buddyGroupHosts = HashMultimap.create();
+        Multimap<String, Integer> raGroupPartitions = HashMultimap.create();
+        Multimap<String, Integer> buddyGroupPartitions = HashMultimap.create();
+        for (Map.Entry<Integer, ExtensibleGroupTag> entry : hostGroups.entrySet()) {
             final List<Integer> hostPartitions = ClusterConfig.partitionsForHost(topo, entry.getKey());
             final List<Integer> hostMasters = ClusterConfig.partitionsForHost(topo, entry.getKey(), true);
             assertEquals(sitesPerHost, hostPartitions.size());
@@ -510,8 +515,8 @@ public class TestClusterCompiler extends TestCase
             assertEquals(hostPartitions.size(), Sets.newHashSet(hostPartitions).size());
 
             masterCountToHost.put(hostMasters.size(), entry.getKey());
-            groupHosts.put(entry.getValue(), entry.getKey());
-            groupPartitions.putAll(entry.getValue(), hostPartitions);
+            raGroupHosts.put(entry.getValue().m_rackAwarenessGroup, entry.getKey());
+            raGroupPartitions.putAll(entry.getValue().m_rackAwarenessGroup, hostPartitions);
         }
 
         // Make sure master partitions are spread out
@@ -525,9 +530,9 @@ public class TestClusterCompiler extends TestCase
         }
 
         // Each group should have at least one copy of all the partitions
-        for (Map.Entry<String, Collection<Integer>> groupAndPids : groupPartitions.asMap().entrySet()) {
-            assertEquals(groupPartitions.toString(),
-                         Math.min(partitionCount, groupHosts.get(groupAndPids.getKey()).size() * sitesPerHost),
+        for (Map.Entry<String, Collection<Integer>> groupAndPids : raGroupPartitions.asMap().entrySet()) {
+            assertEquals(raGroupPartitions.toString(),
+                         Math.min(partitionCount, raGroupHosts.get(groupAndPids.getKey()).size() * sitesPerHost),
                          Sets.newHashSet(groupAndPids.getValue()).size());
         }
     }

@@ -252,6 +252,9 @@ public class VoltDB {
         /** Placement group */
         public String m_placementGroup = null;
 
+        /** Buddy group */
+        public String m_buddyGroup = null;
+
         public boolean m_isPaused = false;
 
         private final static void referToDocAndExit() {
@@ -587,6 +590,8 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
+                else if (arg.equalsIgnoreCase("buddygroup"))
+                    m_buddyGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
                 } else if (arg.equalsIgnoreCase("paused")) {

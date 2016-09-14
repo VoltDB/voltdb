@@ -32,11 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.HashMultimap;
-import com.google_voltpatches.common.collect.Lists;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -44,9 +39,14 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
-
-import com.google_voltpatches.common.collect.Multimap;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Sets;
 
 public class ClusterConfig
 {
@@ -227,6 +227,20 @@ public class ClusterConfig
             }
         }
         return isValid;
+    }
+
+
+    /**
+     * Extend the group concept to support multiple tags for single node.
+     */
+    public static class ExtensibleGroupTag {
+        public final String m_rackAwarenessGroup;
+        public final String m_buddyGroup;
+
+        public ExtensibleGroupTag(String raGroup, String buddyGroup) {
+            m_rackAwarenessGroup = raGroup;
+            m_buddyGroup = buddyGroup;
+        }
     }
 
     private static class Partition {
@@ -482,9 +496,9 @@ public class ClusterConfig
     private static class PhysicalTopology {
         final Group m_root = new Group();
 
-        public PhysicalTopology(Map<Integer, String> hostGroups) {
-            for (Map.Entry<Integer, String> e : hostGroups.entrySet()) {
-                m_root.createHost(parseGroup(e.getValue()), e.getKey());
+        public PhysicalTopology(Map<Integer, ExtensibleGroupTag> hostGroups) {
+            for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
+                m_root.createHost(parseGroup(e.getValue().m_rackAwarenessGroup), e.getKey());
             }
         }
 
@@ -595,7 +609,7 @@ public class ClusterConfig
      * 2. Group partition replica assignment.
      */
     JSONObject groupAwarePlacementStrategy(
-            Map<Integer, String> hostGroups,
+            Map<Integer, ExtensibleGroupTag> hostGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
             int partitionCount,
@@ -662,6 +676,15 @@ public class ClusterConfig
             if (n.partitionCount() != sitesPerHost) {
                 throw new RuntimeException("Some nodes are missing partition replicas: " + allNodes);
             }
+
+            StringBuilder groups = new StringBuilder();
+            for (int ii = 0; ii < n.m_group.length; ii++) {
+                groups.append(n.m_group[ii]);
+                if (ii != (n.m_group.length - 1)) {
+                    groups.append(".");
+                }
+            }
+            hostLog.error(String.format("Node %s(group:%s)", n.toString(), groups.toString()));
         }
         for (Partition p : partitions) {
             if (p.m_neededReplicas != 0 && partitionReplicas.isEmpty() && partitionMasters.isEmpty()) {
@@ -852,7 +875,7 @@ public class ClusterConfig
 
     // Statically build a topology. This only runs at startup;
     // rejoin clones this from an existing server.
-    public JSONObject getTopology(Map<Integer, String> hostGroups,
+    public JSONObject getTopology(Map<Integer, ExtensibleGroupTag> hostGroups,
                                   Multimap<Integer, Long> partitionReplicas,
                                   Map<Integer, Long> partitionMasters) throws JSONException
     {
