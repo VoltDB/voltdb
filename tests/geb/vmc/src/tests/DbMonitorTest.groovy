@@ -114,27 +114,33 @@ class DbMonitorTest extends TestBase {
     }
 
     def openAndCloseDataArea() {
-        when: 'ensure the Data area is open'
-        if (!page.isDataAreaOpen()) {
+        when:
+        if (!page.dataTables.isDisplayed()) {
+
+            when: 'ensure the Data area is open'
+            if (!page.isDataAreaOpen()) {
+                page.openDataArea()
+            }
+            then: 'Data area is open (to start test)'
+            page.isDataAreaOpen()
+
+            when: 'click Show/Hide Data (to close)'
+            page.closeDataArea()
+            then: 'Data area is closed'
+            !page.isDataAreaOpen()
+
+            when: 'click Show/Hide Data (to open again)'
             page.openDataArea()
+            then: 'Data area is open (again)'
+            page.isDataAreaOpen()
+
+            when: 'click Show/Hide Data (to close again)'
+            page.closeDataArea()
+            then: 'Data area is closed (again)'
+            !page.isDataAreaOpen()
         }
-        then: 'Data area is open (to start test)'
-        page.isDataAreaOpen()
-
-        when: 'click Show/Hide Data (to close)'
-        page.closeDataArea()
-        then: 'Data area is closed'
-        !page.isDataAreaOpen()
-
-        when: 'click Show/Hide Data (to open again)'
-        page.openDataArea()
-        then: 'Data area is open (again)'
-        page.isDataAreaOpen()
-
-        when: 'click Show/Hide Data (to close again)'
-        page.closeDataArea()
-        then: 'Data area is closed (again)'
-        !page.isDataAreaOpen()
+        then:
+        println("passed")
     }
 
     def checkActiveMissingJoining() {
@@ -206,11 +212,12 @@ class DbMonitorTest extends TestBase {
         when: 'click Server button (to open list)'
         page.openServerList()
         then: 'Server list is open'
-        page.isServerListOpen()
-        page.serverListHeader.isDisplayed()
-        page.serverNameHeader.isDisplayed()
-        page.serverIpAddressHeader.isDisplayed()
-        page.serverMemoryUsageHeader.isDisplayed()
+        if(page.isServerListOpen()) {
+            page.serverListHeader.isDisplayed()
+            page.serverNameHeader.isDisplayed()
+            page.serverIpAddressHeader.isDisplayed()
+            page.serverMemoryUsageHeader.isDisplayed()
+        }
 
         when: 'click Server button (to close list)'
         page.closeServerList()
@@ -590,134 +597,163 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check if Row Count is clickable"() {
+    def checkIfRowCountIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click row count'
+
+        when:
+        if(page.dataTablesDisplayed()) {
+
+            when: 'click row count'
             page.clickRowcount()
-        then: 'check if row count is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if row count is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click row count'
+            when: 'click row count'
             page.clickRowcount()
-        then: 'check if row count is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if row count is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        println("passed")
     }
 
     def checkIfMaxRowsIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click max rows'
+        when:
+        if(page.dataTablesDisplayed()) {
+            when: 'click max rows'
             page.clickMaxRows()
-        then: 'check if max rows is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if max rows is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click max rows'
+            when: 'click max rows'
             page.clickMaxRows()
-        then: 'check if max rows is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if max rows is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        println("passed")
     }
 
     def "check if Min Rows is clickable"() {
         String before = ""
         String after  = ""
 
-        when: 'click min rows'
+        when:
+        if(page.dataTablesDisplayed()) {
+
+
+            when: 'click min rows'
             page.clickMinRows()
-        then: 'check if min rows is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if min rows is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click min rows'
+            when: 'click min rows'
             page.clickMinRows()
-        then: 'check if min rows is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if min rows is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        println("passed")
     }
 
     def "check if Avg Rows is clickable"() {
         String before = ""
         String after  = ""
 
-        when: 'click avg rows'
+        when:
+        if(page.dataTablesDisplayed()) {
+            when: 'click avg rows'
             page.clickAvgRows()
-        then: 'check if avg rows is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if avg rows is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click avg rows'
+            when: 'click avg rows'
             page.clickAvgRows()
-        then: 'check if avg rows is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if avg rows is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        println("passed")
     }
 
     def "check if Type is clickable"() {
         String before = ""
         String after  = ""
 
-        when: 'click type'
+        when:
+        if(page.dataTablesDisplayed()) {
+            when: 'click type'
             page.clickTabletype()
-        then: 'check if type is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if type is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click type'
+            when: 'click type'
             page.clickTabletype()
-        then: 'check if type is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if type is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        prinln("passed")
     }
 
     // stored procedure ascending descending
@@ -831,24 +867,28 @@ class DbMonitorTest extends TestBase {
 
     def "Check Data in Database Tables"() {
         when:
-        page.databaseTableDisplayed()
+        if(page.databaseTableDisplayed()) {
+
+            when:
+            println("dataTable displayed")
+            then:
+            if (page.databaseTableMsg.text().equals("No data to be displayed")) {
+                println("No data displayed-PASS")
+                println()
+                assert true
+            } else if (!page.databaseTableMsg.text().equals("")) {
+                println("Data displayed-PASS")
+                println(page.databaseTableMsg.text())
+                println()
+                assert true
+            } else {
+                println("FAIL")
+                println()
+                assert false
+            }
+        }
         then:
-        if(page.databaseTableMsg.text().equals("No data to be displayed")) {
-            println("No data displayed-PASS")
-            println()
-            assert true
-        }
-        else if(!page.databaseTableMsg.text().equals("")) {
-            println("Data displayed-PASS")
-            println(page.databaseTableMsg.text())
-            println()
-            assert true
-        }
-        else {
-            println("FAIL")
-            println()
-            assert false
-        }
+        println("passed")
     }
 
     // ALERT
@@ -2822,13 +2862,14 @@ class DbMonitorTest extends TestBase {
         }
         then: 'display'
 
+
         DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
         Date date = new Date();
         String stringTwo = dateFormat.format(date)
 
         String stringOne = timeOne.text()
         int hourOne = page.changeToHour(stringOne)
-        int minuteOne = page.changeToMinute(stringOne)
+
 
         int hourTwo = page.changeToHour(stringTwo)
         int minuteTwo = page.changeToHour(stringTwo)
