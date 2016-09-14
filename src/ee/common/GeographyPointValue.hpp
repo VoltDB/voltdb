@@ -189,7 +189,7 @@ private:
             snprintf(buffer, sizeof(buffer), "%3.1f", number);
         }
         else {
-            int wholeNumberDigits = log10(abs(number)) + 1;
+            int wholeNumberDigits = log10(std::abs(number)) + 1;
             snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumberDigits + decimalPrecision), number);
         }
         return buffer;
