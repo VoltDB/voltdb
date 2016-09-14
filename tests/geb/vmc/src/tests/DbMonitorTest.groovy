@@ -623,8 +623,7 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-            else
-                assert false
+
         }
         then:
         println("passed")
@@ -654,8 +653,6 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-            else
-                assert false
         }
         then:
         println("passed")
@@ -687,8 +684,7 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-            else
-                assert false
+
         }
         then:
         println("passed")
@@ -718,8 +714,7 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-            else
-                assert false
+
         }
         then:
         println("passed")
@@ -749,11 +744,10 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-            else
-                assert false
+
         }
         then:
-        prinln("passed")
+        println("passed")
     }
 
     // stored procedure ascending descending
@@ -839,20 +833,18 @@ class DbMonitorTest extends TestBase {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
-        if(!page.storedProceduresTableDisplayed()) {
-            when: 'click Display Preference button'
-            page.openDisplayPreference()
-            then: 'display title and save button of preferences'
-            page.preferencesTitleDisplayed()
-            page.savePreferencesBtnDisplayed()
-            page.popupCloseDisplayed()
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
 
-            when: 'Stored Procedure checkbox is displayed'
-            page.storedProceduresCheckboxDisplayed()
-            then: 'Add Stored Procedure'
-            page.storedProceduresCheckboxClick()
-            page.savePreferencesBtn.click()
-        }
+        when: 'Stored Procedure checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedure'
+        page.storedProceduresCheckboxClick()
+        page.savePreferencesBtn.click()
 
         when:
         if(page.storedProceduresDisplayed()) {
