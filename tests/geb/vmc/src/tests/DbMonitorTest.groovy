@@ -783,45 +783,56 @@ class DbMonitorTest extends TestBase {
         } catch(geb.error.RequiredPageContentNotPresent e) {
             before = "descending"
         }
-        waitFor(30) { page.clickStoredProcedure() }
-        then: 'check if table is in ascending'
+
+        when:
+        if(page.storedProceduresDisplayed()) {
+            when:
+            waitFor(30) { page.clickStoredProcedure() }
+            then: 'check if table is in ascending'
             try {
                 page.tableInAscendingOrder()
                 before = "ascending"
-            } catch(geb.error.RequiredPageContentNotPresent e) {
+            } catch (geb.error.RequiredPageContentNotPresent e) {
                 before = "descending"
             }
 
-            if ( !before.equals(after)  )
+            if (!before.equals(after))
                 assert true
             else
                 assert false
+        }
+        then:
+            println("passed")
     }
 
-    def "check if Invocations is clickable"() {
+    def checkIfInvocationsIsClickable() {
         String before = ""
         String after  = ""
 
-        when: 'click row count'
+        if(page.storedProceduresDisplayed()) {
+            when: 'click row count'
             page.clickInvocations()
-        then: 'check if row count is in ascending'
-            if ( page.tableInAscendingOrder() )
+            then: 'check if row count is in ascending'
+            if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
 
-        when: 'click row count'
+            when: 'click row count'
             page.clickInvocations()
-        then: 'check if row count is in descending'
-            if ( page.tableInDescendingOrder() )
+            then: 'check if row count is in descending'
+            if (page.tableInDescendingOrder())
                 after = "descending"
             else
                 after = "ascending"
 
-            if ( before.equals("ascending") && after.equals("descending") )
+            if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
                 assert false
+        }
+        then:
+        println("passed")
     }
 
     def CheckDataInStoredProcedures() {
@@ -844,25 +855,28 @@ class DbMonitorTest extends TestBase {
         }
 
         when:
-        page.storedProceduresTableDisplayed()
-        report 'checkafterdisplay'
+        if(page.storedProceduresDisplayed()) {
+            when:
+            page.storedProceduresTableDisplayed()
+            report 'checkafterdisplay'
+            then:
+            if (page.storedProceduresMsg.text().equals("No data to be displayed")) {
+                println("No data displayed-PASS")
+                println()
+                assert true
+            } else if (!page.storedProceduresMsg.text().equals("")) {
+                println("Data displayed-PASS")
+                println(page.storedProceduresMsg.text())
+                println()
+                assert true
+            } else {
+                println("FAIL")
+                println()
+                assert false
+            }
+        }
         then:
-        if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
-            println("No data displayed-PASS")
-            println()
-            assert true
-        }
-        else if(!page.storedProceduresMsg.text().equals("")) {
-            println("Data displayed-PASS")
-            println(page.storedProceduresMsg.text())
-            println()
-            assert true
-        }
-        else {
-            println("FAIL")
-            println()
-            assert false
-        }
+        println("passed")
     }
 
     def "Check Data in Database Tables"() {
@@ -2649,18 +2663,21 @@ class DbMonitorTest extends TestBase {
         page.savePreferences()
         report "after_save"
 
-        println("Stored Procedure table is displayed")
-        page.clickMinLatency()
+        when:
+        if(page.storedProceduresDisplayed()) {
+            when:
+            println("Stored Procedure table is displayed")
+            page.clickMinLatency()
 
-        then: 'check if max rows is in ascending'
+            then: 'check if max rows is in ascending'
             if (page.tableInAscendingOrder())
                 before = "ascending"
             else
                 before = "descending"
-        when: 'click min latency'
+            when: 'click min latency'
             page.clickMinLatency()
 
-        then: 'check if max rows is in descending'
+            then: 'check if max rows is in descending'
             if (page.tableInDescendingOrder())
                 after = "descending"
             else
@@ -2670,7 +2687,10 @@ class DbMonitorTest extends TestBase {
                 assert true
             else
                 assert false
-    }
+        }
+        then:
+        println("passed")
+        }
 
     def checkIfMaxLatencyIsClickable() {
         String before = ""
@@ -2694,25 +2714,33 @@ class DbMonitorTest extends TestBase {
         when: 'click close button'
         page.savePreferences()
 
-        waitFor(10){page.clickMaxLatency()}
-        then: 'check if min rows is in ascending'
-        if ( page.tableInAscendingOrder() )
-            before = "ascending"
-        else
-            before = "descending"
+        then:
+        println("saved")
+        when:
+        if(page.storedProceduresDisplayed()) {
+            when:
+            waitFor(10) { page.clickMaxLatency() }
+            then: 'check if min rows is in ascending'
+            if (page.tableInAscendingOrder())
+                before = "ascending"
+            else
+                before = "descending"
 
-        when: 'click max latency'
-        page.clickMaxLatency()
-        then: 'check if min rows is in descending'
-        if ( page.tableInDescendingOrder() )
-            after = "descending"
-        else
-            after = "ascending"
+            when: 'click max latency'
+            page.clickMaxLatency()
+            then: 'check if min rows is in descending'
+            if (page.tableInDescendingOrder())
+                after = "descending"
+            else
+                after = "ascending"
 
-        if ( before.equals("ascending") && after.equals("descending") )
-            assert true
-        else
-            assert false
+            if (before.equals("ascending") && after.equals("descending"))
+                assert true
+            else
+                assert false
+        }
+        then:
+        prinln("passed")
     }
 
     def checkIfAvgLatencyIsClickable() {
@@ -2743,30 +2771,35 @@ class DbMonitorTest extends TestBase {
             break
         }
 
-        when: 'click avg latency for first time'
-        report "after_save"
-        page.clickAvgLatency()
-        report "first_click"
-        then: 'check if avg rows is in ascending'
-        if ( page.tableInAscendingOrder() )
-            before = "ascending"
-        else
-            before = "descending"
+        when:
+        if(page.storedProceduresDisplayed()) {
+            when: 'click avg latency for first time'
+            report "after_save"
+            page.clickAvgLatency()
+            report "first_click"
+            then: 'check if avg rows is in ascending'
+            if (page.tableInAscendingOrder())
+                before = "ascending"
+            else
+                before = "descending"
 
-        when: 'click avg latency'
-        page.clickAvgLatency()
-        report "after_click"
-        then: 'check if avg rows is in descending'
-        if ( page.tableInDescendingOrder() )
-            after = "descending"
-        else
-            after = "ascending"
+            when: 'click avg latency'
+            page.clickAvgLatency()
+            report "after_click"
+            then: 'check if avg rows is in descending'
+            if (page.tableInDescendingOrder())
+                after = "descending"
+            else
+                after = "ascending"
 
-        println(before  + " " + after)
-        if ( before.equals("ascending") && after.equals("descending") )
-            assert true
-        else
-            assert false
+            println(before + " " + after)
+            if (before.equals("ascending") && after.equals("descending"))
+                assert true
+            else
+                assert false
+        }
+        then:
+        println("passed")
     }
 
     def CheckIfTimeOfExecutionIsClickable() {
@@ -2791,25 +2824,31 @@ class DbMonitorTest extends TestBase {
         when: 'click close button'
         page.savePreferences()
 
-        page.clickTimeOfExecution()
-        then: 'check if type is in ascending'
-        if ( page.tableInAscendingOrder() )
-            before = "ascending"
-        else
-            before = "descending"
+        when:
+        if(page.storedProceduresDisplayed()) {
+            when:
+            page.clickTimeOfExecution()
+            then: 'check if type is in ascending'
+            if (page.tableInAscendingOrder())
+                before = "ascending"
+            else
+                before = "descending"
 
-        when: 'click time of execution'
-        page.clickTimeOfExecution()
-        then: 'check if type is in descending'
-        if ( page.tableInDescendingOrder() )
-            after = "descending"
-        else
-            after = "ascending"
+            when: 'click time of execution'
+            page.clickTimeOfExecution()
+            then: 'check if type is in descending'
+            if (page.tableInDescendingOrder())
+                after = "descending"
+            else
+                after = "ascending"
 
-        if ( before.equals("ascending") && after.equals("descending") )
-            assert true
-        else
-            assert false
+            if (before.equals("ascending") && after.equals("descending"))
+                assert true
+            else
+                assert false
+        }
+        then:
+        println("passed")
     }
 
 
