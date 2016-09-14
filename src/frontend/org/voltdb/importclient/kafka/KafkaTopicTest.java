@@ -16,6 +16,9 @@
  */
 package org.voltdb.importclient.kafka;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.Properties;
@@ -53,16 +56,30 @@ public class KafkaTopicTest {
      */
     public static void main(String[] args) {
         Properties props = new Properties();
-        if (args.length < 2) {
-            System.out.println("testkafkaimporter: brokers topic [format]");
+        if (args.length < 1) {
+            System.out.println("testkafkaimporter: path-to-properties-file - The file should have brokers and topics properties at minimum.");
             System.exit(1);
         }
-        props.put("brokers", args[0]);
-        props.put("topics", args[1]);
-        String format = "csv";
-        if (args.length > 2)
-            format = args[2];
+        String filename = args[0];
+        try (InputStream is = new FileInputStream(new File(filename))) {
+            props.load(is);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
 
+        String partition = props.getProperty("partition");
+        if (args.length > 2) {
+            partition = args[2];
+            if (partition != null && partition.equals("all")) {
+                //Process all partitions.
+                partition = null;
+            }
+        }
+        String format = props.getProperty("format");
+        if (format == null || format.length() <= 0)
+            format = "csv";
+
+        System.out.println("Properties are: " + props);
         props.put("procedure", "fake");
 
         KafkaStreamImporterFactory factory = new KafkaStreamImporterFactory();
@@ -70,11 +87,14 @@ public class KafkaTopicTest {
         ffactory.create(format, props);
         FormatterBuilder fb = new FormatterBuilder(format, props);
         fb.setFormatterFactory(ffactory);
-        System.out.println("Properties are: " + props);
         Map<URI, ImporterConfig> mmap = factory.createImporterConfigurations(props, fb);
-        System.out.println("Number of Partitions for topic are: " + mmap.size());
+        System.out.println("Number of Partitions for topic are: " + mmap.size() + " Requested partition: " + partition);
         CountDownLatch cdl = new CountDownLatch(mmap.size());
         for (URI uri : mmap.keySet()) {
+            if (partition != null && !uri.toString().endsWith(partition)) {
+                cdl.countDown();
+                continue;
+            }
             KafkaTopicPartitionImporter importer = new KafkaTopicPartitionImporter((KafkaStreamImporterConfig )mmap.get(uri));
             Runner runner = new Runner(importer, cdl);
             runner.start();

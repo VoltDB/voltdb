@@ -66,6 +66,7 @@ do
     this=`basename $this`
 done
 this="$(pwd -P)/$this"
+propfile="$(dirname "$this")"/kafkatester.properties
 popd > /dev/null
 # the root of the VoltDB installation
 export VOLTDB_HOME=$(dirname $(dirname "$this"))
@@ -132,4 +133,4 @@ CLASSPATH=${CLASSPATH}
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.importclient.kafka.KafkaTopicTest"
-exec $CMDVAL "$@"
+exec $CMDVAL $propfile
