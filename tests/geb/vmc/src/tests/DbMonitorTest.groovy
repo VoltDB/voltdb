@@ -113,35 +113,35 @@ class DbMonitorTest extends TestBase {
         !page.isGraphAreaOpen()
     }
 
-    def openAndCloseDataArea() {
-        when:
-        if (!page.dataTables.isDisplayed()) {
-
-            when: 'ensure the Data area is open'
-            if (!page.isDataAreaOpen()) {
-                page.openDataArea()
-            }
-            then: 'Data area is open (to start test)'
-            page.isDataAreaOpen()
-
-            when: 'click Show/Hide Data (to close)'
-            page.closeDataArea()
-            then: 'Data area is closed'
-            !page.isDataAreaOpen()
-
-            when: 'click Show/Hide Data (to open again)'
-            page.openDataArea()
-            then: 'Data area is open (again)'
-            page.isDataAreaOpen()
-
-            when: 'click Show/Hide Data (to close again)'
-            page.closeDataArea()
-            then: 'Data area is closed (again)'
-            !page.isDataAreaOpen()
-        }
-        then:
-        println("passed")
-    }
+//    def openAndCloseDataArea() {
+//        when:
+//        if (!page.dataTables.isDisplayed()) {
+//
+//            when: 'ensure the Data area is open'
+//            if (!page.isDataAreaOpen()) {
+//                page.openDataArea()
+//            }
+//            then: 'Data area is open (to start test)'
+//            page.isDataAreaOpen()
+//
+//            when: 'click Show/Hide Data (to close)'
+//            page.closeDataArea()
+//            then: 'Data area is closed'
+//            !page.isDataAreaOpen()
+//
+//            when: 'click Show/Hide Data (to open again)'
+//            page.openDataArea()
+//            then: 'Data area is open (again)'
+//            page.isDataAreaOpen()
+//
+//            when: 'click Show/Hide Data (to close again)'
+//            page.closeDataArea()
+//            then: 'Data area is closed (again)'
+//            !page.isDataAreaOpen()
+//        }
+//        then:
+//        println("passed")
+//    }
 
     def checkActiveMissingJoining() {
         expect: '1 Active server (at least)'
@@ -292,25 +292,25 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "header help exists" () {
-        when:
-        at DbMonitorPage
-        then:
-        waitFor(30) { page.header.help.isDisplayed() }
-        int count = 0
-        while(count<5) {
-            count++
-            try {
-                interact {
-                    moveToElement(page.header.help)
-                }
-                waitFor(30) { page.header.showHelp.isDisplayed() }
-                break
-            } catch (geb.waiting.WaitTimeoutException e) {
-                println("Already tried")
-            }
-        }
-    }
+//    def "header help exists" () {
+//        when:
+//        at DbMonitorPage
+//        then:
+//        waitFor(30) { page.header.help.isDisplayed() }
+//        int count = 0
+//        while(count<5) {
+//            count++
+//            try {
+//                interact {
+//                    moveToElement(page.header.help)
+//                }
+//                waitFor(30) { page.header.showHelp.isDisplayed() }
+//                break
+//            } catch (geb.waiting.WaitTimeoutException e) {
+//                println("Already tried")
+//            }
+//        }
+//    }
 
     //HEADER TAB TESTS
 
@@ -808,7 +808,7 @@ class DbMonitorTest extends TestBase {
     def checkIfInvocationsIsClickable() {
         String before = ""
         String after  = ""
-
+        when:
         if(page.storedProceduresDisplayed()) {
             when: 'click row count'
             page.clickInvocations()
@@ -2663,7 +2663,6 @@ class DbMonitorTest extends TestBase {
         page.savePreferences()
         report "after_save"
 
-        when:
         if(page.storedProceduresDisplayed()) {
             when:
             println("Stored Procedure table is displayed")
@@ -2824,7 +2823,6 @@ class DbMonitorTest extends TestBase {
         when: 'click close button'
         page.savePreferences()
 
-        when:
         if(page.storedProceduresDisplayed()) {
             when:
             page.clickTimeOfExecution()
