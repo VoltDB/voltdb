@@ -550,51 +550,56 @@ class DbMonitorTest extends TestBase {
         report "hello3"
 
         when:
-        page.searchDatabaseTable(tablename)
+        if(page.dataTablesDisplayed()) {
+
+
+            when:
+            page.searchDatabaseTable(tablename)
+            then:
+            report "hello4"
+            waitFor(30) {
+                !page.databaseTableCurrentPage.text().equals("0")
+                !page.databaseTableTotalPage.text().equals("0")
+            }
+            if (!page.databaseTableCurrentPage.text().equals("0") && !page.databaseTableTotalPage.text().equals("0")) {
+                println("The table was successfully created")
+            } else {
+                println("Table not found after creation")
+                assert false
+            }
+            when: 'sql query tab is clicked'
+            page.gotoSqlQuery()
+            then: 'at sql query'
+            at SqlQueryPage
+
+            when: 'set query in the box'
+            page.setQueryText(deleteQuery)
+            then: 'run the query'
+            page.runQuery()
+            report "delete"
+
+            when: 'Db Monitor tab is clicked'
+            page.gotoDbMonitor()
+            then: 'at DbMonitor Page'
+            at DbMonitorPage
+
+            when:
+            page.searchDatabaseTable(tablename)
+            then:
+            report "delete1"
+            waitFor(30) {
+                page.databaseTableCurrentPage.text().equals("0")
+                page.databaseTableTotalPage.text().equals("0")
+            }
+            if (page.databaseTableCurrentPage.text().equals("0") && page.databaseTableTotalPage.text().equals("0")) {
+                println("The table was successfully removed")
+            } else {
+                println("Table found after deletion")
+                assert false
+            }
+        }
         then:
-        report "hello4"
-        waitFor(30) {
-            !page.databaseTableCurrentPage.text().equals("0")
-            !page.databaseTableTotalPage.text().equals("0")
-        }
-        if ( !page.databaseTableCurrentPage.text().equals("0") && !page.databaseTableTotalPage.text().equals("0") ){
-            println("The table was successfully created")
-        }
-        else {
-            println("Table not found after creation")
-            assert false
-        }
-        when: 'sql query tab is clicked'
-        page.gotoSqlQuery()
-        then: 'at sql query'
-        at SqlQueryPage
-
-        when: 'set query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-        report "delete"
-
-        when: 'Db Monitor tab is clicked'
-        page.gotoDbMonitor()
-        then: 'at DbMonitor Page'
-        at DbMonitorPage
-
-        when:
-        page.searchDatabaseTable(tablename)
-        then:
-        report "delete1"
-        waitFor(30) {
-            page.databaseTableCurrentPage.text().equals("0")
-            page.databaseTableTotalPage.text().equals("0")
-        }
-        if ( page.databaseTableCurrentPage.text().equals("0") && page.databaseTableTotalPage.text().equals("0") ) {
-            println("The table was successfully removed")
-        }
-        else {
-            println("Table found after deletion")
-            assert false
-        }
+        println("passed")
     }
 
     def checkIfRowCountIsClickable() {
@@ -871,9 +876,9 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def "Check Data in Database Tables"() {
+    def CheckDataInDatabaseTables() {
         when:
-        if(page.databaseTableDisplayed()) {
+        if(page.dataTablesDisplayed()) {
 
             when:
             println("dataTable displayed")
@@ -2731,7 +2736,7 @@ class DbMonitorTest extends TestBase {
                 assert false
         }
         then:
-        prinln("passed")
+        println("passed")
     }
 
     def checkIfAvgLatencyIsClickable() {
@@ -3253,7 +3258,7 @@ class DbMonitorTest extends TestBase {
             println("passed")
     }
 
-    def "click display preferences remove Data Tables and again add Data Tables"() {
+    def ClickDisplayPreferencesRemoveDataTablesAndAgainAddDataTables() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3271,37 +3276,43 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-        then: 'no Data Tables displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        !page.dataTablesDisplayed()
 
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
+        if(!page.dataTablesDisplayed()) {
 
-        when: 'Data Tables is displayed'
-        page.dataTablesCheckboxDisplayed()
-        then: 'Add Data Tables'
-        page.dataTablesCheckboxClick()
+            then: 'no Data Tables displayed'
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            page.storedProceduresDisplayed()
+            !page.dataTablesDisplayed()
 
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Data Tables displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
+            when: 'click Display Preference button'
+            page.openDisplayPreference()
+            then: 'display title and save button of preferences'
+            page.preferencesTitleDisplayed()
+            page.savePreferencesBtnDisplayed()
+            page.popupCloseDisplayed()
+
+            when: 'Data Tables is displayed'
+            page.dataTablesCheckboxDisplayed()
+            then: 'Add Data Tables'
+            page.dataTablesCheckboxClick()
+
+            when: 'click close button'
+            page.savePreferences()
+            then: 'Data Tables displayed along with others'
+            page.serverCpuDisplayed()
+            page.serverRamDisplayed()
+            page.clusterLatencyDisplayed()
+            page.clusterTransactionsDisplayed()
+            page.partitionIdleTimeDisplayed()
+            page.storedProceduresDisplayed()
+            page.dataTablesDisplayed()
+        }
+        then:
+        println("passed")
     }
 
     def 'confirm Graph area and Data area open initially'() {
