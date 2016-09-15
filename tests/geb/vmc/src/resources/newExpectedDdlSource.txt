@@ -1,7 +1,7 @@
 # Expected DDL Source: (when running the default GEB VMC
 # test server; see ../../server/run_voltdb_server.sh)
 
-file -inlinebatch END_OF_BATCH
+file -inlinebatch
 CREATE STREAM EXPORT_DONE_TABLE PARTITION ON COLUMN TXNID (
    TXNID bigint NOT NUL
 );
@@ -187,4 +187,3 @@ CREATE PROCEDURE InsertReplicatedTableZeroes
    AS
    INSERT INTO replicated_table VALUES   (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');
 
-END_OF_BATCH
