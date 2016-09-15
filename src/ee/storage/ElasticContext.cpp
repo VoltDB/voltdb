@@ -31,10 +31,9 @@ namespace voltdb {
 ElasticContext::ElasticContext(PersistentTable &table,
                                PersistentTableSurgeon &surgeon,
                                int32_t partitionId,
-                               TupleSerializer &serializer,
                                const std::vector<std::string> &predicateStrings,
                                size_t nTuplesPerCall) :
-    TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    TableStreamerContext(table, surgeon, partitionId, predicateStrings),
     m_predicateStrings(predicateStrings), // retained for cloning here, not in TableStreamerContext.
     m_nTuplesPerCall(nTuplesPerCall),
     m_indexActive(false)
@@ -53,7 +52,7 @@ TableStreamerContext* ElasticContext::cloneForTruncatedTable(PersistentTableSurg
         return NULL;
     }
     ElasticContext *cloned = new ElasticContext(surgeon.getTable(), surgeon,
-        getPartitionId(), getSerializer(), m_predicateStrings, m_nTuplesPerCall);
+        getPartitionId(), m_predicateStrings, m_nTuplesPerCall);
     cloned->handleActivation(TABLE_STREAM_ELASTIC_INDEX);
 
     TupleOutputStreamProcessor dummyProcessor;

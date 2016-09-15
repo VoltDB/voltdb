@@ -23,11 +23,8 @@
 #include "StreamPredicateList.h"
 
 namespace voltdb {
-
-class TupleSerializer;
 class TableTuple;
 class PersistentTable;
-class TupleSerializer;
 class TupleOutputStream;
 class StreamPredicateList;
 
@@ -64,8 +61,7 @@ public:
      * numCopiesMade helps deletion logic decide when something is being moved.
      * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &tupleSerializer,
-                  TableTuple &tuple,
+    bool writeRow(TableTuple &tuple,
                   bool *deleteRow = NULL);
 
 private:
