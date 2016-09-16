@@ -254,7 +254,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#delete") {
         }
 
-        while ((line = br.readLine()) != "#name") {
+        while ((line = br.readLine()) != "#deleteOnly") {
             // process the line.
             query = query + line + "\n"
         }
