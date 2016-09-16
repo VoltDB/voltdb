@@ -60,13 +60,12 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         textIndex           { $("#z > div:nth-child(3) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
         textTotal           { $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b") }
 
-        tablenamePresent    (required:false) { $(class:"table-view-name", text:"lina") }
+        tablenamePresent    (required:false) { $(class:"table-view-name", text:"voters") }
 
         searchName          { $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink   { $("#iconDoc") }
         generatedbytxt      {$("#catalogContainer > div.documentation > span")}
         refreshtableworksheet   { $("#MenuCatalog > div > button", text:"Refresh")}
-
     }
 
     static at = {

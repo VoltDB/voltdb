@@ -57,7 +57,7 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPage
     }
 
-    def "Size Worksheet Tab:Add table, search and delete"() {
+    def sizeWorksheetTabAddTableSearchAndDelete() {
         boolean result = false
 
         when: 'go to size worksheet tab'
@@ -160,11 +160,11 @@ class SchemaPageDatabaseTest extends TestBase {
         waitFor(30) { !page.tablenamePresent.isDisplayed() }
 
         if(!page.tablenamePresent.isDisplayed()) {
-            println("Size Worksheet Tab:Add table, search and delete-PASS")
+            println("sizeWorksheetTabAddTableSearchAndDelete-PASS")
             println()
         }
         else {
-            println("Size Worksheet Tab:Add table, search and delete-FAIL")
+            println("sizeWorksheetTabAddTableSearchAndDelete-FAIL")
             println()
             assert false
         }
@@ -196,7 +196,7 @@ class SchemaPageDatabaseTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Add table, search and delete"() {
+    def schemaTabAddTableSearchAndDelete() {
         boolean result = false
 
         when: 'go to schema tab'
@@ -299,11 +299,11 @@ class SchemaPageDatabaseTest extends TestBase {
 
         try {
             page.requiredId.isDisplayed()
-            println("Schema Tab:Add table, search and delete-FAIL")
+            println("schemaTabAddTableSearchAndDelete-FAIL")
             assert false
         }
         catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Schema Tab:Add table, search and delete-PASS")
+            println("schemaTabAddTableSearchAndDelete-PASS")
         }
         println()
 
