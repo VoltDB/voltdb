@@ -59,6 +59,7 @@
 #include "storage/tableutil.h"
 #include "test_utils/plan_testing_baseclass.h"
 #include "test_utils/LoadTableFrom.hpp"
+#include "common/types.h"
 
 
 namespace {
@@ -608,7 +609,15 @@ public:
             {  3,  20,  202},
             {  3,  30,  301}
         };
-        initializeTableOfInt("AAA", &m_AAA, &m_AAA_id, NUM_ROWS_AAA, NUM_COLS_AAA, (int32_t *)input_AAA);
+        voltdb::ValueType types[] = {
+            voltdb::VALUE_TYPE_INTEGER,
+            voltdb::VALUE_TYPE_INTEGER,
+            voltdb::VALUE_TYPE_INTEGER
+        };
+        int32_t sizes[] = { 4, 4, 4};
+        initializeTable("AAA", &m_AAA, &m_AAA_id,
+                        types, sizes,
+                        NUM_ROWS_AAA, NUM_COLS_AAA, (int32_t *)input_AAA, NULL, 0);
     }
 
     ~PartitionByExecutorTest() { }
@@ -621,7 +630,7 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
     const int NUM_ROWS = 15;
     const int NUM_COLS =  4;
 
-    int32_t output[NUM_ROWS][NUM_COLS] = {
+    int outputData[NUM_ROWS][NUM_COLS] = {
             {  1,  10,  101,   1},
             {  1,  10,  102,   1},
             {  1,  20,  201,   3},
@@ -638,15 +647,32 @@ TEST_F(PartitionByExecutorTest, testPartitionBy) {
             {  3,  20,  202,   3},
             {  3,  30,  301,   5}
     };
+    const char *columnNames[] = { "A", "B", "C", "D" };
+    const voltdb::ValueType columnTypes[] = {
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER
+    };
+    const int32_t columnSizes[] = { 4, 4, 4, 4 };
     executeFragment(100, plan_strings[0]);
-    validateResult((int32_t *)output, NUM_ROWS, NUM_COLS);
+    const TableConfig output = {"output",
+                                columnNames,
+                                columnTypes,
+                                columnSizes,
+                                NUM_ROWS,
+                                NUM_COLS,
+                                (const int *)outputData,
+                                NULL,
+                                0};
+    validateResult(&output);
 }
 
 TEST_F(PartitionByExecutorTest, testOrderedPartitionBy) {
     const int NUM_ROWS = 15;
     const int NUM_COLS =  4;
 
-    int32_t output[NUM_ROWS][NUM_COLS] = {
+    int outputData[NUM_ROWS][NUM_COLS] = {
             {  1,  10,  101,   1},
             {  1,  10,  102,   1},
             {  1,  20,  201,   3},
@@ -663,8 +689,25 @@ TEST_F(PartitionByExecutorTest, testOrderedPartitionBy) {
             {  3,  20,  202,   3},
             {  3,  30,  301,   5}
     };
+    const char *columnNames[] = { "A", "B", "C", "D" };
+    const voltdb::ValueType columnTypes[] = {
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER,
+        voltdb::VALUE_TYPE_INTEGER
+    };
+    const int32_t columnSizes[] = { 4, 4, 4, 4 };
+    const TableConfig output = {"output",
+                                columnNames,
+                                columnTypes,
+                                columnSizes,
+                                NUM_ROWS,
+                                NUM_COLS,
+                                (const int *)outputData,
+                                NULL,
+                                0 };
     executeFragment(100, plan_strings[1]);
-    validateResult((int32_t *)output, NUM_ROWS, NUM_COLS);
+    validateResult(&output);
 }
 
 int main() {

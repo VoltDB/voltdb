@@ -72,14 +72,17 @@ public:
      * just for this test.  But that is not easily done.
      */
     TestGeneratedPlans(uint32_t randomSeed = (unsigned int)time(NULL)) {
-        initialize(m_PartitionByExecutorDB, randomSeed);
+        initialize(m_testDB, randomSeed);
     }
 
     ~TestGeneratedPlans() { }
 protected:
-    static DBConfig         m_PartitionByExecutorDB;
+    static DBConfig         m_testDB;
 };
 
+/*
+ * All the test cases are here.
+ */
 TEST_F(TestGeneratedPlans, test_order_by) {
     static int testIndex = 0;
     executeTest(allTests[testIndex]);
@@ -88,21 +91,146 @@ TEST_F(TestGeneratedPlans, test_join) {
     static int testIndex = 1;
     executeTest(allTests[testIndex]);
 }
+TEST_F(TestGeneratedPlans, test_cache) {
+    static int testIndex = 2;
+    executeTest(allTests[testIndex]);
+}
 
 
 namespace {
+/*
+ * These are the names of all the columns.
+ */
 const char *AAA_ColumnNames[] = {
-    "A"
+    "A",
     "B",
     "C",
 };
 const char *BBB_ColumnNames[] = {
-    "A"
+    "A",
+    "B",
+    "C",
+};
+const char *CCC_ColumnNames[] = {
+    "id",
+    "name",
+    "data",
+};
+const char *XXX_ColumnNames[] = {
+    "id",
+    "name",
+    "data",
+};
+const char *order_by_ColumnNames[] = {
+    "A",
+    "B",
+};
+const char *test_join_ColumnNames[] = {
+    "A",
     "B",
     "C",
 };
 
 
+/*
+ * These are the types of all the columns.
+ */
+const voltdb::ValueType AAA_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType BBB_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType CCC_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_VARCHAR,
+    voltdb::VALUE_TYPE_VARCHAR,
+};
+const voltdb::ValueType XXX_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_VARCHAR,
+    voltdb::VALUE_TYPE_VARCHAR,
+};
+const voltdb::ValueType order_by_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType test_join_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+
+
+/*
+ * These are the sizes of all the column data.
+ */
+const int32_t AAA_Sizes[] = {
+    4,
+    4,
+    4,
+};
+const int32_t BBB_Sizes[] = {
+    4,
+    4,
+    4,
+};
+const int32_t CCC_Sizes[] = {
+    4,
+    32,
+    1024,
+};
+const int32_t XXX_Sizes[] = {
+    4,
+    32,
+    1024,
+};
+const int32_t order_by_Sizes[] = {
+    4,
+    4,
+};
+const int32_t test_join_Sizes[] = {
+    4,
+    4,
+    4,
+};
+
+
+/*
+ * These are the strings in each populated columns.
+ * The data will either be integers or indices into this table.
+ */
+int32_t num_AAA_strings = 0;
+const char *AAA_Strings[] = {
+};
+int32_t num_BBB_strings = 0;
+const char *BBB_Strings[] = {
+};
+int32_t num_CCC_strings = 0;
+const char *CCC_Strings[] = {
+};
+int32_t num_XXX_strings = 4;
+const char *XXX_Strings[] = {
+    "alpha",
+    "beta",
+    "gamma",
+    "delta",
+};
+int32_t num_order_by_strings = 0;
+const char *order_by_Strings[] = {
+};
+int32_t num_test_join_strings = 0;
+const char *test_join_Strings[] = {
+};
+
+
+/*
+ * This is the data in all columns.
+ */
 const int NUM_TABLE_ROWS_AAA = 15;
 const int NUM_TABLE_COLS_AAA = 3;
 const int AAAData[NUM_TABLE_ROWS_AAA * NUM_TABLE_COLS_AAA] = {
@@ -143,33 +271,19 @@ const int BBBData[NUM_TABLE_ROWS_BBB * NUM_TABLE_COLS_BBB] = {
       3, 30,301,
 };
 
-
-
-const TableConfig AAAConfig = {
-    "AAA",
-    AAA_ColumnNames,
-    NUM_TABLE_ROWS_AAA,
-    NUM_TABLE_COLS_AAA,
-    AAAData
-};
-const TableConfig BBBConfig = {
-    "BBB",
-    BBB_ColumnNames,
-    NUM_TABLE_ROWS_BBB,
-    NUM_TABLE_COLS_BBB,
-    BBBData
+const int NUM_TABLE_ROWS_CCC = 1000000;
+const int NUM_TABLE_COLS_CCC = 3;
+;
+const int NUM_TABLE_ROWS_XXX = 2;
+const int NUM_TABLE_COLS_XXX = 3;
+const int XXXData[NUM_TABLE_ROWS_XXX * NUM_TABLE_COLS_XXX] = {
+      1,  0,  1,
+      2,  2,  3,
 };
 
-
-const TableConfig *allTables[] = {
-    &AAAConfig,
-    &BBBConfig,
-
-};
-
-const int NUM_OUTPUT_ROWS_TEST_ORDER_BY = 15;
-const int NUM_OUTPUT_COLS_TEST_ORDER_BY = 2;
-const int outputTable_test_order_by[NUM_OUTPUT_ROWS_TEST_ORDER_BY * NUM_OUTPUT_COLS_TEST_ORDER_BY] = {
+const int NUM_TABLE_ROWS_ORDER_BY = 15;
+const int NUM_TABLE_COLS_ORDER_BY = 2;
+const int order_byData[NUM_TABLE_ROWS_ORDER_BY * NUM_TABLE_COLS_ORDER_BY] = {
       1, 10,
       1, 10,
       1, 20,
@@ -187,9 +301,9 @@ const int outputTable_test_order_by[NUM_OUTPUT_ROWS_TEST_ORDER_BY * NUM_OUTPUT_C
       3, 30,
 };
 
-const int NUM_OUTPUT_ROWS_TEST_JOIN = 45;
-const int NUM_OUTPUT_COLS_TEST_JOIN = 3;
-const int outputTable_test_join[NUM_OUTPUT_ROWS_TEST_JOIN * NUM_OUTPUT_COLS_TEST_JOIN] = {
+const int NUM_TABLE_ROWS_TEST_JOIN = 45;
+const int NUM_TABLE_COLS_TEST_JOIN = 3;
+const int test_joinData[NUM_TABLE_ROWS_TEST_JOIN * NUM_TABLE_COLS_TEST_JOIN] = {
       1, 10,101,
       1, 10,101,
       1, 10,101,
@@ -239,7 +353,92 @@ const int outputTable_test_join[NUM_OUTPUT_ROWS_TEST_JOIN * NUM_OUTPUT_COLS_TEST
 
 
 
-TestConfig allTests[2] = {
+/*
+ * These are the names of all the columns.
+ */
+/*
+ * These knit together all the bits of data which form a table.
+ */
+const TableConfig AAAConfig = {
+    "AAA",
+    AAA_ColumnNames,
+    AAA_Types,
+    AAA_Sizes,
+    NUM_TABLE_ROWS_AAA,
+    NUM_TABLE_COLS_AAA,
+    AAAData,
+    AAA_Strings,
+    num_AAA_strings
+};
+const TableConfig BBBConfig = {
+    "BBB",
+    BBB_ColumnNames,
+    BBB_Types,
+    BBB_Sizes,
+    NUM_TABLE_ROWS_BBB,
+    NUM_TABLE_COLS_BBB,
+    BBBData,
+    BBB_Strings,
+    num_BBB_strings
+};
+const TableConfig CCCConfig = {
+    "CCC",
+    CCC_ColumnNames,
+    CCC_Types,
+    CCC_Sizes,
+    NUM_TABLE_ROWS_CCC,
+    NUM_TABLE_COLS_CCC,
+    NULL,
+    CCC_Strings,
+    num_CCC_strings
+};
+const TableConfig XXXConfig = {
+    "XXX",
+    XXX_ColumnNames,
+    XXX_Types,
+    XXX_Sizes,
+    NUM_TABLE_ROWS_XXX,
+    NUM_TABLE_COLS_XXX,
+    XXXData,
+    XXX_Strings,
+    num_XXX_strings
+};
+const TableConfig order_byConfig = {
+    "order_by",
+    order_by_ColumnNames,
+    order_by_Types,
+    order_by_Sizes,
+    NUM_TABLE_ROWS_ORDER_BY,
+    NUM_TABLE_COLS_ORDER_BY,
+    order_byData,
+    order_by_Strings,
+    num_order_by_strings
+};
+const TableConfig test_joinConfig = {
+    "test_join",
+    test_join_ColumnNames,
+    test_join_Types,
+    test_join_Sizes,
+    NUM_TABLE_ROWS_TEST_JOIN,
+    NUM_TABLE_COLS_TEST_JOIN,
+    test_joinData,
+    test_join_Strings,
+    num_test_join_strings
+};
+
+
+/*
+ * This holds all the persistent tables.
+ */
+const TableConfig *allTables[] = {
+    &AAAConfig,
+    &BBBConfig,
+    &CCCConfig,
+    &XXXConfig,
+};
+
+
+TestConfig allTests[3] = {
     {
         // SQL Statement
         "select A, B from AAA order by A, B;",
@@ -333,9 +532,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_ORDER_BY,
-        NUM_OUTPUT_COLS_TEST_ORDER_BY,
-        outputTable_test_order_by
+        &order_byConfig
     },
     {
         // SQL Statement
@@ -534,15 +731,70 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_JOIN,
-        NUM_OUTPUT_COLS_TEST_JOIN,
-        outputTable_test_join
+        &test_joinConfig
+    },
+    {
+        // SQL Statement
+        "select * from CCC;",
+        // Plan String
+        "{\n"
+        "    \"EXECUTE_LIST\": [\n"
+        "        2,\n"
+        "        1\n"
+        "    ],\n"
+        "    \"PLAN_NODES\": [\n"
+        "        {\n"
+        "            \"CHILDREN_IDS\": [2],\n"
+        "            \"ID\": 1,\n"
+        "            \"PLAN_NODE_TYPE\": \"SEND\"\n"
+        "        },\n"
+        "        {\n"
+        "            \"ID\": 2,\n"
+        "            \"INLINE_NODES\": [{\n"
+        "                \"ID\": 3,\n"
+        "                \"OUTPUT_SCHEMA\": [\n"
+        "                    {\n"
+        "                        \"COLUMN_NAME\": \"ID\",\n"
+        "                        \"EXPRESSION\": {\n"
+        "                            \"COLUMN_IDX\": 0,\n"
+        "                            \"TYPE\": 32,\n"
+        "                            \"VALUE_TYPE\": 5\n"
+        "                        }\n"
+        "                    },\n"
+        "                    {\n"
+        "                        \"COLUMN_NAME\": \"NAME\",\n"
+        "                        \"EXPRESSION\": {\n"
+        "                            \"COLUMN_IDX\": 1,\n"
+        "                            \"TYPE\": 32,\n"
+        "                            \"VALUE_SIZE\": 32,\n"
+        "                            \"VALUE_TYPE\": 9\n"
+        "                        }\n"
+        "                    },\n"
+        "                    {\n"
+        "                        \"COLUMN_NAME\": \"DATA\",\n"
+        "                        \"EXPRESSION\": {\n"
+        "                            \"COLUMN_IDX\": 2,\n"
+        "                            \"TYPE\": 32,\n"
+        "                            \"VALUE_SIZE\": 1024,\n"
+        "                            \"VALUE_TYPE\": 9\n"
+        "                        }\n"
+        "                    }\n"
+        "                ],\n"
+        "                \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
+        "            }],\n"
+        "            \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
+        "            \"TARGET_TABLE_ALIAS\": \"CCC\",\n"
+        "            \"TARGET_TABLE_NAME\": \"CCC\"\n"
+        "        }\n"
+        "    ]\n"
+        "}",
+        NULL
     },
 };
 
 }
 
-DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
+DBConfig TestGeneratedPlans::m_testDB =
 
 {
     //
@@ -562,7 +814,19 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "  B integer,\n"
     "  C integer\n"
     " );\n"
-    " ",
+    " \n"
+    "create table CCC (\n"
+    "  id integer,\n"
+    "  name varchar(32),\n"
+    "  data varchar(1024)\n"
+    ");\n"
+    " \n"
+    "create table XXX (\n"
+    "  id integer primary key not null,\n"
+    "  name varchar(32),\n"
+    "  data varchar(1024)\n"
+    ");\n"
+    "",
     //
     // Catalog String
     //
@@ -583,7 +847,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"eJy1TkEOgDAIu/saVljZrhr9/5MEs5ubN9NAAqUtNAcvF4gbC8GDFWIlAWEno1dv7K5urrpvnEuQWEk0JJUlBHWehBYlOT8WZ17SwwY4BoMloy8m9/07ePz7U/ANeEhGWQ==\"\n"
+    "set /clusters#cluster/databases#database schema \"eJy9T8sOwyAMu+9rggMOXNu1//9Jc1C1HdZup00WIIhfsAa4h8GishBc2WC1JGAcpPYWnSM8argvN55LkLiSuCSNRYJ2noSuZXmfFlsyGbIB1mOCy4m/TfJ9fA4++v4/2BOvYBnUqwBu0t2nA+UFOnue6O4OjCevzqRywituDq/ifivWeuJLMQuTfqiU7EOmXPQ+ZtU9kr9Fk9/6wy88APRzjfg=\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -618,6 +882,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#AAA columns B\n"
     "set /clusters#cluster/databases#database/tables#AAA/columns#B index 1\n"
@@ -629,6 +894,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#AAA columns C\n"
     "set /clusters#cluster/databases#database/tables#AAA/columns#C index 2\n"
@@ -640,6 +906,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database tables BBB\n"
     "set /clusters#cluster/databases#database/tables#BBB isreplicated true\n"
@@ -659,6 +926,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#BBB columns B\n"
     "set /clusters#cluster/databases#database/tables#BBB/columns#B index 1\n"
@@ -670,6 +938,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#BBB columns C\n"
     "set /clusters#cluster/databases#database/tables#BBB/columns#C index 2\n"
@@ -681,7 +950,111 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
     "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables CCC\n"
+    "set /clusters#cluster/databases#database/tables#CCC isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"CCC|ivv\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns DATA\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#DATA index 2\n"
+    "set $PREV type 9\n"
+    "set $PREV size 1024\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"DATA\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns ID\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#ID index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"ID\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns NAME\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#NAME index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 32\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"NAME\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables XXX\n"
+    "set /clusters#cluster/databases#database/tables#XXX isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"XXX|ivv\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns DATA\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#DATA index 2\n"
+    "set $PREV type 9\n"
+    "set $PREV size 1024\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"DATA\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#ID index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable false\n"
+    "set $PREV name \"ID\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns NAME\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#NAME index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 32\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"NAME\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX indexes VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID unique true\n"
+    "set $PREV assumeUnique false\n"
+    "set $PREV countable true\n"
+    "set $PREV type 1\n"
+    "set $PREV expressionsjson \"\"\n"
+    "set $PREV predicatejson \"\"\n"
+    "add /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID columns ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID/columns#ID index 0\n"
+    "set $PREV column /clusters#cluster/databases#database/tables#XXX/columns#ID\n"
+    "add /clusters#cluster/databases#database/tables#XXX constraints VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/constraints#VOLTDB_AUTOGEN_IDX_PK_XXX_ID type 4\n"
+    "set $PREV oncommit \"\"\n"
+    "set $PREV index /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set $PREV foreignkeytable null\n"
     "add /clusters#cluster/databases#database procedures testplanseegenerator\n"
     "set /clusters#cluster/databases#database/procedures#testplanseegenerator classname \"\"\n"
     "set $PREV readonly false\n"
@@ -696,7 +1069,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV partitioncolumn null\n"
     "set $PREV partitionparameter 0\n"
     "",
-    2,
+    4,
     allTables
 };
 
