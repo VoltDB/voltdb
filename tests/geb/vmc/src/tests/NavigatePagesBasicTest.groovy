@@ -34,7 +34,7 @@ import vmcTest.pages.*
  */
 class EchoingPageChangeListener implements PageChangeListener {
     void pageWillChange(Browser browser, Page oldPage, Page newPage) {
-        if (NavigatePagesTest.getBooleanSystemProperty("debugPrint", NavigatePagesTest.DEFAULT_DEBUG_PRINT)) {
+        if (NavigatePagesBasicTest.getBooleanSystemProperty("debugPrint", NavigatePagesBasicTest.DEFAULT_DEBUG_PRINT)) {
             println "Browser ($browser) changing page from '$oldPage' to '$newPage'"
         }
     }
