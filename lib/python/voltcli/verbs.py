@@ -436,6 +436,7 @@ class ServerBundle(JavaBundle):
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
+        verb.add_options( cli.StringOption('-b', '--buddy-group', 'buddygroup', 'buddy group', default = '0'))
         if self.is_legacy_verb and self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
@@ -514,6 +515,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.placementgroup:
             final_args.extend(['placementgroup', runner.opts.placementgroup])
+        if runner.opts.buddygroup:
+            final_args.extend(['buddygroup', runner.opts.buddygroup])
         if self.is_legacy_verb and runner.opts.host:
             final_args.extend(['host', runner.opts.host])
         elif not self.subcommand in ('initialize', 'probe'):
