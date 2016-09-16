@@ -94,11 +94,11 @@ import org.voltdb.VoltType;
  * @author bwhite
  *
  */
-public class EEPlanTestGenerator extends PlannerTestCase {
+public class EEPlanTestGenerator extends EEPlanGenerator {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
+
     @Override
     protected void setUp() throws Exception {
-
         setupSchema(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                     "testplanseegenerator",
                     false);
