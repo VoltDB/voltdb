@@ -1,0 +1,14 @@
+<deployment>
+    <cluster hostcount="1" kfactor="0"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true" format="exampleformatter.jar/ExampleFormatterFactory">
+            <property name="brokers">volt15b-domU2:9092</property>
+            <property name="topics">TESTTOPIC0</property>
+            <property name="procedure">InsertOnly</property>
+            <format-property name="example">example</format-property>
+        </configuration>
+    </import>
+</deployment>
