@@ -114,12 +114,12 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-
+        report 'create'
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
         at SchemaPage
-
+        report 'schema_page'
         when: 'go to Size Worksheet Tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at Size Worksheet Tab'
@@ -128,7 +128,7 @@ class SchemaPageDatabaseTest extends TestBase {
         when: 'tablename is searched'
         page.refreshbutton.click()
         //waitFor(30) { page.searchName.isDisplayed() }
-        //page.searchName.value(tablename)
+        report 'refresh'//page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.tablenamePresent.isDisplayed() }
 
