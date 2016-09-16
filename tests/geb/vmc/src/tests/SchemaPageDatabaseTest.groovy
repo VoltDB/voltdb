@@ -114,7 +114,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-        report 'Created'
+z
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
@@ -124,11 +124,11 @@ class SchemaPageDatabaseTest extends TestBase {
         page.openSchemaPageSizeWorksheetTab()
         then: 'at Size Worksheet Tab'
         at SchemaPageSizeWorksheetTab
-        report 'At_size_worksheet'
+
         when: 'tablename is searched'
         page.refreshbutton.click()
         //waitFor(30) { page.searchName.isDisplayed() }
-        report 'searched'//page.searchName.value(tablename)
+        //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.tablenamePresent.isDisplayed() }
 
