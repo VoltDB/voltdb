@@ -29,12 +29,12 @@
         var partitionChart;
         var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
         this.Monitors = {};
-        this.ChartCpu = nv.models.lineChart();
-        this.ChartRam = nv.models.lineChart();
-        this.ChartLatency = nv.models.lineChart();
-        this.ChartTransactions = nv.models.lineChart();
-        this.ChartPartitionIdleTime = nv.models.lineChart();
-        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
+        var ChartCpu = nv.models.lineChart();
+        var ChartRam = nv.models.lineChart();
+        var ChartLatency = nv.models.lineChart();
+        var ChartTransactions = nv.models.lineChart();
+        var ChartPartitionIdleTime = nv.models.lineChart();
+        var ChartDrReplicationRate = nv.models.lineChart();        var ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
         this.enumPartitionColor = {
@@ -236,36 +236,36 @@
 
         nv.addGraph({
             generate: function() {
-                MonitorGraphUI.ChartCpu.xAxis
+                ChartCpu.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format('%X')(new Date(d));
                 });
 
-                MonitorGraphUI.ChartCpu.xAxis.rotateLabels(-20);
+                ChartCpu.xAxis.rotateLabels(-20);
 
-               MonitorGraphUI.ChartCpu.yAxis
+               ChartCpu.yAxis
                     .tickFormat(d3.format(',.2f'));
 
-                MonitorGraphUI.ChartCpu.yAxis
+                ChartCpu.yAxis
                     .axisLabel('(%)')
                     .axisLabelDistance(10);
-                
-                MonitorGraphUI.ChartCpu.margin({ left: 100 });
-                MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
-                MonitorGraphUI.ChartCpu.lines.forceY([0, 100]);
+
+                ChartCpu.margin({ left: 100 });
+                ChartCpu.yAxis.scale().domain([0, 100]);
+                ChartCpu.lines.forceY([0, 100]);
 
                 d3.select('#visualisationCpu')
                     .datum(dataCpu)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCpu);
+                    .call(ChartCpu);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
-                
-                return MonitorGraphUI.ChartCpu;
+                nv.utils.windowResize(ChartCpu.update);
+
+                return ChartCpu;
             },
             callback: function (p) {
-                MonitorGraphUI.ChartCpu.useInteractiveGuideline(true);
-                //var tooltip = MonitorGraphUI.ChartCpu.tooltip;
+                ChartCpu.useInteractiveGuideline(true);
+                //var tooltip = ChartCpu.tooltip;
                 //tooltip.gravity('s');
                 //tooltip.contentGenerator(function (d) {
                 //    var html = '';
@@ -277,39 +277,39 @@
 
                 //    return html;
                 //});
-                return MonitorGraphUI.ChartCpu;
+                return ChartCpu;
             }
         });
 
         nv.addGraph({
             generate: function() {
-                MonitorGraphUI.ChartRam.xAxis
+                ChartRam.xAxis
               .tickFormat(function (d) {
                   return d3.time.format('%X')(new Date(d));
               });
 
-                MonitorGraphUI.ChartRam.xAxis.rotateLabels(-20);
+                ChartRam.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartRam.yAxis
+                ChartRam.yAxis
                     .tickFormat(d3.format(',.4f'));
 
-                MonitorGraphUI.ChartRam.yAxis
+                ChartRam.yAxis
                     .axisLabel('(GB)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartRam.margin({ left: 100 });
-                MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
+                ChartRam.margin({ left: 100 });
+                ChartRam.lines.forceY([0, 0.1]);
 
                 d3.select('#visualisationRam')
                     .datum(dataRam)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartRam);
+                    .call(ChartRam);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartRam.update);
+                nv.utils.windowResize(ChartRam.update);
             },
             callback: function (p) {
-                MonitorGraphUI.ChartRam.useInteractiveGuideline(true);
-                //var tooltip = MonitorGraphUI.ChartRam.tooltip;
+                ChartRam.useInteractiveGuideline(true);
+                //var tooltip = ChartRam.tooltip;
 
                 //tooltip.contentGenerator(function (d) {
                 //    var html = '';
@@ -322,40 +322,40 @@
                 //    return html;
                 //});
 
-                return MonitorGraphUI.ChartCpu;
+                return ChartCpu;
             }
         });
 
         nv.addGraph({
             generate: function() {
-                MonitorGraphUI.ChartLatency.xAxis
+                ChartLatency.xAxis
               .tickFormat(function (d) {
                   return d3.time.format('%X')(new Date(d));
               });
 
-                MonitorGraphUI.ChartLatency.xAxis.rotateLabels(-20);
+                ChartLatency.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartLatency.yAxis
+                ChartLatency.yAxis
                     .tickFormat(d3.format(',.2f'));
 
-                MonitorGraphUI.ChartLatency.yAxis
+                ChartLatency.yAxis
                     .axisLabel('(ms)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartLatency.margin({ left: 100 });
-                MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
+                ChartLatency.margin({ left: 100 });
+                ChartLatency.lines.forceY([0, 1]);
 
                 d3.select('#visualisationLatency')
                     .datum(dataLatency)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartLatency);
+                    .call(ChartLatency);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartLatency.update);
+                nv.utils.windowResize(ChartLatency.update);
             },
             callback: function(p) {
-                MonitorGraphUI.ChartLatency.useInteractiveGuideline(true);
-                //var tooltip = MonitorGraphUI.ChartLatency.tooltip;
-               
+                ChartLatency.useInteractiveGuideline(true);
+                //var tooltip = ChartLatency.tooltip;
+
                 //tooltip.contentGenerator(function (d) {
                 //    var html = '';
                 //    d.series.forEach(function (elem) {
@@ -368,44 +368,43 @@
                 //    //    html += "<table><tr><td colspan='3'><strong class='x=value'>" + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</strong></td></tr></thead>" +
                 //    //        "<tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(27,135,200);'</div></td><td class='key'>Latency</td><td class='value'>" + parseFloat(d.point.y).toFixed(2) + "</td></tr></tbody>";
                 //    //});
-    
+
                 //    return html;
                 //});
-                return MonitorGraphUI.ChartLatency;
+                return ChartLatency;
             }
         });
 
-
-        nv.addGraph({            
+        nv.addGraph({
            generate: function() {
-               MonitorGraphUI.ChartTransactions.xAxis
+               ChartTransactions.xAxis
               .tickFormat(function (d) {
                   return d3.time.format('%X')(new Date(d));
               });
 
-               
-               MonitorGraphUI.ChartTransactions.xAxis.rotateLabels(-20);
 
-               MonitorGraphUI.ChartTransactions.yAxis
+               ChartTransactions.xAxis.rotateLabels(-20);
+
+               ChartTransactions.yAxis
                    .tickFormat(d3.format(',.2f'));
 
-               MonitorGraphUI.ChartTransactions.yAxis
+               ChartTransactions.yAxis
                    .axisLabel('(Transactions/s)')
                    .axisLabelDistance(10);
 
-               MonitorGraphUI.ChartTransactions.margin({ left: 100 });
-               MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
+               ChartTransactions.margin({ left: 100 });
+               ChartTransactions.lines.forceY([0, 1]);
 
                d3.select('#visualisationTransaction')
                    .datum(dataTransactions)
                    .transition().duration(500)
-                   .call(MonitorGraphUI.ChartTransactions);
+                   .call(ChartTransactions);
 
-               nv.utils.windowResize(MonitorGraphUI.ChartTransactions.update);
+               nv.utils.windowResize(ChartTransactions.update);
            },
            callback: function(p) {
-               MonitorGraphUI.ChartTransactions.useInteractiveGuideline(true);
-               //var tooltip = MonitorGraphUI.ChartTransactions.tooltip;
+               ChartTransactions.useInteractiveGuideline(true);
+               //var tooltip = ChartTransactions.tooltip;
                //tooltip.contentGenerator(function (d) {
                //    var html = '';
                //    d.series.forEach(function (elem) {
@@ -416,75 +415,73 @@
 
                //    return html;
                //});
-               return MonitorGraphUI.ChartTransactions;
+               return ChartTransactions;
            }
         });
 
-
-        nv.addGraph({            
+        nv.addGraph({
             generate:function() {
-                MonitorGraphUI.ChartPartitionIdleTime.xAxis
+                ChartPartitionIdleTime.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format('%X')(new Date(d));
                 });
 
-                MonitorGraphUI.ChartPartitionIdleTime.showLegend(false);
-                MonitorGraphUI.ChartPartitionIdleTime.xAxis.rotateLabels(-20);
+                ChartPartitionIdleTime.showLegend(false);
+                ChartPartitionIdleTime.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartPartitionIdleTime.yAxis
+                ChartPartitionIdleTime.yAxis
                     .tickFormat(d3.format(',.2f'));
 
-                MonitorGraphUI.ChartPartitionIdleTime.yAxis
+                ChartPartitionIdleTime.yAxis
                     .axisLabel('(%)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 100 });
-                MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
-                MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
+                ChartPartitionIdleTime.margin({ left: 100 });
+                ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
+                ChartPartitionIdleTime.lines.forceY([0, 100]);
 
                 d3.select('#visualisationPartitionIdleTime')
                     .datum([])
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartPartitionIdleTime);
+                    .call(ChartPartitionIdleTime);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartPartitionIdleTime.update);
+                nv.utils.windowResize(ChartPartitionIdleTime.update);
             },
             callback: function () {
-                MonitorGraphUI.ChartPartitionIdleTime.useInteractiveGuideline(true);
-                return MonitorGraphUI.ChartPartitionIdleTime;
+                ChartPartitionIdleTime.useInteractiveGuideline(true);
+                return ChartPartitionIdleTime;
             }
         });
 
-
         nv.addGraph({
             generate:function() {
-                MonitorGraphUI.ChartDrReplicationRate.xAxis
+                ChartDrReplicationRate.xAxis
                .tickFormat(function (d) {
                    return d3.time.format('%X')(new Date(d));
                });
 
-                MonitorGraphUI.ChartDrReplicationRate.xAxis.rotateLabels(-20);
+                ChartDrReplicationRate.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartDrReplicationRate.yAxis
+                ChartDrReplicationRate.yAxis
                     .tickFormat(d3.format(',.2f'));
 
-                MonitorGraphUI.ChartDrReplicationRate.yAxis
+                ChartDrReplicationRate.yAxis
                     .axisLabel('(KBps)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartDrReplicationRate.margin({ left: 100 });
-                MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
+                ChartDrReplicationRate.margin({ left: 100 });
+                ChartDrReplicationRate.lines.forceY([0, 1]);
 
                 d3.select('#visualizationDrReplicationRate')
                     .datum(dataDrReplicationRate)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartDrReplicationRate);
+                    .call(ChartDrReplicationRate);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartDrReplicationRate.update);
+                nv.utils.windowResize(ChartDrReplicationRate.update);
             },
             callback: function() {
-                MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(true);
-                //var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
+                ChartDrReplicationRate.useInteractiveGuideline(true);
+                //var tooltip = ChartDrReplicationRate.tooltip;
                 //tooltip.contentGenerator(function (d) {
                 //    debugger;
                 //    var html = '';
@@ -495,41 +492,40 @@
                 //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
                 //    return html;
                 //});
-                return MonitorGraphUI.ChartDrReplicationRate;
+                return ChartDrReplicationRate;
             }
         });
 
-
-        nv.addGraph({            
+        nv.addGraph({
             generate: function () {
-                MonitorGraphUI.ChartCommandlog.showLegend(false);
-                MonitorGraphUI.ChartCommandlog.xAxis
+                ChartCommandlog.showLegend(false);
+                ChartCommandlog.xAxis
                     .tickFormat(function (d) {
                         return d3.time.format('%X')(new Date(d));
                     });
 
-                MonitorGraphUI.ChartCommandlog.xAxis.rotateLabels(-20);
+                ChartCommandlog.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartCommandlog.yAxis
+                ChartCommandlog.yAxis
                     .tickFormat(d3.format(',.2f'));
 
-                MonitorGraphUI.ChartCommandlog.yAxis
+                ChartCommandlog.yAxis
                     .axisLabel('(Pending Transactions)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartCommandlog.margin({ left: 100 });
-                MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
+                ChartCommandlog.margin({ left: 100 });
+                ChartCommandlog.lines.forceY([0, 0.1]);
 
                 d3.select('#visualisationCommandLog')
                     .datum(dataCommandLog)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCommandlog);
+                    .call(ChartCommandlog);
 
-                nv.utils.windowResize(MonitorGraphUI.ChartCommandlog.update);
+                nv.utils.windowResize(ChartCommandlog.update);
            },
             callback:function() {
-               MonitorGraphUI.ChartCommandlog.useInteractiveGuideline(true);
-               //var tooltip = MonitorGraphUI.ChartCommandlog.tooltip;
+               ChartCommandlog.useInteractiveGuideline(true);
+               //var tooltip = ChartCommandlog.tooltip;
                //tooltip.contentGenerator(function (d) {
                //    var html = '';
                //    d.series.forEach(function (elem) {
@@ -540,7 +536,7 @@
 
                //    return html;
                //});
-               return MonitorGraphUI.ChartCommandlog;
+               return ChartCommandlog;
            }
         });
 
@@ -842,31 +838,31 @@
                 dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogData;
             }
 
-            nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
+            nv.utils.windowResize(ChartCpu.update);
             changeAxisTimeFormat(view);
         };
 
         this.UpdateCharts = function () {
 
             if (ramChart.is(":visible"))
-                MonitorGraphUI.ChartRam.update();
+                ChartRam.update();
 
             if (cpuChart.is(":visible"))
-                MonitorGraphUI.ChartCpu.update();
+                ChartCpu.update();
 
             if (latencyChart.is(":visible"))
-                MonitorGraphUI.ChartLatency.update();
+                ChartLatency.update();
 
             if (transactionChart.is(":visible"))
-                MonitorGraphUI.ChartTransactions.update();
+                ChartTransactions.update();
 
             if (partitionChart.is(":visible"))
-                MonitorGraphUI.ChartPartitionIdleTime.update();
+                ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
+            if (drReplicationChart.is(":visible"))                ChartDrReplicationRate.update();
 
             if (cmdLogChart.is(":visible"))
-                MonitorGraphUI.ChartCommandlog.update();
+                ChartCommandlog.update();
         };
 
         var changeAxisTimeFormat = function (view) {
@@ -874,31 +870,31 @@
             if (view == 'Days')
                 dateFormat = '%d %b %X';
 
-            MonitorGraphUI.ChartCpu.xAxis
+            ChartCpu.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartRam.xAxis
+            ChartRam.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartLatency.xAxis
+            ChartLatency.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartTransactions.xAxis
+            ChartTransactions.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartPartitionIdleTime.xAxis
+            ChartPartitionIdleTime.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartDrReplicationRate.xAxis
+            ChartDrReplicationRate.xAxis
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            MonitorGraphUI.ChartCommandlog.xAxis
+            ChartCommandlog.xAxis
                 .tickFormat(function(d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
@@ -1077,7 +1073,7 @@
                     d3.select("#visualisationLatency")
                         .datum(dataLatency)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartLatency);
+                        .call(ChartLatency);
                 }
                 monitor.latFirstData = false;
             }
@@ -1085,6 +1081,7 @@
                 monitor.latMaxTimeStamp = timeStamp;
             latSecCount++;
             latMinCount++;
+            latency = null
         };
 
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
@@ -1163,8 +1160,8 @@
                 if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                     physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
 
-                    MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
-                    MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
+                    ChartRam.yAxis.scale().domain([0, physicalMemory]);
+                    ChartRam.lines.forceY([0, physicalMemory]);
                 }
 
                 if (memRss < 0)
@@ -1224,7 +1221,7 @@
                     d3.select('#visualisationRam')
                         .datum(dataRam)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartRam);
+                        .call(ChartRam);
                 }
                 monitor.memFirstData = false;
             }
@@ -1415,7 +1412,7 @@
                 d3.select('#visualisationTransaction')
                     .datum(dataTransactions)
                     .transition().duration(500)
-                    .call(MonitorGraphUI.ChartTransactions);
+                    .call(ChartTransactions);
             }
 
             tpsSecCount++;
@@ -1562,7 +1559,7 @@
                     d3.select('#visualisationCpu')
                         .datum(dataCpu)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartCpu);
+                        .call(ChartCpu);
                 }
             }
             if (timeStamp > monitor.cpuMaxTimeStamp)
@@ -1592,9 +1589,9 @@
             var interval = $( "#slider-range-min" ).slider( "value" )
             interval_end.setMinutes(interval_end.getMinutes() - interval);
 
-            dataArr = [];
+            var dataArr = [];
             for(var i = 0; i < rawDataArr.length; i++){
-                timeStamp =  new Date(rawDataArr[i].timestamp);
+                var timeStamp =  new Date(rawDataArr[i].timestamp);
                 if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
                     dataArr.push(rawDataArr[i])
                 }
@@ -1608,9 +1605,9 @@
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
             interval_end.setMinutes(interval_end.getMinutes() - interval);
-            dataArr = [];
+            var dataArr = [];
             for(var i = 0; i < rawDataArr.length; i++){
-                timeStamp =  new Date(rawDataArr[i].timestamp);
+                var timeStamp =  new Date(rawDataArr[i].timestamp);
                 if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
                     dataArr.push(rawDataArr[i])
                 }
@@ -1623,7 +1620,7 @@
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
             interval_end.setMinutes(interval_end.getMinutes() - interval);
-            partitionData = []
+            var partitionData = []
             for(var i = 0; i< rawDataArr.length; i++){
                 var keyIndex =  i;
                 partitionData[keyIndex] = {}
@@ -1631,7 +1628,7 @@
                 partitionData[keyIndex]["key"] = rawDataArr[keyIndex]["key"]
                 partitionData[keyIndex]["color"] = rawDataArr[keyIndex]["color"]
                 for(var b = 0; b < rawDataArr[i]["values"].length; b++){
-                    timeStamp =  new Date(rawDataArr[i]["values"][b].x);
+                    var timeStamp =  new Date(rawDataArr[i]["values"][b].x);
                     if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
                         partitionData[keyIndex]["values"].push(rawDataArr[i]["values"][b])
                     }
@@ -1646,9 +1643,9 @@
             var interval = $( "#slider-range-min" ).slider( "value" )
             interval_end.setMinutes(interval_end.getMinutes() - interval);
             var values = data[keyIndex].values
-            dataArr = [];
+            var dataArr = [];
             for(var i = 0; i < values.length; i++){
-                timeStamp =  new Date(values[i].x);
+                var timeStamp =  new Date(values[i].x);
                 if(timeStamp.getTime() >= interval_end.getTime() && timeStamp.getTime() <= interval_start.getTime()){
                     dataArr.push(values[i])
                 }
@@ -1711,7 +1708,7 @@
 
             if(monitor.partitionFirstData){
                 for(var i = 0; i< partitionDetailsArr.length; i++){
-                    keyIndexSec =  i;
+                    var keyIndexSec =  i;
                     if(partitionDetailsArr[i]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArr[i]["values"][partitionDetailsArr[i]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                         partitionData[keyIndexSec]["values"] = []
                         for(var b = 0; b < partitionDetailsArr[i]["values"].length; b++){
@@ -1722,7 +1719,7 @@
                 }
 
                 for(var j = 0; j< partitionDetailsArrMin.length; j++){
-                    keyIndexMin =  j;
+                    var keyIndexMin =  j;
                     if(partitionDetailsArrMin[j]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArrMin[j]["values"][partitionDetailsArrMin[j]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
                         partitionDataMin[keyIndexMin]["values"] = []
                         for(var a = 0; a < partitionDetailsArrMin[j]["values"].length; a++){
@@ -1733,7 +1730,7 @@
                 }
 
                 for(var k = 0; k< partitionDetailsArrDay.length; k++){
-                    keyIndexDay = k;
+                    var keyIndexDay = k;
                     if(partitionDetailsArrDay[k]["values"].length > 0 && !(currentTime.getTime() - (new Date(partitionDetailsArrDay[k]["values"][partitionDetailsArrDay[k]["values"].length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
                         partitionDataDay[keyIndexMin]["values"] = []
                         for(var c = 0; c < partitionDetailsArrDay[k]["values"].length; c++){
@@ -1825,7 +1822,7 @@
                     d3.select('#visualisationPartitionIdleTime')
                         .datum(dataPartitionIdleTime)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartPartitionIdleTime);
+                        .call(ChartPartitionIdleTime);
                 }
             }
             if (timeStamp > monitor.partitionMaxTimeStamp)
@@ -1958,7 +1955,7 @@
                     d3.select('#visualizationDrReplicationRate')
                         .datum(dataDrReplicationRate)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartDrReplicationRate);
+                        .call(ChartDrReplicationRate);
                 }
             }
             if (timeStamp > monitor.drMaxTimeStamp)
@@ -1994,8 +1991,6 @@
             if(localStorage.cmdLog != undefined)
                 cmdLogArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLog))
             else{
-                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
-                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.parse(cmdLogArr)
             }
@@ -2033,10 +2028,11 @@
                         })
                     }
                 }
-
-                overlayData = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
+                var overlayData = MonitorGraphUI.GetSnapshotOverlay(overlayDataArr)
                 if(overlayData.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
-                    cmdLogOverlay = MonitorGraphUI.SaveSnapshotOverlay(overlayDataArr)
+                    cmdLogOverlay = []
+                    cmdLogOverlay = overlayData
+                    overlayData = []
                 }
             }
 
@@ -2098,42 +2094,36 @@
                 else {
                     dataCommandLog[0]["values"] = cmdLogData;
                 }
-
                 if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
                     d3.select('#visualisationCommandLog')
                         .datum(dataCommandLog)
                         .transition().duration(500)
-                        .call(MonitorGraphUI.ChartCommandlog);
+                        .call(ChartCommandlog);
                 }
 
                 var isDuplicate = false;
                 if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
                     for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
-                        $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
-                            var x1 = partitionValue.x;
+                        for(var j = 0;j < cmdLogOverlay.length;j++){
+                            var x1 = cmdLogOverlay[j].x;
                             if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
                                 isDuplicate = true;
                             else
                                 isDuplicate = false;
-                        });
+                        }
                         if (!isDuplicate)
                             cmdLogOverlay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
                     }
+                    cmdLogOverlay = MonitorGraphUI.GetSnapshotOverlay(cmdLogOverlay, 15)
                 }
-                d3.select('#visualisationCommandLog .nv-y')
-                    .append('rect')
-                    .attr('x', 2)
-                    .attr('width', 560)
-                    .style('fill', 'white')
-                    .style('opacity', 1)
-                    .attr('y', 0)
-                    .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                $('.overlayGraph').detach()
 
-                localStorage.SnapshotOverlayData = JSON.stringify(MonitorGraphUI.SaveSnapshotOverlay(cmdLogOverlay))
+                localStorage.SnapshotOverlayData = JSON.stringify(cmdLogOverlay)
+                //cmdLogOverlay = []
 
                 $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
-                    var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.startTime);
-                    var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.endTime);
+                    var x1 = ChartCommandlog.xScale()(partitionValue.startTime);
+                    var x2 = ChartCommandlog.xScale()(partitionValue.endTime);
                     var opacity = 1;
                     if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
                         opacity = ((x2 - x1) > 4) ? 0.2 : 1;
@@ -2144,7 +2134,9 @@
                             .style('fill', 'red')
                             .style('opacity', opacity)
                             .attr('y', 0)
-                            .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                            .attr('class', 'overlayGraph')
+                            .attr('height', ChartCommandlog.yAxis.range()[0]);
+
                     }
 
                 });
@@ -2173,15 +2165,15 @@
             return requiredFormat;
         }
 
-        this.SaveSnapshotOverlay = function(snapshotData, timeUnit){
+        this.GetSnapshotOverlay = function(snapshotData, timeInterval){
             var interval_end = new Date()
             var interval_start = new Date()
-            var interval = $( "#slider-range-min" ).slider( "value" )
+            var interval = timeInterval == undefined ? $( "#slider-range-min" ).slider( "value" ) : timeInterval
             interval_end.setMinutes(interval_end.getMinutes() - interval);
-            snapshotDataArr = [];
+            var snapshotDataArr = [];
             for(var i = 0; i < snapshotData.length; i++){
-                start_timeStamp =  snapshotData[i].startTime;
-                stop_timeStamp = snapshotData[i].endTime;
+                var start_timeStamp =  snapshotData[i].startTime;
+                var stop_timeStamp = snapshotData[i].endTime;
                 if(start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()
                 && start_timeStamp >= interval_end.getTime() && start_timeStamp <= interval_start.getTime()){
                     snapshotDataArr.push(snapshotData[i])
@@ -2191,18 +2183,18 @@
         }
 
         this.refreshGraphCmdLog = function () {
-            if ($.isFunction(MonitorGraphUI.ChartCommandlog.update))
-                MonitorGraphUI.ChartCommandlog.update();
+            if ($.isFunction(ChartCommandlog.update))
+                ChartCommandlog.update();
         };
 
         this.refreshGraphDR = function () {
-            if ($.isFunction(MonitorGraphUI.ChartDrReplicationRate.update))
-                MonitorGraphUI.ChartDrReplicationRate.update();
+            if ($.isFunction(ChartDrReplicationRate.update))
+                ChartDrReplicationRate.update();
         };
     });
 
 
 
-    window.MonitorGraphUI = MonitorGraphUI = new IMonitorGraphUI();
+    window.MonitorGraphUI = new IMonitorGraphUI();
 })(window);
 
