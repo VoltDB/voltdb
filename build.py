@@ -67,7 +67,7 @@ if CTX.compilerName() == 'gcc':
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
-if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() >= 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
 if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
@@ -571,7 +571,7 @@ elif CTX.PLATFORM == "Linux":
         if name == "processor":
             numHardwareThreads = numHardwareThreads + 1
 
-print("Making in directory \"%s\" with %d threads" 
+print("Making in directory \"%s\" with %d threads"
 		% (CTX.OUTPUT_PREFIX, numHardwareThreads))
 retval = os.system("make --directory=%s -j%d" % (CTX.OUTPUT_PREFIX, numHardwareThreads))
 if retval != 0:

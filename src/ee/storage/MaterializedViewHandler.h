@@ -52,9 +52,11 @@ private:
 class MaterializedViewHandler {
 public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
-    MaterializedViewHandler(PersistentTable *targetTable,
-                            catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                            VoltDBEngine *engine);
+    MaterializedViewHandler(PersistentTable* targetTable,
+                            catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
+                            VoltDBEngine* engine,
+                            bool needsCatchUp,
+                            bool catchUpFallible);
     ~MaterializedViewHandler();
     // We maintain the source table list here to register / de-register the view handler on the source tables.
     void addSourceTable(PersistentTable *sourceTable);
@@ -114,10 +116,12 @@ private:
                             VoltDBEngine *engine);
     // Set up the m_existingTuple and the m_updatedTuple.
     void setUpBackedTuples();
+
     // This is called to catch up with the existing data in the source tables.
     // It is useful when the view is created after the some data was inserted into the
     // source table(s).
-    void catchUpWithExistingData();
+    void catchUpWithExistingData(bool fallible);
+
     // Find in the view table (m_destTable) for the row that has the same group-by keys as
     // the deltaTuple.
     // The function will return a boolean value indicating if a matching row is found.
