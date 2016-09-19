@@ -263,6 +263,25 @@ class SchemaPage extends VoltDBManagementCenterPage {
     }
 
     /*
+     * get query to delete a table
+     */
+    def String getQueryToDeleteTableOnly() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#deleteOnly") {
+        }
+
+        while ((line = br.readLine()) != "#name") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
      * get tablename that is created and deleted
      */
 
