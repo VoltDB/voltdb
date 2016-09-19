@@ -37,7 +37,7 @@ public class SnapshotInitiationInfo
     private String m_data;
     private boolean m_truncationRequest;
     private SnapshotPathType m_stype;
-    private static final String MAGIC_NONCE_PREFIX = "_VOLTDB";
+    public static final String MAGIC_NONCE_PREFIX = "_VOLTDB";
 
     /**
      * Construct the object given the parameters directly.
