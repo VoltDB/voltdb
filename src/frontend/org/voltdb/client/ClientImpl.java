@@ -23,15 +23,20 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -71,6 +76,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
     final CSL m_listener = new CSL();
+    ClientStatusListenerExt m_clientStatusListener = null;
     /*
      * Username and password as set by the constructor.
      */
@@ -78,6 +84,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
 
+    private final ScheduledExecutorService m_ex = Executors.newSingleThreadScheduledExecutor(
+                    CoreUtils.getThreadFactory("Connection Sync Thread"));
     /**
      * These threads belong to the network thread pool
      * that invokes callbacks. These threads are "blessed"
@@ -118,6 +126,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
+        m_distributer.setTopologyChangeAware((config.m_topologyChangeAware && config.m_useClientAffinity));
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -135,7 +144,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         if (config.m_listener != null) {
             m_distributer.addClientStatusListener(config.m_listener);
+            m_clientStatusListener = config.m_listener;
         }
+
         assert(config.m_maxOutstandingTxns > 0);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
         if (config.m_autoTune) {
@@ -437,7 +448,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         final long nowNanos = System.nanoTime();
-
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         if (m_blockingQueue) {
@@ -581,7 +591,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         m_distributer.shutdown();
-
+        m_ex.shutdown();
+        m_ex.awaitTermination(365, TimeUnit.DAYS);
         ClientFactory.decreaseClientNum();
     }
 
@@ -638,6 +649,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return false;
     }
 
+    class HostConfig {
+        String m_ipAddress;
+        String m_hostName;
+        int m_clientPort;
+        void setValue(String param, String value) {
+            if ("IPADDRESS".equalsIgnoreCase(param)) {
+                m_ipAddress = value;
+            } else if ("HOSTNAME".equalsIgnoreCase(param)) {
+                m_hostName = value;
+            } else if ("CLIENTPORT".equalsIgnoreCase(param)) {
+                m_clientPort = Integer.parseInt(value);
+            }
+        }
+    }
+
     class CSL extends ClientStatusListenerExt {
 
         @Override
@@ -665,7 +691,59 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             }
         }
 
-    }
+        Map<Integer, HostConfig> buildHostNetworkInfo(VoltTable vt) {
+            Map<Integer, HostConfig> info = new HashMap<Integer, HostConfig>();
+            while (vt.advanceRow()) {
+                Integer hid = (int)vt.getLong("HOST_ID");
+                if (!m_distributer.isHostConnected(hid)) {
+                    HostConfig config = info.get(hid);
+                    if(config == null) {
+                        config = new HostConfig();
+                        info.put(hid, config);
+                    }
+                    config.setValue(vt.getString("KEY"), vt.getString("VALUE"));
+                }
+            }
+            return info;
+        }
+
+        void nofifyClientConnectionCreation(HostConfig host, byte status, Throwable e) {
+            if (m_clientStatusListener != null) {
+                m_clientStatusListener.nofifyClientConnectionCreation((host != null) ? host.m_hostName : "",
+                        (host != null) ? host.m_ipAddress : "",
+                        (host != null) ? host.m_clientPort : -1, status, e);
+            }
+        }
+
+        public void createConnectionsUponTopologyChange() {
+            m_ex.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try{
+                        ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
+                        if (resp.getStatus() == ClientResponse.SUCCESS) {
+                            Map<Integer, HostConfig> hosts = buildHostNetworkInfo(resp.getResults()[0]);
+                            for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
+                                HostConfig config = entry.getValue();
+                                try {
+                                    createConnection(config.m_ipAddress,config.m_clientPort);
+                                    nofifyClientConnectionCreation(config, ClientResponse.SUCCESS, null);
+                                } catch (IOException e) {
+                                    nofifyClientConnectionCreation(config, ClientResponse.SERVER_UNAVAILABLE, e);
+                                }
+                            }
+                            m_distributer.updateClientAffinityPartitionsUponTopoChange();
+                        } else {
+                            nofifyClientConnectionCreation(null, resp.getStatus(), null);
+                        }
+                    } catch (Exception e) {
+                        nofifyClientConnectionCreation(null, ClientResponse.SERVER_UNAVAILABLE, e);
+                    }
+                }
+            });
+        }
+}
+
      /****************************************************
                         Implementation
      ****************************************************/

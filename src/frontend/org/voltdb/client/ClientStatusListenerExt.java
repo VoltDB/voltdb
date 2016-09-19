@@ -46,6 +46,16 @@ public class ClientStatusListenerExt {
     public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {}
 
     /**
+     * Notify listeners that the client tried to create connection to unconnected nodes upon topology change.
+     * @param hostname Name of the host the connection was created.
+     * @param ip  The IP address
+     * @param port Port number of the connection to the node.
+     * @param status The creation status {@link ClientResponse}
+     * @param e The reason that the creation fails
+     */
+    public void nofifyClientConnectionCreation(String hostname, String ip, int port, byte status, Throwable e) {}
+
+    /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition
      * where all TCP connections to the servers are full and the {@link Client} will no longer
      * queue invocations.
