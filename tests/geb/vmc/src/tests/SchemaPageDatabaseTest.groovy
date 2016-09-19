@@ -114,7 +114,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-z
+
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
