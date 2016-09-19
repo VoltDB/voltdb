@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -281,30 +282,37 @@ public class Collector {
     private static String getLinuxOSInfo() {
         // Supported Linux OS for voltdb are CentOS, Redhat and Ubuntu
         String versionInfo = "";
-        try {
-            BufferedReader br = null;
-            // base Ubuntu distributions have the distribution info in /etc/lsb-release
-            final String ubuntuDistInfoFilePath = "/etc/lsb-release";
-            // base RedHat, CentOS distributions have the distribution info in /etc/redhat-release
-            final String rhDistInfoFilePath = "/etc/redhat-release";
-            if (Files.exists(Paths.get(ubuntuDistInfoFilePath))) {
 
-                br = new BufferedReader(new FileReader(ubuntuDistInfoFilePath));
+        BufferedReader br = null;
+        // files containing the distribution info
+        // Ubuntu - "/etc/lsb-release"
+        // Redhat, CentOS - "/etc/redhat-release"
+        final List<String> distInfoFilePaths = Arrays.asList("/etc/lsb-release",
+                                                            "/etc/redhat-release");
+        for (String filePath : distInfoFilePaths) {
+            if (Files.exists(Paths.get(filePath))) {
+                try {
+                    br = new BufferedReader(new FileReader(filePath));
+                }
+                catch (FileNotFoundException excp) {
+                    System.err.println(excp.getMessage());
+                }
+                break;
             }
-            else if (Files.exists(Paths.get(rhDistInfoFilePath))) {
-                br = new BufferedReader(new FileReader(rhDistInfoFilePath));
-            }
-            if (br != null) {
-                StringBuffer buffer = new StringBuffer();
+        }
+
+        if (br != null) {
+            StringBuffer buffer = new StringBuffer();
+            try {
                 while ((versionInfo = br.readLine()) != null) {
                     buffer.append(versionInfo);
                 }
                 versionInfo = buffer.toString();
             }
-        }
-        catch (IOException io) {
-            System.err.println(io.getMessage());
-            versionInfo = "";
+            catch (IOException io) {
+                System.err.println(io.getMessage());
+                versionInfo = "";
+            }
         }
         return versionInfo;
     }
