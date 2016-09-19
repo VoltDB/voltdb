@@ -107,6 +107,12 @@ body {
 .leftSide {
 	float: left;
 }
+.leftServWrap {position: relative; top: 5px;}
+.rightSideServ{float: left;padding: 0 0 0px 10px; position: relative;top: -3px;}
+.defaultServ option { font-weight:bold;}
+.defaultServ option{ padding:5px;}
+.defaultServ option:nth-child(1){ color:#222222; background:#cccccc;}
+
 .inputText {
 	height: 30px;
 	padding: 5px 10px;
@@ -830,7 +836,7 @@ ul.addServerList li:nth-child(1) {
 	font-size: 17px;
 }
 .headerAdminContent h1 {
-	padding: 18px 0 0 20px;
+	padding:0 0 15px 20px;
 	font-size: 17px;
 }
 .mainTbl {
@@ -965,7 +971,7 @@ ul.addServerList li:nth-child(1) {
 	margin: 20px 0 0 0;
 }
 .headerAdminContent {
-	height: 53px;
+/*	height: 53px;*/
 	position: relative;
 	background: #fbfbfb;
 	border-bottom: 1px solid #aaa;
@@ -973,10 +979,13 @@ ul.addServerList li:nth-child(1) {
 
 .drAdminHeaderLeft {
 	float: left;
+    font-weight:bold;
+    font-size:14px;
 }
 .drAdminHeaderRight {
 	float: right;
-	width: 65px;
+	/*width: 65px;*/
+	padding-right:46px;
 }
 .replicaWrapper {
 	position: relative;
@@ -1267,6 +1276,7 @@ table.tblPopup {
 	text-decoration: underline;
 	font-style: italic;
 }
+.connectionSourceTbl tr td:nth-child(3) { width:81px;}
 .disableSelect {
 	background-color: #eee;
 	border-color: #ccc;

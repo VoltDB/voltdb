@@ -761,10 +761,10 @@ class ServerAPI(MethodView):
             'isAdded': False,
             'voltdbroot': request.json.get('voltdbroot', "").strip(),
             'snapshots': request.json.get('snapshots', "").strip(),
-            'export_overflow': request.json.get('export_overflow', "").strip(),
-            'commandlog': request.json.get('commandlog', "").strip(),
-            'commandlogsnapshots': request.json.get('commandlogsnapshots', "").strip(),
-            'droverflow': request.json.get('droverflow', "").strip()
+            'export-overflow': request.json.get('export-overflow', "").strip(),
+            'command-log': request.json.get('command-log', "").strip(),
+            'command-log-snapshots': request.json.get('command-log-snapshots', "").strip(),
+            'dr-overflow': request.json.get('dr-overflow', "").strip()
         }
 
         # Add server to the current database
@@ -894,14 +894,14 @@ class ServerAPI(MethodView):
                 str(request.json.get('voltdbroot', current_server['voltdbroot']))
             current_server['snapshots'] = \
                 str(request.json.get('snapshots', current_server['snapshots']))
-            current_server['exportoverflow'] = \
-                str(request.json.get('exportoverflow', current_server['exportoverflow']))
-            current_server['commandlog'] = \
-                str(request.json.get('commandlog', current_server['commandlog']))
-            current_server['commandlogsnapshot'] = \
-                str(request.json.get('commandlogsnapshot', current_server['commandlogsnapshot']))
-            current_server['droverflow'] = \
-                str(request.json.get('droverflow', current_server['droverflow']))
+            current_server['export-overflow'] = \
+                str(request.json.get('export-overflow', current_server['export-overflow']))
+            current_server['command-log'] = \
+                str(request.json.get('command-log', current_server['command-log']))
+            current_server['command-log-snapshots'] = \
+                str(request.json.get('command-log-snapshots', current_server['command-log-snapshots']))
+            current_server['dr-overflow'] = \
+                str(request.json.get('dr-overflow', current_server['dr-overflow']))
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
@@ -1864,8 +1864,9 @@ def main(runner, amodule, config_dir, data_dir, server):
                              'enabled': True, 'external-interface': "", 'internal-interface': "",
                              'public-interface': "", 'client-listener': "", 'internal-listener': "",
                              'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False}
-
+                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False, 'voltdbroot': "voltdbroot",
+                             'snapshot': "snapshot", 'export-overflow': "export_overflow", 'command-log': "command_log",
+                             'command-log-snapshots': "command_log_snapshots", 'dr-overflow': "dr_overflow"}
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
 
     Configuration.write_configuration_file()
