@@ -16,7 +16,7 @@
 
 import time
 import voltdbclient
-from test import outstanding_bugs
+
 
 def check_export_dr(runner):
         partition_min_host = dict()
@@ -78,6 +78,8 @@ def check_dr(runner, partition_min_host, partition_min, partition_max):
         # reset all min values to find the new min
         if pid in partition_max:
             partition_min[pid] = partition_max[pid]
+    if len(partition_data.tuples()) == 0:
+        return
     for r in partition_data.tuples():
         pid = r[3]
         hostname = str(r[2])
@@ -134,12 +136,15 @@ def check_export(runner, export_tables_with_data, last_collection_time):
         return 1
     else:
         tablestats = resp.table(0)
+        if len(tablestats.tuples()) == 0:
+            return 1
         firsttuple = tablestats.tuple(0)
         if firsttuple.column(0) == last_collection_time:
             # this statistic is the same cached set as the last call
             return last_collection_time
         else:
             collection_time = firsttuple.column(0)
+
     for r in tablestats.tuples():
         # first look for streaming (export) tables
         if str(r[6]) == 'StreamedTable':
@@ -195,6 +200,8 @@ def check_importer(runner):
      while True:
         resp = get_stats(runner, 'IMPORTER')
         outstanding = 0
+        if len(resp.table(0).tuples()) == 0:
+            return
         for r in resp.table(0).tuples():
             outstanding += r[8]
         runner.info('Outstanding importer requests=%d' %(outstanding))
