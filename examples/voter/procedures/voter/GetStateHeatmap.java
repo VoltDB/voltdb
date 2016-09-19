@@ -44,11 +44,16 @@ import org.voltdb.VoltType;
 public class GetStateHeatmap extends VoltProcedure {
 
     public final SQLStmt stateHeatMap = new SQLStmt(
-                                                    "SELECT STATE, CONTESTANT_NUMBER, NUM_VOTES "
-                                                  + "FROM ( SELECT STATE, NUM_VOTES, CONTESTANT_NUMBER, "
-                                                  + "       RANK() OVER ( PARTITION BY STATE ORDER BY NUM_VOTES DESC ) VRANK "
-                                                  + "       FROM V_VOTES_BY_CONTESTANT_NUMBER_STATE ) AS SUB "
-                                                  + "WHERE SUB.VRANK = 1; ");
+                                                    "  SELECT state"                                                     +
+                                                    "       , contestant_number"                                         +
+                                                    "       , num_votes"                                                 +
+                                                    "    FROM ( SELECT state"                                            +
+                                                    "                , contestant_number"                                +
+                                                    "                , num_votes"                                        +
+                                                    "                , RANK() OVER ( PARTITION by state "                +
+                                                    "                                ORDER BY num_votes DESC ) AS vrank" +
+                                                    "             FROM v_votes_by_contestant_number_state ) AS sub"      +
+                                                    "   WHERE sub.vrank = 1;");
     public final SQLStmt contestantTotals = new SQLStmt("SELECT * from V_VOTES_BY_CONTESTANT_NUMBER;");
 
     public VoltTable[] run() {
