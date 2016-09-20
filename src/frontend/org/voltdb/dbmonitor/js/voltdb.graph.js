@@ -27,8 +27,12 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
-        this.Monitors = {};
+        var drReplicationChart;        var cmdLogChart;
+        var cmdLogOverlay = [];
+        var cmdLogOverlayMin = [];
+        var cmdLogOverlayDay = [];
+        var physicalMemory = -1;
+        var Monitors = {};
         var ChartCpu = nv.models.lineChart();
         var ChartRam = nv.models.lineChart();
         var ChartLatency = nv.models.lineChart();
@@ -760,7 +764,7 @@
             partitionChart = partitionChartObj;
             drReplicationChart = drReplicationCharObj;
             cmdLogChart = cmdLogChartObj;            currentView = view;
-            MonitorGraphUI.Monitors = {
+            Monitors = {
                 'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
@@ -813,29 +817,29 @@
         this.RefreshGraph = function (view) {
             currentView = view;
             if (view == 'Days') {
-                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataHrs;
-                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataDay;
-                dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataDay;
-                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataDay;
-                dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataDay;
-                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataDay;
-                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogDataDay;
+                dataCpu[0]["values"] = Monitors.cpuDataHrs;
+                dataTransactions[0]["values"] = Monitors.tpsDataDay;
+                dataRam[0]["values"] = Monitors.memDataDay;
+                dataLatency[0]["values"] = Monitors.latDataDay;
+                dataPartitionIdleTime = Monitors.partitionDataDay;
+                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataDay;
+                dataCommandLog[0]["values"] = Monitors.cmdLogDataDay;
             } else if (view == 'Minutes') {
-                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataMin;
-                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataMin;
-                dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataMin;
-                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataMin;
-                dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionDataMin;
-                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationDataMin;
-                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogDataMin;
+                dataCpu[0]["values"] = Monitors.cpuDataMin;
+                dataTransactions[0]["values"] = Monitors.tpsDataMin;
+                dataRam[0]["values"] = Monitors.memDataMin;
+                dataLatency[0]["values"] = Monitors.latDataMin;
+                dataPartitionIdleTime = Monitors.partitionDataMin;
+                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataMin;
+                dataCommandLog[0]["values"] = Monitors.cmdLogDataMin;
             } else {
-                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuData;
-                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsData;
-                dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
-                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
-                dataPartitionIdleTime = MonitorGraphUI.Monitors.partitionData;
-                dataDrReplicationRate[0]["values"] = MonitorGraphUI.Monitors.drReplicationData;
-                dataCommandLog[0]["values"] = MonitorGraphUI.Monitors.cmdLogData;
+                dataCpu[0]["values"] = Monitors.cpuData;
+                dataTransactions[0]["values"] = Monitors.tpsData;
+                dataRam[0]["values"] = Monitors.memData;
+                dataLatency[0]["values"] = Monitors.latData;
+                dataPartitionIdleTime = Monitors.partitionData;
+                dataDrReplicationRate[0]["values"] = Monitors.drReplicationData;
+                dataCommandLog[0]["values"] = Monitors.cmdLogData;
             }
 
             nv.utils.windowResize(ChartCpu.update);
@@ -935,7 +939,7 @@
         }
 
         this.RefreshLatency = function (latency, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
             var dataLatDay = monitor.latDataDay;
@@ -946,23 +950,23 @@
             var latencyArrDay = []
 
             if(localStorage.latencyMin != undefined){
-                latencyArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
+                latencyArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
             } else{
-                latencyArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLatMin, 'timestamp', 'latency'))
+                latencyArrMin = JSON.stringify(convertDataFormat(dataLatMin, 'timestamp', 'latency'))
                 latencyArrMin = JSON.parse(latencyArrMin)
             }
 
             if(localStorage.latency != undefined){
-                latencyArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latency))
+                latencyArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latency))
             } else {
-                latencyArr = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLat, 'timestamp', 'latency'))
+                latencyArr = JSON.stringify(convertDataFormat(dataLat, 'timestamp', 'latency'))
                 latencyArr = JSON.parse(latencyArr)
             }
 
             if(localStorage.latencyDay != undefined){
-                latencyArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyDay))
+                latencyArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyDay))
             } else {
-                latencyArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(dataLatDay, 'timestamp', 'latency'))
+                latencyArrDay = JSON.stringify(convertDataFormat(dataLatDay, 'timestamp', 'latency'))
                 latencyArrDay = JSON.parse(latencyArrDay)
             }
 
@@ -1000,7 +1004,6 @@
 
             // Compute latency statistics
             jQuery.each(latency, function (id, val) {
-
                 var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
                 var latStats = convert2Histogram(strLatStats);
@@ -1026,12 +1029,12 @@
                     dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
                     if (monitor.latMaxTimeStamp == timeStamp) {
                         dataLatMin.push({ 'x': new Date(timeStamp), 'y': dataLatMin[dataLatMin.length - 1].y });
-                        latencyArrMin = MonitorGraphUI.saveLocalStorageInterval(latencyArrMin, {"timestamp": new Date(timeStamp), "latency": dataLatMin[dataLatMin.length - 1].y })
+                        latencyArrMin = saveLocalStorageInterval(latencyArrMin, {"timestamp": new Date(timeStamp), "latency": dataLatMin[dataLatMin.length - 1].y })
                     } else {
                         dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
-                        latencyArrMin = MonitorGraphUI.saveLocalStorageInterval(latencyArrMin, {"timestamp": new Date(timeStamp), "latency": lat })
+                        latencyArrMin = saveLocalStorageInterval(latencyArrMin, {"timestamp": new Date(timeStamp), "latency": lat })
                     }
-                    MonitorGraphUI.Monitors.latDataMin = dataLatMin;
+                    Monitors.latDataMin = dataLatMin;
                     latSecCount = 0;
                 }
 
@@ -1039,24 +1042,24 @@
                     dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
                     if (monitor.latMaxTimeStamp == timeStamp) {
                         dataLatDay.push({ 'x': new Date(timeStamp), 'y': dataLatDay[dataLatDay.length - 1].y });
-                        latencyArrDay = MonitorGraphUI.saveLocalStorageInterval(latencyArrDay, {"timestamp": new Date(timeStamp), "latency": dataLatMin[dataLatMin.length - 1].y })
+                        latencyArrDay = saveLocalStorageInterval(latencyArrDay, {"timestamp": new Date(timeStamp), "latency": dataLatMin[dataLatMin.length - 1].y })
                     } else {
                         dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
-                        latencyArrDay = MonitorGraphUI.saveLocalStorageInterval(latencyArrDay, {"timestamp": new Date(timeStamp), "latency": lat })
+                        latencyArrDay = saveLocalStorageInterval(latencyArrDay, {"timestamp": new Date(timeStamp), "latency": lat })
                     }
-                    MonitorGraphUI.Monitors.latDataDay = dataLatDay;
+                    Monitors.latDataDay = dataLatDay;
                     latMinCount = 0;
                 }
 
                 dataLat = sliceFirstData(dataLat, dataView.Seconds);
                 if (monitor.latMaxTimeStamp == timeStamp) {
                     dataLat.push({ 'x': new Date(timeStamp), 'y': dataLat[dataLat.length - 1].y });
-                    latencyArr = MonitorGraphUI.saveLocalStorageInterval(latencyArr, {"timestamp": new Date(timeStamp), "latency": dataLat[dataLat.length - 1].y })
+                    latencyArr = saveLocalStorageInterval(latencyArr, {"timestamp": new Date(timeStamp), "latency": dataLat[dataLat.length - 1].y })
                 } else {
                     dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
-                    latencyArr = MonitorGraphUI.saveLocalStorageInterval(latencyArr, {"timestamp": new Date(timeStamp), "latency": lat })
+                    latencyArr = saveLocalStorageInterval(latencyArr, {"timestamp": new Date(timeStamp), "latency": lat })
                 }
-                MonitorGraphUI.Monitors.latData = dataLat;
+                Monitors.latData = dataLat;
 
                 localStorage.latency = JSON.stringify(latencyArr)
                 localStorage.latencyMin = JSON.stringify(latencyArrMin)
@@ -1085,7 +1088,7 @@
         };
 
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var dataMem = monitor.memData;
             var dataMemMin = monitor.memDataMin;
             var dataMemDay = monitor.memDataDay;
@@ -1100,24 +1103,24 @@
                 return;
 
             if(localStorage.memoryDetailsMin != undefined){
-                memoryDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsMin))
+                memoryDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsMin))
             } else {
-                memoryDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemMin, 'timestamp', 'physicalMemory'))
+                memoryDetailsArrMin = JSON.stringify(convertDataFormat(dataMemMin, 'timestamp', 'physicalMemory'))
                 memoryDetailsArrMin = JSON.parse(memoryDetailsArrMin)
             }
 
 
             if(localStorage.memoryDetails != undefined){
-                memoryDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetails))
+                memoryDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetails))
             } else {
-                memoryDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMem, 'timestamp', 'physicalMemory'))
+                memoryDetailsArr = JSON.stringify(convertDataFormat(dataMem, 'timestamp', 'physicalMemory'))
                 memoryDetailsArr = JSON.parse(memoryDetailsArr)
             }
 
             if(localStorage.memoryDetailsDay != undefined){
-                memoryDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsDay))
+                memoryDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.memoryDetailsDay))
             } else {
-                memoryDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(dataMemDay, 'timestamp', 'physicalMemory'))
+                memoryDetailsArrDay = JSON.stringify(convertDataFormat(dataMemDay, 'timestamp', 'physicalMemory'))
                 memoryDetailsArrDay = JSON.parse(memoryDetailsArrDay)
             }
 
@@ -1173,12 +1176,12 @@
                     dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
                     if (memTimeStamp == monitor.memMaxTimeStamp) {
                         dataMemMin.push({ "x": new Date(memTimeStamp), "y": dataMemMin[dataMemMin.length - 1].y });
-                        memoryDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArrMin, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMemMin[dataMemMin.length - 1].y })
+                        memoryDetailsArrMin = saveLocalStorageInterval(memoryDetailsArrMin, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMemMin[dataMemMin.length - 1].y })
                     } else {
                         dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                        memoryDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArrMin, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss })
+                        memoryDetailsArrMin = saveLocalStorageInterval(memoryDetailsArrMin, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss })
                     }
-                    MonitorGraphUI.Monitors.memDataMin = dataMemMin;
+                    Monitors.memDataMin = dataMemMin;
                     memSecCount = 0;
                 }
 
@@ -1186,24 +1189,24 @@
                     dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
                     if (memTimeStamp == monitor.memMaxTimeStamp) {
                         dataMemDay.push({ "x": new Date(memTimeStamp), "y": dataMemDay[dataMemDay.length - 1].y });
-                        memoryDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArrDay, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMemDay[dataMemDay.length - 1].y})
+                        memoryDetailsArrDay = saveLocalStorageInterval(memoryDetailsArrDay, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMemDay[dataMemDay.length - 1].y})
                     } else {
                         dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                        memoryDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArrDay, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss})
+                        memoryDetailsArrDay = saveLocalStorageInterval(memoryDetailsArrDay, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss})
                     }
-                    MonitorGraphUI.Monitors.memDataDay = dataMemDay;
+                    Monitors.memDataDay = dataMemDay;
                     memMinCount = 0;
                 }
 
                 dataMem = sliceFirstData(dataMem, dataView.Seconds);
                 if (memTimeStamp == monitor.memMaxTimeStamp) {
                     dataMem.push({ "x": new Date(memTimeStamp), "y": dataMem[dataMem.length - 1].y });
-                    memoryDetailsArr = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArr, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMem[dataMem.length - 1].y})
+                    memoryDetailsArr = saveLocalStorageInterval(memoryDetailsArr, {"timestamp": new Date(memTimeStamp), "physicalMemory": dataMem[dataMem.length - 1].y})
                 } else {
                     dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                    memoryDetailsArr = MonitorGraphUI.saveLocalStorageInterval(memoryDetailsArr, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss})
+                    memoryDetailsArr = saveLocalStorageInterval(memoryDetailsArr, {"timestamp": new Date(memTimeStamp), "physicalMemory": memRss})
                 }
-                MonitorGraphUI.Monitors.memData = dataMem;
+                Monitors.memData = dataMem;
 
 
                 localStorage.memoryDetails = JSON.stringify(memoryDetailsArr)
@@ -1232,7 +1235,7 @@
         };
 
         this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var datatrans = monitor.tpsData;
             var datatransMin = monitor.tpsDataMin;
             var datatransDay = monitor.tpsDataDay;
@@ -1245,23 +1248,23 @@
                 return;
 
             if(localStorage.transDetailsMin != undefined){
-                transDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsMin))
+                transDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsMin))
             } else {
-                transDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(datatransMin, 'timestamp', 'transaction'))
+                transDetailsArrMin = JSON.stringify(convertDataFormat(datatransMin, 'timestamp', 'transaction'))
                 transDetailsArrMin = JSON.parse(transDetailsArrMin)
             }
 
             if(localStorage.transDetails != undefined){
-                transDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetails))
+                transDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetails))
             } else {
-                transDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormat(datatrans, 'timestamp', 'transaction'))
+                transDetailsArr = JSON.stringify(convertDataFormat(datatrans, 'timestamp', 'transaction'))
                 transDetailsArr = JSON.parse(transDetailsArr)
             }
 
             if(localStorage.transDetailsDay != undefined){
-                transDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsDay))
+                transDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.transDetailsDay))
             } else {
-                transDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(datatransDay, 'timestamp', 'transaction'))
+                transDetailsArrDay = JSON.stringify(convertDataFormat(datatransDay, 'timestamp', 'transaction'))
                 transDetailsArrDay = JSON.parse(transDetailsArrDay)
             }
 
@@ -1310,35 +1313,35 @@
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0) || calculatedValue == 0) {
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                        transDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
                     } else {
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransMin[datatransMin.length - 1].y });
-                        transDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransMin[datatransMin.length - 1].y })
+                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransMin[datatransMin.length - 1].y })
                     }
-                    MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
+                    Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
                 if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                        transDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
                     } else {
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransDay[datatransDay.length - 1].y });
-                        transDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransDay[datatransDay.length - 1].y })
+                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatransDay[datatransDay.length - 1].y })
                     }
-                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    Monitors.tpsDataDay = datatransDay;
                     tpsMinCount = 0;
                 }
                 datatrans = sliceFirstData(datatrans, dataView.Seconds);
                 if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
                     datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                    transDetailsArr = MonitorGraphUI.saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
                 } else {
                     datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
-                    transDetailsArr = MonitorGraphUI.saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
+                    transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
                 }
-                MonitorGraphUI.Monitors.tpsData = datatrans;
+                Monitors.tpsData = datatrans;
                 monitor.tpsFirstData = false;
             }
             else{
@@ -1347,47 +1350,47 @@
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
+                        transDetailsArrMin = saveLocalStorageInterval(transDetailsArrMin, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                     }
-                    MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
+                    Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
 
                 if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
                     if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
-                        transDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
+                        transDetailsArrDay = saveLocalStorageInterval(transDetailsArrDay, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": 0 })
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                     }
-                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    Monitors.tpsDataDay = datatransDay;
                     tpsMinCount = 0;
                 }
 
                 if (monitor.tpsFirstData){
                     if(localStorage.transDetails == undefined){
                         datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": null });
-                        MonitorGraphUI.Monitors.tpsData = datatrans;
+                        Monitors.tpsData = datatrans;
                     }
                     else{
                         if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
                             datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
-                            transDetailsArr = MonitorGraphUI.saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
-                            MonitorGraphUI.Monitors.tpsData = datatrans;
+                            transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": datatrans[datatrans.length - 1].y })
+                            Monitors.tpsData = datatrans;
                         }
                     }
                 }
                 else{
                     if(localStorage.transDetails == undefined){
                         datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
-                        MonitorGraphUI.Monitors.tpsData = datatrans;
+                        Monitors.tpsData = datatrans;
                     }
                     else{
                         var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
                         if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
                             datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                            transDetailsArr = MonitorGraphUI.saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
-                            MonitorGraphUI.Monitors.tpsData = datatrans;
+                            transDetailsArr = saveLocalStorageInterval(transDetailsArr, {"timestamp": new Date(transacDetail["TimeStamp"]), "transaction": calculatedValue })
+                            Monitors.tpsData = datatrans;
                         }
                     }
                 }
@@ -1426,7 +1429,7 @@
         }
 
         this.RefreshCpu = function (cpuDetails, currentServer, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var cpuDetailsArr = []
             var cpuDetailsArrMin = []
             var cpuDetailsArrDay = []
@@ -1440,23 +1443,23 @@
                 return;
 
             if(localStorage.cpuDetailsMin != undefined)
-                cpuDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
+                cpuDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
             else{
-                cpuDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormat(cpuDataMin))
+                cpuDetailsArrMin = JSON.stringify(convertDataFormat(cpuDataMin))
                 cpuDetailsArrMin = JSON.parse(cpuDetailsArrMin)
             }
 
             if(localStorage.cpuDetailsDay != undefined)
-                cpuDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsDay))
+                cpuDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsDay))
             else {
-                cpuDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(cpuDataDay))
+                cpuDetailsArrDay = JSON.stringify(convertDataFormat(cpuDataDay))
                 cpuDetailsArrDay = JSON.parse(cpuDetailsArrDay)
             }
 
             if(localStorage.cpuDetails != undefined){
-                cpuDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
+                cpuDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
             } else{
-                cpuDetailsArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cpuData))
+                cpuDetailsArr =  JSON.stringify(convertDataFormat(cpuData))
                 cpuDetailsArr =  JSON.parse(cpuDetailsArr)
             }
 
@@ -1506,33 +1509,33 @@
                     cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
                     if (timeStamp == monitor.cpuMaxTimeStamp) {
                         cpuDataMin.push({ "x": new Date(timeStamp), "y": cpuDataMin[cpuDataMin.length - 1].y });
-                        cpuDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.min  )
+                        cpuDetailsArrMin = saveLocalStorageInterval(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.min  )
                     } else {
                         cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                        cpuDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.min  )
+                        cpuDetailsArrMin = saveLocalStorageInterval(cpuDetailsArrMin, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.min  )
                     }
-                    MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
+                    Monitors.cpuDataMin = cpuDataMin;
                     cpuSecCount = 0;
                 }
                 if (cpuMinCount >= 60 || monitor.cpuFirstData) {
                     cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
                     if (timeStamp == monitor.cpuMaxTimeStamp) {
                         cpuDataDay.push({ "x": new Date(timeStamp), "y": cpuDataDay[cpuDataDay.length - 1].y });
-                        cpuDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.day  )
+                        cpuDetailsArrDay = saveLocalStorageInterval(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.day  )
                     } else {
                         cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                        cpuDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.day )
+                        cpuDetailsArrDay = saveLocalStorageInterval(cpuDetailsArrDay, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.day )
                     }
-                    MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
+                    Monitors.cpuDataHrs = cpuDataDay;
                     cpuMinCount = 0;
                 }
                 cpuData = sliceFirstData(cpuData, dataView.Seconds);
                 if (timeStamp == monitor.cpuMaxTimeStamp) {
                     cpuData.push({ "x": new Date(timeStamp), "y": cpuData[cpuData.length - 1].y });
-                    cpuDetailsArr = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
+                    cpuDetailsArr = saveLocalStorageInterval(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": cpuData[cpuData.length - 1].y}, MonitorGraphUI.timeUnit.sec  )
                 } else {
                     cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                    cpuDetailsArr = MonitorGraphUI.saveLocalStorageInterval(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
+                    cpuDetailsArr = saveLocalStorageInterval(cpuDetailsArr, {"timestamp": new Date(timeStamp), "percentUsed": percentageUsage}, MonitorGraphUI.timeUnit.sec  )
                 }
                 try{
                     $(".errorMsgLocalStorageFull").hide();
@@ -1543,7 +1546,7 @@
                 catch(e){
                     $(".errorMsgLocalStorageFull").show();
                 }
-                MonitorGraphUI.Monitors.cpuData = cpuData;
+                Monitors.cpuData = cpuData;
                 monitor.cpuFirstData = false;
 
                 if (graphView == 'Minutes')
@@ -1583,7 +1586,7 @@
             return slicedData;
         }
 
-        this.saveLocalStorageInterval = function(rawDataArr, newItem){
+        var saveLocalStorageInterval = function(rawDataArr, newItem){
             var interval_end = new Date()
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
@@ -1600,7 +1603,7 @@
             return dataArr;
         }
 
-        this.getFormattedDataFromLocalStorage = function(rawDataArr){
+        var getFormattedDataFromLocalStorage = function(rawDataArr){
             var interval_end = new Date()
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
@@ -1615,7 +1618,7 @@
             return dataArr;
         }
 
-        this.getFormattedPartitionDataFromLocalStorage = function(rawDataArr){
+        var getFormattedPartitionDataFromLocalStorage = function(rawDataArr){
             var interval_end = new Date()
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
@@ -1637,7 +1640,7 @@
             return partitionData;
         }
 
-        this.savePartitionDataToLocalStorage = function(data, newItem, keyIndex){
+        var savePartitionDataToLocalStorage = function(data, newItem, keyIndex){
             var interval_end = new Date()
             var interval_start = new Date()
             var interval = $( "#slider-range-min" ).slider( "value" )
@@ -1656,14 +1659,14 @@
         }
 
         function getPartitionData() {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             monitor.partitionData = getEmptyDataForPartition();
             monitor.partitionDataMin = getEmptyDataForPartitionForMinutes();
             monitor.partitionDataDay = getEmptyDataForPartitionForDay();
         }
 
         this.RefreshPartitionIdleTime = function (partitionDetails, currentServer, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
 
             if (monitor.partitionData.length < 1 || monitor.partitionDataMin.length < 1 || monitor.partitionDataDay.length < 1) {
                 getPartitionData();
@@ -1687,22 +1690,22 @@
             var partitionDetailsArrDay = [];
 
             if(localStorage.partitionDetailsMin != undefined){
-                partitionDetailsArrMin = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsMin))
+                partitionDetailsArrMin = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsMin))
             } else {
-                partitionDetailsArrMin = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionDataMin))
+                partitionDetailsArrMin = JSON.stringify(convertDataFormatForPartition(partitionDataMin))
                 partitionDetailsArrMin = JSON.parse(partitionDetailsArrMin)
             }
 
             if(localStorage.partitionDetailsDay != undefined){
-                partitionDetailsArrDay = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsDay))
+                partitionDetailsArrDay = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetailsDay))
             } else {
-                partitionDetailsArrDay = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionDataDay))
+                partitionDetailsArrDay = JSON.stringify(convertDataFormatForPartition(partitionDataDay))
                 partitionDetailsArrDay = JSON.parse(partitionDetailsArrDay)
             }
             if(localStorage.partitionDetails != undefined){
-                partitionDetailsArr = MonitorGraphUI.getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetails))
+                partitionDetailsArr = getFormattedPartitionDataFromLocalStorage(JSON.parse(localStorage.partitionDetails))
             } else {
-                partitionDetailsArr = JSON.stringify(MonitorGraphUI.convertDataFormatForPartition(partitionData))
+                partitionDetailsArr = JSON.stringify(convertDataFormatForPartition(partitionData))
                 partitionDetailsArr = JSON.parse(partitionDetailsArr)
             }
 
@@ -1761,12 +1764,12 @@
                                 partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
                                 if (timeStamp == monitor.partitionMaxTimeStamp) {
                                     partitionDataMin[keyIndex]["values"].push({"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
-                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
+                                    partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, {"x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y }, keyIndex)
                                 } else {
                                     partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                    partitionDetailsArrMin = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndex)
+                                    partitionDetailsArrMin = savePartitionDataToLocalStorage(partitionDetailsArrMin, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndex)
                                 }
-                                MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
+                                Monitors.partitionDataMin = partitionDataMin;
                             }
                         }
 
@@ -1775,12 +1778,12 @@
                             partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
                             if (timeStamp == monitor.partitionMaxTimeStamp) {
                                 partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
-                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
+                                partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y }, keyIndexDay)
                             } else {
                                 partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                                partitionDetailsArrDay = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexDay)
+                                partitionDetailsArrDay = savePartitionDataToLocalStorage(partitionDetailsArrDay, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexDay)
                             }
-                            MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
+                            Monitors.partitionDataDay = partitionDataDay;
                         }
 
                         var keyIndexSec = dataMapperSec[keyValue];
@@ -1788,13 +1791,13 @@
                         partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
                         if (timeStamp == monitor.partitionMaxTimeStamp) {
                             partitionData[keyIndexSec]["values"].push({"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
-                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
+                            partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, {"x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y }, keyIndexSec)
                         } else {
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
-                            partitionDetailsArr = MonitorGraphUI.savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
+                            partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
 
                         }
-                        MonitorGraphUI.Monitors.partitionData = partitionData;
+                        Monitors.partitionData = partitionData;
                     });
                 });
 
@@ -1833,7 +1836,7 @@
         };
 
         this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var drData = monitor.drReplicationData;
             var drDataMin = monitor.drReplicationDataMin;
             var drDataDay = monitor.drReplicationDataDay;
@@ -1846,23 +1849,23 @@
                 return;
 
             if(localStorage.drDetailsMin != undefined){
-                drDetailsArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsMin))
+                drDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsMin))
             } else {
-                drDetailsArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(drDataMin, 'timestamp', 'outstandingTxn'))
+                drDetailsArrMin =  JSON.stringify(convertDataFormat(drDataMin, 'timestamp', 'outstandingTxn'))
                 drDetailsArrMin = JSON.parse(drDetailsArrMin)
             }
 
             if(localStorage.drDetailsDay != undefined){
-                drDetailsArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsDay))
+                drDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsDay))
             } else {
-                drDetailsArrDay =  JSON.stringify(MonitorGraphUI.convertDataFormat(drDataDay, 'timestamp', 'outstandingTxn'))
+                drDetailsArrDay =  JSON.stringify(convertDataFormat(drDataDay, 'timestamp', 'outstandingTxn'))
                 drDetailsArrDay = JSON.parse(drDetailsArrDay)
             }
 
             if(localStorage.drDetails != undefined){
-                drDetailsArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetails))
+                drDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetails))
             } else {
-                drDetailsArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(drData, 'timestamp', 'outstandingTxn'))
+                drDetailsArr =  JSON.stringify(convertDataFormat(drData, 'timestamp', 'outstandingTxn'))
                 drDetailsArr = JSON.parse(drDetailsArr)
             }
 
@@ -1906,40 +1909,40 @@
                     drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
                     if (timeStamp == monitor.drMaxTimeStamp) {
                         drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
-                        drDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": drDataMin[drDataMin.length - 1].y})
+                        drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": drDataMin[drDataMin.length - 1].y})
                     } else {
                         drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                        drDetailsArrMin = MonitorGraphUI.saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                        drDetailsArrMin = saveLocalStorageInterval(drDetailsArrMin, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
                     }
-                    MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                    Monitors.drReplicationDataMin = drDataMin;
                     drSecCount = 0;
                 }
                 if (drMinCount >= 60 || monitor.drFirstData) {
                     drDataDay = sliceFirstData(drDataDay, dataView.Days);
                     if (timeStamp == monitor.drMaxTimeStamp) {
                         drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
-                        drDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": drDataDay[drDataDay.length - 1].y})
+                        drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": drDataDay[drDataDay.length - 1].y})
                     } else {
                         drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                        drDetailsArrDay = MonitorGraphUI.saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                        drDetailsArrDay = saveLocalStorageInterval(drDetailsArrDay, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
                     }
-                    MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                    Monitors.drReplicationDataDay = drDataDay;
                     drMinCount = 0;
                 }
                 drData = sliceFirstData(drData, dataView.Seconds);
                 if (timeStamp == monitor.drMaxTimeStamp) {
                     drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
-                    drDetailsArr = MonitorGraphUI.saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y})
+                    drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": drData[drData.length - 1].y})
                 } else {
                     drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                    drDetailsArr = MonitorGraphUI.saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
+                    drDetailsArr = saveLocalStorageInterval(drDetailsArr, {"timestamp": new Date(timeStamp), "replicationRate": plottingPoint})
                 }
 
                 localStorage.drDetails = JSON.stringify(drDetailsArr)
                 localStorage.drDetailsMin = JSON.stringify(drDetailsArrMin)
                 localStorage.drDetailsDay = JSON.stringify(drDetailsArrDay)
 
-                MonitorGraphUI.Monitors.drReplicationData = drData;
+                Monitors.drReplicationData = drData;
                 monitor.drFirstData = false;
 
                 if (graphView == 'Minutes')
@@ -1965,7 +1968,7 @@
         };
 
         this.RefreshCommandLog = function (cmdLogDetails, currentServer, graphView, currentTab) {
-            var monitor = MonitorGraphUI.Monitors;
+            var monitor = Monitors;
             var cmdLogData = monitor.cmdLogData;
             var cmdLogDataMin = monitor.cmdLogDataMin;
             var cmdLogDataDay = monitor.cmdLogDataDay;
@@ -1974,29 +1977,37 @@
             var cmdLogArrMin = []
             var cmdLogArrDay = []
             var overlayDataArr = []
+            var overlayDataArrMin = []
+            var overlayDataArrDay = []
 
             if(localStorage.cmdLogMin != undefined)
-                cmdLogArrMin = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogMin))
+                cmdLogArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogMin))
             else{
-                cmdLogArrMin =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataMin))
+                cmdLogArrMin =  JSON.stringify(convertDataFormat(cmdLogDataMin))
                 cmdLogArrMin = JSON.parse(cmdLogArrMin)
             }
             if(localStorage.cmdLogDay != undefined)
-                cmdLogArrDay = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogDay))
+                cmdLogArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogDay))
             else {
-                cmdLogArrDay = JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogDataDay))
+                cmdLogArrDay = JSON.stringify(convertDataFormat(cmdLogDataDay))
                 cmdLogArrDay = JSON.parse(cmdLogArrDay)
             }
 
             if(localStorage.cmdLog != undefined)
-                cmdLogArr = MonitorGraphUI.getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLog))
+                cmdLogArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLog))
             else{
-                cmdLogArr =  JSON.stringify(MonitorGraphUI.convertDataFormat(cmdLogData))
+                cmdLogArr =  JSON.stringify(convertDataFormat(cmdLogData))
                 cmdLogArr =  JSON.parse(cmdLogArr)
             }
 
             if(localStorage.SnapshotOverlayData != undefined)
                 overlayDataArr =  JSON.parse(localStorage.SnapshotOverlayData)
+
+            if(localStorage.SnapshotOverlayDataMin != undefined)
+                overlayDataArrMin = JSON.parse(localStorage.SnapshotOverlayDataMin)
+
+            if(localStorage.SnapshotOverlayDataDay != undefined)
+                overlayDataArrDay = JSON.parse(localStorage.SnapshotOverlayDataDay)
 
             if(monitor.cmdLogFirstData){
                 if(cmdLogArr.length > 0 && !(currentTime.getTime() - (new Date(cmdLogArr[cmdLogArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
@@ -2028,11 +2039,23 @@
                         })
                     }
                 }
-                var overlayData = MonitorGraphUI.GetSnapshotOverlay(overlayDataArr)
+                var overlayData = GetSnapshotOverlay(overlayDataArr)
                 if(overlayData.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                     cmdLogOverlay = []
                     cmdLogOverlay = overlayData
                     overlayData = []
+                }
+
+                var overlayDataMin = GetSnapshotOverlay(overlayDataArrMin)
+                if(overlayDataMin.length != 0 && !(currentTime.getTime() - (new Date(overlayDataMin[overlayDataMin.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.minGraph)){
+                    cmdLogOverlayMin = overlayDataMin
+                    overlayDataMin = []
+                }
+
+                var overlayDataDay = GetSnapshotOverlay(overlayDataArrDay)
+                if(overlayDataDay.length != 0 && !(currentTime.getTime() - (new Date(overlayDataDay[overlayDataDay.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.dayGraph)){
+                    cmdLogOverlayDay = overlayDataDay
+                    overlayDataDay = []
                 }
             }
 
@@ -2047,59 +2070,76 @@
                     cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
                     if (timeStamp == monitor.cmdLogMaxTimeStamp) {
                         cmdLogDataMin.push({ "x": new Date(timeStamp), "y": cmdLogDataMin[cmdLogDataMin.length - 1].y });
-                        cmdLogArrMin = MonitorGraphUI.saveLocalStorageInterval(cmdLogArrMin, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogDataMin[cmdLogDataMin.length - 1].y})
+                        cmdLogArrMin = saveLocalStorageInterval(cmdLogArrMin, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogDataMin[cmdLogDataMin.length - 1].y})
                     } else {
                         cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                        cmdLogArrMin = MonitorGraphUI.saveLocalStorageInterval(cmdLogArrMin, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
+                        cmdLogArrMin = saveLocalStorageInterval(cmdLogArrMin, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
                     }
-                    MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
+                    Monitors.cmdLogDataMin = cmdLogDataMin;
+
+                    var isDuplicate = false;
+                    if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                        for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                            for(var j = 0;j < cmdLogOverlayMin.length;j++){
+                                var x1 = cmdLogOverlayMin[j].x;
+                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                    isDuplicate = true;
+                                else
+                                    isDuplicate = false;
+                            }
+                            if (!isDuplicate)
+                                cmdLogOverlayMin.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                        }
+                        cmdLogOverlayMin = GetSnapshotOverlay(cmdLogOverlayMin, 90)
+                    }
+                    localStorage.SnapshotOverlayDataMin = JSON.stringify(cmdLogOverlayMin)
+
                     cmdLogSecCount = 0;
                 }
                 if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
                     cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
                     if (timeStamp == monitor.cmdLogMaxTimeStamp) {
                         cmdLogDataDay.push({ "x": new Date(timeStamp), "y": cmdLogDataDay[cmdLogDataDay.length - 1].y });
-                        cmdLogArrDay = MonitorGraphUI.saveLocalStorageInterval(cmdLogArrDay, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogDataDay[cmdLogDataDay.length - 1].y})
+                        cmdLogArrDay = saveLocalStorageInterval(cmdLogArrDay, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogDataDay[cmdLogDataDay.length - 1].y})
                     } else {
                         cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                        cmdLogArrDay = MonitorGraphUI.saveLocalStorageInterval(cmdLogArrDay, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
+                        cmdLogArrDay = saveLocalStorageInterval(cmdLogArrDay, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
                     }
-                    MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
+                    Monitors.cmdLogDataDay = cmdLogDataDay;
+
+                    var isDuplicate = false;
+                    if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                        for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                            for(var j = 0;j < cmdLogOverlayDay.length;j++){
+                                var x1 = cmdLogOverlayDay[j].x;
+                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                    isDuplicate = true;
+                                else
+                                    isDuplicate = false;
+                            }
+                            if (!isDuplicate)
+                                cmdLogOverlayDay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                        }
+                        cmdLogOverlayDay = GetSnapshotOverlay(cmdLogOverlayDay, 2400)
+                    }
+                    localStorage.SnapshotOverlayDataDay = JSON.stringify(cmdLogOverlayDay)
+
                     cmdLogMinCount = 0;
                 }
                 cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
                 if (timeStamp == monitor.cmdLogMaxTimeStamp) {
                     cmdLogData.push({ "x": new Date(timeStamp), "y": cmdLogData[cmdLogData.length - 1].y });
-                    cmdLogArr = MonitorGraphUI.saveLocalStorageInterval(cmdLogArr, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogData[cmdLogData.length - 1].y})
+                    cmdLogArr = saveLocalStorageInterval(cmdLogArr, {"timestamp": new Date(timeStamp), "outstandingTxn": cmdLogData[cmdLogData.length - 1].y})
 
                 } else {
                     cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                    cmdLogArr = MonitorGraphUI.saveLocalStorageInterval(cmdLogArr, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
+                    cmdLogArr = saveLocalStorageInterval(cmdLogArr, {"timestamp": new Date(timeStamp), "outstandingTxn": outStandingTxn})
                 }
-                MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
+                Monitors.cmdLogData = cmdLogData;
 
                 localStorage.cmdLog = JSON.stringify(cmdLogArr)
                 localStorage.cmdLogMin = JSON.stringify(cmdLogArrMin)
                 localStorage.cmdLogDay = JSON.stringify(cmdLogArrDay)
-
-                if (monitor.cmdLogFirstData) {
-                    $(".cmdLogLegend").css("display", "block");
-                }
-                monitor.cmdLogFirstData = false;
-
-                if (graphView == 'Minutes')
-                    dataCommandLog[0]["values"] = cmdLogDataMin;
-                else if (graphView == 'Days')
-                    dataCommandLog[0]["values"] = cmdLogDataDay;
-                else {
-                    dataCommandLog[0]["values"] = cmdLogData;
-                }
-                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
-                    d3.select('#visualisationCommandLog')
-                        .datum(dataCommandLog)
-                        .transition().duration(500)
-                        .call(ChartCommandlog);
-                }
 
                 var isDuplicate = false;
                 if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
@@ -2114,16 +2154,40 @@
                         if (!isDuplicate)
                             cmdLogOverlay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
                     }
-                    cmdLogOverlay = MonitorGraphUI.GetSnapshotOverlay(cmdLogOverlay, 15)
+                    cmdLogOverlay = GetSnapshotOverlay(cmdLogOverlay, 15)
                 }
+                localStorage.SnapshotOverlayData = JSON.stringify(cmdLogOverlay)
+
+                if (monitor.cmdLogFirstData) {
+                    $(".cmdLogLegend").css("display", "block");
+                }
+                monitor.cmdLogFirstData = false;
+
+                dataOverlay = [];
+                if (graphView == 'Minutes'){
+                    dataCommandLog[0]["values"] = cmdLogDataMin;
+                    dataOverlay = cmdLogOverlayMin;
+                } else if (graphView == 'Days'){
+                    dataCommandLog[0]["values"] = cmdLogDataDay;
+                    dataOverlay = cmdLogOverlayDay;
+                } else {
+                    dataCommandLog[0]["values"] = cmdLogData;
+                    dataOverlay = cmdLogOverlay;
+                }
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
+                    d3.select('#visualisationCommandLog')
+                        .datum(dataCommandLog)
+                        .transition().duration(500)
+                        .call(ChartCommandlog);
+                }
+
+                //cmdLogOverlay = []
                 $('.overlayGraph').detach()
 
-                localStorage.SnapshotOverlayData = JSON.stringify(cmdLogOverlay)
-                //cmdLogOverlay = []
-
-                $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
-                    var x1 = ChartCommandlog.xScale()(partitionValue.startTime);
-                    var x2 = ChartCommandlog.xScale()(partitionValue.endTime);
+                for(var i = 0; i < dataOverlay.length; i++){
+                    var x1 = ChartCommandlog.xScale()(dataOverlay[i].startTime);
+                    var x2 = ChartCommandlog.xScale()(dataOverlay[i].endTime);
                     var opacity = 1;
                     if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
                         opacity = ((x2 - x1) > 4) ? 0.2 : 1;
@@ -2138,8 +2202,7 @@
                             .attr('height', ChartCommandlog.yAxis.range()[0]);
 
                     }
-
-                });
+                }
 
             }
             if (timeStamp > monitor.cmdLogMaxTimeStamp) {
@@ -2149,7 +2212,7 @@
             cmdLogMinCount++;
         };
 
-        this.convertDataFormat = function(cmdLogData){
+        var convertDataFormat = function(cmdLogData){
             var requiredFormat = []
             for(var i = 0; i < cmdLogData.length; i++){
                 requiredFormat.push({"timestamp": cmdLogData[i].x, "outstandingTxn": cmdLogData[i].y})
@@ -2157,7 +2220,7 @@
             return requiredFormat;
         }
 
-        this.convertDataFormatForPartition = function(partitionData){
+        var convertDataFormatForPartition = function(partitionData){
             var requiredFormat = []
             for(var i = 0; i < partitionData.length; i++){
                 requiredFormat.push({"key": partitionData[i].key, "values": partitionData[i].values, "color": partitionData[i].color})
@@ -2165,7 +2228,7 @@
             return requiredFormat;
         }
 
-        this.GetSnapshotOverlay = function(snapshotData, timeInterval){
+        var GetSnapshotOverlay = function(snapshotData, timeInterval){
             var interval_end = new Date()
             var interval_start = new Date()
             var interval = timeInterval == undefined ? $( "#slider-range-min" ).slider( "value" ) : timeInterval
