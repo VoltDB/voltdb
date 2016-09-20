@@ -439,7 +439,7 @@ class ServerBundle(JavaBundle):
         if self.is_legacy_verb and self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
-                default='localhost:3021'))
+                default=' '))
         elif self.is_legacy_verb:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))

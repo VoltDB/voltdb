@@ -677,6 +677,18 @@ public class VoltDB {
                 referToDocAndExit();
             }
 
+                    // For a single node cluster, make sure the port and host matches
+                    // what the user set as the internal port.
+            if (m_internalPort != org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT &&
+               (m_leader == null || m_leader.trim().isEmpty() ) ) {
+                 m_leader = "localhost:" + Integer.toString(m_internalPort);
+            }
+            if (m_startAction == StartAction.PROBE &&
+                (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) &&
+                (m_hostCount == UNDEFINED || m_hostCount == 1) &&
+                m_internalPort != org.voltcore.common.Constants.DEFAULT_INTERNAL_PORT) {
+                m_meshBrokers = "localhost:" + Integer.toString(m_internalPort);
+            }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
