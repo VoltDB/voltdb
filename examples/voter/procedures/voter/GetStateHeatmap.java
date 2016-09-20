@@ -54,7 +54,10 @@ public class GetStateHeatmap extends VoltProcedure {
                                                     "                                ORDER BY num_votes DESC ) AS vrank" +
                                                     "             FROM v_votes_by_contestant_number_state ) AS sub"      +
                                                     "   WHERE sub.vrank = 1;");
-    public final SQLStmt contestantTotals = new SQLStmt("SELECT * from V_VOTES_BY_CONTESTANT_NUMBER;");
+    public final SQLStmt contestantTotals = new SQLStmt("   SELECT contestant_number"                                    +
+                                                        "        , SUM(num_votes)"                                       +
+                                                        "     FROM v_votes_by_contestant_number_state"                   +
+                                                        " GROUP BY contestant_number;");
 
     public VoltTable[] run() {
         voltQueueSQL(stateHeatMap);

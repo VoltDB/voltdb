@@ -80,18 +80,6 @@ AS
         , state
 ;
 
-CREATE VIEW v_votes_by_contestant_number
-(
-    contestant_number
-,   num_votes
-)
-AS
-  SELECT contestant_number
-       , COUNT(*)
-    FROM votes
-GROUP BY contestant_number
-;
-
 END_OF_BATCH
 
 -- Update classes from jar so that the server will know about classes
