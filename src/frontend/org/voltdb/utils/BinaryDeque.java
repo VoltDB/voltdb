@@ -78,6 +78,12 @@ public interface BinaryDeque {
      */
     public BinaryDequeReader openForRead(String cursorId) throws IOException;
 
+    /**
+     * Close a BinaryDequeReader for reader, also close the SegmentReader for the segment if it is reading one
+     * @param cursorId a String identifying the cursor.
+     * @throws IOException on any errors trying to close the SegmentReader if it is the last one for the segment
+     */
+    public void closeCursor(String cursorId);
 
     /**
      * Persist all objects in the queue to the backing store
