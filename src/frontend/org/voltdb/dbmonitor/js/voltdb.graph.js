@@ -2080,12 +2080,13 @@
                     var isDuplicate = false;
                     if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
                         for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                            isDuplicate = false;
                             for(var j = 0;j < cmdLogOverlayMin.length;j++){
-                                var x1 = cmdLogOverlayMin[j].x;
-                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                var x1 = cmdLogOverlayMin[j].startTime;
+                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME){
                                     isDuplicate = true;
-                                else
-                                    isDuplicate = false;
+                                    break;
+                                }
                             }
                             if (!isDuplicate)
                                 cmdLogOverlayMin.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
@@ -2110,12 +2111,13 @@
                     var isDuplicate = false;
                     if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
                         for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                            isDuplicate = false
                             for(var j = 0;j < cmdLogOverlayDay.length;j++){
-                                var x1 = cmdLogOverlayDay[j].x;
-                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                var x1 = cmdLogOverlayDay[j].startTime;
+                                if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME){
                                     isDuplicate = true;
-                                else
-                                    isDuplicate = false;
+                                    break;
+                                }
                             }
                             if (!isDuplicate)
                                 cmdLogOverlayDay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
@@ -2144,15 +2146,17 @@
                 var isDuplicate = false;
                 if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
                     for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                        isDuplicate = false;
                         for(var j = 0;j < cmdLogOverlay.length;j++){
-                            var x1 = cmdLogOverlay[j].x;
-                            if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                            var x1 = cmdLogOverlay[j].startTime;
+                            if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME){
                                 isDuplicate = true;
-                            else
-                                isDuplicate = false;
+                                break;
+                            }
                         }
-                        if (!isDuplicate)
+                        if (!isDuplicate){
                             cmdLogOverlay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                        }
                     }
                     cmdLogOverlay = GetSnapshotOverlay(cmdLogOverlay, 15)
                 }
