@@ -44,7 +44,7 @@ class EchoingPageChangeListener implements PageChangeListener {
  * This class tests navigation between pages (or tabs), of the the VoltDB
  * Management Center (VMC), which is the VoltDB (new) web UI.
  */
-class NavigatePagesTest extends TestBase {
+class NavigatePagesBasicTest extends TestBase {
 
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
