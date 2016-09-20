@@ -72,10 +72,15 @@ public class Producer extends Thread {
         m_servers = config.brokers;
         m_rate = config.producerrate;
         m_cycletime = config.cycletime;
-        if (topicnum % 2 == 0)      // alternate compression strategies, if any
-            m_compression = config.compression;
+        // if (topicnum % 2 == 0)      // alternate compression strategies, if any
+        //     m_compression = config.compression;
+        // else
+        //     m_compression = "none";
+        if (config.compression.equals("all"))
+            m_compression = KafkaProducerConfig.compression_types.split(" ")[topicnum%4];
         else
-            m_compression = "none";
+            m_compression = config.compression;
+        log.info("Topic " + topicnum + " compression: " + m_compression);
         m_pausetime = (int) (config.pausetime * Math.random()); // let each thread have its own wait time between 0 and pausetime
         m_rows = config.totalrows;
         long possiblecycles = m_rows / (m_rate * m_cycletime);
@@ -144,6 +149,7 @@ public class Producer extends Thread {
      * and validation.
      */
     static class KafkaProducerConfig extends CLIConfig {
+        static final String compression_types = "none gzip snappy lz4";
 
         @Option(desc = "Kafka topic name <topicbase><number>")
         String topic = "TOPIC";
@@ -169,12 +175,11 @@ public class Producer extends Thread {
         @Option(desc = "Number of producer cycles")
         int cycles = 5;
 
-        @Option(desc = "Compression codec: none, gzip, snappy, lz4")
-        String compression = "gzip";
+        @Option(desc = "Compression codec: none, gzip, snappy, lz4 or all to cycle through choices.")
+        String compression = "all";
 
         @Override
         public void validate() {
-            final String compression_types = "none gzip snappy lz4";
             if (ntopics == 0) ntopics = 1;
             if (topic.length() <= 0) exitWithMessageAndUsage("Topic name required");
             if (brokers.length() < 0) exitWithMessageAndUsage("Broker list required");
@@ -183,7 +188,7 @@ public class Producer extends Thread {
             if (pausetime <= 0) exitWithMessageAndUsage("Pause time must be > 0");
             if (totalrows <= 0) exitWithMessageAndUsage("Total rows must be > 0");
             if (cycles <= 0) exitWithMessageAndUsage("Cycle count must be > 0");
-            if (! compression_types.contains(compression))
+            if (! compression_types.contains(compression) && !compression.equals("all"))
                 exitWithMessageAndUsage("Compression value unknown");
         }
     }
