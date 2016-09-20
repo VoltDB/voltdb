@@ -667,6 +667,31 @@ class Global:
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
     VOLT_SERVER_PATH = ''
+    DEFAULT_PATH = []
+
+
+class DefaultPathAPI(MethodView):
+    """Class to handle requests relating to Default Path"""
+
+    @staticmethod
+    def get():
+        defaultpath = Global.DEFAULT_PATH
+        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': defaultpath})
+
+    @staticmethod
+    def post():
+        Global.DEFAULT_PATH = []
+
+        Global.DEFAULT_PATH.append({
+            'voltdbroot': request.json.get('voltdbroot', "").strip(),
+            'snapshots': request.json.get('snapshots', "").strip(),
+            'export-overflow': request.json.get('export-overflow', "").strip(),
+            'command-log': request.json.get('command-log', "").strip(),
+            'command-log-snapshots': request.json.get('command-log-snapshots', "").strip(),
+            'dr-overflow': request.json.get('dr-overflow', "").strip()
+        })
+
+        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': defaultpath})
 
 
 class ServerAPI(MethodView):
@@ -1834,6 +1859,10 @@ def main(runner, amodule, config_dir, data_dir, server):
     global __IP__
     global __PORT__
 
+    Global.DEFAULT_PATH.append({'voltdbroot': "voltdbroot",
+                             'snapshot': "snapshot", 'export-overflow': "export_overflow", 'command-log': "command_log",
+                             'command-log-snapshots': "command_log_snapshots", 'dr-overflow': "dr_overflow"})
+
     config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
     arrServer = {}
@@ -1864,10 +1893,11 @@ def main(runner, amodule, config_dir, data_dir, server):
                              'enabled': True, 'external-interface': "", 'internal-interface': "",
                              'public-interface': "", 'client-listener': "", 'internal-listener': "",
                              'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False, 'voltdbroot': "voltdbroot",
-                             'snapshot': "snapshot", 'export-overflow': "export_overflow", 'command-log': "command_log",
-                             'command-log-snapshots': "command_log_snapshots", 'dr-overflow': "dr_overflow"}
+                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False, 'voltdbroot': "",
+                             'snapshot': "", 'export-overflow': "", 'command-log': "",
+                             'command-log-snapshots': "", 'dr-overflow': ""}
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
+
 
     Configuration.write_configuration_file()
 
@@ -1892,6 +1922,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     ADD_SERVER_VIEW = AddServerAPI.as_view('add_server_api')
     ADD_LOCAL_SERVER_VIEW = AddLocalServerAPI.as_view('add_local_server_api')
     STOP_LOCAL_SERVER_VIEW = StopLocalServerAPI.as_view('stop_local_server_api')
+    DEFAULT_PATH_VIEW = DefaultPathAPI.as_view('default_path_api')
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
                      view_func=SERVER_VIEW, methods=['GET', 'POST'])
@@ -1943,6 +1974,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=ADD_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/stop', strict_slashes=False,
                      view_func=STOP_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/defaultpath', strict_slashes=False,
+                     view_func=DEFAULT_PATH_VIEW, methods=['GET'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
