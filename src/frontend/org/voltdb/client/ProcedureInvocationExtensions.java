@@ -52,7 +52,8 @@ public abstract class ProcedureInvocationExtensions {
         return buf.get();
     }
 
-    public static void writeBatchTimeout(ByteBuffer buf, int timeoutValue) {
+    public static void writeBatchTimeoutWithTypeByte(ByteBuffer buf, int timeoutValue) {
+        buf.put(BATCH_TIMEOUT);
         writeLength(buf, INTEGER_SIZE);
         buf.putInt(timeoutValue);
     }
@@ -62,7 +63,11 @@ public abstract class ProcedureInvocationExtensions {
         if (len != INTEGER_SIZE) {
             throw new IllegalStateException("Batch timeout serialization length expected to be 4");
         }
-        return buf.getInt();
+        int timeout = buf.getInt();
+        if ((timeout < 0) && (timeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
+            throw new IllegalStateException("Invalid timeout value deserialized: " + timeout);
+        }
+        return timeout;
     }
 
     public static void skipUnknownExtension(ByteBuffer buf) {

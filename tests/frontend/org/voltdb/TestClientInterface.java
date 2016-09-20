@@ -133,12 +133,9 @@ public class TestClientInterface {
     // the mailbox in CI
     //private static Mailbox m_mb = null;
 
-    private static int[] m_allPartitions = new int[] {0, 1, 2};
-
     @BeforeClass
     public static void setUpOnce() throws Exception {
         buildCatalog();
-
     }
 
     BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<>();
@@ -206,7 +203,7 @@ public class TestClientInterface {
 
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
                 m_context, m_messenger, ReplicationRole.NONE,
-                m_cartographer, m_allPartitions));
+                m_cartographer));
         m_ci.bindAdapter(m_cxn, null);
 
         //m_mb = m_ci.m_mailbox;

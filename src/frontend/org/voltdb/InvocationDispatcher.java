@@ -18,7 +18,6 @@
 package org.voltdb;
 
 
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
@@ -108,7 +107,6 @@ public final class InvocationDispatcher {
     private final Cartographer m_cartographer;
     private final ConcurrentMap<Long, ClientInterfaceHandleManager> m_cihm;
     private final AtomicReference<Map<Integer,Long>> m_localReplicas = new AtomicReference<>(ImmutableMap.of());
-    private final int [] m_allPartitions;
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
     // used to decide if we should shortcut reads
@@ -123,7 +121,6 @@ public final class InvocationDispatcher {
         ConcurrentMap<Long, ClientInterfaceHandleManager> m_cihm;
         Mailbox m_mailbox;
         ReplicationRole m_replicationRole;
-        int [] m_allPartitions;
         SnapshotDaemon m_snapshotDaemon;
         long m_plannerSiteId;
         long m_siteId;
@@ -158,13 +155,6 @@ public final class InvocationDispatcher {
             return this;
         }
 
-        public Builder allPartitions(int [] allPartitions) {
-            checkArgument(allPartitions != null && allPartitions.length > 0,
-                    "given all partitions is null or empty");
-            m_allPartitions = allPartitions;
-            return this;
-        }
-
         public Builder snapshotDaemon(SnapshotDaemon snapshotDaemon) {
             m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
             return this;
@@ -181,7 +171,6 @@ public final class InvocationDispatcher {
                     m_catalogContext,
                     m_cihm,
                     m_mailbox,
-                    m_allPartitions,
                     m_snapshotDaemon,
                     m_replicationRole,
                     m_plannerSiteId,
@@ -199,7 +188,6 @@ public final class InvocationDispatcher {
             AtomicReference<CatalogContext> catalogContext,
             ConcurrentMap<Long, ClientInterfaceHandleManager> cihm,
             Mailbox mailbox,
-            int [] allPartitions,
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
             long plannerSiteId,
@@ -218,9 +206,7 @@ public final class InvocationDispatcher {
         m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
                                              backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
                                              backendTargetType == BackendTarget.POSTGIS_BACKEND);
-        checkArgument(allPartitions != null && allPartitions.length > 0,
-                "given all partitions is null or empty");
-        m_allPartitions = allPartitions;
+
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         // try to get the global default setting for read consistency, but fall back to SAFE
@@ -758,24 +744,6 @@ public final class InvocationDispatcher {
         m_mailbox.send(initiatorHSId, mppm);
     }
 
-    /**
-     * Send a multipart sentinel to all partitions. This is only used when the
-     * multipart didn't generate any sentinels for partitions, e.g. DR
-     * @LoadMultipartitionTable.
-     *
-     * @param txnId
-     */
-    private final void sendSentinelsToAllPartitions(long txnId) {
-        for (int partition : m_allPartitions) {
-            final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
-            /*
-             * HACK! DR LoadMultipartitionTable generates sentinels here,
-             * they pretend to be for replay so that the SPIs won't generate responses for them.
-             */
-            sendSentinel(txnId, initiatorHSId, -1, -1, true);
-        }
-    }
-
     private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
             InvocationClientHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
         ParameterSet params = task.getParams();
@@ -879,7 +847,7 @@ public final class InvocationDispatcher {
                     m_siteId,
                     task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     isAdmin, ccxn, catalogBytes, deploymentString,
-                    task.getProcName(), task.type,
+                    task.getProcName(),
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     useDdlSchema,
                     m_adhocCompletionHandler, user,
@@ -1071,7 +1039,7 @@ public final class InvocationDispatcher {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
-                task.getProcName(), task.type,
+                task.getProcName(),
                 task.getBatchTimeout(),
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
@@ -1340,9 +1308,7 @@ public final class InvocationDispatcher {
 
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
-        // DR stuff
-        task.type = plannedStmtBatch.work.invocationType;
-        task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
+        task.setBatchTimeout(plannedStmtBatch.work.m_batchTimeout);
         // pick the sysproc based on the presence of partition info
         // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
         // -- instead, use its always-SP implementation of AdHoc

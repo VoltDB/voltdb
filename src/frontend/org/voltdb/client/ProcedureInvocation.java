@@ -35,7 +35,6 @@ public class ProcedureInvocation {
     private final long m_clientHandle;
     private final String m_procName;
     private byte m_procNameBytes[] = null;
-    private byte m_extensionCount;
     private final int m_batchTimeout;
     private final ParameterSet m_parameters;
 
@@ -49,7 +48,6 @@ public class ProcedureInvocation {
     }
 
     public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
-        super();
         if ((batchTimeout < 0) && (batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
             throw new IllegalArgumentException("Timeout value can't be negative." );
         }
@@ -61,8 +59,6 @@ public class ProcedureInvocation {
                             : ParameterSet.emptyParameterSet());
 
         m_batchTimeout = batchTimeout;
-        // only supported extension is timeout, so extension count is 0 or 1
-        m_extensionCount = (byte) (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 1);
     }
 
     /** return the clientHandle value */
@@ -81,6 +77,7 @@ public class ProcedureInvocation {
         }
 
         // if batch extension present, then 6 bytes long, otherwise 0
+        // 6 is one byte for ext type, one for size, and 4 for integer value
         int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
 
         int size =
@@ -103,6 +100,14 @@ public class ProcedureInvocation {
         return m_parameters.getParam(index);
     }
 
+    public long getClientHandle() {
+        return m_clientHandle;
+    }
+
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         // convert proc name to bytes if needed
         if (m_procNameBytes == null) {
@@ -116,9 +121,12 @@ public class ProcedureInvocation {
         buf.putLong(m_clientHandle);
 
         // there is one possible extension
-        buf.put(m_extensionCount);
-        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
-            ProcedureInvocationExtensions.writeBatchTimeout(buf, m_batchTimeout);
+        if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+            buf.put((byte) 0); // extension count
+        }
+        else {
+            buf.put((byte) 1); // extension count
+            ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, m_batchTimeout);
         }
 
         m_parameters.flattenToBuffer(buf);

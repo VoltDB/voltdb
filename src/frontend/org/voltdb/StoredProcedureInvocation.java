@@ -55,7 +55,6 @@ public class StoredProcedureInvocation implements JSONString {
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
     private String procName = null;
     private byte m_procNameBytes[] = null;
-    private byte m_extensionCount = 0;
 
     public static final long UNITIALIZED_ID = -1L;
 
@@ -71,7 +70,7 @@ public class StoredProcedureInvocation implements JSONString {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
-    int batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+    private int batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -80,7 +79,7 @@ public class StoredProcedureInvocation implements JSONString {
         copy.clientHandle = clientHandle;
         copy.params = params;
         copy.procName = procName;
-        copy.m_extensionCount = m_extensionCount;
+        copy.m_procNameBytes = m_procNameBytes;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -96,11 +95,17 @@ public class StoredProcedureInvocation implements JSONString {
     }
 
     public void setProcName(String name) {
+        if (name == null) {
+            throw new IllegalArgumentException("SPI setProcName(String name) doesn't accept NULL.");
+        }
         procName = name;
         m_procNameBytes = null;
     }
 
     public void setProcName(byte[] name) {
+        if (name == null) {
+            throw new IllegalArgumentException("SPI setProcName(byte[] name) doesn't accept NULL.");
+        }
         procName = null;
         m_procNameBytes = name;
     }
@@ -187,6 +192,7 @@ public class StoredProcedureInvocation implements JSONString {
     public int getSerializedSize()
     {
         // get batch extension size
+        // 6 is one byte for ext type, one for size, and 4 for integer value
         int batchExtensionSize = batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
 
         // get params size
@@ -269,9 +275,12 @@ public class StoredProcedureInvocation implements JSONString {
         buf.putLong(clientHandle);
 
         // there is one possible extension
-        buf.put(m_extensionCount);
-        if (batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
-            ProcedureInvocationExtensions.writeBatchTimeout(buf, batchTimeout);
+        if (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+            buf.put((byte) 0);
+        }
+        else {
+            buf.put((byte) 1);
+            ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, batchTimeout);
         }
 
         if (serializedParams != null)
@@ -333,10 +342,14 @@ public class StoredProcedureInvocation implements JSONString {
     }
 
     private void initOriginalFromBuffer(ByteBuffer buf) throws IOException {
-        // dumb check -- remove before commit
-        assert(false);
-
-        setProcName(SerializationHelper.getVarbinary(buf));
+        byte[] procNameBytes = SerializationHelper.getVarbinary(buf);
+        if (procNameBytes == null) {
+            throw new IOException("Procedure name cannot be null in invocation deserialization.");
+        }
+        if (procNameBytes.length == 0) {
+            throw new IOException("Procedure name cannot be length zero in invocation deserialization.");
+        }
+        setProcName(procNameBytes);
         clientHandle = buf.getLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = buf.slice();
@@ -350,9 +363,6 @@ public class StoredProcedureInvocation implements JSONString {
     }
 
     private void initVersion1FromBuffer(ByteBuffer buf) throws IOException {
-        // dumb check -- remove before commit
-        assert(false);
-
         BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(buf.get());
         if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
             batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
@@ -371,27 +381,40 @@ public class StoredProcedureInvocation implements JSONString {
     }
 
     private void initVersion2FromBuffer(ByteBuffer buf) throws IOException {
-        setProcName(SerializationHelper.getVarbinary(buf));
-        clientHandle = buf.getLong();
+        byte[] procNameBytes = SerializationHelper.getVarbinary(buf);
+        if (procNameBytes == null) {
+            throw new IOException("Procedure name cannot be null in invocation deserialization.");
+        }
+        if (procNameBytes.length == 0) {
+            throw new IOException("Procedure name cannot be length zero in invocation deserialization.");
+        }
+        setProcName(procNameBytes);
 
-        // dumb check -- remove before commit
-        assert(getProcName().length() < 100);
+        clientHandle = buf.getLong();
 
         // default values for extensions
         batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
         // read any invocation extensions and skip any we don't recognize
         int extensionCount = buf.get();
 
-        // dumb check -- remove before commit
-        assert(extensionCount < 2);
+        // this limits things a bit, but feels worth it in terms of being a possible way
+        // to stumble on a bug
+        if (extensionCount < 0) {
+            throw new IOException("SPI extension count was < 0: possible corrupt network data.");
+        }
+        if (extensionCount > 30) {
+            throw new IOException("SPI extension count was > 30: possible corrupt network data.");
+        }
 
         for (int i = 0; i < extensionCount; ++i) {
             final byte type = ProcedureInvocationExtensions.readNextType(buf);
             switch (type) {
             case ProcedureInvocationExtensions.BATCH_TIMEOUT:
                 batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
+                break;
             default:
                 ProcedureInvocationExtensions.skipUnknownExtension(buf);
+                break;
             }
         }
 
@@ -477,6 +500,5 @@ public class StoredProcedureInvocation implements JSONString {
 
     public void setBatchTimeout(int timeout) {
         batchTimeout = timeout;
-        m_extensionCount = (byte) (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 1);
     }
 }

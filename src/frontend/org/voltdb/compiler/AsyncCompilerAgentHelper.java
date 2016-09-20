@@ -52,7 +52,6 @@ public class AsyncCompilerAgentHelper
         retval.connectionId = work.connectionId;
         retval.adminConnection = work.adminConnection;
         retval.hostname = work.hostname;
-        retval.invocationType = work.invocationType;
         retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
 
