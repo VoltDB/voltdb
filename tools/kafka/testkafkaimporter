@@ -69,7 +69,7 @@ this="$(pwd -P)/$this"
 propfile="$(dirname "$this")"/kafkatester.properties
 popd > /dev/null
 # the root of the VoltDB installation
-export VOLTDB_HOME=$(dirname $(dirname "$this"))
+export VOLTDB_HOME=$(dirname $(dirname $(dirname "$this")))
 
 # detect and adjust for Linux package installation vs. VoltDB distribution
 if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then
