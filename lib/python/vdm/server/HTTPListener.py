@@ -691,7 +691,7 @@ class DefaultPathAPI(MethodView):
             'dr-overflow': request.json.get('dr-overflow', "").strip()
         })
 
-        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': defaultpath})
+        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': Global.DEFAULT_PATH})
 
 
 class ServerAPI(MethodView):
@@ -1975,7 +1975,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/stop', strict_slashes=False,
                      view_func=STOP_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/defaultpath', strict_slashes=False,
-                     view_func=DEFAULT_PATH_VIEW, methods=['GET'])
+                     view_func=DEFAULT_PATH_VIEW, methods=['GET', 'POST'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
