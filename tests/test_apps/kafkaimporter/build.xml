@@ -91,6 +91,6 @@
             </manifest>
         </jar>
         <copy file="formatter.jar" todir="${basedir}/../../../bundles"/>
-        <copy file="formatter.jar" todir="${basedir}/../../../../pro/obj/pro/voltdb-ent-6.6/bundles"/>
+        <!-- <copy file="formatter.jar" todir="${basedir}/../../../../pro/obj/pro/voltdb-ent-6.6/bundles"/> -->
     </target>
 </project>
