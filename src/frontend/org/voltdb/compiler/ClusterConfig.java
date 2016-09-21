@@ -36,7 +36,9 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.TreeMultimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -208,28 +210,7 @@ public class ClusterConfig
         return true;
     }
 
-    public boolean validate(int origStartCount)
-    {
-        boolean isValid = validate();
-        if (isValid && origStartCount < m_hostCount && origStartCount > 0)
-        {
-            if ((m_hostCount - origStartCount) > m_replicationFactor + 1)
-            {
-                m_errorMsg = String.format("You can only add %d servers at a time for k=%d",
-                        m_replicationFactor + 1, m_replicationFactor);
-                return false;
-            }
-            else if ((m_hostCount - origStartCount) % (m_replicationFactor + 1) != 0)
-            {
-                m_errorMsg = String.format("Must add %d servers at a time for k=%d",
-                        m_replicationFactor + 1, m_replicationFactor);
-                return false;
-            }
-        }
-        return isValid;
-    }
-
-    private static class Partition {
+    private static class Partition implements Comparable {
         private Node m_master;
         private final Set<Node> m_replicas = new HashSet<Node>();
         private final Integer m_partitionId;
@@ -279,6 +260,15 @@ public class ClusterConfig
             }
             sb.append("]");
             return sb.toString();
+        }
+
+        @Override
+        public int compareTo(Object o)
+        {
+            if (!(o instanceof Partition)) {
+                return -1;
+            }
+            return Integer.compare(m_partitionId, ((Partition) o).m_partitionId);
         }
     }
 
@@ -394,6 +384,15 @@ public class ClusterConfig
         {
             List<Deque<Node>> results = Lists.newArrayList();
             getGroupSiblingsOf(group, 0, results);
+            if (group[0] != null) {
+                getHosts(findGroup(group), results);
+            }
+            return results;
+        }
+
+        public List<Deque<Node>> getDescendentsInGroup(String[] group)
+        {
+            List<Deque<Node>> results = Lists.newArrayList();
             if (group[0] != null) {
                 getHosts(findGroup(group), results);
             }
@@ -642,6 +641,10 @@ public class ClusterConfig
                                          MiscUtils.zip(sortByConnectionsToNode(p.m_master, phys.m_root.sortNodesByDistance(p.m_master.m_group))));
             }
 
+            if (!partitionMasters.isEmpty()) {
+                partitions = sortPartitions(phys, sitesPerHost, allNodes, partitions);
+            }
+
             // Step 2. For each partition, assign a replica to each group other
             // than the group of the partition master. This recursively goes
             // through permutations to try to find a feasible assignment for all
@@ -675,16 +678,16 @@ public class ClusterConfig
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
         stringer.key("partitions").array();
-        for (int part = 0; part < partitionCount; part++)
+        for (Partition p : partitions)
         {
             stringer.object();
-            stringer.key("partition_id").value(part);
-            stringer.key("master").value(partitions.get(part).m_master.m_hostId);
+            stringer.key("partition_id").value(p.m_partitionId);
+            stringer.key("master").value(p.m_master.m_hostId);
             stringer.key("replicas").array();
-            for (Node n : partitions.get(part).m_replicas) {
+            for (Node n : p.m_replicas) {
                 stringer.value(n.m_hostId);
             }
-            stringer.value(partitions.get(part).m_master.m_hostId);
+            stringer.value(p.m_master.m_hostId);
             stringer.endArray();
             stringer.endObject();
         }
@@ -692,6 +695,48 @@ public class ClusterConfig
         stringer.endObject();
 
         return new JSONObject(stringer.toString());
+    }
+
+    private static List<Partition> sortPartitions(PhysicalTopology phys, int sitesPerHost,
+                                                  Collection<Node> allNodes, List<Partition> partitions)
+    {
+        Node rejoinNode = null;
+        // Find the rejoining node first, assumes one rejoin node
+        for (Node n : allNodes) {
+            if (n.partitionCount() == 0) {
+                rejoinNode = n;
+                break;
+            } else {
+                assert n.partitionCount() == sitesPerHost;
+            }
+        }
+
+        if (rejoinNode == null) {
+            return null;
+        }
+
+        HashMap<Partition, Integer> partitionRepCount = new HashMap<>();
+        final List<Deque<Node>> siblingsWithSelf = phys.m_root.getDescendentsInGroup(new String[]{rejoinNode.m_group[0]});
+
+        // Prime the partition replication count map with all partitions set to 0
+        partitions.forEach(p -> partitionRepCount.put(p, 0));
+
+        // Count how many replicas each partition has in the same top-level group
+        for (Deque<Node> nodes : siblingsWithSelf) {
+            for (Node n : nodes) {
+                for (Partition p : n.m_masterPartitions) {
+                    partitionRepCount.compute(p, (k, v) -> v + 1);
+                }
+                for (Partition p : n.m_replicaPartitions) {
+                    partitionRepCount.compute(p, (k, v) -> v + 1);
+                }
+            }
+        }
+
+        // Sort candidate partitions in replica count order
+        Multimap<Integer, Partition> inverse = Multimaps.invertFrom(Multimaps.forMap(partitionRepCount),
+                                                                  TreeMultimap.create());
+        return new ArrayList<>(inverse.values());
     }
 
     /**
@@ -857,7 +902,7 @@ public class ClusterConfig
                                   Map<Integer, Long> partitionMasters) throws JSONException
     {
         int hostCount = getHostCount();
-        int partitionCount = getPartitionCount();
+        int partitionCount = partitionMasters.isEmpty() ? getPartitionCount() : partitionMasters.size();
         int sitesPerHost = getSitesPerHost();
 
         if (hostCount != hostGroups.size() && partitionReplicas.isEmpty() && partitionMasters.isEmpty()) {
