@@ -770,7 +770,8 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                 }
                 break
             }
-            result = result.replaceAll(variable, value.toString())
+
+            result = result.replace(variable, value.toString())
         }
         if (count >= maxCount) {
             println "\nWARNING: this query or result contains an excessively nested, probably recursive, variable definition:\n  " +
