@@ -43,6 +43,7 @@ class DbMonitorTest extends TestBase {
             try {
                 when: 'click the DB Monitor link (if needed)'
                 page.openDbMonitorPage()
+                browser.driver.executeScript("localStorage.clear()")
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
 
