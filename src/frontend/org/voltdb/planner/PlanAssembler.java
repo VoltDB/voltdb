@@ -121,8 +121,8 @@ public class PlanAssembler {
     private ParsedDeleteStmt m_parsedDelete = null;
     /** parsed statement for an select */
     private ParsedSelectStmt m_parsedSelect = null;
-    /** parsed statement for an union */
-    private ParsedSetOpStmt m_parsedSetop = null;
+    /** parsed statement for a set operation */
+    private ParsedSetOpStmt m_parsedSetOp = null;
 
     /** plan selector */
     private final PlanSelector m_planSelector;
@@ -274,8 +274,8 @@ public class PlanAssembler {
         m_partitioning.analyzeTablePartitioning(parsedStmt.allScans());
 
         if (parsedStmt instanceof ParsedSetOpStmt) {
-            m_parsedSetop = (ParsedSetOpStmt) parsedStmt;
-            m_subAssembler = new SetOpSubPlanAssembler(m_catalogCluster, m_catalogDb, m_parsedSetop, m_partitioning, m_planSelector);
+            m_parsedSetOp = (ParsedSetOpStmt) parsedStmt;
+            m_subAssembler = new SetOpSubPlanAssembler(m_catalogCluster, m_catalogDb, m_parsedSetOp, m_partitioning, m_planSelector);
             return;
         }
         if (parsedStmt instanceof ParsedSelectStmt) {
@@ -640,8 +640,8 @@ public class PlanAssembler {
     private CompiledPlan getNextPlan() {
         CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
-        if (m_parsedSetop != null) {
-            nextStmt = m_parsedSetop;
+        if (m_parsedSetOp != null) {
+            nextStmt = m_parsedSetOp;
             retval = getNextSetOpPlan();
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
@@ -693,12 +693,12 @@ public class PlanAssembler {
         m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
 
         // order by
-        if (m_parsedSetop.hasOrderByColumns()) {
-            rootNode = handleOrderBy(m_parsedSetop, rootNode);
+        if (m_parsedSetOp.hasOrderByColumns()) {
+            rootNode = handleOrderBy(m_parsedSetOp, rootNode);
         }
 
         // limit/offset
-        if (m_parsedSetop.hasLimitOrOffset()) {
+        if (m_parsedSetOp.hasLimitOrOffset()) {
             rootNode = handleSetopLimitOperator(rootNode);
         }
 
@@ -706,8 +706,8 @@ public class PlanAssembler {
         retval.rootPlanGraph = rootNode;
         retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
-        boolean orderIsDeterministic = m_parsedSetop.isOrderDeterministic();
-        boolean hasLimitOrOffset = m_parsedSetop.hasLimitOrOffset();
+        boolean orderIsDeterministic = m_parsedSetOp.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedSetOp.hasLimitOrOffset();
         String isContentDeterministic = ((SetOpSubPlanAssembler)m_subAssembler).getIsContentDeterministic();
         retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
         return retval;
@@ -1782,7 +1782,7 @@ public class PlanAssembler {
         // If planning "order by ... limit", getNextSetopPlan()
         // will have already added an order by to the coordinator frag.
         // This is the only limit node in a SP plan
-        LimitPlanNode topLimit = m_parsedSetop.getLimitNodeTop();
+        LimitPlanNode topLimit = m_parsedSetOp.getLimitNodeTop();
         assert(topLimit != null);
         return inlineLimitOperator(root, topLimit);
     }

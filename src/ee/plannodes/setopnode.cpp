@@ -57,32 +57,32 @@ PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETO
 std::string SetOpPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "SetOpType[" << m_setopType << "]\n";
+    buffer << spacer << "SetOpType[" << m_setOpType << "]\n";
     return buffer.str();
 }
 
 void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    std::string setopTypeStr = obj.valueForKey("SETOP_TYPE").asStr();
-    if (setopTypeStr == "UNION") {
-        m_setopType = SETOP_TYPE_UNION;
-    } else if (setopTypeStr == "UNION_ALL") {
-        m_setopType = SETOP_TYPE_UNION_ALL;
-    } else if (setopTypeStr == "INTERSECT") {
-        m_setopType = SETOP_TYPE_INTERSECT;
-    } else if (setopTypeStr == "INTERSECT_ALL") {
-        m_setopType = SETOP_TYPE_INTERSECT_ALL;
-    } else if (setopTypeStr == "EXCEPT") {
-        m_setopType = SETOP_TYPE_EXCEPT;
-    } else if (setopTypeStr == "EXCEPT_ALL") {
-        m_setopType = SETOP_TYPE_EXCEPT_ALL;
-    } else if (setopTypeStr == "NONE") {
-        m_setopType = SETOP_TYPE_NONE;
+    std::string setOpTypeStr = obj.valueForKey("SETOP_TYPE").asStr();
+    if (setOpTypeStr == "UNION") {
+        m_setOpType = SETOP_TYPE_UNION;
+    } else if (setOpTypeStr == "UNION_ALL") {
+        m_setOpType = SETOP_TYPE_UNION_ALL;
+    } else if (setOpTypeStr == "INTERSECT") {
+        m_setOpType = SETOP_TYPE_INTERSECT;
+    } else if (setOpTypeStr == "INTERSECT_ALL") {
+        m_setOpType = SETOP_TYPE_INTERSECT_ALL;
+    } else if (setOpTypeStr == "EXCEPT") {
+        m_setOpType = SETOP_TYPE_EXCEPT;
+    } else if (setOpTypeStr == "EXCEPT_ALL") {
+        m_setOpType = SETOP_TYPE_EXCEPT_ALL;
+    } else if (setOpTypeStr == "NONE") {
+        m_setOpType = SETOP_TYPE_NONE;
     } else {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "SetopPlanNode::loadFromJSONObject:"
                                       " Unsupported SETOP_TYPE value " +
-                                      setopTypeStr);
+                                      setOpTypeStr);
     }
 }
 

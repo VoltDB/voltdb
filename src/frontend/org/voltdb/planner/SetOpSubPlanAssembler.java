@@ -46,7 +46,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
     private final Cluster m_catalogCluster;
     private final PlanSelector m_planSelector;
     // Common partitioning across all the children
-    private StatementPartitioning m_setOpPrtitioning = null;
+    private StatementPartitioning m_setOpPartitioning = null;
     private String m_isContentDeterministic = null;
 
     /**
@@ -82,7 +82,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         // Build best plans for the children first
         int planId = 0;
 
-        m_setOpPrtitioning = null;
+        m_setOpPartitioning = null;
         for (AbstractParsedStmt parsedChildStmt : parsedSetOpStmt.m_children) {
             StatementPartitioning partitioning = (StatementPartitioning) m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
@@ -125,7 +125,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 canPushSetOpDown = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
                 if (canPushSetOpDown) {
                     // Extract partition column(s) from the child
-                    Set<Integer> partitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
+                    Set<Integer> partitionColumns = extractPartitioningColumn(bestChildPlan.rootPlanGraph);
                     if (commonPartitionColumns == null) {
                         commonPartitionColumns = partitionColumns;
                     } else {
@@ -141,13 +141,13 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             }
 
             // Decide whether child statements' partitioning is compatible.
-            if (m_setOpPrtitioning == null) {
-                m_setOpPrtitioning = partitioning;
+            if (m_setOpPartitioning == null) {
+                m_setOpPartitioning = partitioning;
                 continue;
             }
 
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
-            if (m_setOpPrtitioning.requiresTwoFragments()) {
+            if (m_setOpPartitioning.requiresTwoFragments()) {
                 if ((partitioning.requiresTwoFragments() && !canPushSetOpDown)
                         || statementPartitionExpression != null) {
                     // If two child statements need to use a second fragment,
@@ -162,11 +162,11 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
-            AbstractExpression commonPartitionExpression = m_setOpPrtitioning.singlePartitioningExpression();
+            AbstractExpression commonPartitionExpression = m_setOpPartitioning.singlePartitioningExpression();
             if (commonPartitionExpression == null) {
                 // the prior statement(s) were apparently replicated reads
                 // and have no effect on partitioning
-                m_setOpPrtitioning = partitioning;
+                m_setOpPartitioning = partitioning;
                 continue;
             }
             if (partitioning.requiresTwoFragments()) {
@@ -191,7 +191,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         m_planSelector.m_planId = planId;
 
         // Add and link children plans. Push down the SetOP if needed
-        return buildSetOpPlan(setOpPlanNode, childrenPlans, m_setOpPrtitioning.requiresTwoFragments() && canPushSetOpDown);
+        return buildSetOpPlan(setOpPlanNode, childrenPlans, m_setOpPartitioning.requiresTwoFragments() && canPushSetOpDown);
     }
 
     /**
@@ -200,7 +200,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      * @param rootNode A root node for a set op child query
      * @return Set<Integer>
      */
-    private Set<Integer> extractPrationColumn(AbstractPlanNode rootNode) {
+    private Set<Integer> extractPartitioningColumn(AbstractPlanNode rootNode) {
         Set<Integer> partitioningColumnSet = new HashSet<Integer>();
 
         NodeSchema outputSchema = null;
@@ -267,7 +267,8 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         PlanNodeType planNodeType = planNode.getPlanNodeType();
         if (PlanNodeType.RECEIVE == planNodeType || PlanNodeType.MERGERECEIVE == planNodeType) {
             return true;
-        } else if (PlanNodeType.PROJECTION == planNodeType) {
+        }
+        if (PlanNodeType.PROJECTION == planNodeType) {
             assert(planNode.getChildCount() == 1);
             return hasTrivialCoordinator(planNode.getChild(0));
         }
@@ -291,15 +292,16 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             for (CompiledPlan selectPlan : childrenPlans) {
                 AbstractPlanNode childPlan = selectPlan.rootPlanGraph;
                 AbstractPlanNode childParent = setOpPlanNode;
-                if (selectPlan.rootPlanGraph instanceof ProjectionPlanNode) {
+                if (childPlan instanceof ProjectionPlanNode) {
                     // Keep the child projection by adding it directly under the Set Op node
-                    setOpPlanNode.addAndLinkChild(selectPlan.rootPlanGraph);
+                    setOpPlanNode.addAndLinkChild(childPlan);
                     // Detach the rest of the child plan
-                    assert(selectPlan.rootPlanGraph.getChildCount() == 1);
-                    childPlan = selectPlan.rootPlanGraph.getChild(0);
-                    selectPlan.rootPlanGraph.clearChildren();
+                    assert(childPlan.getChildCount() == 1);
+                    AbstractPlanNode newChildPlan = childPlan.getChild(0);
+                    childPlan.clearChildren();
                     // Reset child parent to be its own projection node
-                    childParent = selectPlan.rootPlanGraph;
+                    childParent = childPlan;
+                    childPlan = newChildPlan;
                 }
                 // Remove child Send/Receive nodes
                 assert(childPlan instanceof MergeReceivePlanNode || childPlan instanceof ReceivePlanNode);
@@ -319,7 +321,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
     }
 
     StatementPartitioning getSetOpPartitioning() {
-        return m_setOpPrtitioning;
+        return m_setOpPartitioning;
     }
 
     String getIsContentDeterministic() {

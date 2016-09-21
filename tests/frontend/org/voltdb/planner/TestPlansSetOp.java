@@ -40,7 +40,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SetOpType;
 
-public class TestUnion extends PlannerTestCase {
+public class TestPlansSetOp extends PlannerTestCase {
 
     public void testUnion() {
         AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 UNION select C from T3");
@@ -68,9 +68,17 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 2);
 
+        // One side is replicated (T2) and the other side doesn't require a MP plan.
+        pn = compile("select B from T2 UNION select A from T1 WHERE A = 1");
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
+        assertTrue(unionPN.getChildCount() == 2);
+
         // In the future, new capabilities like "pushdown of set ops into the collector fragment" and
         // "designation of coordinator execution sites for multi-partition (multi-fragment) plans"
         // may allow more liberal mixes of selects on partitioned tables.
+        // See testMultiPartitionedSetOpsPushDown for more examples
     }
 
     public void testUnionAll() {
@@ -617,11 +625,39 @@ public class TestUnion extends PlannerTestCase {
       setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
       checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
+      // Union of two distributed selects. The first select has the partitioning column T9.A
+      // aliased to a non-partitioning one B and wise-versa
+      pns = compileToFragments("select AT9.A B, AT9.B A from T9 AT9 union select AT10.A, AT10.B from T10 AT10");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+      // Union of two distributed selects. The first select has the partitioning column T9.A
+      // aliased to a non-partitioning one B.
+      pns = compileToFragments("select A B from T9 union select A from T10");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+      // Union of two distributed selects - select from distributed T1 still requires a MP plan
+      // because of the T1.A + 0 = 3 expression. The 'alternative' version T1.A = 3 makes
+      // the first select a SP and the whole UNION is rejected (failtToCmpile below)
+      pns = compileToFragments("select T1.A from T1 where T1.A + 0 = 3 union select T5.E from T5");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
       // EXCEPT of three distributed selects
       pns = compileToFragments("select A from T9 except select A from T10 except select A from T1");
       coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
       setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN, PlanNodeType.SEQSCAN};
       checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+      // INTERSECT of three distributed selects
+      pns = compileToFragments("select A from T9 intersect select A from T10 intersect select A from T1");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT, setOpChildren);
 
       // Missed optimization for Set Ops - Should be MERGERECEIVE since the partitions results are ordered by the primary key A
       pns = compileToFragments("(select A from T9 where A > 0 order by A) union (select A from T10 where A > 0 order by A) order by A");
@@ -629,7 +665,8 @@ public class TestUnion extends PlannerTestCase {
       setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
       checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
-      // AT9.A AA2 and AT10.A A2 - partitioning column repeated twice
+      // The first select has the partitioning column (T9.9) repeated twice in its output - AT9.A AA1, AT9.A AA2.
+      // The other select has a partitioning column AT10.A A2 in the second position
       pns = compileToFragments("select AT9.A AA1, AT9.A AA2 from T9 AT9 union select AT10.B AB1, AT10.A A2 from T10 AT10");
       coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
       setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
@@ -669,23 +706,44 @@ public class TestUnion extends PlannerTestCase {
       // FROM subquery - non-trivial coordinator fragment - SEQSCAN
       failToCompile("select A, B from (select T9.A, T10.B from T9, T10 where T9.A = T10.A limit 10) T union select A, B from T9",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // No partioning columns in the output
+      // No partitioning columns in the output
       failToCompile("select T1.DESC from T1 union select T5.TEXT from T5",
               "Statements are too complex in set operation using multiple partitioned tables.");
       failToCompile("SELECT F, COUNT(*) FROM T1 GROUP BY F UNION SELECT D, COUNT(*) FROM T4 GROUP BY D",
               "Statements are too complex in set operation using multiple partitioned tables.");
       failToCompile("SELECT COUNT(*) FROM T1 UNION SELECT D FROM T4",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // Partitioning columns position mismatch
+      // Partitioning columns position mismatch. VT1.V_A and T4.D are respective partitioning columns
       failToCompile("SELECT CNT, V_A FROM VT1 UNION SELECT D, COUNT(*) FROM T4 GROUP BY D",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // Select from distributed T1 does not require a MP plan
+      // Partitioning columns position mismatch. The first select has the partitioning column T9.A
+      // aliased to a non-partitioning one B and wise-versa. The second select has the partitioning
+      // column AT10.A in the second position
+      failToCompile("select AT9.A B, AT9.B A from T9 AT9 union select AT10.B, AT10.A from T10 AT10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // Partitioning columns position mismatch. The first select has the partitioning column T9.A
+      // and the other column T9.B aliased to A. The second select has the partitioning
+      // column A in the second position
+      failToCompile("select A, B A from T9 union select B A, A from T10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // No partitioning column in the first child output. The non-partitioning column B is aliased to
+      // the partitioning column A.
+      failToCompile("select B A from T9 union select A from T10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // Select from distributed T1 does not require a MP plan. T5.E is a partitioning column
       failToCompile("select T1.A from T1 where T1.A = 3 union select T5.E from T5",
               "Statements are too complex in set operation using multiple partitioned tables.");
       // Partitioning columns (T9.A and T10.A) position mismatch
       failToCompile("select T9.A, T9.B from T9 union select T10.B, T10.A from T10",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // Union of three distributed selects. The output fo the last select doesn't have the partitioning column
+      // Partitioning columns position mismatch. The first select output has the partitioning column repeated twice
+      // The second select output has the partitioning and dummy columns and the third select has
+      // the output column order reversed - a dummy column followed by the partitioning column
+      failToCompile("select A A1, A A2 from T9 union " +
+              " select A, B from T10 union " +
+              " select B, A from T10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // Union of three distributed selects. The output from the last select doesn't have the partitioning column
       failToCompile("select A from T9 union select A from T10 union select F from T1",
               "Statements are too complex in set operation using multiple partitioned tables.");
       // Not all of the selects (T10) have partitioning column in the output
@@ -693,6 +751,13 @@ public class TestUnion extends PlannerTestCase {
               "Statements are too complex in set operation using multiple partitioned tables.");
       // Union of two distributed selects. One of them has a column expression that involved a partitioning column
       failToCompile("select AT9.A + 1 AA from T9 AT9 union select AT10.A A2 from T10 AT10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // Union of one replicated T2 and two compatible distributed tables T9 and T10.
+      // Both are partitioned on column A
+      failToCompile("select B from T2 union select A from T9 union select A from T10",
+              "Statements are too complex in set operation using multiple partitioned tables.");
+      // Same as above but different table order
+      failToCompile("select A from T9 intersect select B from T2 intersect select A from T10",
               "Statements are too complex in set operation using multiple partitioned tables.");
     }
 
@@ -743,6 +808,6 @@ public class TestUnion extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestUnion.class.getResource("testplans-union-ddl.sql"), "testunion", false);
+        setupSchema(TestPlansSetOp.class.getResource("testplans-union-ddl.sql"), "testunion", false);
     }
 }
