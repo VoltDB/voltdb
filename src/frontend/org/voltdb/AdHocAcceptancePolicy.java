@@ -33,8 +33,8 @@ public class AdHocAcceptancePolicy extends InvocationValidationPolicy {
             StoredProcedureInvocation invocation,
             Procedure sysProc) {
 
-        if ( ! invocation.procName.equals("@AdHoc") &&
-             ! invocation.procName.equals("@AdHocSpForTest")) {
+        if ( ! invocation.getProcName().equals("@AdHoc") &&
+             ! invocation.getProcName().equals("@AdHocSpForTest")) {
             return null;
         }
 
