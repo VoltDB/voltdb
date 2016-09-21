@@ -283,10 +283,11 @@ public class TestClusterCompiler extends TestCase
 
             // Rejoin one node at a time and verify that they have the correct partitions
             for (Map.Entry<Integer, ExtensibleGroupTag> rejoin : rejoinHostGroups.entrySet()) {
-                System.out.println("Rejoining " + rejoin.getKey() + " in group " + rejoin.getValue());
-                rejoinHostGroup.put(rejoin.getKey(), rejoin.getValue());
+                final int rejoinHostId = rejoin.getKey() + fullHostGroup.size();
+                System.out.println("Rejoining " + rejoin.getKey() + " as " + rejoinHostId + " in group " + rejoin.getValue().m_rackAwarenessGroup);
+                rejoinHostGroup.put(rejoinHostId, rejoin.getValue());
                 final JSONObject rejoinTopo = initialConfig.getTopology(rejoinHostGroup, replicas, masters);
-                final List<Integer> partitionsOnRejoinHost = ClusterConfig.partitionsForHost(rejoinTopo, rejoin.getKey());
+                final List<Integer> partitionsOnRejoinHost = ClusterConfig.partitionsForHost(rejoinTopo, rejoinHostId);
 
                 // Verify rejoined host first. Partitions on rejoined host should have
                 // at least one replica in a different group.
@@ -305,18 +306,22 @@ public class TestClusterCompiler extends TestCase
                                    foundHostInOtherGroup);
                     }
                 }
-                assertTrue(ClusterConfig.partitionsForHost(rejoinTopo, rejoin.getKey(), true).isEmpty()); // No master on rejoined host
+                assertTrue(ClusterConfig.partitionsForHost(rejoinTopo, rejoinHostId, true).isEmpty()); // No master on rejoined host
 
                 // Verify existing hosts remain the same
                 for (Map.Entry<Integer, Collection<Integer>> e : hostPartitions.asMap().entrySet()) {
-                    assertEquals(e.getValue(), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, e.getKey())));
-                    assertEquals(hostMasters.get(e.getKey()), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, e.getKey(), true)));
+                    int hostId = e.getKey();
+                    if (rejoinHostGroups.containsKey(e.getKey())) {
+                        hostId = e.getKey() + fullHostGroup.size();
+                    }
+                    assertEquals("host " + hostId + " key " + e.getKey(), e.getValue(), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, hostId)));
+                    assertEquals(hostMasters.get(e.getKey()), new HashSet<>(ClusterConfig.partitionsForHost(rejoinTopo, hostId, true)));
                 }
 
                 // Now add the rejoined host to the live host maps
                 hostPartitions.putAll(rejoin.getKey(), partitionsOnRejoinHost);
                 for (int pid : partitionsOnRejoinHost) {
-                    replicas.put(pid, CoreUtils.getHSIdFromHostAndSite(rejoin.getKey(), pid));
+                    replicas.put(pid, CoreUtils.getHSIdFromHostAndSite(rejoinHostId, pid));
                 }
             }
         }

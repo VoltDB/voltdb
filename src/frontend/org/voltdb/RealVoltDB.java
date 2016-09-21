@@ -1577,7 +1577,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
             int hostcount = liveHostIds.size();
             ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
-            if (!clusterConfig.validate()) {
+            if (!startAction.doesRejoin() && !clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
 
