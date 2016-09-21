@@ -49,7 +49,7 @@ public enum TxnId2Utils {;
                 if (proc == "@AdHoc")
                     cr = client.callProcedure("@AdHoc", (String) parms[0]);
                 else
-                    cr = client.callProcedure(proc);
+                    cr = client.callProcedure(proc, parms);
                 if (cr.getStatus() == ClientResponse.SUCCESS) {
                     Benchmark.txnCount.incrementAndGet();
                     return cr;
@@ -65,17 +65,15 @@ public enum TxnId2Utils {;
                 ClientResponse cr = e.getClientResponse();
                 String ss = cr.getStatusString();
                 log.debug(ss);
-                if (!timedOutOnce && ss.matches("(?s).*No response received in the allotted time.*"))
-                    /* allow a generic timeout but only once so that we don't risk masking error conditions */
-                    {timedOutOnce = true;}
-                else if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
+                if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
                     (ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
                      ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                      ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                      ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
                      ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
                     )) {}
-                else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
+                else if (ss.matches("(?s).*No response received in the allotted time.*") ||
+                         ss.matches(".*Server is currently unavailable; try again later.*") ||
                          ss.matches(".*Server is paused and is currently unavailable.*")) {
                     sleep = true;
                 }

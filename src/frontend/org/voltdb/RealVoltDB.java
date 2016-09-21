@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -49,7 +48,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
@@ -132,10 +130,13 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.processtools.ShellTools;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
+import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
@@ -156,7 +157,6 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -184,8 +184,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private final Properties m_pathList = new Properties();
-
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -194,12 +192,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
+    // Managed voltdb directories settings
+    volatile private PathSettings m_paths;
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "6.6";
+    static final String m_defaultVersionString = "6.7";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.7\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -305,6 +305,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
+    private boolean m_isBare = false;
+
+    private int m_maxThreadsCount;
 
     @Override
     public boolean isRunningWithOldVerbs() {
@@ -406,7 +409,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
+        return m_paths.getVoltDBRoot().getPath();
     }
 
     @Override
@@ -414,7 +417,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
+        return m_paths.resolve(m_paths.getCommandLog()).getPath();
     }
 
     @Override
@@ -422,7 +425,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
+        return m_paths.resolve(m_paths.getCommandLogSnapshot()).getPath();
     }
 
     @Override
@@ -430,7 +433,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
+        return m_paths.resolve(m_paths.getSnapshoth()).getPath();
     }
 
     @Override
@@ -438,7 +441,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.EXPORT_OVERFLOW_PATH_KEY);
+        return m_paths.resolve(m_paths.getExportOverflow()).getPath();
     }
 
     @Override
@@ -446,42 +449,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_pathList.getProperty(VoltDB.DR_OVERFLOW_PATH_KEY);
-    }
-
-    @Override
-    public String getPath(String name) {
-        return m_pathList.getProperty(name);
+        return m_paths.resolve(m_paths.getDROverflow()).getPath();
     }
 
     @Override
     public String getVoltDBRootPath() {
-        return m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
+        return m_paths.getVoltDBRoot().getPath();
     }
 
     @Override
     public String getCommandLogPath() {
-        return m_pathList.getProperty(VoltDB.CL_PATH_KEY);
+        return m_paths.resolve(m_paths.getCommandLog()).getPath();
     }
 
     @Override
     public String getCommandLogSnapshotPath() {
-        return m_pathList.getProperty(VoltDB.CL_SNAPSHOT_PATH_KEY);
+        return m_paths.resolve(m_paths.getCommandLogSnapshot()).getPath();
     }
 
     @Override
     public String getSnapshotPath() {
-        return m_pathList.getProperty(VoltDB.SNAPTHOT_PATH_KEY);
+        return m_paths.resolve(m_paths.getSnapshoth()).getPath();
     }
 
     @Override
     public String getExportOverflowPath() {
-        return m_pathList.getProperty(VoltDB.EXPORT_OVERFLOW_PATH_KEY);
+        return m_paths.resolve(m_paths.getExportOverflow()).getPath();
     }
 
     @Override
     public String getDROverflowPath() {
-        return m_pathList.getProperty(VoltDB.DR_OVERFLOW_PATH_KEY);
+        return m_paths.resolve(m_paths.getDROverflow()).getPath();
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -590,7 +588,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
-                    deleteEverythingButLogs(config.m_voltdbRoot);
+                    deleteInitializationMarkers(config);
                 }
             }
 
@@ -608,8 +606,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ReadDeploymentResults readDepl = readPrimedDeployment(config);
 
             if (config.m_startAction == StartAction.INITIALIZE) {
-                if (config.m_forceVoltdbCreate) {
-                    initForceDeleteFiles(config, readDepl.deployment);
+                if (config.m_forceVoltdbCreate && m_paths.clean()) {
+                    String msg = "Archived previous snapshot directory to " + m_paths.getSnapshoth() + ".1";
+                    consoleLog.info(msg);
+                    hostLog.info(msg);
                 }
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
@@ -642,6 +642,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         }
                     }
                 }
+            }
+
+            List<String> failed = m_paths.ensureDirectoriesExist();
+            if (!failed.isEmpty()) {
+                String msg = "Unable to access or create the following directories:\n  - " +
+                        Joiner.on("\n  - ").join(failed);
+                VoltDB.crashLocalVoltDB(msg);
+                return;
             }
 
             if (config.m_hostCount == VoltDB.UNDEFINED) {
@@ -678,6 +686,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_configLogger = null;
             ActivePlanRepository.clear();
 
+            updateMaxThreadsLimit();
+
             // set up site structure
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
@@ -712,8 +722,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // 2) properties from the cluster.properties files
             // 3) properties from the deployment file
 
-            // this initializes the property needed to read the configuration file
-            m_config.asClusterSettingsMap();
             // this reads the file config/cluster.properties
             ClusterSettings fromPropertyFile = ClusterSettings.create();
             // handle case we recover clusters that were elastically expanded
@@ -785,6 +793,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
+                setMode(OperationMode.PAUSED);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
@@ -1073,7 +1082,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // DR overflow directory
-            if (m_config.m_isEnterprise) {
+            if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
                 try {
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
@@ -1738,13 +1747,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        //Get all paths and put it in properties build the list early so managed check and others can use it.
-        try {
-            loadPaths(dt);
-        } catch (IOException ex) {
-            VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
-        }
-
         // check for already existing artifacts
         List<String> nonEmptyPaths = managedPathsWithFiles(config, dt);
         if (!nonEmptyPaths.isEmpty()) {
@@ -1766,26 +1768,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // create the remaining paths
         if (config.m_isEnterprise) {
-            List<String> failed = new ArrayList<>();
-            List<File> paths = ImmutableList.<File>builder()
-                    .add(new VoltFile(dt.getPaths().getCommandlog().getPath()))
-                    .add(new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath()))
-                    .add(new VoltFile(dt.getPaths().getSnapshots().getPath()))
-                    .add(new VoltFile(dt.getPaths().getExportoverflow().getPath()))
-                    .add(new VoltFile(dt.getPaths().getDroverflow().getPath()))
-                    .build();
-            for (File path: paths) {
-                if (!path.isAbsolute()) {
-                    path = new VoltFile(config.m_voltdbRoot, path.getPath());
-                }
-                if (!path.exists() && !path.mkdirs()) {
-                    failed.add("Unabled to create \"" + path + "\"");
-                    continue;
-                }
-                if (!path.isDirectory() || !path.canRead() || !path.canWrite() || !path.canExecute()) {
-                    failed.add("Unable to access \"" + path + "\"");
-                }
-            }
+            List<String> failed = m_paths.ensureDirectoriesExist();
             if (!failed.isEmpty()) {
                 String msg = "Unable to access or create the following directories:\n    "
                         + Joiner.on("\n    ").join(failed);
@@ -1797,7 +1780,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //In init/start mode we save adminmode to false always.
         dt.getAdminMode().setAdminstartup(false);
         //Now its safe to Save .paths
-        stagePathConfiguration(config);
+        m_paths.store();
 
          //Now that we are done with deployment configuration set all path null.
          dt.setPaths(null);
@@ -1817,7 +1800,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         // Save cluster settings properties derived from the deployment file
-        config.asClusterSettingsMap();
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
 
@@ -1830,59 +1812,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void stagePathConfiguration(Configuration config) {
-        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_PATHS);
-        try (PrintWriter pw = new PrintWriter(new FileWriter(depFH), true)) {
-            m_pathList.store(pw, "DO NOT MODIFY THIS FILE");
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to stage configuration path destination", false, e);
-        }
-    }
-
-    private void loadPathConfiguration(Configuration config) {
-        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_PATHS);
-        try (FileInputStream is = new FileInputStream(depFH)) {
-            consoleLog.info("Loading Path configuration from " + depFH.getAbsolutePath());
-            m_pathList.load(is);
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to read configuration path destination", false, e);
-        }
-    }
-
-    private void deleteEverythingButLogs(File rootDH) {
-        File [] allButLog = rootDH.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File p) {
-                return !p.isDirectory() || !"log".equals(p.getName());
-            }
-        });
-        for (File c: allButLog) {
+    private void deleteInitializationMarkers(Configuration configuration) {
+        for (File c: configuration.getInitMarkers()) {
             MiscUtils.deleteRecursively(c);
-        }
-    }
-
-    private void initForceDeleteFiles(Configuration config, DeploymentType depl) {
-        if (!config.m_forceVoltdbCreate) {
-            return;
-        }
-        File vroot = config.m_voltdbRoot;
-        Set<String> paths = ImmutableSet.<String>builder()
-                .add(depl.getPaths().getCommandlog().getPath())
-                .add(depl.getPaths().getCommandlogsnapshot().getPath())
-                .add(depl.getPaths().getSnapshots().getPath())
-                .add(depl.getPaths().getExportoverflow().getPath())
-                .add(depl.getPaths().getDroverflow().getPath())
-                .build();
-        for (String path: paths) {
-            File f = new File(path);
-            f = f.isAbsolute() ? f : new File(vroot, path);
-            if (f.isDirectory()) {
-                for (File remove: f.listFiles()) {
-                    MiscUtils.deleteRecursively(remove);
-                }
-            } else {
-                f.delete();
-            }
         }
     }
 
@@ -2116,46 +2048,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    //Load paths into properties list.
-    private void loadPaths(DeploymentType deployment) throws IOException {
-        String voltdbRoot = (new VoltFile(deployment.getPaths().getVoltdbroot().getPath())).getCanonicalPath();
-        m_pathList.put(VoltDB.VOLTDBROOT_PATH_KEY, voltdbRoot);
-        File path = new File(deployment.getPaths().getCommandlog().getPath());
-        if (!path.isAbsolute()) {
-            path = new VoltFile(voltdbRoot, path.getPath());
-        }
-        m_pathList.put(VoltDB.CL_PATH_KEY, path.getCanonicalPath());
-
-        path = new File(deployment.getPaths().getCommandlogsnapshot().getPath());
-        if (!path.isAbsolute()) {
-            path = new VoltFile(voltdbRoot, path.getPath());
-        }
-        m_pathList.put(VoltDB.CL_SNAPSHOT_PATH_KEY, path.getCanonicalPath());
-
-        path = new File(deployment.getPaths().getSnapshots().getPath());
-        if (!path.isAbsolute()) {
-            path = new VoltFile(voltdbRoot, path.getPath());
-        }
-        m_pathList.put(VoltDB.SNAPTHOT_PATH_KEY, path.getCanonicalPath());
-
-        path = new File(deployment.getPaths().getExportoverflow().getPath());
-        if (!path.isAbsolute()) {
-            path = new VoltFile(voltdbRoot, path.getPath());
-        }
-        m_pathList.put(VoltDB.EXPORT_OVERFLOW_PATH_KEY, path.getCanonicalPath());
-
-        path = new File(deployment.getPaths().getDroverflow().getPath());
-        if (!path.isAbsolute()) {
-            path = new VoltFile(voltdbRoot, path.getPath());
-        }
-        m_pathList.put(VoltDB.DR_OVERFLOW_PATH_KEY, path.getCanonicalPath());
-    }
 
     @Override
     public void loadLegacyPathProperties(DeploymentType deployment) throws IOException {
         //Load deployment paths now if Legacy so that we access through the interface all the time.
-        if (isRunningWithOldVerbs()) {
-            loadPaths(deployment);
+        if (isRunningWithOldVerbs() && m_paths == null) {
+            m_paths = PathSettings.create(CatalogUtil.asPathSettingsMap(deployment));
+            List<String> failed = m_paths.ensureDirectoriesExist();
+            if (!failed.isEmpty()) {
+                String msg = "Unable to validate path settings:\n  " +
+                        Joiner.on("\n  ").join(failed);
+                hostLog.fatal(msg);
+                throw new IOException(msg);
+            }
         }
     }
 
@@ -2196,43 +2101,41 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + config.m_pathToDeployment, false, null);
                 return new ReadDeploymentResults(deploymentBytes, deployment);
             }
+            PathSettings pathSettings = null;
             // adjust deployment host count when the cluster members are given by mesh configuration
             // providers
+            switch(config.m_startAction) {
+            case PROBE:
+                // once a voltdbroot is inited, the path properties contain the true path values
+                Settings.initialize(config.m_voltdbRoot);
+                pathSettings = PathSettings.create();
+                File pathSettingsFH = new File(getConfigDirectory(config), "path.properties");
+                consoleLog.info("Loaded path settings from " + pathSettingsFH.getPath());
+                hostLog.info("Loaded path settings from " + pathSettingsFH.getPath());
+                break;
+            case INITIALIZE:
+                Settings.initialize(config.m_voltdbRoot);
+                // voltdbroot value from config overrides voltdbroot value in the deployment
+                // file
+                pathSettings = PathSettings.create(
+                        config.asPathSettingsMap(),
+                        CatalogUtil.asPathSettingsMap(deployment));
+                break;
+            default:
+                pathSettings = PathSettings.create(CatalogUtil.asPathSettingsMap(deployment));
+                Settings.initialize(pathSettings.getVoltDBRoot());
+                config.m_voltdbRoot = pathSettings.getVoltDBRoot();
+                break;
+            }
+            m_paths = pathSettings;
+
             if (config.m_startAction == StartAction.PROBE) {
-                loadPathConfiguration(config);
+                // once initialized the path properties contain the true path values
                 if (config.m_hostCount == VoltDB.UNDEFINED) {
                     config.m_hostCount = 1;
                 }
             } else {
                 config.m_hostCount = deployment.getCluster().getHostcount();
-            }
-            /*
-             * if it is a legacy statup initialize config.m_voltdbRoot if it the value
-             * in the deployment file differs from the default voltdbroot. When the startup action
-             * is PROBE then the value in configs m_voltdbRoot must match the deployment one
-             */
-            File optrootFH = config.m_voltdbRoot;
-            // use the voltdbroot in paths instead if it is present
-            String pathrootFN = m_pathList.getProperty(VoltDB.VOLTDBROOT_PATH_KEY);
-            if (pathrootFN != null && !pathrootFN.trim().isEmpty()) {
-                optrootFH = new File(pathrootFN);
-            }
-            File dplrootFH = new File(deployment.getPaths().getVoltdbroot().getPath());
-            if (config.m_startAction.isLegacy()) {
-                if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
-                    config.m_voltdbRoot = dplrootFH;
-                }
-            } else if ((pathrootFN == null || pathrootFN.trim().isEmpty())
-                    && !optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile()))
-            {
-                if (config.m_startAction == StartAction.PROBE) {
-                    String msg = "VoltDB root specified on the command line \"" + optrootFH
-                            + "\" is different from the one specified at initialization \""
-                            + dplrootFH + "\"";
-                    hostLog.fatal(msg);
-                    VoltDB.crashLocalVoltDB(msg);
-                    return new ReadDeploymentResults(deploymentBytes, deployment);
-                }
             }
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
@@ -2399,6 +2302,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    @Override
+    public boolean isBare() {
+        return m_isBare;
+    }
+    void setBare(boolean flag) {
+        m_isBare = flag;
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -2409,6 +2320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
+        setBare(bareAtStartup);
 
         final Supplier<Integer> hostCountSupplier = new Supplier<Integer>() {
             @Override
@@ -3095,6 +3007,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
+                checkThreadsSanity();
+
                 return Pair.of(m_catalogContext, csp);
             }
         } finally {
@@ -3350,7 +3264,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
-        m_statusTracker.setNodeState(NodeState.UP);
+        if (!m_joining) {
+            m_statusTracker.setNodeState(NodeState.UP);
+            Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        }
     }
 
     @Override
@@ -3520,9 +3439,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        if (!m_rejoining && !m_joining) {
+            Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        }
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
@@ -3877,6 +3798,68 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
+    }
+
+    private void checkThreadsSanity() {
+        int tableCount = m_catalogContext.tables.size();
+        int partitions = m_iv2Initiators.size() - 1;
+        int replicates = m_configuredReplicationFactor;
+        int importPartitions = ImportManager.getPartitionsCount();
+        int exportTableCount = ExportManager.instance().getExportTablesCount();
+        int exportNonceCount = ExportManager.instance().getConnCount();
+
+        int expThreadsCount = computeThreadsCount(tableCount, partitions, replicates, importPartitions, exportTableCount, exportNonceCount);
+
+        // if the expected number of threads exceeds the limit, update the limit.
+        if (m_maxThreadsCount < expThreadsCount) {
+            updateMaxThreadsLimit();
+        }
+
+        // do insane check again.
+        if (m_maxThreadsCount < expThreadsCount) {
+            StringBuilder builder = new StringBuilder();
+            builder.append(String.format("The configuration of %d tables, %d partitions, %d replicates, ", tableCount, partitions, replicates));
+            builder.append(String.format("with importer configuration of %d importer partitions, ", importPartitions));
+            builder.append(String.format("with exporter configuration of %d export tables %d partitions %d replicates, ", exportTableCount, partitions, replicates));
+            builder.append(String.format("approximately requires %d threads.", expThreadsCount));
+            builder.append(String.format("The maximum number of threads to the system is %d. \n", m_maxThreadsCount));
+            builder.append("Please increase the maximum system threads number or reduce the number of threads in your program, and then restart VoltDB. \n");
+            consoleLog.warn(builder.toString());
+        }
+    }
+
+    private void updateMaxThreadsLimit() {
+        String[] command = {"bash", "-c" ,"ulimit -u"};
+        String cmd_rst = ShellTools.local_cmd(command);
+        try {
+            m_maxThreadsCount = Integer.parseInt(cmd_rst.substring(0, cmd_rst.length() - 1));
+        } catch(Exception e) {
+            m_maxThreadsCount = Integer.MAX_VALUE;
+        }
+    }
+
+    private int computeThreadsCount(int tableCount, int partitionCount, int replicateCount, int importerPartitionCount, int exportTableCount, int exportNonceCount) {
+        final int clusterBaseCount = 5;
+        final int hostBaseCount = 56;
+        return clusterBaseCount + (hostBaseCount + partitionCount)
+                + computeImporterThreads(importerPartitionCount)
+                + computeExporterThreads(exportTableCount, partitionCount, replicateCount, exportNonceCount);
+    }
+
+    private int computeImporterThreads(int importerPartitionCount) {
+        if (importerPartitionCount == 0) {
+            return 0;
+        }
+        int importerBaseCount = 6;
+        return importerBaseCount + importerPartitionCount;
+    }
+
+    private int computeExporterThreads(int exportTableCount, int partitionCount, int replicateCount, int exportNonceCount) {
+        if (exportTableCount == 0) {
+            return 0;
+        }
+        int exporterBaseCount = 1;
+        return exporterBaseCount + partitionCount * exportTableCount + exportNonceCount;
     }
 
     @Override

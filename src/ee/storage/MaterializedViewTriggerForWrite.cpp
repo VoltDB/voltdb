@@ -49,7 +49,13 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
          * See ENG-7872
          */
         if (m_groupByColumnCount == 0) {
-            initializeTupleHavingNoGroupBy();
+            /**
+             * There are three cases that this constructor will be called. Two of them are related
+             * to schema change, the other one is in truncate table view creation case.
+             * We do not want to create new UNDO action in either case. Similar like the insert cases.
+             * Creating extra UNDO action will crash the server or leak the memory.
+             */
+            initializeTupleHavingNoGroupBy(false);
         }
         if ( ! srcTable->isPersistentTableEmpty()) {
             TableTuple scannedTuple(srcTable->schema());
@@ -403,19 +409,29 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         // If there is no group by column, the count() should remain 0 and other functions should
         // have value null. See ENG-7872.
         if (m_groupByColumnCount == 0) {
-            initializeTupleHavingNoGroupBy();
+            initializeTupleHavingNoGroupBy(fallible);
         }
         return;
     }
     // assume from here that we're just updating the existing row
 
-    // set up the first n columns, based on group-by columns
+
+    // Set up the first n columns, based on group-by columns.
+    bool allowUsingPlanForMinMax = true;
+    const bool viewHasFallbackPlans = m_fallbackExecutorVectors.size() > 0;
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         // note that if the tuple is in the mv's target table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
-        m_updatedTuple.setNValue(colindex, m_existingTuple.getNValue(colindex));
+        NValue val = m_existingTuple.getNValue(colindex);
+        if (viewHasFallbackPlans && allowUsingPlanForMinMax && val.isNull()) {
+            // We need to workaround ENG-11080: we will get an incorrect answer
+            // in the case of GB columns containing NULL values, so don't use
+            // the plan for this case.
+            allowUsingPlanForMinMax = false;
+        }
+        m_updatedTuple.setNValue(colindex, val);
     }
 
     m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
@@ -443,7 +459,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
-                    if (m_usePlanForAgg[minMaxAggIdx]) {
+                    if (m_usePlanForAgg[minMaxAggIdx] && allowUsingPlanForMinMax) {
                         newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
                     }
                     // indexscan if an index is available, otherwise tablescan

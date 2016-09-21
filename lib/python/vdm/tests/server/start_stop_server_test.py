@@ -16,9 +16,9 @@
 
 import unittest
 import requests
-import xmlrunner
 import socket
 import time
+import xmlrunner
 import json
 
 __host_name__ = socket.gethostname()
@@ -302,6 +302,98 @@ class StartServer(Cluster):
                     self.assertEqual(response.status_code, 500)
 
 
+class DefaultRecoverServer(ClusterDefault):
+    """
+    Recover Server
+    """
+
+    def test_recover_server(self):
+        """
+        ensure server recover is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            server_url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                         (__host_or_ip__, last_db_id)
+            server_response = requests.get(server_url)
+            server_value = server_response.json()
+            if server_value:
+                server_len = len(server_value['members'])
+                last_server_id = server_value['members'][server_len-1]['id']
+
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/recover?id=%u' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                print "Recovering..."
+                response = requests.put(url)
+                value = response.json()
+                if not value['statusString']:
+                    print "Error occurred while recovering."
+                elif "Success" in value['statusString']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(20)
+                    CheckServerStatus(self, last_db_id, last_server_id, 'running')
+                    print "Stopping Server...."
+                    url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                    response = requests.put(url_stop)
+                    value = response.text
+                    if "Server shutdown successfully." in value or "success" in value:
+                        self.assertEqual(response.status_code, 200)
+                        time.sleep(15)
+                        CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
+                elif 'A VoltDB Server process is already running' in value['statusString']:
+                    print value['statusString']
+                    assert True
+                elif response.status_code == 500:
+                    self.assertEqual(response.status_code, 500)
+
+    def test_recover_server_pause_admin_mode(self):
+        """
+        ensure recover server is working properly when admin mode is True
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            server_url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                         (__host_or_ip__, last_db_id)
+            server_response = requests.get(server_url)
+            server_value = server_response.json()
+            if server_value:
+                server_len = len(server_value['members'])
+                last_server_id = server_value['members'][server_len-1]['id']
+
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/recover?id=%u&pause=true' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                print "Recovering with pause mode..."
+                response = requests.put(url)
+                value = response.json()
+                if not value['statusString']:
+                    print "Error occurred while recovering."
+                elif "Success" in value['statusString']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(20)
+                    CheckServerStatus(self, last_db_id, last_server_id, 'running')
+                    print "Stopping Cluster...."
+                    url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                    response = requests.put(url_stop)
+                    value = response.text
+                    if "Server shutdown successfully." in value or "success" in value:
+                        self.assertEqual(response.status_code, 200)
+                        time.sleep(15)
+                        CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
+                elif 'A VoltDB Server process is already running' in value['statusString']:
+                    print value['statusString']
+                    assert True
+                elif response.status_code == 500:
+                    self.assertEqual(response.status_code, 500)
+
+
 def CheckServerStatus(self, last_db_id, last_server_id, status):
     status_url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/status' % \
     (__host_or_ip__, last_db_id, last_server_id)
@@ -316,4 +408,3 @@ def CheckServerStatus(self, last_db_id, last_server_id, status):
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()

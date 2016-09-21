@@ -133,12 +133,9 @@ public class TestClientInterface {
     // the mailbox in CI
     //private static Mailbox m_mb = null;
 
-    private static int[] m_allPartitions = new int[] {0, 1, 2};
-
     @BeforeClass
     public static void setUpOnce() throws Exception {
         buildCatalog();
-
     }
 
     BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<>();
@@ -206,7 +203,7 @@ public class TestClientInterface {
 
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
                 m_context, m_messenger, ReplicationRole.NONE,
-                m_cartographer, m_allPartitions));
+                m_cartographer));
         m_ci.bindAdapter(m_cxn, null);
 
         //m_mb = m_ci.m_mailbox;
@@ -251,10 +248,6 @@ public class TestClientInterface {
 
     }
 
-    private static ByteBuffer createMsg(String name, final Object...params) throws IOException {
-        return createMsg(null, name, params);
-    }
-
     /**
      * Create a VoltMessage that can be fed into CI's handleRead() method.
      * @param origTxnId The original txnId if it's a replicated transaction
@@ -263,14 +256,10 @@ public class TestClientInterface {
      * @return
      * @throws IOException
      */
-    private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException
+    private static ByteBuffer createMsg(String name, final Object...params) throws IOException
     {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
-        if (origTxnId != null) {
-            proc.setOriginalTxnId(origTxnId);
-        }
         proc.setParams(params);
         ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
         proc.flattenToBuffer(buf);
@@ -483,7 +472,7 @@ public class TestClientInterface {
         catalogResult.deploymentString = "blah";
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
-        catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
+        catalogResult.invocationType = ProcedureInvocationType.VERSION2;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
         catalogResult.diffCommandsLength = 10;
@@ -505,9 +494,7 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
-        assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
-        assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
+        assertEquals(ProcedureInvocationType.VERSION2, message.getStoredProcedureInvocation().getType());
     }
 
     @Test
@@ -682,15 +669,6 @@ public class TestClientInterface {
 
         msg = createMsg("@Resume");
         resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
-    }
-
-    @Test
-    public void testRejectDupInvocation() throws IOException {
-        // by default, the mock initiator returns false for createTransaction()
-        ByteBuffer msg = createMsg(12345l, "hello", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }

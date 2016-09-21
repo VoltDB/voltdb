@@ -32,9 +32,11 @@ typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
 
 namespace voltdb {
 
-    MaterializedViewHandler::MaterializedViewHandler(PersistentTable *destTable,
-                                                     catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                                                     VoltDBEngine *engine) :
+    MaterializedViewHandler::MaterializedViewHandler(PersistentTable* destTable,
+                                                     catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
+                                                     VoltDBEngine* engine,
+                                                     bool needsCatchUp,
+                                                     bool catchUpFallible) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
             m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
@@ -44,7 +46,14 @@ namespace voltdb {
         setUpMinMaxQueries(mvHandlerInfo, engine);
         setUpBackedTuples();
         m_dirty = false;
-        catchUpWithExistingData();
+        if (needsCatchUp) {
+            catchUpWithExistingData(catchUpFallible);
+        }
+        /* // enable to debug
+        std::cout << "DEBUG: join view initially there are "
+                  << m_destTable->activeTupleCount()
+                  << " tuples in " << m_destTable->name() << std::endl;
+        //*/
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
@@ -160,19 +169,20 @@ namespace voltdb {
         }
     }
 
-    // If the source table(s) is not empty when the view is created, we need to execute the plan directly
+    // If the source table(s) is not empty when the view is created,
+    // or for non-grouped views* we need to execute the plan directly
     // to catch up with the existing data.
-    void MaterializedViewHandler::catchUpWithExistingData() {
-        if (! m_destTable->isPersistentTableEmpty()) {
-            return;
-        }
+    //TODO: *non-grouped views could instead set up a hard-coded initial
+    // row as they do in the single-table case to avoid querying empty tables.
+    void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
+        auto executorList = m_createQueryExecutorVector->getExecutorList();
         Table *viewContent = ec->executeExecutors(executorList);
         TableIterator ti = viewContent->iterator();
         TableTuple tuple(viewContent->schema());
         while (ti.next(tuple)) {
-            m_destTable->insertTuple(tuple);
+            //* enable to debug */ std::cout << "DEBUG: inserting catchup tuple into " << m_destTable->name() << std::endl;
+            m_destTable->insertPersistentTuple(tuple, fallible, true);
         }
         ec->cleanupExecutorsForSubquery(executorList);
     }
@@ -290,34 +300,57 @@ namespace voltdb {
         // COUNT(*)
         NValue existingCount = m_existingTuple.getNValue(m_groupByColumnCount);
         NValue deltaCount = deltaTuple.getNValue(m_groupByColumnCount);
-        m_updatedTuple.setNValue(m_groupByColumnCount, existingCount.op_subtract(deltaCount));
-        // Aggregations
+        NValue newCount = existingCount.op_subtract(deltaCount);
+        m_updatedTuple.setNValue(m_groupByColumnCount, newCount);
         int aggOffset = m_groupByColumnCount + 1;
-        int minMaxColumnIndex = 0;
-        for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
-            NValue existingValue = m_existingTuple.getNValue(columnIndex);
-            NValue deltaValue = deltaTuple.getNValue(columnIndex);
-            NValue newValue = existingValue;
-            if (! deltaValue.isNull()) {
-                switch(m_aggTypes[aggIndex]) {
-                    case EXPRESSION_TYPE_AGGREGATE_SUM:
-                    case EXPRESSION_TYPE_AGGREGATE_COUNT:
-                        newValue = existingValue.op_subtract(deltaValue);
-                        break;
-                    case EXPRESSION_TYPE_AGGREGATE_MIN:
-                    case EXPRESSION_TYPE_AGGREGATE_MAX:
-                        if (existingValue.compare(deltaValue) == 0) {
-                            // re-calculate MIN / MAX
-                            newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
-                        }
-                        minMaxColumnIndex++;
-                        break;
-                    default:
-                        assert(false); // Should have been caught when the matview was loaded.
-                        // no break
+        NValue newValue;
+        if (newCount.isZero()) {
+            // no group by key, no rows, aggs will be null except for count().
+            for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+                if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
+                    newValue = ValueFactory::getBigIntValue(0);
                 }
+                else {
+                    newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(columnIndex));
+                }
+                m_updatedTuple.setNValue(columnIndex, newValue);
             }
-            m_updatedTuple.setNValue(columnIndex, newValue);
+        }
+        else {
+            // Aggregations
+            int minMaxColumnIndex = 0;
+            for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+                NValue existingValue = m_existingTuple.getNValue(columnIndex);
+                NValue deltaValue = deltaTuple.getNValue(columnIndex);
+                newValue = existingValue;
+                ExpressionType aggType = m_aggTypes[aggIndex];
+
+                if (! deltaValue.isNull()) {
+                    switch(aggType) {
+                        case EXPRESSION_TYPE_AGGREGATE_SUM:
+                        case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                            newValue = existingValue.op_subtract(deltaValue);
+                            break;
+                        case EXPRESSION_TYPE_AGGREGATE_MIN:
+                        case EXPRESSION_TYPE_AGGREGATE_MAX:
+                            if (existingValue.compare(deltaValue) == 0) {
+                                // re-calculate MIN / MAX
+                                newValue = fallbackMinMaxColumn(columnIndex, minMaxColumnIndex);
+                            }
+                            break;
+                        default:
+                            assert(false); // Should have been caught when the matview was loaded.
+                            // no break
+                    }
+                }
+
+                if (aggType == EXPRESSION_TYPE_AGGREGATE_MIN
+                    || aggType == EXPRESSION_TYPE_AGGREGATE_MAX) {
+                    minMaxColumnIndex++;
+                }
+
+                m_updatedTuple.setNValue(columnIndex, newValue);
+            }
         }
     }
 
@@ -374,11 +407,13 @@ namespace voltdb {
             if (existingCount.compare(deltaCount) == 0 && m_groupByColumnCount > 0) {
                 m_destTable->deleteTuple(m_existingTuple, fallible);
             }
-            mergeTupleForDelete(deltaTuple);
-            // Shouldn't need to update group-key-only indexes such as the primary key
-            // since their keys shouldn't ever change, but do update other indexes.
-            m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                        m_updatableIndexList, fallible);
+            else {
+                mergeTupleForDelete(deltaTuple);
+                // Shouldn't need to update group-key-only indexes such as the primary key
+                // since their keys shouldn't ever change, but do update other indexes.
+                m_destTable->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                            m_updatableIndexList, fallible);
+            }
         }
         ec->cleanupExecutorsForSubquery(executorList);
     }

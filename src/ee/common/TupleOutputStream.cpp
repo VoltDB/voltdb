@@ -16,7 +16,6 @@
  */
 
 #include "TupleOutputStream.h"
-#include "TupleSerializer.h"
 #include "tabletuple.h"
 #include <limits>
 
@@ -43,11 +42,10 @@ std::size_t TupleOutputStream::startRows(int32_t partitionId)
     return m_rowCountPosition;
 }
 
-std::size_t TupleOutputStream::writeRow(TupleSerializer &tupleSerializer,
-                                        const TableTuple &tuple)
+std::size_t TupleOutputStream::writeRow(const TableTuple &tuple)
 {
     const std::size_t startPos = position();
-    tupleSerializer.serializeTo(tuple, this);
+    tuple.serializeTo(*this, true);
     const std::size_t endPos = position();
     m_rowCount++;
     std::size_t bytesSerialized = endPos - startPos;

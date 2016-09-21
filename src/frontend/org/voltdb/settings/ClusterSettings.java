@@ -28,8 +28,6 @@ import com.google_voltpatches.common.base.Suppliers;
 
 @Sources("file:${org.voltdb.config.dir}/cluster.properties")
 public interface ClusterSettings extends Settings {
-    public final static String CONFIG_DIR = "org.voltdb.config.dir";
-
     // property keys
     public final static String HOST_COUNT = "org.voltdb.cluster.hostcount";
     public final static String CANGAMANGA = "dumy.cangamanga";
@@ -51,26 +49,11 @@ public interface ClusterSettings extends Settings {
     }
 
     default void store() {
-        final String configDN = ConfigFactory.getProperty(CONFIG_DIR).intern();
-        if (configDN == null || configDN.trim().isEmpty()) {
-            throw new IllegalStateException("property " + CONFIG_DIR + " must be defined");
-        }
-        File configDH = new File(configDN);
-        if (!configDH.exists() && !configDH.mkdirs()) {
-            throw new SettingsException("failed to create " + configDN);
-        }
-        if (   !configDH.isDirectory()
-            || !configDH.canRead()
-            || !configDH.canWrite()
-            || !configDH.canExecute())
-        {
-            throw new SettingsException("cannot access " + configDN);
-        }
-        store(new File(configDH, "cluster.properties"), "VoltDB cluster settings");
+        File configFH = new File(Settings.getConfigDir(), "cluster.properties");
+        store(configFH, "VoltDB cluster settings. DO NOT MODIFY THIS FILE!");
     }
 
     default Supplier<ClusterSettings> asSupplier() {
         return Suppliers.ofInstance(this);
     }
-
 }

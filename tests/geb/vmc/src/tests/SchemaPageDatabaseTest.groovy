@@ -57,7 +57,7 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPage
     }
 
-    def "Size Worksheet Tab:Add table, search and delete"() {
+    def sizeWorksheetTabAddTableSearchAndDelete() {
         boolean result = false
 
         when: 'go to size worksheet tab'
@@ -66,7 +66,7 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPageSizeWorksheetTab
 
         String createQuery = page.getQueryToCreateTable()
-        String deleteQuery = page.getQueryToDeleteTable()
+        String deleteQuery = page.getQueryToDeleteTableOnly()
         String tablename = page.getTablename()
 
         // Changes for handling the pause
@@ -114,12 +114,12 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-
+        report 'create'
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
         at SchemaPage
-
+        report 'schema_page'
         when: 'go to Size Worksheet Tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at Size Worksheet Tab'
@@ -128,7 +128,7 @@ class SchemaPageDatabaseTest extends TestBase {
         when: 'tablename is searched'
         page.refreshbutton.click()
         //waitFor(30) { page.searchName.isDisplayed() }
-        //page.searchName.value(tablename)
+        report 'refresh'//page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.tablenamePresent.isDisplayed() }
 
@@ -160,11 +160,11 @@ class SchemaPageDatabaseTest extends TestBase {
         waitFor(30) { !page.tablenamePresent.isDisplayed() }
 
         if(!page.tablenamePresent.isDisplayed()) {
-            println("Size Worksheet Tab:Add table, search and delete-PASS")
+            println("sizeWorksheetTabAddTableSearchAndDelete-PASS")
             println()
         }
         else {
-            println("Size Worksheet Tab:Add table, search and delete-FAIL")
+            println("sizeWorksheetTabAddTableSearchAndDelete-FAIL")
             println()
             assert false
         }
@@ -196,7 +196,7 @@ class SchemaPageDatabaseTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Add table, search and delete"() {
+    def schemaTabAddTableSearchAndDelete() {
         boolean result = false
 
         when: 'go to schema tab'
@@ -205,7 +205,7 @@ class SchemaPageDatabaseTest extends TestBase {
         at SchemaPageSchemaTab
 
         String createQuery = page.getQueryToCreateTable()
-        String deleteQuery = page.getQueryToDeleteTable()
+        String deleteQuery = page.getQueryToDeleteTableOnly()
         String tablename = page.getTablename()
 
         // Corrections
@@ -253,7 +253,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-
+        report "create"
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
@@ -270,7 +270,7 @@ class SchemaPageDatabaseTest extends TestBase {
         //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.requiredId.isDisplayed() }
-
+        report "check_created"
         when: 'go to SQL Query page'
         page.openSqlQueryPage()
         then: 'at SQL Query page'
@@ -280,7 +280,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-
+        report "delete"
         when: 'go to Schema page'
         page.openSchemaPage()
         then: 'at Schema page'
@@ -288,22 +288,21 @@ class SchemaPageDatabaseTest extends TestBase {
 
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
-        then: 'at sschema tab'
+        then: 'at Schema tab'
         at SchemaPageSchemaTab
 
         when: 'tablename is searched'
         page.refreshbutton.click()
         //waitFor(30) { page.searchName.isDisplayed() }
-        //page.searchName.value(tablename)
+        report 'search'//page.searchName.value(tablename)
         then: 'at least one table is present'
-
         try {
             page.requiredId.isDisplayed()
-            println("Schema Tab:Add table, search and delete-FAIL")
+            println("schemaTabAddTableSearchAndDelete-FAIL")
             assert false
         }
         catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Schema Tab:Add table, search and delete-PASS")
+            println("schemaTabAddTableSearchAndDelete-PASS")
         }
         println()
 
@@ -335,6 +334,8 @@ class SchemaPageDatabaseTest extends TestBase {
     }
 
     def cleanup() {
+        String deleteQuery
+
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
@@ -348,9 +349,17 @@ class SchemaPageDatabaseTest extends TestBase {
         page.openSqlQueryPage()
         then: 'should be on DB Monitor page'
         at SqlQueryPage
-        String deleteQuery = page.getQueryToDeleteTable()
-        page.setQueryText(deleteQuery)
 
+        when: 'set delete query in the box'
+        deleteQuery = page.getQueryToDeleteTable()
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'set delete query in the box'
+        deleteQuery = page.getQueryToDeleteTableOnly()
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
         page.runQuery()
     }
 }

@@ -36,6 +36,7 @@
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/FileSaver.min.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
     <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
     <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
@@ -178,8 +179,19 @@
                             <div id="GraphBlock" class="">
                                 <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
                             </div>
+
                         </div>
                         <div class="rightShowhide">
+                            <div class="sliderGraph">
+                                <div class="labelSlider">
+                                    <label for="timeInterval">Retained Time Interval:</label>
+                                <input type="text" id="timeInterval" readonly ><span>mins</span>
+
+
+                                </div>
+                                <div id="slider-range-min" class="sliderMain"></div>
+                            </div>
+
                             <ul class="rightShowhideList" id="showHideRightlist">
                                 <li class="viewSelect">
                                     <label>View</label>
@@ -194,35 +206,60 @@
                         </div>
                         <div class="clear"></div>
                     </div>
+
                     <div id="mainGraphBlock">
+                    <div class="errorMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
-                                    <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+                                    <h1>Server CPU <span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationCpu" width="100%" height="350"></svg>
                             </div>
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
-                                    <h1>Server RAM<span class="activeServerName" title=""></span></h1>
+                                    <h1>Server RAM<span class="activeServerName" title=""></span>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationRam" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Latency (99th percentile, ms)</h1>
+                                    <h1><div class="chartLeft">Cluster Latency (99th percentile, ms)</div>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationLatency" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Transactions (tps)</h1>
+                                    <h1>Cluster Transactions (tps)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Partition Idle Time</h1>
+                                    <h1>Partition Idle Time
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="legend" style="display:none;">
                                     <ul>
@@ -235,13 +272,19 @@
                             </div>
                             <div id="ChartDrReplicationRate" class="chart" style="display: none">
                                 <div class="chartHeader">
-                                    <h1>Database Replication (DR)</h1>
+                                    <h1>Database Replication (DR)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
                             </div>
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
-                                    <h1>Command Log Statistics</h1>
+                                    <h1>Command Log Statistics
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="cmdLogLegend" style="display:none;">
                                     <ul>
@@ -629,10 +672,10 @@
                                 </tr>
                                 <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
                                     <td class="configLabel">File Prefix </td>
-                                    <td align="right" class="tdSnapshotPrefix">
+                                    <td class="tdSnapshotPrefix" align="right">
                                         <form id="frmSnapshotFilePrefix" method="get" action="">
                                             <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
-                                            <span id="prefixSpan"></span>
+                                            <span id="prefixSpan" class="wordBreak"></span>
                                             <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
                                             <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
                                         </form>
@@ -732,8 +775,9 @@
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>
-                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
+                                        <a href="javascript:void(0);" id="addNewImportConfigLink" class="plusAdd" style="display: block;" title="Add Import Configuration">&nbsp;</a>
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
+                                        <a href="#addImportConfigPopup" id="addImportConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
@@ -1139,6 +1183,7 @@
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
+
     <!-- POPUP Saved Preferences -->
     <!-- POPUP Alerts -->
     <div id="memoryAlerts" style="display: none">
@@ -1660,6 +1705,24 @@
         </div>
     </div>
     <!--Update error Popup-->
+    <!--Update Import Configuration error Popup-->
+    <div style="display: none"><a href="#updateImportErrorPopup" id="updateImportErrorPopupLink">Update Error</a></div>
+    <div id="updateImportErrorPopup" style="display: none">
+        <div id="updateImportInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateImportErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnImportUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
     <!--Update error Auto Snapshot Popup-->
     <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
     <div id="updateSnapshotErrorPopup" style="display: none">
@@ -1804,6 +1867,32 @@
         </div>
     </div>
     <!--Add Disk Limit Popup-->
+    <!--Add Import Configuration Popup-->
+    <div id="addImportConfigPopup" style="display: none">
+        <div id="addImportConfigInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addImportConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteImportConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+            <div id="addImportConfigControls">
+                <div class="clear"></div>
+                <form id="formAddImportConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addImportConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddImportConfigSave" class="btn">Save</a> <a id="btnAddImportConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveImportConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="importSaveConfigText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveImportConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveImportConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--Add Import Configuration Popup-->
     <div id="addDiskLimitPopup" style="display: none">
         <div id="addDiskLimitInnerPopup">
             <div class="overlay-title icon-alert">

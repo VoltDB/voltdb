@@ -45,7 +45,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.Language;
@@ -234,12 +233,7 @@ public class ProcedureRunner {
      * @return The transaction id for determinism, not for ordering.
      */
     long getTransactionId() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
-            return invocation.getOriginalTxnId();
-        } else {
-            return m_txnState.txnId;
-        }
+        return m_txnState.txnId;
     }
 
     Random getSeededRandomNumberGenerator() {
@@ -425,12 +419,6 @@ public class ProcedureRunner {
             if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
                 retval.setHash(hash);
             }
-            if ((m_txnState != null) && // may be null for tests
-                (m_txnState.getInvocation() != null) &&
-                (ProcedureInvocationType.isDeprecatedInternalDRType(m_txnState.getInvocation().getType())))
-            {
-                retval.convertResultsToHashForDeterminism();
-            }
         }
         finally {
             // finally at the call(..) scope to ensure params can be
@@ -576,12 +564,7 @@ public class ProcedureRunner {
      * partition so plenty of headroom.
      */
     public long getUniqueId() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
-            return invocation.getOriginalUniqueId();
-        } else {
-            return m_txnState.uniqueId;
-        }
+        return m_txnState.uniqueId;
     }
 
     /*

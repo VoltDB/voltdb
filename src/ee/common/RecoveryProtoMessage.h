@@ -19,7 +19,6 @@
 #define RECOVERY_PROTO_MESSAGE_
 
 #include "common/tabletuple.h"
-#include "common/declarations.h"
 
 namespace voltdb {
 class Pool;

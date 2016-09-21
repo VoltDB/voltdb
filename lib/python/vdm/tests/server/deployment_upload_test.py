@@ -20,8 +20,9 @@ import io
 import requests
 import socket
 from cStringIO import StringIO
-import xmlrunner
 from flask import json
+import xmlrunner
+
 
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
@@ -176,4 +177,3 @@ class UploadConfiguration(Database):
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()

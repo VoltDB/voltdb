@@ -33,7 +33,7 @@ public class UpdateClassesAcceptancePolicy extends InvocationValidationPolicy {
     public ClientResponseImpl shouldAccept(AuthUser user,
                                 StoredProcedureInvocation invocation,
                                 Procedure sysProc) {
-        if (!invocation.procName.equals("@UpdateClasses")) {
+        if (!invocation.getProcName().equals("@UpdateClasses")) {
             return null;
         }
 

@@ -1376,7 +1376,8 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *c
         if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
-            new MaterializedViewHandler(destTable, mvHandlerInfo, this);
+            new MaterializedViewHandler(destTable, mvHandlerInfo, this,
+                    destTable->isPersistentTableEmpty(), false);
         }
     }
 }
@@ -1631,7 +1632,7 @@ bool VoltDBEngine::activateTableStream(
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 

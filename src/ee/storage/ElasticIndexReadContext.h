@@ -26,24 +26,18 @@
 #include "storage/TableStreamerContext.h"
 #include "storage/TupleBlock.h"
 
-namespace voltdb
-{
-
+namespace voltdb {
 class TableStreamer;
 class PersistentTableSurgeon;
-class TupleSerializer;
 class TupleOutputStreamProcessor;
 class TupleSchema;
 class TableTuple;
 
-class ElasticIndexReadContext : public TableStreamerContext
-{
-
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+class ElasticIndexReadContext : public TableStreamerContext {
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
-
     /**
      * Destructor.
      */
@@ -66,7 +60,6 @@ public:
                                      std::vector<int> &retPositions);
 
 private:
-
     /**
      * Construct a copy on write context for the specified table that will
      * serialize tuples using the provided serializer.
@@ -75,7 +68,6 @@ private:
     ElasticIndexReadContext(PersistentTable &table,
                             PersistentTableSurgeon &surgeon,
                             int32_t partitionId,
-                            TupleSerializer &serializer,
                             const std::vector<std::string> &predicateStrings);
 
     /**

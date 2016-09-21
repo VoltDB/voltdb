@@ -38,13 +38,13 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
      */
     @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
-        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc_RW")) {
+        if (proc.getSystemproc() && invocation.getProcName().startsWith("@AdHoc_RW")) {
             if (user.hasPermission(Permission.SQL)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;
         }
-        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
+        if (proc.getSystemproc() && invocation.getProcName().startsWith("@AdHoc")) {
             if (user.hasPermission(Permission.SQLREAD)) {
                 return PolicyResult.ALLOW;
             }

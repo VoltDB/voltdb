@@ -81,7 +81,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -142,6 +141,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    @SuppressWarnings("unused")
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
     public enum ExplainMode {
@@ -790,8 +792,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Outstanding requests may actually still be at large
              */
             ClientInterfaceHandleManager cihm = m_cihm.remove(connectionId());
-            cihm.freeOutstandingTxns();
-            cihm.m_acg.removeMember(this);
+            // might be null if closing the interface in prep for self-kill / graceful shutdown
+            if (cihm != null) {
+                cihm.freeOutstandingTxns();
+                cihm.m_acg.removeMember(this);
+            }
+            // if null, check to ensure this CI is stopping
+            else if (m_isAcceptingConnections.get()) {
+                log.error("NULL ClientInterfaceHandleManager for active ClientInterface unexepected.");
+            }
+
             m_notifier.removeConnection(c);
         }
 
@@ -1065,27 +1075,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             int adminPort,
             long timestampTestingSalt) throws Exception {
 
-        // create a list of all partitions
-        int[] allPartitions = new int[partitionCount];
-        int index = 0;
-        for (Integer partition : cartographer.getPartitions()) {
-            if (partition != MpInitiator.MP_INIT_PID) {
-                allPartitions[index++] = partition;
-            }
-        }
-
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
+                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer);
 
         return ci;
     }
 
     ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
-            Cartographer cartographer, int[] allPartitions) throws Exception {
+            Cartographer cartographer) throws Exception {
         m_catalogContext.set(context);
         m_snapshotDaemon = new SnapshotDaemon(context);
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -1138,7 +1139,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
 
         m_dispatcher = InvocationDispatcher.builder()
-                .allPartitions(allPartitions)
                 .snapshotDaemon(m_snapshotDaemon)
                 .replicationRole(replicationRole)
                 .cartographer(m_cartographer)
@@ -1597,7 +1597,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         Procedure catProc = sysProc.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.procName = procedureName;
+        spi.setProcName(procedureName);
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
@@ -1848,7 +1848,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (ex != null) {
             exMsg = ex.getMessage();
         }
-        String errorMessage = "Error sending procedure " + task.procName
+        String errorMessage = "Error sending procedure " + task.getProcName()
                 + " to the correct partition. Make sure parameter values are correct."
                 + " Parameter value " + invocationParameter
                 + ", partition column " + catProc.getPartitioncolumn().getName()
@@ -1945,8 +1945,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return false;
         }
         finally {
+            m_isAcceptingConnections.set(false);
             // this feels like an unclean thing to do... but should work
-            // for the purposes of cutting all responses right before we deliberatly
+            // for the purposes of cutting all responses right before we deliberately
             // end the process
             // m_cihm itself is threadsafe, and the regular shutdown code won't
             // care if it's empty... so... this.

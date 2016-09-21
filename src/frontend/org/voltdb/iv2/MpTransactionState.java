@@ -34,7 +34,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -160,10 +159,6 @@ public class MpTransactionState extends TransactionState
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
-            }
-
-            if (ProcedureInvocationType.isDeprecatedInternalDRType(m_initiationMsg.getStoredProcedureInvocation().getType())) {
-                task.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
             }
 
             m_remoteWork = task;
