@@ -2438,6 +2438,7 @@ var loadPage = function (serverName, portid) {
     });
 
     refreshClusterHealth();
+    MonitorGraphUI.setStartTime()
     refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {

@@ -65,86 +65,21 @@ class AdminExportEditTest extends TestBase {
         testStatus = false
 
         // Create Add Configuration
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        page.overview.addProperty.isDisplayed()
-        page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
-        page.overview.metadatabroker.value().equals("metadata.broker.list")
-        page.overview.metadatabroker.isDisplayed()
+        when:
+        if (page.overview.addconfig.isDisplayed()) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            page.overview.addProperty.isDisplayed()
+            page.overview.save.isDisplayed()
+            page.overview.cancel.isDisplayed()
+            page.overview.metadatabroker.value().equals("metadata.broker.list")
+            page.overview.metadatabroker.isDisplayed()
 
-        when: 'Provide values for add configuration'
-        page.overview.stream.value("kafkaTest")
-        page.overview.metadatabrokerValue.value("metadataValue")
-        and: 'Save the values'
-        count = 0
-        while (count < numberOfTrials) {
-            count++
-            try {
-                waitFor(waitTime) { page.overview.save.click() }
-                waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch (geb.error.RequiredPageContentNotPresent e) {
-            } catch (org.openqa.selenium.StaleElementReferenceException e) {
-            } catch (geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        count = 0
-        while (count < numberOfTrials) {
-            count++
-            try {
-                waitFor(waitTime) { page.overview.confirmyesbtn.click() }
-                waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch (geb.error.RequiredPageContentNotPresent e) {
-            } catch (org.openqa.selenium.StaleElementReferenceException e) {
-            } catch (geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        then: 'Print saved'
-        println("Saved")
-
-        // Add property in the existing Configuration
-        when: 'Expand export'
-        if (! waitFor(waitTime) { page.overview.addconfig.isDisplayed() }) {
-            isPro = true
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    export.click()
-                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
-            }
-        }
-        then: 'Display the created KAFKA'
-        if (isPro) {
-            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-            println("Configuration created")
-        }
-
-        if (isPro) {
-            when: 'Edit button is displayed'
-            waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-            then: 'Click edit button'
-            page.overview.editExportConfiguration.click()
-
-            when: 'Add property is clicked'
-            waitFor(waitTime) { page.overview.addProperty.click() }
-            then: 'New text and value fields are displayed'
-            page.overview.newTextField.isDisplayed()
-            page.overview.newValueField.isDisplayed()
-            page.overview.deleteFirstProperty.isDisplayed()
-
-            when: 'Provide values for text and value fields'
-            page.overview.newTextField.value("value1")
-            page.overview.newValueField.value("value2")
+            when: 'Provide values for add configuration'
+            page.overview.stream.value("kafkaTest")
+            page.overview.metadatabrokerValue.value("metadataValue")
             and: 'Save the values'
             count = 0
             while (count < numberOfTrials) {
@@ -170,54 +105,124 @@ class AdminExportEditTest extends TestBase {
                 } catch (geb.waiting.WaitTimeoutException e) {
                 }
             }
-            then: 'Print Added Value'
-            println("Added Value")
+            then: 'Print saved'
+            println("Saved")
 
-            // Delete the configuration
+            // Add property in the existing Configuration
             when: 'Expand export'
-            page.overview.export.isDisplayed()
-            page.overview.expandExport()
-            then: 'Display the KAFKA'
-            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-
-            when: 'Edit button is displayed'
-            waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-            and: 'Click edit button'
-            page.overview.editExportConfiguration.click()
-            then: 'Delete is displayed'
-            waitFor(waitTime) { page.overview.deleteConfiguration.isDisplayed() }
-
-            when: 'Delete is clicked'
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    page.overview.deleteConfiguration.click()
-                    waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
+            if (!waitFor(waitTime) { page.overview.addconfig.isDisplayed() }) {
+                isPro = true
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        export.click()
+                        waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
                 }
             }
-            and: 'Confirm delete'
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    page.overview.confirmyesbtn.click()
-                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
+            then: 'Display the created KAFKA'
+            if (isPro) {
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+                println("Configuration created")
             }
-            then:
-            println("Configuration Deleted")
 
-            println("Test End: Verify 'Add configuration' in Export and delete it")
+            if (isPro) {
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                then: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+
+                when: 'Add property is clicked'
+                waitFor(waitTime) { page.overview.addProperty.click() }
+                then: 'New text and value fields are displayed'
+                page.overview.newTextField.isDisplayed()
+                page.overview.newValueField.isDisplayed()
+                page.overview.deleteFirstProperty.isDisplayed()
+
+                when: 'Provide values for text and value fields'
+                page.overview.newTextField.value("value1")
+                page.overview.newValueField.value("value2")
+                and: 'Save the values'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        waitFor(waitTime) { page.overview.save.click() }
+                        waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        waitFor(waitTime) { page.overview.confirmyesbtn.click() }
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then: 'Print Added Value'
+                println("Added Value")
+
+                // Delete the configuration
+                when: 'Expand export'
+                page.overview.export.isDisplayed()
+                page.overview.expandExport()
+                then: 'Display the KAFKA'
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                and: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+                then: 'Delete is displayed'
+                waitFor(waitTime) { page.overview.deleteConfiguration.isDisplayed() }
+
+                when: 'Delete is clicked'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.deleteConfiguration.click()
+                        waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                and: 'Confirm delete'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.confirmyesbtn.click()
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then:
+                println("Configuration Deleted")
+
+                println("Test End: Verify 'Add configuration' in Export and delete it")
+            }
         }
+            then:
+            println("passed")
     }
     /*
      *  This test creates a new configuration, edits it and deletes it
@@ -228,78 +233,22 @@ class AdminExportEditTest extends TestBase {
         int count = 0
         testStatus = false
 
-        // Create Add Configuration
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        page.overview.addProperty.isDisplayed()
-        page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
-        page.overview.metadatabroker.value().equals("metadata.broker.list")
-        page.overview.metadatabroker.isDisplayed()
+        when:
+        if (page.overview.addconfig.isDisplayed()) {
+            // Create Add Configuration
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            page.overview.addProperty.isDisplayed()
+            page.overview.save.isDisplayed()
+            page.overview.cancel.isDisplayed()
+            page.overview.metadatabroker.value().equals("metadata.broker.list")
+            page.overview.metadatabroker.isDisplayed()
 
-        when: 'Provide values for add configuration'
-        page.overview.stream.value("kafkaTest")
-        page.overview.metadatabrokerValue.value("metadataValue")
-        and: 'Save the values'
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                waitFor(waitTime) { page.overview.save.click() }
-                waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                waitFor(waitTime) { page.overview.confirmyesbtn.click() }
-                waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        then: 'Print saved'
-        println("Saved")
-
-        // Add property in the existing Configuration
-        when: 'Expand export'
-        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
-            isPro = true
-            page.overview.export.isDisplayed()
-            page.overview.expandExport()
-        }
-        then: 'Display the created KAFKA'
-        if(isPro) {
-            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-            println("Configuration created")
-        }
-
-        if(isPro) {
-            when: 'Edit button is displayed'
-            waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-            then: 'Click edit button'
-            page.overview.editExportConfiguration.click()
-
-            when: 'Change the type'
-            page.overview.textType.click()
-            page.overview.textType.value("ELASTICSEARCH")
-            then: 'Check the new fields'
-            waitFor(waitTime) {
-                page.overview.endpointES.isDisplayed()
-                page.overview.endpointESValue.isDisplayed()
-            }
-
-            when: 'Provide values for text and value fields'
-            page.overview.endpointESValue.value("endpointESValue")
+            when: 'Provide values for add configuration'
+            page.overview.stream.value("kafkaTest")
+            page.overview.metadatabrokerValue.value("metadataValue")
             and: 'Save the values'
             count = 0
             while (count < numberOfTrials) {
@@ -325,63 +274,124 @@ class AdminExportEditTest extends TestBase {
                 } catch (geb.waiting.WaitTimeoutException e) {
                 }
             }
-            then: 'Print Added Value'
-            println("Configuration Edited")
+            then: 'Print saved'
+            println("Saved")
 
-            // Delete the configuration
+            // Add property in the existing Configuration
             when: 'Expand export'
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    export.click()
-                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
+            if (!waitFor(10) { updateInnerErrorPopup.isDisplayed() }) {
+                isPro = true
+                page.overview.export.isDisplayed()
+                page.overview.expandExport()
             }
-            then: 'Display the KAFKA'
-            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-
-            when: 'Edit button is displayed'
-            waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-            and: 'Click edit button'
-            page.overview.editExportConfiguration.click()
-            then: 'Delete is displayed'
-            waitFor(waitTime) { page.overview.deleteConfiguration.isDisplayed() }
-
-            when: 'Delete is clicked'
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    page.overview.deleteConfiguration.click()
-                    waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
+            then: 'Display the created KAFKA'
+            if (isPro) {
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+                println("Configuration created")
             }
-            and: 'Confirm delete'
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    page.overview.confirmyesbtn.click()
-                    waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
-            }
-            then:
-            println("Configuration Deleted")
 
-            println("Test End: Verify edit in Export and delete it")
+            if (isPro) {
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                then: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+
+                when: 'Change the type'
+                page.overview.textType.click()
+                page.overview.textType.value("ELASTICSEARCH")
+                then: 'Check the new fields'
+                waitFor(waitTime) {
+                    page.overview.endpointES.isDisplayed()
+                    page.overview.endpointESValue.isDisplayed()
+                }
+
+                when: 'Provide values for text and value fields'
+                page.overview.endpointESValue.value("endpointESValue")
+                and: 'Save the values'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        waitFor(waitTime) { page.overview.save.click() }
+                        waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        waitFor(waitTime) { page.overview.confirmyesbtn.click() }
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then: 'Print Added Value'
+                println("Configuration Edited")
+
+                // Delete the configuration
+                when: 'Expand export'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        export.click()
+                        waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then: 'Display the KAFKA'
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                and: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+                then: 'Delete is displayed'
+                waitFor(waitTime) { page.overview.deleteConfiguration.isDisplayed() }
+
+                when: 'Delete is clicked'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.deleteConfiguration.click()
+                        waitFor(waitTime) { page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                and: 'Confirm delete'
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.confirmyesbtn.click()
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then:
+                println("Configuration Deleted")
+
+                println("Test End: Verify edit in Export and delete it")
+            }
         }
+        then:
+        println("passed")
     }
 }

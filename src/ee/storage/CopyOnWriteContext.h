@@ -20,7 +20,6 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "common/TupleSerializer.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "storage/persistenttable.h"
 #include "storage/TableStreamer.h"
@@ -39,7 +38,7 @@ class PersistentTableSurgeon;
 
 class CopyOnWriteContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
@@ -95,7 +94,6 @@ private:
      */
     CopyOnWriteContext(PersistentTable &table,
                        PersistentTableSurgeon &surgeon,
-                       TupleSerializer &serializer,
                        int32_t partitionId,
                        const std::vector<std::string> &predicateStrings,
                        int64_t totalTuples);

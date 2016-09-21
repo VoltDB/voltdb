@@ -54,7 +54,7 @@ class ClusterConfigurationDRTest extends TestBase {
             } catch(Exception e) {
                 deleteDatabase(create_DatabaseTest_File)
             } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
-                deleteDatabase(create_DatabaseTest_File)
+//                deleteDatabase(create_DatabaseTest_File)
             }
         }
         newDatabaseName = "name_src"
@@ -90,26 +90,29 @@ class ClusterConfigurationDRTest extends TestBase {
 
         // Create a DR configuration
         when: 'Open popup for DR'
+
         for(count=0; count<numberOfTrials; count++) {
-            try {
-                dr.editButton.click()
-                waitFor { dr.editPopupSave.isDisplayed() }
-                break
-            } catch (geb.waiting.WaitTimeoutException exception) {
-                println("Waiting - Retrying")
-            } catch (org.openqa.selenium.ElementNotVisibleException exception) {
+            if(dr.editButton.isDisplayed()) {
                 try {
+                    dr.editButton.click()
                     waitFor { dr.editPopupSave.isDisplayed() }
                     break
-                } catch (geb.waiting.WaitTimeoutException exc) {
+                } catch (geb.waiting.WaitTimeoutException exception) {
                     println("Waiting - Retrying")
-                }
-            } catch(org.openqa.selenium.WebDriverException exception) {
-                try {
-                    waitFor { dr.editPopupSave.isDisplayed() }
-                    break
-                } catch (geb.waiting.WaitTimeoutException exc) {
-                    println("Waiting - Retrying")
+                } catch (org.openqa.selenium.ElementNotVisibleException exception) {
+                    try {
+                        waitFor { dr.editPopupSave.isDisplayed() }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                } catch (org.openqa.selenium.WebDriverException exception) {
+                    try {
+                        waitFor { dr.editPopupSave.isDisplayed() }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
                 }
             }
         }
