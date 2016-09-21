@@ -102,7 +102,6 @@ private:
     ElasticContext(PersistentTable &table,
                    PersistentTableSurgeon &surgeon,
                    int32_t partitionId,
-                   TupleSerializer &serializer,
                    const std::vector<std::string> &predicateStrings,
                    size_t nTuplesPerCall = DEFAULT_TUPLES_PER_CALL);
 

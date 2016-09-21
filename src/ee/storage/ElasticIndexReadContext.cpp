@@ -34,9 +34,8 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
-        TupleSerializer &serializer,
         const std::vector<std::string> &predicateStrings) :
-    TableStreamerContext(table, surgeon, partitionId, serializer),
+    TableStreamerContext(table, surgeon, partitionId),
     m_predicateStrings(predicateStrings),
     m_materialized(false)
 {}
@@ -141,7 +140,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                 // output.
                 if (!tuple.isPendingDelete()) {
                     // Write the tuple.
-                    yield = outputStreams.writeRow(getSerializer(), tuple);
+                    yield = outputStreams.writeRow(tuple);
                 } else {
                     throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }
