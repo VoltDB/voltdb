@@ -672,6 +672,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         header.tabSchema.click()
     }
 
+
     /*
      * get query to create a table
      */
@@ -702,6 +703,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#delete") {
         }
 
+        while ((line = br.readLine()) != "#deleteOnly") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+    * get query to delete a table only
+    */
+    def String getQueryToDeleteTableOnly() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#deleteOnly") {
+        }
+
         while ((line = br.readLine()) != "#name") {
             // process the line.
             query = query + line + "\n"
@@ -721,7 +741,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#name") {
         }
 
-        while ((line = br.readLine()) != null) {
+        while ((line = br.readLine()) != "#index") {
             query = query + line + "\n"
         }
 
@@ -750,7 +770,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *  Get delete query
+     *  Get query to delete a view
      */
     def String getQueryToDeleteView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
@@ -785,7 +805,6 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
         return query
     }
-
 
     def String getCssPathOfTab(int index) {
         return "#qTab-" + String.valueOf(index) +" > a"
