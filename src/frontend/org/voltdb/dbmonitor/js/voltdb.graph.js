@@ -2043,7 +2043,6 @@
                 if(overlayData.length != 0 && !(currentTime.getTime() - (new Date(overlayData[overlayData.length - 1].endTime)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                     cmdLogOverlay = []
                     cmdLogOverlay = overlayData
-                    overlayData = []
                 }
 
                 var overlayDataMin = GetSnapshotOverlay(overlayDataArrMin)
@@ -2088,13 +2087,16 @@
                                     break;
                                 }
                             }
-                            if (!isDuplicate)
+                            if (!isDuplicate){
                                 cmdLogOverlayMin.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                                overlayDataArrMin.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME })
+                            }
                         }
                         cmdLogOverlayMin = GetSnapshotOverlay(cmdLogOverlayMin, 90)
                     }
-                    localStorage.SnapshotOverlayDataMin = JSON.stringify(cmdLogOverlayMin)
 
+                    localStorage.SnapshotOverlayDataMin = JSON.stringify(GetSnapshotOverlay(overlayDataArrMin))
+                    overlayDataArrMin = []
                     cmdLogSecCount = 0;
                 }
                 if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
@@ -2119,13 +2121,15 @@
                                     break;
                                 }
                             }
-                            if (!isDuplicate)
+                            if (!isDuplicate){
                                 cmdLogOverlayDay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                                overlayDataArrDay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME })
+                            }
                         }
                         cmdLogOverlayDay = GetSnapshotOverlay(cmdLogOverlayDay, 2400)
                     }
-                    localStorage.SnapshotOverlayDataDay = JSON.stringify(cmdLogOverlayDay)
-
+                    localStorage.SnapshotOverlayDataDay = JSON.stringify(GetSnapshotOverlay(overlayDataArrDay))
+                    overlayDataArrDay = []
                     cmdLogMinCount = 0;
                 }
                 cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
@@ -2156,11 +2160,12 @@
                         }
                         if (!isDuplicate){
                             cmdLogOverlay.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                            overlayDataArr.push({ "startTime": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "endTime": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
                         }
                     }
                     cmdLogOverlay = GetSnapshotOverlay(cmdLogOverlay, 15)
                 }
-                localStorage.SnapshotOverlayData = JSON.stringify(cmdLogOverlay)
+                localStorage.SnapshotOverlayData = JSON.stringify(GetSnapshotOverlay(overlayDataArr))
 
                 if (monitor.cmdLogFirstData) {
                     $(".cmdLogLegend").css("display", "block");
