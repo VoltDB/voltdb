@@ -678,20 +678,38 @@ class DefaultPathAPI(MethodView):
         defaultpath = Global.DEFAULT_PATH
         return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': defaultpath})
 
+    # @staticmethod
+    # def post():
+    #     Global.DEFAULT_PATH = []
+    #
+    #     Global.DEFAULT_PATH.append({
+    #         'voltdbroot': request.json.get('voltdbroot', "").strip(),
+    #         'snapshots': request.json.get('snapshots', "").strip(),
+    #         'exportoverflow': request.json.get('exportoverflow', "").strip(),
+    #         'commandlog': request.json.get('commandlog', "").strip(),
+    #         'commandlogsnapshots': request.json.get('commandlogsnapshots', "").strip(),
+    #         'droverflow': request.json.get('droverflow', "").strip()
+    #     })
+    #
+    #     return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': Global.DEFAULT_PATH})
+
     @staticmethod
-    def post():
-        Global.DEFAULT_PATH = []
+    def put():
+        defaultpath = Global.DEFAULT_PATH
+        if 'voltdbroot' in request.json:
+            defaultpath[0]['voltdbroot'] = request.json['voltdbroot']
+        if 'commandlog' in request.json:
+            defaultpath[0]['commandlog'] = request.json['commandlog']
+        if 'commandlogsnapshots' in request.json:
+            defaultpath[0]['commandlogsnapshots'] = request.json['commandlogsnapshots']
+        if 'droverflow' in request.json:
+            defaultpath[0]['droverflow'] = request.json['droverflow']
+        if 'exportoverflow' in request.json:
+            defaultpath[0]['exportoverflow'] = request.json['exportoverflow']
+        if 'snapshot' in request.json:
+            defaultpath[0]['snapshot'] = request.json['snapshot']
+        return jsonify({'status': 200, 'statusString': 'Ok', 'defaultpath': defaultpath})
 
-        Global.DEFAULT_PATH.append({
-            'voltdbroot': request.json.get('voltdbroot', "").strip(),
-            'snapshots': request.json.get('snapshots', "").strip(),
-            'export-overflow': request.json.get('export-overflow', "").strip(),
-            'command-log': request.json.get('command-log', "").strip(),
-            'command-log-snapshots': request.json.get('command-log-snapshots', "").strip(),
-            'dr-overflow': request.json.get('dr-overflow', "").strip()
-        })
-
-        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': Global.DEFAULT_PATH})
 
 
 class ServerAPI(MethodView):
@@ -786,10 +804,10 @@ class ServerAPI(MethodView):
             'isAdded': False,
             'voltdbroot': request.json.get('voltdbroot', "").strip(),
             'snapshots': request.json.get('snapshots', "").strip(),
-            'export-overflow': request.json.get('export-overflow', "").strip(),
-            'command-log': request.json.get('command-log', "").strip(),
-            'command-log-snapshots': request.json.get('command-log-snapshots', "").strip(),
-            'dr-overflow': request.json.get('dr-overflow', "").strip()
+            'exportoverflow': request.json.get('exportoverflow', "").strip(),
+            'commandlog': request.json.get('commandlog', "").strip(),
+            'commandlogsnapshots': request.json.get('commandlogsnapshots', "").strip(),
+            'droverflow': request.json.get('droverflow', "").strip()
         }
 
         # Add server to the current database
@@ -862,77 +880,97 @@ class ServerAPI(MethodView):
             Information of server with specified server_id after being updated
             otherwise the error message.
         """
-        if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'status': 404, 'statusString': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
-        database = Global.DATABASES.get(database_id)
-        if database is None:
-            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+        if len(request.json) != 1:
+            if 'id' in request.json and server_id != request.json['id']:
+                return make_response(jsonify({'status': 404, 'statusString': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+
+            database = Global.DATABASES.get(database_id)
+            if database is None:
+                return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+            else:
+                members = database['members']
+            if server_id in members:
+                server_type_error = ValidateServerFieldType(request.json)
+                if 'status' in server_type_error and server_type_error['status'] == 'error':
+                    return jsonify(status=401, statusString=server_type_error['errors'])
+
+                inputs = ServerInputs(request)
+                if not inputs.validate():
+                    return jsonify(status=401, statusString=inputs.errors)
+                current_server = Global.SERVERS.get(server_id)
+                if current_server is None:
+                    abort(404)
+
+                result = validate_server_ports(database_id, server_id)
+                if result is not None:
+                    return result
+
+                current_server['name'] = \
+                    request.json.get('name', current_server['name'])
+                current_server['hostname'] = \
+                    request.json.get('hostname', current_server['hostname'])
+                current_server['description'] = \
+                    request.json.get('description', current_server['description'])
+                current_server['enabled'] = \
+                    request.json.get('enabled', current_server['enabled'])
+                current_server['admin-listener'] = \
+                    request.json.get('admin-listener', current_server['admin-listener'])
+                current_server['internal-listener'] = \
+                    request.json.get('internal-listener', current_server['internal-listener'])
+                current_server['http-listener'] = \
+                    request.json.get('http-listener', current_server['http-listener'])
+                current_server['zookeeper-listener'] = \
+                    request.json.get('zookeeper-listener', current_server['zookeeper-listener'])
+                current_server['replication-listener'] = \
+                    request.json.get('replication-listener', current_server['replication-listener'])
+                current_server['client-listener'] = \
+                    request.json.get('client-listener', current_server['client-listener'])
+                current_server['internal-interface'] = \
+                    request.json.get('internal-interface', current_server['internal-interface'])
+                current_server['external-interface'] = \
+                    request.json.get('external-interface', current_server['external-interface'])
+                current_server['public-interface'] = \
+                    request.json.get('public-interface', current_server['public-interface'])
+                current_server['placement-group'] = \
+                    str(request.json.get('placement-group', current_server['placement-group']))
+                current_server['isAdded'] = current_server['isAdded']
+                current_server['voltdbroot'] = \
+                    str(request.json.get('voltdbroot', current_server['voltdbroot']))
+                current_server['snapshots'] = \
+                    str(request.json.get('snapshots', current_server['snapshots']))
+                current_server['exportoverflow'] = \
+                    str(request.json.get('exportoverflow', current_server['exportoverflow']))
+                current_server['commandlog'] = \
+                    str(request.json.get('commandlog', current_server['commandlog']))
+                current_server['commandlogsnapshots'] = \
+                    str(request.json.get('commandlogsnapshots', current_server['commandlogsnapshots']))
+                current_server['droverflow'] = \
+                    str(request.json.get('droverflow', current_server['droverflow']))
+                sync_configuration()
+                Configuration.write_configuration_file()
+                return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
+            else:
+                return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+                    server_id, database_id)})
         else:
-            members = database['members']
-        if server_id in members:
-            server_type_error = ValidateServerFieldType(request.json)
-            if 'status' in server_type_error and server_type_error['status'] == 'error':
-                return jsonify(status=401, statusString=server_type_error['errors'])
-
-            inputs = ServerInputs(request)
-            if not inputs.validate():
-                return jsonify(status=401, statusString=inputs.errors)
             current_server = Global.SERVERS.get(server_id)
             if current_server is None:
                 abort(404)
 
-            result = validate_server_ports(database_id, server_id)
-            if result is not None:
-                return result
-
-            current_server['name'] = \
-                request.json.get('name', current_server['name'])
-            current_server['hostname'] = \
-                request.json.get('hostname', current_server['hostname'])
-            current_server['description'] = \
-                request.json.get('description', current_server['description'])
-            current_server['enabled'] = \
-                request.json.get('enabled', current_server['enabled'])
-            current_server['admin-listener'] = \
-                request.json.get('admin-listener', current_server['admin-listener'])
-            current_server['internal-listener'] = \
-                request.json.get('internal-listener', current_server['internal-listener'])
-            current_server['http-listener'] = \
-                request.json.get('http-listener', current_server['http-listener'])
-            current_server['zookeeper-listener'] = \
-                request.json.get('zookeeper-listener', current_server['zookeeper-listener'])
-            current_server['replication-listener'] = \
-                request.json.get('replication-listener', current_server['replication-listener'])
-            current_server['client-listener'] = \
-                request.json.get('client-listener', current_server['client-listener'])
-            current_server['internal-interface'] = \
-                request.json.get('internal-interface', current_server['internal-interface'])
-            current_server['external-interface'] = \
-                request.json.get('external-interface', current_server['external-interface'])
-            current_server['public-interface'] = \
-                request.json.get('public-interface', current_server['public-interface'])
-            current_server['placement-group'] = \
-                str(request.json.get('placement-group', current_server['placement-group']))
-            current_server['isAdded'] = current_server['isAdded']
-            current_server['voltdbroot'] = \
-                str(request.json.get('voltdbroot', current_server['voltdbroot']))
-            current_server['snapshots'] = \
-                str(request.json.get('snapshots', current_server['snapshots']))
-            current_server['export-overflow'] = \
-                str(request.json.get('export-overflow', current_server['export-overflow']))
-            current_server['command-log'] = \
-                str(request.json.get('command-log', current_server['command-log']))
-            current_server['command-log-snapshots'] = \
-                str(request.json.get('command-log-snapshots', current_server['command-log-snapshots']))
-            current_server['dr-overflow'] = \
-                str(request.json.get('dr-overflow', current_server['dr-overflow']))
-            sync_configuration()
-            Configuration.write_configuration_file()
-            return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
-        else:
-            return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
-                server_id, database_id)})
+            if 'voltdbroot' in request.json:
+                current_server['voltdbroot'] = request.json['voltdbroot']
+            if 'commandlog' in request.json:
+                current_server['commandlog'] = request.json['commandlog']
+            if 'commandlogsnapshots' in request.json:
+                current_server['commandlogsnapshots'] = request.json['commandlogsnapshots']
+            if 'droverflow' in request.json:
+                current_server['droverflow'] = request.json['droverflow']
+            if 'exportoverflow' in request.json:
+                current_server['exportoverflow'] = request.json['exportoverflow']
+            if 'snapshot' in request.json:
+                current_server['snapshot'] = request.json['snapshot']
+            return jsonify({'status': 200, 'statusString': 'Ok', 'server': current_server})
 
 
 class DatabaseAPI(MethodView):
@@ -1860,8 +1898,8 @@ def main(runner, amodule, config_dir, data_dir, server):
     global __PORT__
 
     Global.DEFAULT_PATH.append({'voltdbroot': "voltdbroot",
-                             'snapshot': "snapshot", 'export-overflow': "export_overflow", 'command-log': "command_log",
-                             'command-log-snapshots': "command_log_snapshots", 'dr-overflow': "dr_overflow"})
+                             'snapshot': "snapshot", 'exportoverflow': "export_overflow", 'commandlog': "command_log",
+                             'commandlogsnapshots': "command_log_snapshots", 'droverflow': "dr_overflow"})
 
     config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
@@ -1894,8 +1932,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                              'public-interface': "", 'client-listener': "", 'internal-listener': "",
                              'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                              'zookeeper-listener': "", 'placement-group': "", 'isAdded': False, 'voltdbroot': "",
-                             'snapshot': "", 'export-overflow': "", 'command-log': "",
-                             'command-log-snapshots': "", 'dr-overflow': ""}
+                             'snapshot': "", 'exportoverflow': "", 'commandlog': "",
+                             'commandlogsnapshots': "", 'droverflow': ""}
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
 
 
@@ -1975,7 +2013,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/stop', strict_slashes=False,
                      view_func=STOP_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/defaultpath', strict_slashes=False,
-                     view_func=DEFAULT_PATH_VIEW, methods=['GET', 'POST'])
+                     view_func=DEFAULT_PATH_VIEW, methods=['GET', 'PUT'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
