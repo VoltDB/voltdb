@@ -70,7 +70,13 @@ public class TestStoredProcedureInvocation extends TestCase {
             new Pair<Integer, Boolean>(1, true),
             new Pair<Integer, Boolean>(Integer.MAX_VALUE, true),
             new Pair<Integer, Boolean>(Integer.MIN_VALUE, false),
-            new Pair<Integer, Boolean>(2000000, true)
+            new Pair<Integer, Boolean>(2000000, true),
+            new Pair<Integer, Boolean>(BatchTimeoutOverrideType.NO_TIMEOUT, true)
+    };
+
+    Pair<?,?>[] allPartitions = {
+            new Pair<Boolean, Boolean>(true, true),
+            new Pair<Boolean, Boolean>(false, true)
     };
 
     Pair<?,?>[] params = {
@@ -83,13 +89,14 @@ public class TestStoredProcedureInvocation extends TestCase {
     };
 
 
-    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout) throws IOException {
+    void roundTripBuffer(boolean expectSuccess, ByteBuffer buf, String procName, long handle, int timeout, boolean allPartition) throws IOException {
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.initFromBuffer(buf);
 
         if (expectSuccess) {
             assertEquals(handle, spi.getClientHandle());
             assertEquals(timeout, spi.getBatchTimeout());
+            assertEquals(allPartition, spi.getAllPartition());
             assertTrue(procName.equals(spi.getProcName()));
         }
         else {
@@ -99,6 +106,9 @@ public class TestStoredProcedureInvocation extends TestCase {
             if (timeout != spi.getBatchTimeout()) {
                 return;
             }
+
+            // no all-partition handling for failure because it can't fail
+
             if (procName != null) {
                 if (!procName.equals(spi.getProcName())) {
                     return;
@@ -113,17 +123,17 @@ public class TestStoredProcedureInvocation extends TestCase {
         }
     }
 
-    void roundTripProcedureInvocation(boolean expectSuccess, String procName, long handle, int timeout, Object[] params) throws IOException {
+    void roundTripProcedureInvocation(boolean expectSuccess, String procName, long handle, int timeout, boolean allPartition, Object[] params) throws IOException {
 
         // try ProcedureInvocation version
         try {
-            ProcedureInvocation pi = new ProcedureInvocation(handle, timeout, procName, params);
+            ProcedureInvocation pi = new ProcedureInvocation(handle, timeout, allPartition, procName, params);
 
             ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize());
             pi.flattenToBuffer(buf);
             buf.flip();
 
-            roundTripBuffer(expectSuccess, buf, procName, handle, timeout);
+            roundTripBuffer(expectSuccess, buf, procName, handle, timeout, allPartition);
         }
         catch (Exception e) {
             if (expectSuccess) {
@@ -139,12 +149,13 @@ public class TestStoredProcedureInvocation extends TestCase {
             spi.setClientHandle(handle);
             spi.setBatchTimeout(timeout);
             spi.setParams(params);
+            spi.setAllPartition(allPartition);
 
             ByteBuffer buf = ByteBuffer.allocate(spi.getSerializedSize());
             spi.flattenToBuffer(buf);
             buf.flip();
 
-            roundTripBuffer(expectSuccess, buf, procName, handle, timeout);
+            roundTripBuffer(expectSuccess, buf, procName, handle, timeout, allPartition);
         }
         catch (Exception e) {
             if (expectSuccess) {
@@ -181,7 +192,8 @@ public class TestStoredProcedureInvocation extends TestCase {
 
             buf.flip();
 
-            roundTripBuffer(expectSuccess, buf, procName, handle, timeout);
+            // don't bother testing allPartition in binary
+            roundTripBuffer(expectSuccess, buf, procName, handle, timeout, false);
         }
         catch (Exception e) {
             if (expectSuccess) {
@@ -208,7 +220,8 @@ public class TestStoredProcedureInvocation extends TestCase {
 
                 buf.flip();
 
-                roundTripBuffer(expectSuccess, buf, procName, handle, timeout);
+                // don't bother testing allPartition in older versions
+                roundTripBuffer(expectSuccess, buf, procName, handle, timeout, false);
             }
             catch (Exception e) {
                 if (expectSuccess) {
@@ -240,7 +253,8 @@ public class TestStoredProcedureInvocation extends TestCase {
 
             buf.flip();
 
-            roundTripBuffer(expectSuccess, buf, procName, handle, timeout);
+            // don't bother testing allPartition in older versions
+            roundTripBuffer(expectSuccess, buf, procName, handle, timeout, false);
         }
         catch (Exception e) {
             if (expectSuccess) {
@@ -263,18 +277,22 @@ public class TestStoredProcedureInvocation extends TestCase {
                     int timeout = (Integer) timeoutsRaw.getFirst();
                     boolean timeoutShouldWork = (Boolean) timeoutsRaw.getSecond();
 
-                    for (Pair<?,?> paramsRaw : params) {
-                        Object[] params = (Object[]) paramsRaw.getFirst();
-                        boolean paramsShouldWork = (Boolean) paramsRaw.getSecond();
+                    for (Pair<?,?> allPartitionsRaw : allPartitions) {
+                        boolean allPartition = (Boolean) allPartitionsRaw.getFirst();
+                        // all allPartition values are valid
 
-                        System.out.printf("Trying proc:\"%s\", handle:%d, timeout:%d, params:%s\n",
-                                String.valueOf(procName), handle, timeout, String.valueOf(params));
+                        for (Pair<?,?> paramsRaw : params) {
+                            Object[] params = (Object[]) paramsRaw.getFirst();
+                            boolean paramsShouldWork = (Boolean) paramsRaw.getSecond();
 
-                        // try without a timeout
-                        boolean shouldWork = procShouldWork && handleShouldWork && paramsShouldWork && timeoutShouldWork;
-                        roundTripProcedureInvocation(shouldWork, procName, handle, timeout, params);
+                            System.out.printf("Trying proc:\"%s\", handle:%d, timeout:%d, allPartition:%s, params:%s\n",
+                                    String.valueOf(procName), handle, timeout, String.valueOf(allPartition), String.valueOf(params));
+
+                            // try without a timeout
+                            boolean shouldWork = procShouldWork && handleShouldWork && paramsShouldWork && timeoutShouldWork;
+                            roundTripProcedureInvocation(shouldWork, procName, handle, timeout, allPartition, params);
+                        }
                     }
-
                 }
             }
         }
