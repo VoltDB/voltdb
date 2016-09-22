@@ -294,13 +294,10 @@ class NValue {
        provided. This function will perform memory allocations for
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
-    template <TupleSerializationFormat F, Endianess E>
-    static void deserializeFrom(
-        SerializeInput<E>& input, Pool* tempPool, char* storage,
-        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
-    static void deserializeFrom(
-        SerializeInputBE& input, Pool* tempPool, char* storage,
-        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
+    static void deserializeFrom(SerializeInputBE& input, Pool* tempPool, char* storage,
+                                ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
+    static void deserializeFromDR(SerializeInputLE& input, Pool* tempPool, char* storage,
+                                  ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
         // eliminate the potential NValue copy.
@@ -742,6 +739,10 @@ private:
     void createDecimalFromString(const std::string &txt);
     std::string createStringFromDecimal() const;
 
+    template <class T> static void deserializeFromCommon(T& input,
+            Pool* tempPool, char* storage,
+            ValueType type, bool isInlined,
+            int32_t maxLength, bool isInBytes);
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
     void deserializeIntoANewNValueList(SerializeInputBE& input, Pool* tempPool);
@@ -2869,6 +2870,44 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
 }
 
 
+inline void NValue::deserializeFrom(SerializeInputBE& input,
+        Pool* tempPool, char *storage,
+        ValueType type, bool isInlined,
+        int32_t maxLength, bool isInBytes) {
+    if (type == VALUE_TYPE_DECIMAL) {
+        uint64_t *longStorage = reinterpret_cast<uint64_t*>(storage);
+        //Reverse order for Java BigDecimal BigEndian
+        longStorage[1] = input.readLong();
+        longStorage[0] = input.readLong();
+        return;
+    }
+    deserializeFromCommon(input, tempPool, storage,
+                          type, isInlined, maxLength, isInBytes);
+}
+
+inline void NValue::deserializeFromDR(SerializeInputLE& input,
+        Pool* tempPool, char *storage,
+        ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
+    if (type == VALUE_TYPE_DECIMAL) {
+        const int scale = input.readByte();
+        const int precisionBytes = input.readByte();
+        if (scale != kMaxDecScale) {
+            throwFatalException("Unexpected scale %d", scale);
+        }
+        if (precisionBytes != 16) {
+            throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
+        }
+        uint64_t *longStorage = reinterpret_cast<uint64_t*>(storage);
+        //Reverse order for Java BigDecimal BigEndian
+        // Serialize to export serializes them in network byte order, have to reverse them here
+        longStorage[1] = ntohll(input.readLong());
+        longStorage[0] = ntohll(input.readLong());
+        return;
+    }
+    deserializeFromCommon(input, tempPool, storage,
+                          type, isInlined, maxLength, isInBytes);
+}
+
 /**
  * Deserialize a scalar value of the specified type from the
  * SerializeInput directly into the tuple storage area
@@ -2876,14 +2915,8 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInputBE& input, Pool* tempPool, char *storage,
-        const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
-    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, tempPool, storage,
-                                                type, isInlined, maxLength, isInBytes);
-}
-
-template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(
-        SerializeInput<E>& input, Pool* tempPool, char *storage,
+template <class T> inline void NValue::deserializeFromCommon(T& input,
+        Pool* tempPool, char *storage,
         ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
     switch (type) {
     case VALUE_TYPE_BIGINT:
@@ -2954,26 +2987,10 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         return;
     }
     case VALUE_TYPE_DECIMAL: {
-        if (F == TUPLE_SERIALIZATION_DR) {
-            const int scale = input.readByte();
-            const int precisionBytes = input.readByte();
-            if (scale != kMaxDecScale) {
-                throwFatalException("Unexpected scale %d", scale);
-            }
-            if (precisionBytes != 16) {
-                throwFatalException("Unexpected number of precision bytes %d", precisionBytes);
-            }
-        }
-        uint64_t *longStorage = reinterpret_cast<uint64_t*>(storage);
-        //Reverse order for Java BigDecimal BigEndian
-        longStorage[1] = input.readLong();
-        longStorage[0] = input.readLong();
-
-        if (F == TUPLE_SERIALIZATION_DR) {
-            // Serialize to export serializes them in network byte order, have to reverse them here
-            longStorage[0] = ntohll(longStorage[0]);
-            longStorage[1] = ntohll(longStorage[1]);
-        }
+        // There is no "common" approach to serializing decimals.
+        // The caller should be filtering out this case and doing something
+        // DR-specific or non-DR-specific.
+        assert(false);
         return;
     }
     default:

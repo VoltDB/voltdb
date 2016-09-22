@@ -933,7 +933,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
             setNValue(j, value);
         } else {
             char *dataPtr = getWritableDataPtr(columnInfo);
-            NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
+            NValue::deserializeFromDR(
                     tupleIn, dataPool, dataPtr,
                     columnInfo->getVoltType(), columnInfo->inlined,
                     static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
@@ -944,7 +944,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     for (int i = 0; i < hiddenColumnCount; i++) {
         const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
         char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
-        NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
+        NValue::deserializeFromDR(
                             tupleIn, dataPool, dataPtr,
                             hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
                             static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);

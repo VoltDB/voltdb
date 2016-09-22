@@ -104,10 +104,6 @@ TEST_F(SerializeIOTest, ReadWrite) {
 
     ReferenceSerializeInputBE in(out.data(), out.size());
     readTestSuite(&in);
-
-    CopySerializeInputBE in2(out.data(), out.size());
-    memset(const_cast<char*>(out.data()), 0, out.size());
-    readTestSuite(&in2);
 }
 
 TEST_F(SerializeIOTest, Unread) {

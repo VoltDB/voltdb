@@ -329,7 +329,7 @@ TableTupleExportTest::serElSize(std::vector<uint16_t> &keep_offsets,
 void
 TableTupleExportTest::verSer(int cnt, char *data)
 {
-    ExportSerializeInput sin(data, 2048);
+    ReferenceSerializeInputLE sin(data, 2048);
 
     if (cnt-- >= 0)
     {

@@ -98,10 +98,25 @@ namespace voltdb {
 
 #endif // unix or mac
 
+class LittleEndian {
+public:
+    // Network format values are already LittleEndian, so pass them through.
+    template <typename T> static T toEndian(const T& value) { return value; }
+};
+
+class BigEndian {
+public:
+    // Network format values larger than a byte need conversion to BigEndian.
+    static char toEndian(const char& value) { return value; }
+    static int8_t toEndian(const int8_t& value) { return value; }
+    static int16_t toEndian(const int16_t& value) { return ntohs(value); }
+    static int32_t toEndian(const int32_t& value) { return ntohl(value); }
+    static int64_t toEndian(const int64_t& value) { return ntohll(value); }
+};
 
 
 /** Abstract class for reading from memory buffers. */
-template <Endianess E> class SerializeInput {
+template <class E> class SerializeInput {
 protected:
     /** Does no initialization. Subclasses must call initialize. */
     SerializeInput() : current_(NULL), end_(NULL) {}
@@ -112,8 +127,6 @@ protected:
     }
 
 public:
-    virtual ~SerializeInput() {};
-
     // functions for deserialization
     inline char readChar() {
         return readPrimitive<char>();
@@ -124,21 +137,11 @@ public:
     }
 
     inline int16_t readShort() {
-        int16_t value = readPrimitive<int16_t>();
-        if (E == BYTE_ORDER_BIG_ENDIAN) {
-            return ntohs(value);
-        } else {
-            return value;
-        }
+        return readPrimitive<int16_t>();
     }
 
     inline int32_t readInt() {
-        int32_t value = readPrimitive<int32_t>();
-        if (E == BYTE_ORDER_BIG_ENDIAN) {
-            return ntohl(value);
-        } else {
-            return value;
-        }
+        return readPrimitive<int32_t>();
     }
 
     inline bool readBool() {
@@ -150,19 +153,11 @@ public:
     }
 
     inline int64_t readLong() {
-        int64_t value = readPrimitive<int64_t>();
-        if (E == BYTE_ORDER_BIG_ENDIAN) {
-            return ntohll(value);
-        } else {
-            return value;
-        }
+        return readPrimitive<int64_t>();
     }
 
     inline float readFloat() {
         int32_t value = readPrimitive<int32_t>();
-        if (E == BYTE_ORDER_BIG_ENDIAN) {
-            value = ntohl(value);
-        }
         float retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
@@ -170,9 +165,6 @@ public:
 
     inline double readDouble() {
         int64_t value = readPrimitive<int64_t>();
-        if (E == BYTE_ORDER_BIG_ENDIAN) {
-            value = ntohll(value);
-        }
         double retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
@@ -228,12 +220,11 @@ public:
     }
 
 private:
-    template <typename T>
-    T readPrimitive() {
+    template <typename T> T readPrimitive() {
         T value;
         ::memcpy(&value, current_, sizeof(value));
         current_ += sizeof(value);
-        return value;
+        return E::toEndian(value);
     }
 
     // Current read position.
@@ -312,40 +303,12 @@ public:
         writeByte(static_cast<int8_t>(value));
     }
 
-    inline size_t writeCharAt(size_t position, char value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeByteAt(size_t position, int8_t value) {
-        return writePrimitiveAt(position, value);
-    }
-
-    inline size_t writeShortAt(size_t position, int16_t value) {
-        return writePrimitiveAt(position, htons(value));
-    }
-
     inline size_t writeIntAt(size_t position, int32_t value) {
         return writePrimitiveAt(position, htonl(value));
     }
 
     inline size_t writeBoolAt(size_t position, bool value) {
         return writePrimitiveAt(position, value ? int8_t(1) : int8_t(0));
-    }
-
-    inline size_t writeLongAt(size_t position, int64_t value) {
-        return writePrimitiveAt(position, htonll(value));
-    }
-
-    inline size_t writeFloatAt(size_t position, float value) {
-        int32_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonl(data));
-    }
-
-    inline size_t writeDoubleAt(size_t position, double value) {
-        int64_t data;
-        memcpy(&data, &value, sizeof(data));
-        return writePrimitiveAt(position, htonll(data));
     }
 
     // this explicitly accepts char* and length (or ByteArray)
@@ -413,6 +376,10 @@ public:
         return position_;
     }
 
+    size_t remaining() const {
+        return capacity_ - position_;
+    }
+
 protected:
 
     /** Called when trying to write past the end of the
@@ -458,42 +425,18 @@ protected:
 };
 
 /** Implementation of SerializeInput that references an existing buffer. */
-template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
+template <class E> class ReferenceSerializeInput : public SerializeInput<E> {
 public:
     ReferenceSerializeInput(const void* data, size_t length) {
         this->initialize(data, length);
     }
-
-    // Destructor does nothing: nothing to clean up!
-    virtual ~ReferenceSerializeInput() {}
 };
 
-/** Implementation of SerializeInput that makes a copy of the buffer. */
-template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
-public:
-    CopySerializeInput(const void* data, size_t length) :
-            bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-        this->initialize(bytes_.data(), static_cast<int>(length));
-    }
+typedef SerializeInput<BigEndian> SerializeInputBE;
+typedef SerializeInput<LittleEndian> SerializeInputLE;
 
-    // Destructor frees the ByteArray.
-    virtual ~CopySerializeInput() {}
-
-private:
-    ByteArray bytes_;
-};
-
-#ifndef SERIALIZE_IO_DECLARATIONS
-#define SERIALIZE_IO_DECLARATIONS
-typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
-typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
-
-typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
-typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
-
-typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
-typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
-#endif
+typedef ReferenceSerializeInput<BigEndian> ReferenceSerializeInputBE;
+typedef ReferenceSerializeInput<LittleEndian> ReferenceSerializeInputLE;
 
 /** Implementation of SerializeOutput that references an existing buffer. */
 class ReferenceSerializeOutput : public SerializeOutput {
@@ -504,14 +447,10 @@ public:
         initialize(data, length);
     }
 
-    /** Set the buffer to buffer with capacity and sets the position. */
-    virtual void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
+    /** Set the buffer to buffer with capacity and set the position. */
+    void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
         setPosition(position);
         initialize(buffer, capacity);
-    }
-
-    size_t remaining() const {
-        return capacity_ - position_;
     }
 
     // Destructor does nothing: nothing to clean up!
@@ -536,15 +475,14 @@ public:
         ReferenceSerializeOutput(), fallbackBuffer_(NULL) {
     }
 
-    /** Set the buffer to buffer with capacity and sets the position. */
+    /** Set the buffer to buffer with capacity and set the position. */
     void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
         if (fallbackBuffer_ != NULL) {
             char *temp = fallbackBuffer_;
             fallbackBuffer_ = NULL;
             delete []temp;
         }
-        setPosition(position);
-        initialize(buffer, capacity);
+        ReferenceSerializeOutput::initializeWithPosition(buffer, capacity, position);
     }
 
     // Destructor frees the fallback buffer if it is allocated

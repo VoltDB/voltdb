@@ -60,9 +60,9 @@ const int CLUSTER_ID_REPLICA = 2;
 const int BUFFER_SIZE = 4096;
 const int LARGE_BUFFER_SIZE = 32768;
 
-static bool s_mulitPartitionFlag = false;
+static bool s_multiPartitionFlag = false;
 static int64_t addPartitionId(int64_t value) {
-    return s_mulitPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 42);
+    return s_multiPartitionFlag ? ((value << 14) | 16383) : ((value << 14) | 42);
 }
 
 class MockExportTupleStream : public ExportTupleStream {
@@ -448,10 +448,10 @@ public:
         return std::make_pair(data, startPos);
     }
 
-    CopySerializeInputLE* getDRTaskInfo() {
+    ReferenceSerializeInputLE* getDRTaskInfo() {
         DRStreamData data = getDRStreamData();
         const char* taskParams = &data.first[data.second];
-        return new CopySerializeInputLE(taskParams + 4,
+        return new ReferenceSerializeInputLE(taskParams + 4,
                 ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
     }
 
@@ -2071,7 +2071,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     ASSERT_FALSE(flush(98));
     ASSERT_EQ(0, m_topend.blocks.size());
 
-    s_mulitPartitionFlag = true;
+    s_multiPartitionFlag = true;
 
     beginTxn(m_engine, 99, 99, 98, 70);
     endTxn(m_engine, true);
@@ -2081,7 +2081,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     ASSERT_EQ(2, m_topend.blocks.size());
 
-    std::unique_ptr<CopySerializeInputLE> taskInfo(getDRTaskInfo());
+    std::unique_ptr<ReferenceSerializeInputLE> taskInfo(getDRTaskInfo());
     taskInfo->readByte(); // DR version
     DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
     ASSERT_EQ(DR_RECORD_BEGIN_TXN, type);
@@ -2117,7 +2117,7 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     ASSERT_EQ(INT64_MAX, m_undoToken);
     m_undoToken = prevUndoToken;
 
-    s_mulitPartitionFlag = false;
+    s_multiPartitionFlag = false;
 }
 
 int main() {

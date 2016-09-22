@@ -525,7 +525,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     int32_t txnLength = m_uso - m_beginTxnUso;
     ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
                                   txnLength);
-    extraio.position(BEGIN_RECORD_HEADER_SIZE);
+    extraio.setPosition(BEGIN_RECORD_HEADER_SIZE);
     extraio.writeByte(static_cast<int8_t>(m_hashFlag));
     extraio.writeInt(txnLength);
     // if it is the replicated stream or first record is TRUNCATE_TABLE
@@ -535,7 +535,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c(crc, m_currBlock->mutableDataPtr() - txnLength, txnLength - 4);
     crc = vdbcrc::crc32cFinish(crc);
-    extraio.position(txnLength - 4);
+    extraio.setPosition(txnLength - 4);
     extraio.writeInt(crc);
 
     m_committedUso = m_uso;
