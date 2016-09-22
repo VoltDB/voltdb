@@ -201,14 +201,14 @@ def print_summary():
             sql_type_count = -1
             if count_sql_statements[sql_type].get('total'):
                 sql_type_count = count_sql_statements[sql_type]['total']
-            summary_message += '\n    {:6s}:'.format(sql_type)
+            summary_message += '\n    {0:6s}:'.format(sql_type)
             for validity in sorted(count_sql_statements[sql_type], reverse=True):
                 if validity != 'total':  # save total for last
                     count = count_sql_statements[sql_type][validity]
                     percent = int(round(100.0 * count / sql_type_count))
-                    summary_message += '{:7d} '.format(count) + validity + ' ({:2d}%),'.format(percent)
+                    summary_message += '{0:7d} '.format(count) + validity + ' ({0:2d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
-            summary_message += '{:7d} '.format(sql_type_count) + 'total ({:2d}%)'.format(percent)
+            summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:2d}%)'.format(percent)
         summary_message += '\n\n'
     except Exception as e:
         print '\n\nCaught exception attempting to print SUMMARY message:'
