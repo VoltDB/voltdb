@@ -239,8 +239,6 @@ CTX.INPUT['common'] = """
  NValue.cpp
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
- DefaultTupleSerializer.cpp
- FullTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp

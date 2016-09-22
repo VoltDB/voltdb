@@ -23,10 +23,8 @@
 #include <list>
 #include <boost/shared_ptr.hpp>
 #include <boost/foreach.hpp>
-#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/TupleSerializer.h"
 #include "storage/TableStreamerInterface.h"
 #include "storage/TupleBlock.h"
 #include "storage/ElasticScanner.h"
@@ -62,7 +60,6 @@ public:
      * Return true if the stream was activated (by the call or previously).
      */
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
-                                TupleSerializer &serializer,
                                 TableStreamType streamType,
                                 const std::vector<std::string> &predicateStrings);
 
