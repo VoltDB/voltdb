@@ -505,7 +505,10 @@ def buildMakefile(CTX):
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
     makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
+    # The dependency magic injects harness.h et. al. into the dependencies of
+    # harness.o. So, it's a good idea to explicitly repeat the source path on
+    # the compiler command line rather than trying to pick it up with $^.
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $(ROOTDIR)/" + harness_source + "\n")
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
