@@ -35,6 +35,7 @@ import java.util.Calendar;
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 class DbMonitorTest extends TestBase {
+    int count = 0
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         int count = 0
@@ -988,24 +989,22 @@ class DbMonitorTest extends TestBase {
     }
 
     //server cpu
-    def "check min value in server cpu days"(){
-        int count = 0
-
+    def checkMinAndMaxValueInServerCpuDays() {
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
+            page.chooseGraphView("Minutes")
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax = ""
         String stringMin = ""
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1023,6 +1022,7 @@ class DbMonitorTest extends TestBase {
             }
         }
 
+        when:
         String monthMax = page.changeToMonth(stringMax)
         String monthMin = page.changeToMonth(stringMin)
 
@@ -1031,6 +1031,7 @@ class DbMonitorTest extends TestBase {
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
+        then:
         println(intDateMax)
         println(intDateMin)
         if(monthMax.equals(monthMin)) {
@@ -1053,12 +1054,10 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server cpu days"(){
-        int count = 0
-
+/*    def checkMaxValueInServerCpuDays(){
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
@@ -1115,9 +1114,9 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
-    }
+    }*/
 
-    def "check min value in server cpu minutes"(){
+/*    def "check min value in server cpu minutes"(){
         int count = 0
 
         when:
@@ -1158,26 +1157,23 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
-    }
+    }*/
 
-    def "check max value in server cpu minutes"(){
-        int count = 0
-
+    def checkMinAndMaxValueInServerCpuMinutes() {
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Minutes")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1194,7 +1190,7 @@ class DbMonitorTest extends TestBase {
         String result = page.compareTime(stringMax, stringMin)
 
         if(result.equals("minutes")) {
-            println("The maximum value is " + stringMax + " and the time is in " + result )
+            println("The maximum and minimum values are " + stringMax + " and " + stringMin + "respectively and the time is in " + result )
             assert true
         }
         else {
@@ -1204,23 +1200,20 @@ class DbMonitorTest extends TestBase {
     }
 
     def "check min value in server cpu seconds"(){
-        int count = 0
-
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1247,23 +1240,20 @@ class DbMonitorTest extends TestBase {
     }
 
     def "check max value in server cpu seconds"(){
-        int count = 0
-
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1290,24 +1280,21 @@ class DbMonitorTest extends TestBase {
     }
 
     //for server ram
-    def checkMinValueInServerRamDays(){
-        int count = 0
-
+    def checkMaxAndMinValueInServerRamDays(){
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax = ""
         String stringMin = ""
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1354,7 +1341,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def CheckMaxValueInServerRamDays(){
+    /*def CheckMaxValueInServerRamDays(){
         int count = 0
 
         when:
@@ -1427,7 +1414,7 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
-    }
+    }*/
 
     def "check min value in server ram minutes"(){
         int count = 0
@@ -2259,9 +2246,7 @@ class DbMonitorTest extends TestBase {
     }
 
     // for partition idle graph
-    def CheckMinValueInPartitionIdleGraphWithRespectToSeconds() {
-        int count = 0
-
+    def checkMinValueInPartitionIdleGraphWithRespectToSeconds() {
         when:
         page.chooseGraphView("Minutes")
         // This loop is used to gain time.
@@ -2277,7 +2262,7 @@ class DbMonitorTest extends TestBase {
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -2965,10 +2950,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        // page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Server Cpu and again add Server Cpu"() {
+    def clickDisplayPreferencesRemoveServerCpuAndAddServerCpu() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3012,10 +2997,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        // page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Server RAM and again add Server RAM"() {
+    def clickDisplayPreferencesRemoveServerRamAndAddServerRam() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3058,10 +3043,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        //page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
+    def clickDisplayPreferencesRemoveClusterLatencyAndAddClusterLatency() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3105,10 +3090,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        // page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Cluster Transactions and again add Cluster Transactions"() {
+    def clickDisplayPreferencesRemoveClusterTransactionsAndAddClusterTransactions() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3152,7 +3137,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        //page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemovePartitionIdleTimeAndAgainAddPartitionIdleTime() {
@@ -3178,7 +3163,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-//        !page.partitionIdleTimeDisplayed()
+        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3199,7 +3184,7 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        !page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemoveStoredProceduresAndAgainAddStoredProcedures() {
