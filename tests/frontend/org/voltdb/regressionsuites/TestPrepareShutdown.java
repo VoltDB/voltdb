@@ -35,6 +35,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.VoltFile;
 
 public class TestPrepareShutdown extends RegressionSuite
 {
@@ -43,10 +44,10 @@ public class TestPrepareShutdown extends RegressionSuite
     }
 
     public void testPrepareShutdown() throws Exception {
-
+        VoltFile.resetSubrootForThisProcess();
         final Client client2 = this.getClient();
         for (int i = 0; i < 50; i++) {
-            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 30000);
+            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);
         }
         final Client client = getAdminClient();
         ClientResponse resp = client.callProcedure("@PrepareShutdown");
@@ -85,13 +86,6 @@ public class TestPrepareShutdown extends RegressionSuite
             Thread.sleep(2000);
         }
         assertTrue (sum == 0);
-        try {
-            client2.callProcedure("@Shutdown");
-            fail("Unallowed Shutdown is executed.");
-        } catch (ProcCallException e) {
-            //if execution reaches here, it indicates the expected exception was thrown.
-            System.out.println("@Shutdown:" + e.getMessage() + " please shutdown via admin mode");
-        }
 
         try{
             client.callProcedure("@Shutdown");
