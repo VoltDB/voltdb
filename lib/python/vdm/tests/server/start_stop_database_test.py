@@ -16,9 +16,9 @@
 
 import unittest
 import requests
-import xmlrunner
 import socket
 import time
+import xmlrunner
 import json
 
 __host_name__ = socket.gethostname()
@@ -233,6 +233,40 @@ class Default_01_StartServer(Server):
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
+    def test_start_stop_server_force_create_new_db(self):
+        """
+        ensure Start and stop server is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/start?force=true' % \
+                (__host_or_ip__,last_db_id)
+            print "Starting with force enabled to create a new database..."
+            response = requests.put(url)
+            value = response.json()
+            if not value['statusString']:
+                print "The Server list is empty"
+            elif "Start request sent successfully to servers" in value['statusString']:
+                self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
+                time.sleep(10)
+                print "Stopping Cluster...."
+                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
+                (__host_or_ip__,last_db_id)
+                response = requests.put(url_stop)
+                value = response.json()
+                if "Server shutdown successfully." in value['statusString']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
+            elif response.status_code == 500:
+                self.assertEqual(response.status_code, 500)
+
 
 class StartServer(Cluster):
     """
@@ -277,19 +311,17 @@ class StartServer(Cluster):
 
 class Default_02_RecoverServer(Server):
     """
-    Create Server
+    Recover
     """
-
     def test_recover_stop_server(self):
         """
-        ensure Start and stop server is working properly
+        Ensure Start and stop server is working properly
         """
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-
             url = 'http://%s:8000/api/1.0/databases/%u/recover' % \
                 (__host_or_ip__,last_db_id)
             print "Recovering..."
@@ -307,7 +339,8 @@ class Default_02_RecoverServer(Server):
                 time.sleep(10)
                 print "Stopping Cluster...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
-                (__host_or_ip__,last_db_id)
+                            (__host_or_ip__, last_db_id)
+
                 response = requests.put(url_stop)
                 value = response.json()
                 if "Server shutdown successfully." in value['statusString']:
@@ -332,7 +365,6 @@ class Default_02_RecoverServer(Server):
             print "Recovering with pause enabled..."
             response = requests.put(url)
             value = response.json()
-
             if not value['statusString']:
                 print "Error"
             elif "FATAL: VoltDB Community Edition" in value['statusString']:
@@ -344,7 +376,7 @@ class Default_02_RecoverServer(Server):
                 time.sleep(10)
                 print "Stopping Cluster...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
-                (__host_or_ip__,last_db_id)
+                (__host_or_ip__, last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
                 if "Server shutdown successfully." in value['statusString']:
@@ -370,4 +402,3 @@ def CheckServerStatus(self, last_db_id, status):
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()

@@ -424,7 +424,7 @@ public class TestClientPortChannel extends TestCase {
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
         byte bad_proto[] = VAR1.clone();
-        bad_proto[iVERSION] = StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1;
+        bad_proto[iVERSION] = (byte) (StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1);
         verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.

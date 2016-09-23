@@ -2272,13 +2272,14 @@ label.error {
     color: #c70000;
     width: auto;
     display: block;
-    line-height: 0px;
+    line-height: 15px;
     font-size: 11px;
     /*padding: 10px 5px 0 7px;*/
     padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
-    height: 10px;
+    height:auto;
 }
+/*.tdSnapshotFrequency label.error{line-height:15px; height:auto;}*/
 
 .adminWrapper {
     margin: 0;
@@ -3017,7 +3018,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
     .overviewTbl table td {
-        white-space: nowrap !important;
+       /*white-space: nowrap !important;*/
     }
 
 .confirmationHeight {
@@ -3282,6 +3283,11 @@ a.restoreBtn {
         .configurTbl tr td input[type="text"] {
         }
 
+
+.configureImportTbl tr td{
+    border: none;
+    padding: 5px 2px;
+}
 .propertiesAlign {
     margin: 10px 0 0 0;
     border-top: 1px solid #CCCCCC;
@@ -3372,6 +3378,12 @@ a.drTblBtn {
 
 
 .loadExport {
+    position: relative;
+    left: 3px;
+    top: 5px;
+}
+
+.loadImport {
     position: relative;
     left: 3px;
     top: 5px;
@@ -3811,12 +3823,70 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .chartDataContent ul li { line-height:20px;}
 .chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
 .chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
+ .wordBreak{word-break: break-all; line-height:22px!important;}
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
 /********************jquery us css override end*****************/
 .errorHeightFix { line-height:12px!important; position:relative; top:-6px;}
 
+.formatImport {
+    position: relative;
+    width: 175px;
+    margin-bottom: 0;
+}
+
+.drop-down-list {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    position: absolute;
+    left: 0;
+    top: 30px;
+    width: 173px;
+    display: none;
+}
+.input-group {
+    position: relative;
+    display: table;
+    border-collapse: separate;
+}
+.formatImport > .input-group > .formatHeight {
+    height: 30px;
+    border: 1px solid #ccc;
+    width: 140px;
+    padding: 0 0 0 5px;
+}
+.input-group-addon:last-child {
+    border-left: 0;
+}
+.input-group-addon {
+    padding: 6px 9px;
+    font-size: 14px;
+    font-weight: normal;
+    line-height: 1;
+    color: #555;
+    text-align: center;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    }
+.input-group-addon, .input-group-btn {
+    width: 1%;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.input-group-addon, .input-group-btn, .input-group .form-control {
+    display: table-cell;
+}
+.downImg { background: url(images/drop_down_arrow.png) no-repeat; width:16px; height:16px; display:block;}
+
+.drop-down-list li {
+    padding: 6px 10px;
+}
+.drop-down-list li:hover {
+    background-color: #3A89FF;
+    color: #fff;
+}
 
 /*********************************************media Qu********************/
 
@@ -4685,3 +4755,4 @@ fieldset { border:1px solid #ccc; padding:20px;}
 
     }
 }
+

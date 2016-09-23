@@ -1043,6 +1043,7 @@ var loadPage = function (serverName, portid) {
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
                 $("#addNewConfigLink").hide();
+                //$("#addNewImportConfigLink").hide();
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
             }
@@ -2437,6 +2438,7 @@ var loadPage = function (serverName, portid) {
     });
 
     refreshClusterHealth();
+    MonitorGraphUI.setStartTime()
     refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
     setInterval(function () {

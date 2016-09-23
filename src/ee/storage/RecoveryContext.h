@@ -32,7 +32,7 @@ class ReferenceSerializeOutput;
 
 class RecoveryContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
@@ -58,7 +58,6 @@ private:
     RecoveryContext(PersistentTable &table,
                     PersistentTableSurgeon &surgeon,
                     int32_t partitionId,
-                    TupleSerializer &serializer,
                     int32_t tableId);
 
     bool m_firstMessage;

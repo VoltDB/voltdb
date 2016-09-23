@@ -71,7 +71,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
-        super.setOriginalTxnId(invocation.getOriginalTxnId());
 
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
@@ -89,11 +88,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
-    }
-
-    @Override
-    public boolean isForDRv1() {
-        return super.isForDRv1();
     }
 
     @Override

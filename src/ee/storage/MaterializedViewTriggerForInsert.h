@@ -109,7 +109,7 @@ protected:
                                   catalog::MaterializedViewInfo *mvInfo);
     void setTargetTable(PersistentTable * target);
 
-    void initializeTupleHavingNoGroupBy();
+    void initializeTupleHavingNoGroupBy(bool fallible);
 
     void allocateBackedTuples();
 

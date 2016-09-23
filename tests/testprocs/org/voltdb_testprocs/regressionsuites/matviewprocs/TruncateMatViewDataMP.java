@@ -74,7 +74,7 @@ public class TruncateMatViewDataMP extends VoltProcedure {
     public final SQLStmt validateview16 = new SQLStmt("SELECT COUNT(*) FROM VENG6511C;");
     public final SQLStmt validateview17 = new SQLStmt("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
     // ORDER_COUNT_GLOBAL is a view without group by column.
-    // If the soruce tables are sucessfully truncated, it will have one row with value 0.
+    // If the source tables are successfully truncated, it will have one row with value 0.
     public final SQLStmt validateview18 = new SQLStmt("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
     public final SQLStmt validateview19 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
     public final SQLStmt validateview20 = new SQLStmt("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
@@ -134,7 +134,7 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview15); // ("SELECT COUNT(*) FROM VENG6511expLR;");
         voltQueueSQL(validateview16); // ("SELECT COUNT(*) FROM VENG6511C;");
         voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
-        voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
+        voltQueueSQL(validateview18); // ("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
         voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
         voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
         voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
@@ -143,11 +143,23 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview24); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_SUM;");
         voltQueueSQL(validateview25); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX;");
         result = voltExecuteSQL(true);
-        /*
-        for (VoltTable deleted : result) {
-            System.out.println("DEBUG Validated deletion: " + deleted.asScalarLong());
+        int ii = 0;
+        for (VoltTable undeleted : result) {
+            ++ii;
+            try {
+                long found = undeleted.asScalarLong();
+                if (found != 0) {
+                    System.out.println("DEBUG: In TruncateMatViewDataMP.java," +
+                            " validated truncate statements with check  " + ii +
+                            " and got: " + found + " undeleted tuples.");
+                }
+            }
+            catch (Exception exc) {
+                System.out.println("DEBUG: In TruncateMatViewDataMP.java, " +
+                        "validated truncate statements with check " + ii +
+                        " and got: " + exc);
+            }
         }
-        */
         return result;
     }
 }

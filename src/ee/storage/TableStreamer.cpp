@@ -71,7 +71,6 @@ TableStreamerInterface* TableStreamer::cloneForTruncatedTable(PersistentTableSur
  * Context classes determine whether or not reactivation is allowed.
  */
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
-                                   TupleSerializer &serializer,
                                    TableStreamType streamType,
                                    const std::vector<std::string> &predicateStrings)
 {
@@ -100,23 +99,23 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 case TABLE_STREAM_SNAPSHOT:
                     // Constructor can throw exception when it parses the predicates.
                     context.reset(
-                        new CopyOnWriteContext(m_table, surgeon, serializer, m_partitionId,
+                        new CopyOnWriteContext(m_table, surgeon, m_partitionId,
                                                predicateStrings, m_table.activeTupleCount()));
                     break;
 
                 case TABLE_STREAM_RECOVERY:
                     context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
-                                                      serializer, m_tableId));
+                                                      m_tableId));
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX:
                     context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
-                                                     serializer, predicateStrings));
+                                                     predicateStrings));
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_READ:
                     context.reset(new ElasticIndexReadContext(m_table, surgeon, m_partitionId,
-                                                              serializer, predicateStrings));
+                                                              predicateStrings));
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_CLEAR:
