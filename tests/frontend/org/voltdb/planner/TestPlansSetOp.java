@@ -164,11 +164,10 @@ public class TestPlansSetOp extends PlannerTestCase {
 
     public void testNonSupportedUnions()
     {
-        // If both sides are multi-partitioned, there is no facility for pushing down the
-        // union processing below the send/receive, so each child of the union requires
-        // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
+        // If both sides are multi-partitioned, the only way to avoid a 3-fragment plan is
+        // to push down the union processing below the send/receive. At the moment, it is only possible
+        // if each child output's contains its partitioning column at the same position across all children.
         failToCompile("select DESC from T1 UNION select TEXT from T5");
-//        failToCompile("select A from T1 UNION select D from T4");
 
         // Query hangs from SQL coverage
         failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2");
