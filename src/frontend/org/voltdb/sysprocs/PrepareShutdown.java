@@ -17,60 +17,25 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.List;
-import java.util.Map;
-
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.DependencyPair;
-import org.voltdb.OperationMode;
-import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltZK;
 
+/**
+ *The system stored procedure will pause the cluster and set a flag indicating that
+ *the cluster is preparing for shutdown. All reads and writes except the system stored procedures which are allowed as
+ *specified in SystemProcedureCatalog will be blocked.
+ *
+ */
 @ProcInfo(singlePartition = false)
-public class PrepareShutdown extends VoltSystemProcedure
+public class PrepareShutdown extends Pause
 {
     @Override
-    public void init() {}
-
-    @Override
-    public DependencyPair executePlanFragment(
-            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params, SystemProcedureExecutionContext context)
-    {
-        throw new RuntimeException("PrepareShutdown was given an " +
-                                   "invalid fragment id: " + String.valueOf(fragmentId));
-    }
-
-    /**
-     * Enter admin mode
-     * @param ctx       Internal parameter. Not user-accessible.
-     * @return          Standard STATUS table.
-     */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx)
-    {
-        // Choose the lowest site ID on this host to actually flip the bit
-        if (ctx.isLowestSiteId())
-        {
-            new VoltLogger("HOST").warn("VoltDB is preparing for shutdown.");
-            VoltDB.instance().setMode(OperationMode.PAUSED);
-            try {
-                VoltDB.instance().getHostMessenger().getZK().setData(
-                        VoltZK.operationMode,
-                        OperationMode.PAUSED.getBytes(), -1);
-                VoltDB.instance().getHostMessenger().pause();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+    public VoltTable[] run(SystemProcedureExecutionContext ctx){
+        if (ctx.isLowestSiteId()){
             VoltDB.instance().setShuttingdown(true);
         }
-
-        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(VoltSystemProcedure.STATUS_OK);
-        return (new VoltTable[] {t});
+        return super.run(ctx);
     }
 }
