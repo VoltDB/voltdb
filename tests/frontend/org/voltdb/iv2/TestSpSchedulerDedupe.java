@@ -113,7 +113,6 @@ public class TestSpSchedulerDedupe extends TestCase
         // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         when(spi.getProcName()).thenReturn(MockSPName);
-        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =
