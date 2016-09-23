@@ -217,9 +217,6 @@ public class TestPlansSetOp extends PlannerTestCase {
         // nonsense syntax in place of union ops (trying various internal symbol names meaning n/a)
         failToCompile("select A from T1 NOUNION select B from T2");
         failToCompile("select A from T1 TERM select B from T2");
-
-        // 1. one SP and two compatible MP - fail
-        // one SP plus MP select with Partkey = 4 - fail
     }
 
     public void testSelfUnion() {
