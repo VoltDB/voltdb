@@ -69,10 +69,12 @@ class DeploymentConfiguration():
         pass
 
     @staticmethod
-    def get_database_deployment(dbid):
+    def get_database_deployment(dbid, sid):
         deployment_top = Element('deployment')
         value = HTTPListener.Global.DEPLOYMENT[dbid]
         db = HTTPListener.Global.DATABASES[dbid]
+        server = HTTPListener.Global.SERVERS.get(sid)
+        value = DeploymentConfiguration.get_specific_directories(value, server)
         host_count = len(db['members'])
         value['cluster']['hostcount'] = host_count
         # Add users
@@ -100,3 +102,22 @@ class DeploymentConfiguration():
         xmlstr = tostring(deployment_top,encoding='UTF-8')
         return xmlstr
 
+
+    @staticmethod
+    def get_specific_directories(value, server):
+        if server['voltdbroot'] != "":
+            value['paths']["voltdbroot"]["path"] = server['voltdbroot']
+        else:
+            value['paths']["voltdbroot"]["path"] = HTTPListener.Global.DEFAULT_PATH[0]['voltdbroot']
+        if server['commandlog'] != "":
+            value['paths']["commandlog"]["path"] = server['commandlog']
+        if server['commandlogsnapshot'] != "":
+            value['paths']["commandlogsnapshot"]["path"] = server['commandlogsnapshot']
+        if server['snapshots'] != "":
+            value['paths']["snapshots"]["path"] = server['snapshots']
+        if server['droverflow'] != "":
+            value['paths']["droverflow"]["path"] = server['droverflow']
+        if server['exportoverflow'] != "":
+            value['paths']["exportoverflow"]["path"] = server['exportoverflow']
+
+        return value
