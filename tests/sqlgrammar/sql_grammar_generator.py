@@ -256,29 +256,13 @@ def increment_sql_statement_type(type=None, validity=None):
             increment_sql_statement_indexes(type, validity)
 
 
-def print_sql_statement(sql, max_save_statements=1000, num_chars_in_sql_type=6):
+def print_sql_statement(sql, num_chars_in_sql_type=6):
     """Print the specified SQL statement (sql), to the SQL output file (which may
     be STDOUT); and, if the sqlcmd option was specified, pass that SQL statement
     to sqlcmd, and print its output in the sqlcmd output file (which may be
-    STDOUT). Both output files should contain a maximum of the specified number
-    of SQL statements (max_save_statements), meaning that each time we reach
-    that number, the output file(s) are deleted and begun again.
+    STDOUT).
     """
-    global count_sql_statements, sql_output_file, sqlcmd_output_file, sqlcmd_proc, debug
-
-    # After every 'max_save_statements' statements, delete the output file(s),
-    # and start over, to avoid the file(s) becoming too large
-    if (count_sql_statements and count_sql_statements.get('total')
-            and count_sql_statements['total'].get('total') and max_save_statements
-            and not count_sql_statements['total']['total'] % max_save_statements):
-        if sql_output_file and sql_output_file != sys.stdout:
-            filename = sql_output_file.name
-            sql_output_file.close()
-            sql_output_file = open(filename, 'w')
-        if sqlcmd_output_file and sqlcmd_output_file != sys.stdout:
-            filename = sqlcmd_output_file.name
-            sqlcmd_output_file.close()
-            sqlcmd_output_file = open(filename, 'w')
+    global sql_output_file, sqlcmd_output_file, sqlcmd_proc, debug
 
     print >> sql_output_file, sql
 
@@ -317,14 +301,15 @@ def print_sql_statement(sql, max_save_statements=1000, num_chars_in_sql_type=6):
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
 
 
-def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000):
+def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_statements=1000,
+                            delete_statement_type='truncate-statement', delete_statement_number=10):
     """Generate and print the specified number of SQL statements (num_sql_statements),
     of the specified type (sql_statement_type); the output file(s) should contain
     a maximum of the specified number of SQL statements (max_save_statements), meaning
     that each time we reach that number, the output file(s) are deleted and begun again.
     """
-    global max_time, grammar
-    global sql_output_file, sqlcmd_proc, sqlcmd_output_file, debug
+    global max_time, debug, grammar
+    global count_sql_statements, sql_output_file, sqlcmd_output_file
 
     # A negative number of SQL statements means to run until the time limit is reached
     if num_sql_statements < 0:
@@ -335,8 +320,25 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
             if debug:
                 print 'DEBUG: exceeded max_time, at:', time()
             break
-        sql_statement = get_one_sql_statement(grammar, sql_statement_type)
-        print_sql_statement(sql_statement, max_save_statements)
+        print_sql_statement(get_one_sql_statement(grammar, sql_statement_type))
+
+        # After every 'max_save_statements' statements, delete the output file(s)
+        # and start over, to avoid the file(s) becoming too large; at the same
+        # time, issue TRUNCATE (or DELETE) statements, in order to avoid the
+        # VoltDB server's memory growing too large
+        if (count_sql_statements and count_sql_statements.get('total')
+                and count_sql_statements['total'].get('total') and max_save_statements
+                and not count_sql_statements['total']['total'] % max_save_statements):
+            for i in range(delete_statement_number):
+                print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
+            if sql_output_file and sql_output_file != sys.stdout:
+                filename = sql_output_file.name
+                sql_output_file.close()
+                sql_output_file = open(filename, 'w')
+            if sqlcmd_output_file and sqlcmd_output_file != sys.stdout:
+                filename = sqlcmd_output_file.name
+                sqlcmd_output_file.close()
+                sqlcmd_output_file = open(filename, 'w')
 
 
 if __name__ == "__main__":
@@ -349,9 +351,9 @@ if __name__ == "__main__":
                       help="a file, or comma-separated list of files, that defines the SQL grammar "
                          + "[default: sql-grammar.txt]")
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
-                      help="a type, or comma-separated list of types, of statements to generate initially; typically "
+                      help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
-    parser.add_option("-j", "--num_initial", dest="num_initial", default=0,
+    parser.add_option("-j", "--initial_number", dest="initial_number", default=0,
                       help="the number of each 'initial_type' of SQL statement to generate [default: 0]")
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
@@ -363,16 +365,22 @@ if __name__ == "__main__":
     parser.add_option("-m", "--minutes", dest="minutes", default=0,
                       help="the number of minutes to generate all SQL statements, of all types "
                          + "(if positive, overrides the number of SQL statements) [default: 0]")
+    parser.add_option("-d", "--delete_type", dest="delete_type", default="truncate-statement",
+                      help="a type of SQL statements used to delete data periodically, so that a VoltDB "
+                         + "server's memory does not grow too large [default: truncate-statement]")
+    parser.add_option("-e", "--delete_number", dest="delete_number", default=10,
+                      help="the number of 'delete_type' SQL statements to generate, each time [default: 10]")
+    parser.add_option("-x", "--max_save", dest="max_save", default=10000,
+                      help="the maximum number of SQL statements (and their results, if sqlcmd is called) to save "
+                         + "in the output files; after this many SQL statements, the output files are erased, and "
+                         + "'delete_type' statements are called, to clear the database and start fresh [default: 10000]")
     parser.add_option("-o", "--output", dest="sql_output", default=None,
                       help="an output file name, to which to send all generated SQL statements; "
                          + "if not specified, output goes to STDOUT [default: None]")
     parser.add_option("-s", "--sqlcmd", dest="sqlcmd_output", default=None,
                       help="an output file name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
                          + "generated SQL statements are only passed to sqlcmd if this value is specified [default: None]")
-    parser.add_option("-x", "--max_save", dest="max_save", default=1000,
-                      help="the maximum number SQL statements (and their results, if sqlcmd is called) "
-                         + "to save in the output files [default: 1000]")
-    parser.add_option("-d", "--debug", dest="debug", default=0,
+    parser.add_option("-D", "--debug", dest="debug", default=0,
                       help="print debug info: 0 for none, increasing values for more [default: 0]")
     (options, args) = parser.parse_args()
 
@@ -383,17 +391,19 @@ if __name__ == "__main__":
     debug = int(options.debug)
     if debug > 1:
         print "DEBUG: all arguments:", " ".join(sys.argv)
-        print "DEBUG: options.path         :", options.path
-        print "DEBUG: options.grammar_files:", options.grammar_files
-        print "DEBUG: options.initial_type :", options.initial_type
-        print "DEBUG: options.num_initial  :", options.num_initial
-        print "DEBUG: options.type         :", options.type
-        print "DEBUG: options.number       :", options.number
-        print "DEBUG: options.minutes      :", options.minutes
-        print "DEBUG: options.sql_output   :", options.sql_output
-        print "DEBUG: options.sqlcmd_output:", options.sqlcmd_output
-        print "DEBUG: options.max_save     :", options.max_save
-        print "DEBUG: options.debug        :", options.debug
+        print "DEBUG: options.path            :", options.path
+        print "DEBUG: options.grammar_files   :", options.grammar_files
+        print "DEBUG: options.initial_type    :", options.initial_type
+        print "DEBUG: options.initial_number  :", options.initial_number
+        print "DEBUG: options.type            :", options.type
+        print "DEBUG: options.number          :", options.number
+        print "DEBUG: options.minutes         :", options.minutes
+        print "DEBUG: options.delete_type     :", options.delete_type
+        print "DEBUG: options.delete_number   :", options.delete_number
+        print "DEBUG: options.max_save        :", options.max_save
+        print "DEBUG: options.sql_output      :", options.sql_output
+        print "DEBUG: options.sqlcmd_output   :", options.sqlcmd_output
+        print "DEBUG: options.debug           :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
 
@@ -443,19 +453,20 @@ if __name__ == "__main__":
     # Generate the specified number of each type of SQL statement;
     # and run each in sqlcmd, if the sqlcmd option was specified
     count_sql_statements = {}
-    if options.num_initial:
+    if options.initial_number:
         for sql_statement_type in options.initial_type.split(','):
-            generate_sql_statements(sql_statement_type, int(options.num_initial), int(options.max_save))
+            generate_sql_statements(sql_statement_type, int(options.initial_number))
     for sql_statement_type in options.type.split(','):
-        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save))
+        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save), 
+                                options.delete_type, options.delete_number)
 
     if debug > 3:
-        print_sql_statement('select * from P1;', 0)
-        print_sql_statement('select * from R1;', 0)
-        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;', 0)
-        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from R1;', 0)
-        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from P1;', 0)
-        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;', 0)
+        print_sql_statement('select * from P1;')
+        print_sql_statement('select * from R1;')
+        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from P1;')
+        print_sql_statement('select ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME from R1;')
+        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from P1;')
+        print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;')
 
     if debug:
         print 'DEBUG: end time  :', time()
