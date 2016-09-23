@@ -61,7 +61,6 @@ function cleanall() {
 function jars() {
     ant all
     cp formatter.jar $VOLTDB_BASE/bundles
-    cp formatter.jar ~/workspace/voltdb/bundles
 }
 
 # compile the procedure and client jarfiles if they don't exist
