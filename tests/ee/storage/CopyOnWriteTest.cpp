@@ -23,7 +23,6 @@
 
 #include "harness.h"
 
-#include "common/DefaultTupleSerializer.h"
 #include "common/NValue.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStream.h"
@@ -479,8 +478,7 @@ public:
                           bool skipInternalActivation) {
         m_outputStreams.reset(new TupleOutputStreamProcessor(m_serializationBuffer, sizeof(m_serializationBuffer)));
         m_outputStream = &m_outputStreams->at(0);
-        return m_table->activateWithCustomStreamer(m_serializer,
-                                                   streamType,
+        return m_table->activateWithCustomStreamer(streamType,
                                                    streamer,
                                                    m_tableId,
                                                    predicateStrings,
@@ -963,7 +961,7 @@ public:
 
     void streamElasticIndex(std::vector<std::string> &predicateStrings, bool checkCalls) {
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getPredicateSerializeInput(predicateStrings);
-        bool ok = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+        bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
         ASSERT_TRUE(ok);
 
         // Force index streaming to need multiple streamMore() calls.
@@ -991,7 +989,7 @@ public:
 
         totalInserted = 0;
 
-        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, predicateInput);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, predicateInput);
 
         while (true) {
             TupleOutputStreamProcessor outputStreams(m_serializationBuffer, sizeof(m_serializationBuffer));
@@ -1047,7 +1045,7 @@ public:
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
 
         m_engine->setUndoToken(m_undoToken);
-        bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ,
+        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ,
                                                  0, m_tableId, *predicateInput);
         ASSERT_TRUE(activated);
 
@@ -1094,7 +1092,7 @@ public:
 
     void clearIndex(const T_HashRange &testRange, bool expected) {
         boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getHashRangePredicateInput(testRange);
-        bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_CLEAR,
+        bool activated = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR,
                                                  0, m_tableId, *predicateInput);
         ASSERT_EQ(expected,activated);
     }
@@ -1109,7 +1107,6 @@ public:
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
     char signature[20];
-    DefaultTupleSerializer m_serializer;
     char m_serializationBuffer[BUFFER_SIZE];
     char m_predicateBuffer[1024 * 256];
     char m_hashRangeBuffer[1024 * 256];
@@ -1211,7 +1208,7 @@ TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);
     // activate snapshot
-    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     // insert tuples
     addRandomUniqueTuples(m_table, tupleCount);
     // do work - start taking snapshot of the table
@@ -1238,7 +1235,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
 
-        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1305,7 +1302,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         char config[4];
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
-        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1373,7 +1370,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         char config[4];
         ::memset(config, 0, 4);
         ReferenceSerializeInputBE input(config, 4);
-        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -1494,7 +1491,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("activate");
 
         ReferenceSerializeInputBE input(buffer, output.position());
-        bool success = m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        bool success = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         if (!success) {
             error("COW was previously activated");
         }
@@ -1584,7 +1581,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     char config[4];
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);
-    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
@@ -1607,7 +1604,6 @@ public:
         m_test(test), m_partitionId(partitionId), m_type(type) {}
 
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
-                                TupleSerializer &tupleSerializer,
                                 TableStreamType streamType,
                                 const std::vector<std::string> &predicateStrings) {
         return false;
@@ -1778,11 +1774,10 @@ public:
     {}
 
     virtual bool activateStream(PersistentTableSurgeon &surgeon,
-                                TupleSerializer &tupleSerializer,
                                 TableStreamType streamType,
                                 const std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
-                                           tupleSerializer, m_predicateStrings));
+                                           m_predicateStrings));
         return m_context->handleActivation(streamType) == TableStreamerContext::ACTIVATION_SUCCEEDED;
     }
 

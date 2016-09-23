@@ -24,7 +24,6 @@
 namespace voltdb {
 class Pool;
 class TupleSchema;
-class TupleSerializer;
 class ReferenceSerializeOutput;
 
 /*
@@ -52,7 +51,6 @@ public:
             uint32_t totalTupleCount,//Number of tuples in table overall
                                     //Not the number in this message. Used to size hash tables.
             ReferenceSerializeOutput *out,
-            TupleSerializer *serializer,
             const TupleSchema *schema);
 
     /*

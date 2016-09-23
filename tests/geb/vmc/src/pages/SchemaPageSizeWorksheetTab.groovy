@@ -46,7 +46,7 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         //descending        { $(class:"tablesorter-icon icon-chevron-down") }
         descending      { $("#sizetable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
 
-        sizeAnalysisSummary { $("h3", text:"Size Analysis Summary") }
+        sizeAnalysisSummary { $("#z > div:nth-child(1) > div.dataBlockHeading > h1") }
 
         sizeTableMin        { $("#s-size-summary-table-min") }
         sizeTableMax        { $("#s-size-summary-table-max") }
@@ -55,18 +55,17 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         sizeTotalMin        { $("#s-size-summary-total-min") }
         sizeTotalMax        { $("#s-size-summary-total-max") }
 
-        textTable           { $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
-        textView            { $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
-        textIndex           { $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
+        textTable           { $("#z > div:nth-child(3) > div.dataBlockContent > div > table > tbody > tr:nth-child(1) > td:nth-child(2)") }
+        textView            { $("#z > div:nth-child(3) > div.dataBlockContent > div > table > tbody > tr:nth-child(2) > td:nth-child(2)") }
+        textIndex           { $("#z > div:nth-child(3) > div.dataBlockContent > div > table > tbody > tr:nth-child(3) > td:nth-child(2)") }
         textTotal           { $("#z > div:nth-child(2) > div.dataBlockContent > div > table > tbody > tr:nth-child(5) > td:nth-child(1) > b") }
 
-        tablenamePresent    (required:false) { $(class:"table-view-name", text:"lina") }
+        tablenamePresent    (required:false) { $(class:"table-view-name", text:"voters") }
 
         searchName          { $("#sizetable > thead > tr.tablesorter-filter-row > td:nth-child(1) > input") }
         documentationLink   { $("#iconDoc") }
         generatedbytxt      {$("#catalogContainer > div.documentation > span")}
         refreshtableworksheet   { $("#MenuCatalog > div > button", text:"Refresh")}
-
     }
 
     static at = {

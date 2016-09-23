@@ -1632,7 +1632,7 @@ bool VoltDBEngine::activateTableStream(
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
+    if (!table->activateStream(streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
