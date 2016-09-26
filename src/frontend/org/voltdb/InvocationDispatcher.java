@@ -404,7 +404,7 @@ public final class InvocationDispatcher {
 
         // Verify that admin mode sysprocs are called from a client on the
         // admin port, otherwise return a failure
-        if (("@Pause".equals(procName) || "@Resume".equals(procName)) || "@PrepareShutdown".equals(procName) && !handler.isAdmin()) {
+        if (("@Pause".equals(procName) || "@Resume".equals(procName) || "@PrepareShutdown".equals(procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
                     procName + " is not available to this client",
                     task.clientHandle);
