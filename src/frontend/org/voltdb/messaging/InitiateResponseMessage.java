@@ -259,7 +259,7 @@ public class InitiateResponseMessage extends VoltMessage {
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("INITITATE_RESPONSE FOR TXN ").append(m_txnId);
+        sb.append("INITITATE_RESPONSE FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append("\n SP HANDLE: ").append(TxnEgo.txnIdToString(m_spHandle));
         sb.append("\n INITIATOR HSID: ").append(CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: ").append(CoreUtils.hsIdToString(m_coordinatorHSId));

@@ -69,7 +69,7 @@ public class BufferedReadLog
 
         @Override
         public String toString() {
-            String msg = "Buffered read safe SpHandle " + m_safeSpHandle;
+            String msg = "Buffered read safe SpHandle " + TxnEgo.txnIdToString(m_safeSpHandle) + ", ";
             msg += m_initiateMsg != null ? m_initiateMsg.toString() : m_fragmentMsg.toString();
             return msg;
         }

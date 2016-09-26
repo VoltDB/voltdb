@@ -264,7 +264,7 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(m_destinationHSId));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
 
