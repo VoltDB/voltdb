@@ -1,0 +1,6 @@
+CREATE TABLE T (
+  A INTEGER,
+  B INTEGER,
+  C INTEGER
+);
+

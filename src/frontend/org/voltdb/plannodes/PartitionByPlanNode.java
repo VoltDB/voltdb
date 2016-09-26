@@ -88,7 +88,11 @@ public class PartitionByPlanNode extends AggregatePlanNode {
         // don't add an expression here, and we will add order by expressions
         // to the plan node, as if we were doing it right.  We will fix it
         // up, which is to say, we will break it, in the EE.
-        m_aggregateExpressions.add(null);
+        if (winExpr.getAggregateArguments().size() > 0) {
+            m_aggregateExpressions.add(winExpr.getAggregateArguments().get(0));
+        } else {
+            m_aggregateExpressions.add(null);
+        }
         for (AbstractExpression expr : winExpr.getPartitionByExpressions()) {
             m_groupByExpressions.add(expr);
         }
