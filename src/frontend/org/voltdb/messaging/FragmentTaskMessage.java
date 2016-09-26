@@ -944,8 +944,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         sb.append("FRAGMENT_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");
