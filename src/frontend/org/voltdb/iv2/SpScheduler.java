@@ -120,7 +120,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         @Override
         public String toString() {
-            return "<" + TxnEgo.debugTxnId(m_txnId) + ", " + TxnEgo.debugTxnId(m_spHandle) + ">";
+            return "<" + TxnEgo.txnIdToString(m_txnId) + ", " + TxnEgo.txnIdToString(m_spHandle) + ">";
         }
     };
 
@@ -975,24 +975,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
-            // doing duplicate suppresion: all done.
+            // doing duplicate suppression: all done.
             return;
-        } else {
-            // No k-safety means no replica: read/write queries on master.
-            // K-safety: read-only queries (on master) or write queries (on replica).
-            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
-                    && (txn == null || txn.isReadOnly()) ) {
-                // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
-                // we will have to buffer these reads until previous writes acked in the cluster.
-                long readTxnId = txn == null ? message.getSpHandle() : txn.m_spHandle;
-                m_bufferedReadLog.offer(m_mailbox, message, readTxnId, m_repairLogTruncationHandle);
-                return;
-            }
+        }
 
-            // for complete writes txn, we will advance the transaction point
-            if (txn != null && !txn.isReadOnly() && txn.isDone()) {
-                setRepairLogTruncationHandle(txn.m_spHandle);
-            }
+        // No k-safety means no replica: read/write queries on master.
+        // K-safety: read-only queries (on master) or write queries (on replica).
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
+                && (txn == null || txn.isReadOnly()) ) {
+            // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
+            // we will have to buffer these reads until previous writes acked in the cluster.
+            long readTxnId = txn == null ? message.getSpHandle() : txn.m_spHandle;
+            m_bufferedReadLog.offer(m_mailbox, message, readTxnId, m_repairLogTruncationHandle);
+            return;
+        }
+
+        // for complete writes txn, we will advance the transaction point
+        if (txn != null && !txn.isReadOnly() && txn.isDone()) {
+            setRepairLogTruncationHandle(txn.m_spHandle);
         }
 
         m_mailbox.send(message.getDestinationSiteId(), message);
@@ -1130,7 +1130,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.debugTxnId(getCurrentTxnId()));
+        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
         hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
         hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
@@ -1246,7 +1246,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
 
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-            hostLog.info("[dump] current truncation handle: " + TxnEgo.debugTxnId(m_repairLogTruncationHandle) + " "
+            tmLog.info("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
                 + (m_defaultConsistencyReadLevel == Consistency.ReadLevel.SAFE ? m_bufferedReadLog.toString() : ""));
         }
     }
@@ -1268,10 +1268,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         if (newHandle < m_repairLogTruncationHandle) {
             throw new RuntimeException("Updating truncation point from " +
-                    TxnEgo.debugTxnId(m_repairLogTruncationHandle) +
-                    "to" + TxnEgo.debugTxnId(newHandle));
+                    TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                    "to" + TxnEgo.txnIdToString(newHandle));
         }
-        assert newHandle >= m_repairLogTruncationHandle;
 
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;

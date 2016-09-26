@@ -21,7 +21,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -32,25 +31,26 @@ public class BufferedReadLog
     public static class Item {
         final InitiateResponseMessage m_initiateMsg;
         final FragmentResponseMessage m_fragmentMsg;
-        final long m_txnId;
+        final long m_safeSpHandle;
 
         Item(InitiateResponseMessage msg) {
             m_initiateMsg = msg;
             m_fragmentMsg = null;
-            m_txnId = Long.MIN_VALUE;
+            // SP transaction's SpHandle is the same as its transaction Id
+            m_safeSpHandle = msg.getSpHandle();
         }
 
         Item(FragmentResponseMessage msg, long txnId) {
             m_initiateMsg = null;
             m_fragmentMsg = msg;
-            m_txnId = txnId;
+            // multi-fragments MP read's spHandle may be advanced between each fragment
+            // by scheduling any SP writes.
+            // we should use it's first SpHandle as a safe point to release reads instead.
+            m_safeSpHandle = txnId;
         }
 
-        long getTxnId() {
-            if (m_initiateMsg != null) {
-                return m_initiateMsg.getSpHandle();
-            }
-            return m_txnId;
+        long getSafeSpHandle() {
+            return m_safeSpHandle;
         }
 
         long getResponseHSId() {
@@ -69,10 +69,9 @@ public class BufferedReadLog
 
         @Override
         public String toString() {
-            if (m_initiateMsg != null) {
-                return "Buffered read msg: " + m_initiateMsg.toString();
-            }
-            return "Buffered read msg: " + m_fragmentMsg.toString();
+            String msg = "Buffered read safe SpHandle " + m_safeSpHandle;
+            msg += m_initiateMsg != null ? m_initiateMsg.toString() : m_fragmentMsg.toString();
+            return msg;
         }
     }
 
@@ -107,7 +106,7 @@ public class BufferedReadLog
         Deque<Item> deq = m_bufferedReads;
         Item item = null;
         while ((item = deq.peek()) != null) {
-            if (item.getTxnId() <= spHandle) {
+            if (item.getSafeSpHandle() <= spHandle) {
                 // when the sp reads' handle is less equal than truncation handle
                 // we know any previous write has been confirmed and it's safe to release.
                 mailbox.send(item.getResponseHSId(), item.getMessage());
