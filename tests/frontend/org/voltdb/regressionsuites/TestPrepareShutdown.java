@@ -25,8 +25,9 @@ package org.voltdb.regressionsuites;
 
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.Properties;
 import org.voltdb.BackendTarget;
+import org.voltdb.TestCSVFormatterSuiteBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -49,6 +50,14 @@ public class TestPrepareShutdown extends RegressionSuite
         for (int i = 0; i < 50; i++) {
             client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);
         }
+
+        //push import data async
+        String[] myData = new String[5000];
+        for (int i =0; i < 5000; i++) {
+            myData[i] = i + ",1,2,3,4,5,6,7,8,9,10";
+        }
+        TestCSVFormatterSuiteBase.pushDataAsync(7001, myData);
+
         final Client client = getAdminClient();
         ClientResponse resp = client.callProcedure("@PrepareShutdown");
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
@@ -87,6 +96,19 @@ public class TestPrepareShutdown extends RegressionSuite
         }
         assertTrue (sum == 0);
 
+        //check import OUTSTANDING_REQUESTS
+       sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            resp = client2.callProcedure("@Statistics", "IMPORTER", 0);
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = resp.getResults()[0];
+            if (t.advanceRow()) {
+                sum = t.getLong(8);
+            }
+            System.out.printf("Outstanding importer transactions: %d\n", sum);
+            Thread.sleep(500);
+        }
+        assertTrue (sum == 0);
         try{
             client.callProcedure("@Shutdown");
             fail("@Shutdown fails via admin mode");
@@ -100,12 +122,33 @@ public class TestPrepareShutdown extends RegressionSuite
 
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestPrepareShutdown.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
+
+        String bundleLocation = System.getProperty("user.dir") + "/bundles";
+        additionalEnv.put("voltdbbundlelocation", bundleLocation);
+
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
         project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
+        project.addPartitionInfo("indexme", "pkey");
 
-        LocalCluster config = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI,
+        // configure socket importer 1
+        Properties props = buildProperties(
+                "port", "7001",
+                "decode", "true",
+                "procedure", "indexme.insert");
+
+        Properties formatConfig = buildProperties(
+                "nullstring", "test",
+                "separator", ",",
+                "blank", "empty",
+                "escape", "\\",
+                "quotechar", "\"",
+                "nowhitespace", "true");
+
+        project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
+
+        LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
