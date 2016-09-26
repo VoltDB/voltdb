@@ -45,6 +45,7 @@ import Configuration
 import signal
 import thread
 
+
 filter_log = Filter('/api/1.0/', 'GET')
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -668,32 +669,6 @@ class Global:
     DELETED_HOSTNAME = ''
     VOLT_SERVER_PATH = ''
     DEFAULT_PATH = []
-
-
-class DefaultPathAPI(MethodView):
-    """Class to handle requests relating to Default Path"""
-
-    @staticmethod
-    def get():
-        defaultpath = Global.DEFAULT_PATH
-        return jsonify({'status': 200, 'statusString': 'OK', 'defaultPath': defaultpath})
-
-    @staticmethod
-    def put():
-        defaultpath = Global.DEFAULT_PATH
-        if 'voltdbroot' in request.json:
-            defaultpath[0]['voltdbroot'] = request.json['voltdbroot']
-        if 'commandlog' in request.json:
-            defaultpath[0]['commandlog'] = request.json['commandlog']
-        if 'commandlogsnapshot' in request.json:
-            defaultpath[0]['commandlogsnapshot'] = request.json['commandlogsnapshot']
-        if 'droverflow' in request.json:
-            defaultpath[0]['droverflow'] = request.json['droverflow']
-        if 'exportoverflow' in request.json:
-            defaultpath[0]['exportoverflow'] = request.json['exportoverflow']
-        if 'snapshots' in request.json:
-            defaultpath[0]['snapshots'] = request.json['snapshots']
-        return jsonify({'status': 200, 'statusString': 'Ok', 'defaultpath': defaultpath})
 
 
 class ServerAPI(MethodView):
@@ -1677,7 +1652,7 @@ class DatabaseDeploymentAPI(MethodView):
 
             return jsonify({'deployment': new_deployment})
         else:
-            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id, 1)
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
             return Response(deployment_content, mimetype='text/xml')
 
     @staticmethod
@@ -1861,9 +1836,6 @@ def main(runner, amodule, config_dir, data_dir, server):
     global __IP__
     global __PORT__
 
-    Global.DEFAULT_PATH.append({'voltdbroot': "voltdbroot",
-                             'snapshots': "snapshots", 'exportoverflow': "export_overflow", 'commandlog': "command_log",
-                             'commandlogsnapshot': "command_log_snapshot", 'droverflow': "dr_overflow"})
 
     config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
@@ -1924,7 +1896,6 @@ def main(runner, amodule, config_dir, data_dir, server):
     ADD_SERVER_VIEW = AddServerAPI.as_view('add_server_api')
     ADD_LOCAL_SERVER_VIEW = AddLocalServerAPI.as_view('add_local_server_api')
     STOP_LOCAL_SERVER_VIEW = StopLocalServerAPI.as_view('stop_local_server_api')
-    DEFAULT_PATH_VIEW = DefaultPathAPI.as_view('default_path_api')
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
                      view_func=SERVER_VIEW, methods=['GET', 'POST'])
@@ -1976,8 +1947,6 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=ADD_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/stop', strict_slashes=False,
                      view_func=STOP_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/defaultpath', strict_slashes=False,
-                     view_func=DEFAULT_PATH_VIEW, methods=['GET', 'PUT'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):

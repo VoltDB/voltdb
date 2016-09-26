@@ -16,6 +16,7 @@
 
 import HTTPListener
 from xml.etree.ElementTree import Element, SubElement, tostring
+import copy
 
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
@@ -69,12 +70,14 @@ class DeploymentConfiguration():
         pass
 
     @staticmethod
-    def get_database_deployment(dbid, sid):
+    def get_database_deployment(dbid, sid=0):
         deployment_top = Element('deployment')
-        value = HTTPListener.Global.DEPLOYMENT[dbid]
+        deployment = HTTPListener.Global.DEPLOYMENT[dbid]
+        value = copy.deepcopy(deployment)
         db = HTTPListener.Global.DATABASES[dbid]
-        server = HTTPListener.Global.SERVERS.get(sid)
-        value = DeploymentConfiguration.get_specific_directories(value, server)
+        if not sid == 0:
+            server = HTTPListener.Global.SERVERS.get(sid)
+            value = DeploymentConfiguration.get_specific_directories(value, server, dbid)
         host_count = len(db['members'])
         value['cluster']['hostcount'] = host_count
         # Add users
@@ -104,11 +107,9 @@ class DeploymentConfiguration():
 
 
     @staticmethod
-    def get_specific_directories(value, server):
+    def get_specific_directories(value, server, database_id):
         if server['voltdbroot'] != "":
             value['paths']["voltdbroot"]["path"] = server['voltdbroot']
-        else:
-            value['paths']["voltdbroot"]["path"] = HTTPListener.Global.DEFAULT_PATH[0]['voltdbroot']
         if server['commandlog'] != "":
             value['paths']["commandlog"]["path"] = server['commandlog']
         if server['commandlogsnapshot'] != "":
