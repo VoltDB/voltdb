@@ -3233,7 +3233,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION PROCEDURE PartitionParamInteger ON TABLE PKEY_WHAAAT COLUMN PKEY;"
                 );
         expectedError = "PartitionParamInteger has partition properties defined both in class " +
-                "\"org.voltdb.compiler.procedures.PartitionParamInteger\" and in the schema defintion file(s)";
+                "\"org.voltdb.compiler.procedures.PartitionParamInteger\" and in the schema definition file(s)";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(

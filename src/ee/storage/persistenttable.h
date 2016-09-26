@@ -52,7 +52,6 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include "common/declarations.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -80,10 +79,10 @@ class MaterializedViewInfo;
 }
 
 namespace voltdb {
-
 class CoveringCellIndexTest_TableCompaction;
 class MaterializedViewTriggerForWrite;
 class MaterializedViewHandler;
+class TableIndex;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -380,8 +379,7 @@ public:
      * Prepare table for streaming from serialized data.
      * Return true on success or false if it was already active.
      */
-    bool activateStream(TupleSerializer &tupleSerializer,
-                        TableStreamType streamType,
+    bool activateStream(TableStreamType streamType,
                         int32_t partitionId,
                         CatalogId tableId,
                         ReferenceSerializeInputBE &serializeIn);
@@ -543,8 +541,7 @@ private:
      * Use custom TableStreamer provided.
      * Return true on success or false if it was already active.
      */
-    bool activateWithCustomStreamer(TupleSerializer &tupleSerializer,
-                                    TableStreamType streamType,
+    bool activateWithCustomStreamer(TableStreamType streamType,
                                     boost::shared_ptr<TableStreamerInterface> tableStreamer,
                                     CatalogId tableId,
                                     std::vector<std::string> &predicateStrings,

@@ -33,7 +33,7 @@ public class UpdateCatalogAcceptancePolicy extends InvocationValidationPolicy {
     public ClientResponseImpl shouldAccept(AuthUser user,
                                 StoredProcedureInvocation invocation,
                                 Procedure sysProc) {
-        if (!invocation.procName.equals("@UpdateApplicationCatalog")) {
+        if (!invocation.getProcName().equals("@UpdateApplicationCatalog")) {
             return null;
         }
 
