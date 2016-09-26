@@ -37,7 +37,7 @@ public class SnapshotInitiationInfo
     private String m_data;
     private boolean m_truncationRequest;
     private SnapshotPathType m_stype;
-    public static final String MAGIC_NONCE_PREFIX = "_VOLTDB";
+    public static final String MAGIC_NONCE_PREFIX = "MANUAL";
 
     /**
      * Construct the object given the parameters directly.
@@ -78,11 +78,13 @@ public class SnapshotInitiationInfo
                 m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
                 m_stype = SnapshotPathType.SNAP_AUTO;
                 m_path = VoltDB.instance().getSnapshotPath();
+                //We will always generate a good valid nonce.
+                checkNonceValidity = false;
                 break;
         }
 
         if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",")) && m_nonce.startsWith(MAGIC_NONCE_PREFIX)) {
-            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
+            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
         }
     }
 

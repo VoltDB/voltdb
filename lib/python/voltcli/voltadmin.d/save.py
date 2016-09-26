@@ -32,18 +32,31 @@ import urllib
                               default = None),
         VOLT.StringListOption(None, '--skiptables', 'skip_tables',
                               'tables to skip in the snapshot',
-                              default = None),
-        VOLT.StringOption('-n', '--nonce', 'nonce', 'the unique snapshot identifier (nonce)', default = None),
-        VOLT.StringOption('-d', '--directory', 'directory', 'the snapshot server directory', default = None)
+                              default = None)
+    ),
+    arguments=(
+            VOLT.PathArgument('directory', 'the snapshot server directory', absolute=True, optional=True),
+            VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)', optional=True)
     )
 )
 def save(runner):
     uri = None
+    dir_specified = False
     if runner.opts.directory != None:
         uri = 'file://%s' % urllib.quote(runner.opts.directory)
+        dir_specified = True
+
     nonce = None
     if runner.opts.nonce != None:
         nonce = runner.opts.nonce.replace('"', '\\"')
+    elif dir_specified:
+        runner.abort('When a DIRECTORY is given a NONCE must be specified as well.')
+    else:
+        blocking = 'true'
+        format = 'native'
+        tables = None
+        skip_tables = None
+
     if runner.opts.blocking:
         blocking = 'true'
     else:
