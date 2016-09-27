@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-		<title>Voter Sample: Real-Time Results</title>
+        <title>Voter Sample: Real-Time Results</title>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="VoltDB demo dashboard" />
         <meta name="author" content="voltdb" />
-		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
         <!-- Bootstrap core CSS -->
         <link href="css/bootstrap.min.css" rel="stylesheet" />
         <!-- Bootstrap theme -->
@@ -38,10 +38,14 @@
                     var tot = 1;
                     for(var i=0;i<response.results[0].data.length;i++)
                     {
-                        if (response.results[0].data[i][3] == 1)
-                            data.push([response.results[0].data[i][0], response.results[0].data[i][1]-1]);
-                        agg[response.results[0].data[i][1]-1] += response.results[0].data[i][2];
+                        data.push([response.results[0].data[i][0], response.results[0].data[i][1]-1]);
                         tot += response.results[0].data[i][2];
+                    }
+                    for (var i=0; i < response.results[1].data.length; i++)
+                    {
+                        var contestant = response.results[1].data[i][0] - 1;
+                        var nvotes     = response.results[1].data[i][1];
+                        agg[contestant] = nvotes;
                     }
                     for(var i=0;i<agg.length;i++)
                     {
@@ -131,9 +135,9 @@ function DrawTPSChart(response, someDiv) {
 
     var options = {
         series: {
-	    lines: { show: true, fill: true },
-	    //bars: { show: true, barWidth : 60*1000, fill: true},
-	    points: { show: false }
+        lines: { show: true, fill: true },
+        //bars: { show: true, barWidth : 60*1000, fill: true},
+        points: { show: false }
         },
         xaxis: { mode: "time", timezone: "browser", minTickSize: [10, "second"], ticks: 4 },
         yaxis: { position: "right" },
@@ -147,13 +151,13 @@ function DrawTPSChart(response, someDiv) {
         {
             var cnum = ""+num;
             var parr = [], j = cnum.length, m = Math.floor(j / 3), n = cnum.length % 3 || 3;
-    	    for (var i = 0; i < j; i += n)
+            for (var i = 0; i < j; i += n)
             {
-    	        if (i != 0) {n = 3;}
-	            parr[parr.length] = cnum.substr(i, n);
-	            m -= 1;
-	        }
-    	    return parr.join(',');
+                if (i != 0) {n = 3;}
+                parr[parr.length] = cnum.substr(i, n);
+                m -= 1;
+            }
+            return parr.join(',');
         }
 
         $(document).ready(function(){

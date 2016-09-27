@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -48,7 +49,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
  *  and provides methods to call stored procedures and receive
  *  responses.
  */
-public final class ClientImpl implements Client, ReplicaProcCaller {
+public final class ClientImpl implements Client {
 
     /*
      * refresh the partition key cache every 1 second
@@ -88,6 +89,9 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<>();
 
     private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
+
+    // global instance of null callback for performance (you only need one)
+    private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
 
     /****************************************************
                         Public API
@@ -184,8 +188,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return m_passwordHashCode;
     }
 
-    public void createConnectionWithHashedCredentials(String host, int port, String program, byte[] hashedPassword)
-        throws IOException
+    public void createConnectionWithHashedCredentials(
+            String host,
+            int port,
+            String program,
+            byte[] hashedPassword)
+                    throws IOException
     {
         if (m_isShutdown) {
             throw new IOException("Client instance is shutdown");
@@ -209,8 +217,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws NoConnectionsException
      */
     @Override
-    public final ClientResponse callProcedure(String procName, Object... parameters)
-        throws IOException, NoConnectionsException, ProcCallException
+    public final ClientResponse callProcedure(
+            String procName,
+            Object... parameters)
+                    throws IOException, NoConnectionsException, ProcCallException
     {
         return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
@@ -226,13 +236,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws NoConnectionsException
      */
     @Override
-    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
-        throws IOException, NoConnectionsException, ProcCallException
+    public ClientResponse callProcedureWithTimeout(
+            int batchTimeout,
+            String procName,
+            Object... parameters)
+                    throws IOException, NoConnectionsException, ProcCallException
     {
-        if (batchTimeout < 0) {
-            throw new IllegalArgumentException("Timeout value can't be negative." );
-        }
-
         return callProcedureWithClientTimeout(batchTimeout, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
@@ -249,64 +258,17 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public ClientResponse callProcedureWithClientTimeout(int batchTimeout, String procName,
-            long clientTimeout, TimeUnit unit, Object... parameters)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
-        final SyncCallback cb = new SyncCallback();
-        cb.setArgs(parameters);
-        final ProcedureInvocation invocation
-            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
-        return callProcedure(cb, System.nanoTime(), unit.toNanos(clientTimeout), invocation);
-    }
-
-    /**
-     * The synchronous procedure call method for DR replication
-     */
-    @Override
-    public ClientResponse callProcedure(
-            long originalTxnId,
-            long originalUniqueId,
+    public ClientResponse callProcedureWithClientTimeout(
+            int batchTimeout,
             String procName,
+            long clientTimeout,
+            TimeUnit unit,
             Object... parameters)
-            throws IOException, NoConnectionsException, ProcCallException
+                    throws IOException, NoConnectionsException, ProcCallException
     {
-        final SyncCallback cb = new SyncCallback();
-        cb.setArgs(parameters);
-        final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalUniqueId,
-                                    m_handle.getAndIncrement(),
-                                    procName, parameters);
-        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_CLIENT_TIMEOUT, invocation);
-    }
-
-    private final ClientResponse callProcedure(SyncCallback cb, long nowNanos, long timeout, ProcedureInvocation invocation)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
-        if (m_isShutdown) {
-            throw new NoConnectionsException("Client instance is shutdown");
-        }
-
-        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
-            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
-                    " without deadlocking the client library");
-        }
-
-        m_distributer.queue(
-                invocation,
-                cb,
-                true, nowNanos, timeout);
-
-        try {
-            cb.waitForResponse();
-        } catch (final InterruptedException e) {
-            throw new java.io.InterruptedIOException("Interrupted while waiting for response");
-        }
-        if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
-        }
-        // cb.result() throws ProcCallException if procedure failed
-        return cb.getResponse();
+        ProcedureInvocation invocation
+            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
+        return internalSyncCallProcedure(unit.toNanos(clientTimeout), invocation);
     }
 
     /**
@@ -317,8 +279,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @return True if the procedure was queued and false otherwise
      */
     @Override
-    public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
-    throws IOException, NoConnectionsException {
+    public final boolean callProcedure(
+            ProcedureCallback callback,
+            String procName,
+            Object... parameters)
+                    throws IOException, NoConnectionsException
+    {
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback, BatchTimeoutOverrideType.NO_TIMEOUT, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
@@ -333,15 +299,21 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @return True if the procedure was queued and false otherwise
      */
     @Override
-    public final boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
-    throws IOException, NoConnectionsException {
-        if (batchTimeout < 0) {
-            throw new IllegalArgumentException("Timeout value can't be negative." );
-        }
-
-        //Time unit doesn't matter in this case since the timeout isn't being specified
-        return callProcedureWithClientTimeout(callback, batchTimeout, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
+    public final boolean callProcedureWithTimeout(
+            ProcedureCallback callback,
+            int batchTimeout,
+            String procName,
+            Object... parameters)
+                    throws IOException, NoConnectionsException
+    {
+        //Time unit doesn't matter in this case since the timeout isn't being specifie
+        return callProcedureWithClientTimeout(
+                callback,
+                batchTimeout,
+                procName,
+                Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
+                TimeUnit.NANOSECONDS,
+                parameters);
     }
 
     /**
@@ -355,85 +327,97 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
-    public boolean callProcedureWithClientTimeout(ProcedureCallback callback, int batchTimeout, String procName,
-            long timeout, TimeUnit unit, Object... parameters) throws IOException, NoConnectionsException {
-        if (m_isShutdown) {
-            return false;
-        }
+    public boolean callProcedureWithClientTimeout(
+            ProcedureCallback callback,
+            int batchTimeout,
+            String procName,
+            long clientTimeout,
+            TimeUnit clientTimeoutUnit,
+            Object... parameters)
+                    throws IOException, NoConnectionsException
+    {
         if (callback instanceof ProcedureArgumentCacher) {
             ((ProcedureArgumentCacher) callback).setArgs(parameters);
         }
+
         ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
-        return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
+
+        return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
     }
 
-    /**
-     * Asynchronously invoke a replicated procedure. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check
-     * the return value to determine if queuing actually took place.
-     *
-     * @param originalTxnId The original txnId generated for this invocation.
-     * @param originalTimestamp The original timestamp associated with this invocation.
-     * @param callback ProcedureCallback that will be invoked with procedure results.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return <code>true</code> if the procedure was queued and
-     *         <code>false</code> otherwise
-     */
+    @Deprecated
     @Override
-    public final boolean callProcedure(
-            long originalTxnId,
-            long originalUniqueId,
-            ProcedureCallback callback,
+    public int calculateInvocationSerializedSize(
             String procName,
             Object... parameters)
-            throws IOException, NoConnectionsException {
-        if (callback instanceof ProcedureArgumentCacher) {
-            ((ProcedureArgumentCacher)callback).setArgs(parameters);
-        }
-        ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalUniqueId,
-                                    m_handle.getAndIncrement(),
-                                    procName, parameters);
-        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_CLIENT_TIMEOUT);
-    }
-
-    @Override
-    public int calculateInvocationSerializedSize(String procName,
-            Object... parameters) {
+    {
         final ProcedureInvocation invocation =
             new ProcedureInvocation(0, procName, parameters);
         return invocation.getSerializedSize();
     }
 
+    @Deprecated
     @Override
     public final boolean callProcedure(
            ProcedureCallback callback,
            int expectedSerializedSize,
-            String procName,
-            Object... parameters)
-           throws NoConnectionsException, IOException {
-        if (callback instanceof ProcedureArgumentCacher) {
-            ((ProcedureArgumentCacher)callback).setArgs(parameters);
-        }
-        ProcedureInvocation invocation =
-            new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_CLIENT_TIMEOUT);
+           String procName,
+           Object... parameters)
+                   throws NoConnectionsException, IOException
+    {
+        return callProcedure(callback, procName, parameters);
     }
 
-    private final boolean private_callProcedure(
+    private final ClientResponse internalSyncCallProcedure(
+            long clientTimeoutNanos,
+            ProcedureInvocation invocation) throws ProcCallException, IOException {
+
+        if (m_isShutdown) {
+            throw new NoConnectionsException("Client instance is shutdown");
+        }
+
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
+                    " without deadlocking the client library");
+        }
+
+        SyncCallbackLight cb = new SyncCallbackLight();
+
+        boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, invocation);
+        if (!success) {
+            final ClientResponseImpl r = new ClientResponseImpl(
+                    ClientResponse.GRACEFUL_FAILURE,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                    "",
+                    new VoltTable[0],
+                    String.format("Unable to queue client request."));
+            throw new ProcCallException(r, "Unable to queue client request.", null);
+        }
+
+        try {
+            cb.waitForResponse();
+        } catch (final InterruptedException e) {
+            throw new java.io.InterruptedIOException("Interrupted while waiting for response");
+        }
+        if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(cb.getResponse(), cb.getResponse().getStatusString(), null);
+        }
+        return cb.getResponse();
+    }
+
+    private final boolean internalAsyncCallProcedure(
             ProcedureCallback callback,
-            int expectedSerializedSize,
-            ProcedureInvocation invocation, long timeoutNanos)
+            long clientTimeoutNanos,
+            ProcedureInvocation invocation)
             throws IOException, NoConnectionsException {
+
         if (m_isShutdown) {
             return false;
         }
 
         if (callback == null) {
-            callback = new NullCallback();
+            callback = NULL_CALLBACK;
         }
 
         final long nowNanos = System.nanoTime();
@@ -444,13 +428,15 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, nowNanos, timeoutNanos)) {
+                    isBlessed, nowNanos, clientTimeoutNanos)) {
 
                 /*
                  * Wait on backpressure honoring the timeout settings
                  */
                 final long delta = Math.max(1, System.nanoTime() - nowNanos);
-                final long timeout = timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ? m_distributer.getProcedureTimeoutNanos() : timeoutNanos;
+                final long timeout =
+                        clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
+                                m_distributer.getProcedureTimeoutNanos() : clientTimeoutNanos;
                 try {
                     if (backpressureBarrier(nowNanos, timeout - delta)) {
                         final ClientResponseImpl r = new ClientResponseImpl(
@@ -459,7 +445,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                                 "",
                                 new VoltTable[0],
                                 String.format("No response received in the allotted time (set to %d ms).",
-                                        TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+                                        TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
                         try {
                             callback.clientCallback(r);
                         } catch (Throwable t) {
@@ -475,7 +461,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, nowNanos, timeoutNanos);
+                    isBlessed, nowNanos, clientTimeoutNanos);
         }
     }
 
@@ -725,7 +711,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
     }
 
-    public static int getPortFromHostnameColonPort(String server,
+    private static int getPortFromHostnameColonPort(String server,
             int defaultPort) {
         String[] parts = server.split(":");
         if (parts.length == 1) {
@@ -871,6 +857,51 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             }
         }
         return true;
+    }
+
+    /**
+     * Essentially the same code as SyncCallback, but without the overhead (memory, gc)
+     * of storing the parameters of every outstanding request while waiting for a response.
+     *
+     */
+    private final class SyncCallbackLight implements ProcedureCallback {
+        private final Semaphore m_lock;
+        private ClientResponse m_response;
+
+        /**
+         * Create a SyncCallbackLight instance.
+         */
+        public SyncCallbackLight() {
+            m_response = null;
+            m_lock = new Semaphore(1);
+            m_lock.acquireUninterruptibly();
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) {
+            m_response = clientResponse;
+            m_lock.release();
+        }
+
+        /**
+         * <p>Retrieve the ClientResponse returned for this procedure invocation.</p>
+         *
+         * @return ClientResponse for this invocation
+         */
+        public ClientResponse getResponse() {
+            return m_response;
+        }
+
+        /**
+         * <p>Block until a response has been received for the invocation associated with this callback. Call getResponse
+         * to retrieve the response or result() to retrieve the just the results.</p>
+         *
+         * @throws InterruptedException on interruption.
+         */
+        public void waitForResponse() throws InterruptedException {
+            m_lock.acquire();
+            m_lock.release();
+        }
     }
 
     /**

@@ -23,7 +23,6 @@
 
 #include "harness.h"
 
-#include "common/DefaultTupleSerializer.h"
 #include "common/NValue.hpp"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
@@ -404,11 +403,10 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 
     stx::btree_set<int32_t> COWTuples;
     int totalInsertedCOWTuples = 0;
-    DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
     ReferenceSerializeInputBE input(config, 5);
-    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
     for (int qq = 0; qq < 3; qq++) {
 #ifdef MEMCHECK
@@ -549,12 +547,11 @@ TEST_F(CompactionTest, TestENG897) {
 
     size_t blocksNotPendingSnapshot = m_table->getBlocksNotPendingSnapshotCount();
     ASSERT_EQ(5, blocksNotPendingSnapshot);
-    DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
     ReferenceSerializeInputBE input(config, 5);
 
-    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     for (int ii = 0; ii < 16130; ii++) {
         if (ii % 2 == 0) {
             continue;
@@ -595,7 +592,7 @@ TEST_F(CompactionTest, TestENG897) {
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
     ReferenceSerializeInputBE input2(config, 5);
-    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
+    m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();
     m_table->doIdleCompaction();

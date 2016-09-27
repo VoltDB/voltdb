@@ -16,7 +16,6 @@
  */
 #include "storage/RecoveryContext.h"
 #include "common/RecoveryProtoMessageBuilder.h"
-#include "common/DefaultTupleSerializer.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "storage/persistenttable.h"
@@ -29,9 +28,8 @@ RecoveryContext::RecoveryContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
-        TupleSerializer &serializer,
         int32_t tableId) :
-    TableStreamerContext(table, surgeon, partitionId, serializer),
+    TableStreamerContext(table, surgeon, partitionId),
     m_firstMessage(true),
     m_iterator(getTable().iterator()),
     m_tableId(tableId),
@@ -80,7 +78,6 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
             m_tableId,
             allocatedTupleCount,
             out,
-            &getSerializer(),
             getTable().schema());
     TableTuple tuple(getTable().schema());
     while (message.canAddMoreTuples() && m_iterator.next(tuple)) {

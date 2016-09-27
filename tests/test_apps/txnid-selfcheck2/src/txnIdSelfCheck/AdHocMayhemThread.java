@@ -132,7 +132,7 @@ public class AdHocMayhemThread extends BenchmarkThread {
     @Override
     public void run() {
         try {
-            client.callProcedure("SetupAdHocTables");
+            TxnId2Utils.doProcCall(client, "SetupAdHocTables");
         } catch (Exception e) {
             hardStop("SetupAdHocTables failed in AdHocMayhemThread. Will exit.", e);
         }

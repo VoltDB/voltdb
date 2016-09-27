@@ -575,7 +575,7 @@ public class Benchmark {
 
         // get stats
         try {
-            ClientResponse cr = client.callProcedure("Summarize_Replica", config.threadoffset, config.threads);
+            ClientResponse cr = TxnId2Utils.doProcCall(client, "Summarize_Replica", config.threadoffset, config.threads);
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
                 log.error(((ClientResponseImpl) cr).toJSONString());
