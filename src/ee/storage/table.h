@@ -45,16 +45,7 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
-#ifndef BTREE_DEBUG
-#define BTREE_DEBUG
-#endif
-#include <string>
-#include <vector>
-#include <set>
-#include <list>
-#include <cassert>
 
-#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -65,7 +56,13 @@
 #include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
 
+#include <vector>
+#include <string>
+#include <cassert>
+
 namespace voltdb {
+class TableIterator;
+class TableStats;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 

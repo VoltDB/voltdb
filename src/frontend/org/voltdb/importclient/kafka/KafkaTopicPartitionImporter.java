@@ -81,6 +81,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
     private final FetchRequestBuilder m_fetchRequestBuilder;
+    boolean noTransaction = false;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
@@ -462,7 +463,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                                 invocation);
-                         if (!callProcedure(invocation, cb)) {
+                         if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                               }

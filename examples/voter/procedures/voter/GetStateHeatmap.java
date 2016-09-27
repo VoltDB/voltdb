@@ -35,57 +35,34 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
+/**
+ * This procedure returns two VoltTables as results.  The first is a list of states,
+ * the contestant numbers of the winner in that state and the total number of votes for that
+ * contestant in that state.  The second is a table of contestants and all votes
+ * for that contestant globally.
+ */
 public class GetStateHeatmap extends VoltProcedure {
 
-    public final SQLStmt resultStmt = new SQLStmt(
-            "SELECT contestant_number, state, num_votes " +
-            "FROM v_votes_by_contestant_number_state " +
-            "ORDER BY 2 ASC, 3 DESC, 1 ASC;");
+    public final SQLStmt stateHeatMap = new SQLStmt(
+                                                    "  SELECT state"                                                     +
+                                                    "       , contestant_number"                                         +
+                                                    "       , num_votes"                                                 +
+                                                    "    FROM ( SELECT state"                                            +
+                                                    "                , contestant_number"                                +
+                                                    "                , num_votes"                                        +
+                                                    "                , RANK() OVER ( PARTITION by state "                +
+                                                    "                                ORDER BY num_votes DESC ) AS vrank" +
+                                                    "             FROM v_votes_by_contestant_number_state ) AS sub"      +
+                                                    "   WHERE sub.vrank = 1;");
+    public final SQLStmt contestantTotals = new SQLStmt("   SELECT contestant_number"                                    +
+                                                        "        , SUM(num_votes)"                                       +
+                                                        "     FROM v_votes_by_contestant_number_state"                   +
+                                                        " GROUP BY contestant_number;");
 
-    static class Result {
-        public final String state;
-        public final int contestantNumber;
-        public final long votes;
-        public final byte isWinning;
-
-        public Result(String state, int contestantNumber, long votes, byte isWinning) {
-            this.state = state;
-            this.contestantNumber = contestantNumber;
-            this.votes = votes;
-            this.isWinning = isWinning;
-        }
-    }
-
-    public VoltTable run() {
-        ArrayList<Result> results = new ArrayList<Result>();
-        voltQueueSQL(resultStmt);
-        VoltTable summary = voltExecuteSQL()[0];
-        String state = "";
-
-        while(summary.advanceRow()) {
-            if (!summary.getString(1).equals(state)) {
-                state = summary.getString(1);
-                results.add(new Result(state, (int)summary.getLong(0), summary.getLong(2), (byte)1));
-            }
-            else {
-                results.add(new Result(state, (int)summary.getLong(0), summary.getLong(2), (byte)0));
-            }
-        }
-
-        Object[] resultArray = results.toArray();
-        VoltTable result = new VoltTable(
-                new VoltTable.ColumnInfo("state",VoltType.STRING),
-                new VoltTable.ColumnInfo("contestant_number",VoltType.INTEGER),
-                new VoltTable.ColumnInfo("num_votes",VoltType.BIGINT),
-                new VoltTable.ColumnInfo("is_winning",VoltType.TINYINT));
-
-        for(int i=0;i<resultArray.length;i++) {
-            result.addRow(new Object[] {
-                    ((Result)resultArray[i]).state,
-                    ((Result)resultArray[i]).contestantNumber,
-                    ((Result)resultArray[i]).votes,
-                    ((Result)resultArray[i]).isWinning });
-        }
+    public VoltTable[] run() {
+        voltQueueSQL(stateHeatMap);
+        voltQueueSQL(contestantTotals);
+        VoltTable[] result = voltExecuteSQL();
         return result;
     }
 }

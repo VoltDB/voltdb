@@ -779,7 +779,7 @@ class VoltTable:
     "definition and content of one VoltDB table"
     def __init__(self, fser):
         self.fser = fser
-        self.columns = []  # column defintions
+        self.columns = []  # column definitions
         self.tuples = []
 
     def __str__(self):
