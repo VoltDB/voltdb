@@ -46,17 +46,17 @@ class Hosts(object):
             value = int(value)
         self.hosts_by_id.setdefault(host_id, Host(host_id, self.abort_func))[prop_name] = value
 
-    def get_target_and_connection_host(self, host_name):
+    def get_target_and_connection_host(self, target_host_name, connection_host_name):
         """
-        Find an arbitrary host that isn't the one being stopped.
+        Find host being stopped and current host connected to. 
         Returns a tuple with connection and target host objects.
         """
         connection_host = None
         target_host = None
         for host in self.hosts_by_id.values():
-            if host.hostname == host_name:
+            if host.hostname == target_host_name:
                 target_host = host
-            elif connection_host is None:
+            if connection_host_name in host.values():
                 connection_host = host
             if not connection_host is None and not target_host is None:
                 break
@@ -83,19 +83,18 @@ def stop(runner):
         hosts.update(tuple[0], tuple[1], tuple[2])
 
     # Connect to an arbitrary host that isn't being stopped.
-    (thost, chost) = hosts.get_target_and_connection_host(runner.opts.target_host)
+    (thost, chost) = hosts.get_target_and_connection_host(runner.opts.target_host, runner.opts.host.host)
     if thost is None:
         runner.abort('Host not found in cluster: %s' % runner.opts.target_host)
     if chost is None:
         runner.abort('The entire cluster is being stopped, use "shutdown" instead.')
+    if thost == chost:
+        runner.abort('You must connect to a different host than the one you want to stop')
 
     if runner.opts.username:
         user_info = ', user: %s' % runner.opts.username
     else:
         user_info = ''
-    runner.info('Connecting to host: %s:%d%s' % (chost.hostname, chost.adminport, user_info))
-    runner.voltdb_connect(chost.hostname, chost.adminport,
-                          runner.opts.username, runner.opts.password)
 
     # Stop the requested host using exec @StopNode HOST_ID
     runner.info('Stopping host %d: %s' % (thost.id, thost.hostname))
