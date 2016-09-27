@@ -17,23 +17,14 @@
 
 package org.voltdb.importer;
 
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
-
-import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
-import org.osgi.framework.Constants;
-import org.osgi.framework.ServiceReference;
-import org.osgi.framework.launch.Framework;
-import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
@@ -41,14 +32,9 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.modular.ModuleManager;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
-
-import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.collect.FluentIterable;
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  *
@@ -61,8 +47,6 @@ public class ImportManager implements ChannelChangeCallback {
      */
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
-    private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
-
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
     private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
@@ -71,12 +55,11 @@ public class ImportManager implements ChannelChangeCallback {
     private static ImportManager m_self;
     private final HostMessenger m_messenger;
 
-    private final Map<String, String> m_frameworkProps;
     private final int m_myHostId;
-    private Framework m_framework;
     private ChannelDistributer m_distributer;
     private boolean m_serverStarted;
     private final ImporterStatsCollector m_statsCollector;
+    private final ModuleManager m_moduleManager;
 
     /**
      * Get the global instance of the ImportManager.
@@ -86,70 +69,22 @@ public class ImportManager implements ChannelChangeCallback {
         return m_self;
     }
 
-    private final static Function<String,String> appendVersion = new Function<String, String>() {
-        @Override
-        public String apply(String input) {
-            return input + ";version=1.0.0";
-        }
-    };
+    private ModuleManager getModuleManager() {
+        return ModuleManager.instance();
+    }
 
     protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
         m_statsCollector = statsCollector;
-
-        String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
-        //Create a directory in temp + username
-        File f = new File(tmpFilePath, System.getProperty("user.name"));
-        if (!f.exists() && !f.mkdirs()) {
-            throw new IOException("Failed to create required OSGI cache directory: " + f.getAbsolutePath());
-        }
-
-        if (!f.isDirectory() || !f.canRead() || !f.canWrite() || !f.canExecute()) {
-            throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
-        }
-
-        /*
-         * Note for developers: please keep list in alpha-numerical order
-         */
-        List<String> packages = ImmutableList.<String>builder()
-                .add("com.google_voltpatches.common.base")
-                .add("com.google_voltpatches.common.collect")
-                .add("com.google_voltpatches.common.io")
-                .add("com.google_voltpatches.common.net")
-                .add("com.google_voltpatches.common.util.concurrent")
-                .add("jsr166y")
-                .add("org.apache.log4j")
-                .add("org.slf4j")
-                .add("org.voltcore.network")
-                .add("org.voltcore.logging")
-                .add("org.voltcore.utils")
-                .add("org.voltdb.client")
-                .add("org.voltdb.importer")
-                .add("org.voltdb.importer.formatter")
-                .build();
-
-        String systemPackagesSpec = FluentIterable.from(packages).transform(appendVersion).join(COMMA_JOINER);
-
-        m_frameworkProps = ImmutableMap.<String,String>builder()
-                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesSpec)
-                .put("org.osgi.framework.storage.clean", "onFirstInit")
-                .put("felix.cache.rootdir", f.getAbsolutePath())
-                .put("felix.cache.locking", Boolean.FALSE.toString())
-                .build();
-
+        m_moduleManager = getModuleManager();
     }
 
-    private void startOSGiFramework() throws BundleException {
+    private void initializeChannelDistributer() throws BundleException {
         if (m_distributer != null) return;
 
         m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
         m_distributer.registerCallback("__IMPORT_MANAGER__", this);
-
-        FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
-        importLog.info("Framework properties are: " + m_frameworkProps);
-        m_framework = frameworkFactory.newFramework(m_frameworkProps);
-        m_framework.start();
     }
 
     /**
@@ -183,12 +118,12 @@ public class ImportManager implements ChannelChangeCallback {
             if (importElement == null || importElement.getConfiguration().isEmpty()) {
                 return;
             }
-            startOSGiFramework();
+            initializeChannelDistributer();
 
             final String clusterTag = m_distributer.getClusterTag();
 
             ImportDataProcessor newProcessor = new ImportProcessor(
-                    myHostId, m_distributer, m_framework, m_statsCollector, clusterTag);
+                    myHostId, m_distributer, m_moduleManager, m_statsCollector, clusterTag);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             m_formatterFactories.clear();
 
@@ -198,15 +133,11 @@ public class ImportManager implements ChannelChangeCallback {
                 try {
                     AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
                     if (formatterFactory == null) {
-                        Bundle bundle = m_framework.getBundleContext().installBundle(module);
-                        bundle.start();
-                        ServiceReference<?> refs[] = bundle.getRegisteredServices();
-                        //Must have one service only.
-                        ServiceReference<?> reference = refs[0];
-                        if (reference == null) {
+                        URI moduleURI = URI.create(module);
+                        formatterFactory = m_moduleManager.getService(moduleURI, AbstractFormatterFactory.class);
+                        if (formatterFactory == null) {
                             VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
                         }
-                        formatterFactory = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
                         m_formatterFactories.put(module, formatterFactory);
                     }
                     config.setFormatterFactory(formatterFactory);
