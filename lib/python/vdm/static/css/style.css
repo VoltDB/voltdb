@@ -107,7 +107,7 @@ body {
 .leftSide {
 	float: left;
 }
-.leftServWrap {position: relative; top: 5px;}
+.leftServWrap {position: relative; top: 5px; float:left!important;}
 .rightSideServ{float: left;padding: 0 0 0px 10px; position: relative;top: -3px;}
 .defaultServ option { font-weight:bold;}
 .defaultServ option{ padding:5px;}
@@ -968,13 +968,14 @@ ul.addServerList li:nth-child(1) {
 	text-align: right
 }
 .drWrapperAdmin {
-	margin: 20px 0 0 0;
+	padding: 20px 0 0 0;
+	border-top:1px solid #ccc;
 }
 .headerAdminContent {
 /*	height: 53px;*/
 	position: relative;
 	background: #fbfbfb;
-	border-bottom: 1px solid #aaa;
+	border-bottom: 1px solid #ccc;
 }
 
 .drAdminHeaderLeft {
@@ -1832,12 +1833,11 @@ ul.nav li:nth-child(1) {
 }
 
 @media (min-width: 320px) and (max-width: 360px) {
-.headerAdminContent { width:auto; overflow:auto;}
 .drAdminHeaderRight { width:10px;}
 }
 @media (min-width: 320px) and (max-width: 480px) {
 .headerAdminContent {
-	height: 63px;
+	/*height: 63px;*/
 }
 ul.drList {
 	margin: 0 12px 0 0;
@@ -1872,6 +1872,7 @@ ul.drList {
 .form-horizontal >.panel-group {
 	margin: 0;
 }
+
 }
  @media (min-width: 320px) and (max-width: 640px) {
 .rightSide {
@@ -1888,6 +1889,7 @@ ul.drList {
 	margin: 35% auto;
 	right: 0;
 }
+
 }
  @media (min-width: 620px) and (max-width: 800px) {
 .modal.custom .modifiedModalCreateDB {
@@ -1912,6 +1914,10 @@ ul.drList {
 .createDB {
 	margin-left: 15px;
 }
+}
+@media (max-width: 980px) {
+	
+.mainTblLeft, .mainTblRight { float:none; width:100%; overflow:auto;}	
 }
 @media (min-width: 768px) and (max-width: 980px) {
 .modal.custom .modifiedModalCreateDB {
