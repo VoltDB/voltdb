@@ -30,7 +30,7 @@ def shutdown(runner):
         if status <> 0:
             runner.error('The preparation for shutdown failed with status: %d' % status)
             return
-        runner.info('The cluster is paused prior to shutdown and will not accept new transactions other than @Statistics.')
+        runner.info('The cluster is paused prior to shutdown.')
         runner.info('Writing out all queued export data')
         status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
         if status <> 0:
