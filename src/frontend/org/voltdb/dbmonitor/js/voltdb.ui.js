@@ -609,16 +609,18 @@ function getPartitionType(key, color){
 function convertOverlayData(data){
      var chartData = [];
      for (var i=0; i< data.length; i++){
-        var startTime = new Date(data[i].startTime *1000);
-        var endTime = new Date(data[i].endTime *1000);
+        var startTime = new Date(data[i].startTime);
+        var endTime = new Date(data[i].endTime);
         var starthours = startTime.getHours();
         var startminutes = "0" + startTime.getMinutes();
         var startseconds = "0" + startTime.getSeconds();
-        var startformattedTime = starthours + ':' + startminutes.substr(-2) + ':' + startseconds.substr(-2);
+        var startmilliseconds = startTime.getMilliseconds() < 100 ? "0" + startTime.getMilliseconds() : startTime.getMilliseconds();
+        var startformattedTime = starthours + ':' + startminutes.substr(-2) + ':' + startseconds.substr(-2) + ':' + startmilliseconds;
         var endhours = endTime.getHours();
         var endminutes = "0" + endTime.getMinutes();
         var endseconds = "0" + endTime.getSeconds();
-        var endformattedTime = endhours + ':' + endminutes.substr(-2) + ':' + endseconds.substr(-2);
+        var endmilliseconds = endTime.getMilliseconds();
+        var endformattedTime = endhours + ':' + endminutes.substr(-2) + ':' + endseconds.substr(-2) + ':' + endmilliseconds;
 
         chartData.push({
         "startTime": startformattedTime,
