@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 /**
@@ -89,7 +90,7 @@ public class Iv2LogFaultMessage extends VoltMessage
         sb.append("IV2 LOG_FAULT (FROM ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" SPHANDLE: ");
-        sb.append(m_spHandle);
+        sb.append(TxnEgo.txnIdToString(m_spHandle));
         sb.append(" SPUNIQUEID: ");
         sb.append(UniqueIdGenerator.toShortString(m_spUniqueId));
         return sb.toString();
