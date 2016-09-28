@@ -45,6 +45,7 @@ class DbMonitorTest extends TestBase {
                 when: 'click the DB Monitor link (if needed)'
                 page.openDbMonitorPage()
                 browser.driver.executeScript("localStorage.removeItem('user-preferences_null')")
+                browser.driver.executeScript("localStorage.removeItem('user-preferences_8080')")
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
 
