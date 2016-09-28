@@ -42,27 +42,27 @@ import urllib
 def save(runner):
     uri = None
     dir_specified = False
-    if runner.opts.directory != None:
+    if runner.opts.directory is not None:
         uri = 'file://%s' % urllib.quote(runner.opts.directory)
         dir_specified = True
 
     nonce = None
-    if runner.opts.nonce != None:
+    if runner.opts.nonce is not None:
         nonce = runner.opts.nonce.replace('"', '\\"')
     elif dir_specified:
         runner.abort('When a DIRECTORY is given a NONCE must be specified as well.')
     else:
-        blocking = 'true'
-        format = 'native'
-        tables = None
-        skip_tables = None
+        runner.opts.blocking = 'true'
+        runner.opts.format = 'native'
+        runner.opts.tables = None
+        runner.opts.skip_tables = None
 
     if runner.opts.blocking:
         blocking = 'true'
     else:
         blocking = 'false'
-    if uri != None:
-        if nonce != None:
+    if uri is not None:
+        if nonce is not None:
             raw_json_opts = ['uripath:"%s"' % (uri),
                              'nonce:"%s"' % (nonce),
                              'block:%s' % (blocking),
@@ -72,7 +72,7 @@ def save(runner):
                              'block:%s' % (blocking),
                              'format:"%s"' % (runner.opts.format)]
     else:
-        if nonce != None:
+        if nonce is not None:
             raw_json_opts = ['uripath:"%s"' % (uri),
                              'nonce:"%s"' % (nonce),
                              'block:%s' % (blocking),
