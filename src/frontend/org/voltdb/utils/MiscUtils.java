@@ -679,7 +679,7 @@ public class MiscUtils {
      * Zip the two lists up into a multimap
      * @return null if one of the lists is empty
      */
-    public static <K, V> Multimap<K, V> zipToMap(List<K> keys, List<V> values)
+    public static <K, V> Multimap<K, V> zipToMap(Collection<K> keys, Collection<V> values)
     {
         if (keys.isEmpty() || values.isEmpty()) {
             return null;
@@ -695,7 +695,7 @@ public class MiscUtils {
 
         // In case there are more values than keys, assign the rest of the
         // values to the first key
-        K firstKey = keys.get(0);
+        K firstKey = keys.iterator().next();
         while (valueIter.hasNext()) {
             result.put(firstKey, valueIter.next());
         }

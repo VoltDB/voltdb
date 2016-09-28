@@ -30,12 +30,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.HashMultimap;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -128,8 +130,8 @@ public class TestLeaderAppointer extends ZKTestBase {
     {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(),
-                null, m_config.getTopology(m_hostGroups), m_mpi, stats, false);
+                                    m_config.getReplicationFactor(),
+                                    null, m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -278,7 +280,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     false);
@@ -525,7 +527,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     true);

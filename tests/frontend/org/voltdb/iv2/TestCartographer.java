@@ -80,65 +80,6 @@ public class TestCartographer extends ZKTestBase {
     }
 
     @Test
-    public void testReplicateLeastReplicated()
-    {
-        // Gin up our fake replication counts to leave the last partition needing two replicas
-        // 5 hosts, 3 sites/host, k=2 is 15 sites, 5 partitions.
-        // Need 2 hosts dead, so 6 missing replicas, last one needs to miss 2
-        Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        repsPerPart.put(0, 2);
-        repsPerPart.put(1, 2);
-        repsPerPart.put(2, 2);
-        repsPerPart.put(3, 2);
-        repsPerPart.put(4, 1);
-        int kfactor = 2;
-        int numberOfPartitions = 5;
-        int sitesPerHost = 3;
-
-        List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
-        assertEquals(3, firstRejoin.size());
-        assertEquals((Integer)4, firstRejoin.get(0));
-        assertEquals((Integer)0, firstRejoin.get(1));
-        assertEquals((Integer)1, firstRejoin.get(2));
-        // add to each of the repsPerPart from the firstRejoin results
-        for (int partition : firstRejoin) {
-            repsPerPart.put(partition, repsPerPart.get(partition) + 1);
-        }
-
-        // now do it again and make sure we fully replicate
-        List<Integer> secondRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
-        assertEquals(3, secondRejoin.size());
-        assertEquals((Integer)2, secondRejoin.get(0));
-        assertEquals((Integer)3, secondRejoin.get(1));
-        assertEquals((Integer)4, secondRejoin.get(2));
-    }
-
-    @Test
-    public void testNoOverReplication()
-    {
-        // We'll set things up to only require one more replica and then offer up a host with more sites
-        // than we need.  This particular case could never happen but should test the logic correctly.
-        // Also, test that we don't replicate the same partition twice on the same host again.
-        int kfactor = 2;
-        int numberOfPartitions = 5;
-        int sitesPerHost = 3;
-
-        Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        repsPerPart.put(0, 3);
-        repsPerPart.put(1, 3);
-        repsPerPart.put(2, 3);
-        repsPerPart.put(3, 3);
-        repsPerPart.put(4, 1);
-
-        List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
-        assertEquals(1, firstRejoin.size());
-        assertEquals((Integer)4, firstRejoin.get(0));
-    }
-
-    @Test
     public void testSPMasterChange() throws Exception
     {
         ZooKeeper zk = getClient(0);
