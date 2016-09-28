@@ -350,15 +350,15 @@ public abstract class AbstractParsedStmt {
         m_exprParsers.put("aggregation",
                           (AbstractParsedStmt stmt, VoltXMLElement element)
                               -> stmt.parseAggregationExpression(element));
+        m_exprParsers.put("asterisk",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> null);
         m_exprParsers.put("win_aggregation",
                           (AbstractParsedStmt stmt, VoltXMLElement element)
                               -> stmt.parseWindowedAggregationExpression(element));
         m_exprParsers.put("function",
                           (AbstractParsedStmt stmt, VoltXMLElement element)
                               -> stmt.parseFunctionExpression(element));
-        m_exprParsers.put("asterisk",
-                          (AbstractParsedStmt stmt, VoltXMLElement element)
-                              -> null);
         m_exprParsers.put("tablesubquery",
                           (AbstractParsedStmt stmt, VoltXMLElement element)
                               -> stmt.parseSubqueryExpression(element));
@@ -381,7 +381,7 @@ public abstract class AbstractParsedStmt {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
         retval = parser.parse(this, exprNode);
-        assert(retval != null);
+        assert("asterisk".equals(elementName) || retval != null);
         return retval;
     }
 
