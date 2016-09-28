@@ -436,7 +436,7 @@ class ServerBundle(JavaBundle):
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
-        verb.add_options( cli.StringOption('-b', '--buddy-group', 'buddygroup', 'buddy group', default = '0'))
+        verb.add_options( cli.StringOption('-u', '--buddy-group', 'buddygroup', 'buddy group', default = '0'))
         if self.is_legacy_verb and self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
