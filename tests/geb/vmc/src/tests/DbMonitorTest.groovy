@@ -2245,18 +2245,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    // for partition idle graph
+    // for partition idle graphs
     def checkMinValueInPartitionIdleGraphWithRespectToSeconds() {
-        when:
-        page.chooseGraphView("Minutes")
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Seconds")
-            if(graphView.text().equals("")) {
-                break
-            }
-        }
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
+
         count = 0
         then:
         String stringMax
@@ -2984,7 +2978,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3005,7 +2998,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        // page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemoveServerRamAndAddServerRam() {
@@ -3124,7 +3116,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         !page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3145,7 +3136,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        //page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemovePartitionIdleTimeAndAgainAddPartitionIdleTime() {
