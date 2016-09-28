@@ -37,6 +37,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
+import javax.net.ssl.SSLEngine;
+
 public class VoltNetworkPool {
 
     public interface IOStatsIntf {
@@ -88,15 +90,16 @@ public class VoltNetworkPool {
 
     public Connection registerChannel(
             final SocketChannel channel,
-            final InputHandler handler) throws IOException {
-        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS);
+            final InputHandler handler, SSLEngine sslEngine) throws IOException {
+        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS, sslEngine);
     }
 
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps,
-            final ReverseDNSPolicy dns) throws IOException {
+            final ReverseDNSPolicy dns,
+            SSLEngine sslEngine) throws IOException {
         //Start with a round robin base policy
         VoltNetwork vn = m_networks[(int)(m_nextNetwork.getAndIncrement() % m_networks.length)];
         //Then do a load based policy which is a little racy
@@ -106,7 +109,7 @@ public class VoltNetworkPool {
                 vn = m_networks[ii];
             }
         }
-        return vn.registerChannel(channel, handler, interestOps, dns);
+        return vn.registerChannel(channel, handler, interestOps, dns, sslEngine);
     }
 
     public List<Long> getThreadIds() {

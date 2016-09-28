@@ -241,7 +241,7 @@ public class TestDistributer extends TestCase {
                         client.configureBlocking(false);
                         channels.add(client);
                         if (handleConnection) {
-                            network.registerChannel( client, handler);
+                            network.registerChannel( client, handler, null);
                         }
                     }
                     Thread.yield();

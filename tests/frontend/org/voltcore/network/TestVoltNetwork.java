@@ -43,7 +43,7 @@ public class TestVoltNetwork extends TestCase {
 
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
-            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, null);
         }
 
         @Override

@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -27,6 +28,7 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -95,6 +97,12 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
+
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
  * This class accepts new connections and manages existing connections through
@@ -102,6 +110,8 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
  *
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
+
+    private static final int HANDSHAKE_BUFFER_SIZE = 16 * 1024;
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
@@ -245,6 +255,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
+        private SSLContext sslCtx;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -294,6 +305,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
+
+            try {
+                KeyStore ks = KeyStore.getInstance("JKS");
+                ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+                kmf.init(ks, "myk5yst15r5".toCharArray());
+                sslCtx = SSLContext.getInstance("TLS");
+                sslCtx.init(kmf.getKeyManagers(), null, null);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new IOException(e);
+            }
+
             m_running = true;
             String threadName = m_isAdmin ? "AdminPort connection acceptor" : "ClientPort connection acceptor";
             m_thread = new Thread( null, this, threadName, 262144);
@@ -315,9 +339,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Thread for Running authentication of client.
         class AuthRunnable implements Runnable {
             final SocketChannel m_socket;
+            final SSLEngine m_sslEngine;
 
-            AuthRunnable(SocketChannel socket) {
+            AuthRunnable(SocketChannel socket, SSLEngine sslEngine) {
                 this.m_socket = socket;
+                this.m_sslEngine = sslEngine;
             }
 
             @Override
@@ -327,7 +353,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -340,7 +366,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 m_socket,
                                                 handler,
                                                 0,
-                                                ReverseDNSPolicy.ASYNCHRONOUS);
+                                                ReverseDNSPolicy.ASYNCHRONOUS,
+                                                m_sslEngine);
                                 /*
                                  * If IV2 is enabled the logic initially enabling read is
                                  * in the started method of the InputHandler
@@ -350,7 +377,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         m_socket,
                                         handler,
                                         SelectionKey.OP_READ,
-                                        ReverseDNSPolicy.ASYNCHRONOUS);
+                                        ReverseDNSPolicy.ASYNCHRONOUS,
+                                        m_sslEngine);
                             }
                             success = true;
                         }
@@ -375,6 +403,149 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             }
+        }
+
+        private Object[] unwrap(SocketChannel socketChannel, SSLEngine engine, ByteBuffer myAppData, ByteBuffer peerAppData, ByteBuffer peerNetData) throws IOException {
+
+            ByteBuffer myPeerAppData = peerAppData;
+
+            // handle loss of connection
+            if (socketChannel.read(peerNetData) < 0) {
+
+                // if the ssl engine is already closed, just return null, handshaking has failed.
+                if (engine.isInboundDone() && engine.isOutboundDone()) {
+                    return null;
+                }
+                // otherwise, close the engine.
+                try {
+                    engine.closeInbound();
+                } catch (SSLException e) {
+                    // want to eat this as we're just closing the engine.
+                }
+                engine.closeOutbound();
+                return new Object[] {engine.getHandshakeStatus(), myPeerAppData};
+            }
+
+            // the typical unwrap logic.
+            peerNetData.flip();
+
+            SSLEngineResult.HandshakeStatus hs;
+            SSLEngineResult res;
+            try {
+                res = engine.unwrap(peerNetData, peerAppData);
+                peerNetData.compact();
+                hs = res.getHandshakeStatus();
+            } catch (SSLException e) {
+                System.err.println("unwrap: see ssl exception " + e.getMessage());
+                engine.closeOutbound();
+                return new Object[]{engine.getHandshakeStatus(), myPeerAppData};
+            }
+
+            SSLEngineResult.Status status = res.getStatus();
+            switch (status) {
+                case OK:
+                    break;
+                case BUFFER_OVERFLOW:
+                    ByteBuffer bigger = ByteBuffer.allocate(peerAppData.capacity() * 2);
+                    myPeerAppData = bigger;
+                    break;
+                case BUFFER_UNDERFLOW:
+                    // During handshake, this indicates that there's not yet data to read.  We'll stay
+                    // in this state until data shows up in peerNetData.
+                    break;
+                case CLOSED:
+                    if (engine.isOutboundDone()) {
+                        return null;
+                    } else {
+                        engine.closeOutbound();
+                        hs = engine.getHandshakeStatus();
+                    }
+                    break;
+            }
+            return new Object[]{hs, myPeerAppData};
+        }
+
+        private Object[] wrap(SocketChannel sc, SSLEngine engine, ByteBuffer myAppData, ByteBuffer myNetData) throws IOException {
+
+            ByteBuffer myMyNetData = myNetData;
+            SSLEngineResult res;
+            SSLEngineResult.HandshakeStatus hs;
+            SSLEngineResult.Status status;
+            try {
+                res = engine.wrap(myAppData, myNetData);
+                hs = res.getHandshakeStatus();
+            } catch (SSLException e) {
+                hostLog.fatal("Failed wrap in ssl handshake" + e.getMessage());
+                engine.closeOutbound();
+                return new Object[] {engine.getHandshakeStatus(), myMyNetData};
+            }
+            status = res.getStatus();
+            switch (status) {
+                case OK:
+                    myNetData.flip();
+                    while (myNetData.hasRemaining()) {
+                        sc.write(myNetData);
+                    }
+                    myNetData.compact();
+                    break;
+                case BUFFER_OVERFLOW:
+                    ByteBuffer bigger = ByteBuffer.allocate(myNetData.capacity() * 2);
+                    myMyNetData = bigger;
+                    break;
+                case BUFFER_UNDERFLOW:
+                    // There's nothing in myAppData.  This is a bug...
+                    throw new IOException("SSLEngine: nothing in myAppData when wrapping");
+                case CLOSED:
+                    // write out any remaining data...
+                    myNetData.flip();
+                    try {
+                        while (myNetData.hasRemaining()) {
+                            sc.write(myNetData);
+                        }
+                    } catch (IOException e) {
+                        // can safely eat/ignore this.
+                    }
+                    hs = engine.getHandshakeStatus();
+                    break;
+            }
+            return new Object[] {hs, myMyNetData};
+        }
+
+        private boolean handshake(SocketChannel socketChannel, SSLEngine engine)
+                throws IOException {
+
+            ByteBuffer myAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+            ByteBuffer myNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+            ByteBuffer peerAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+            ByteBuffer peerNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+
+            SSLEngineResult.HandshakeStatus hs = engine.getHandshakeStatus();
+            while (hs != null && hs != SSLEngineResult.HandshakeStatus.FINISHED && hs != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
+                switch (hs) {
+                    case NEED_UNWRAP:
+                        Object[] unwrapRes = unwrap(socketChannel, engine, myAppData, peerAppData, peerNetData);
+                        hs = (SSLEngineResult.HandshakeStatus) unwrapRes[0];
+                        peerAppData = (ByteBuffer) unwrapRes[1];
+                        break;
+                    case NEED_WRAP:
+                        Object[] wrapRes = wrap(socketChannel, engine, myAppData, myNetData);
+                        hs = (SSLEngineResult.HandshakeStatus) wrapRes[0];
+                        myNetData = (ByteBuffer) wrapRes[1];
+                        break;
+                    case NEED_TASK:
+                        Runnable runnable;
+                        while ((runnable = engine.getDelegatedTask()) != null) {
+                            runnable.run();
+                        }
+                        hs = engine.getHandshakeStatus();
+                        break;
+                    case FINISHED:
+                        break;
+                    case NOT_HANDSHAKING:
+                        break;
+                }
+            }
+            return hs != null;
         }
 
         @Override
@@ -430,7 +601,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    final AuthRunnable authRunnable = new AuthRunnable(socket);
+                    // do the handshaking here.
+                    socket.configureBlocking(false);
+
+                    SSLEngine engine = sslCtx.createSSLEngine();
+                    engine.setUseClientMode(false);
+                    engine.setNeedClientAuth(false);
+                    engine.beginHandshake();
+
+                    if (!handshake(socket, engine)) {
+                        throw new IOException("SSL handshake failed");
+                    }
+
+
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, engine);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -473,7 +657,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -697,7 +881,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin, sslEngine);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -732,8 +916,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final String m_username;
 
         public ClientInputHandler(String username,
-                                  boolean isAdmin)
+                                  boolean isAdmin,
+                                  SSLEngine sslEngine)
         {
+            super(sslEngine);
             m_username = username.intern();
             m_isAdmin = isAdmin;
         }
@@ -951,7 +1137,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
-         * @param now the current timestamp
          * @return true if the transaction is restarted successfully, false otherwise.
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
@@ -1339,7 +1524,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     /**
      *
-     * @param port
      * * return True if an error was generated and needs to be returned to the client
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) {

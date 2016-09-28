@@ -27,6 +27,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+
 /**
 *
 *  Provide a queue for ByteBuffers and DeferredSerializations and drain them to gathering ByteChannel.
@@ -76,20 +79,28 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
+    private final SSLEngine m_sslEngine;
+    private final boolean m_isSSLCcnfigured;
+    private  ByteBuffer m_encBuffer;
+
     NIOWriteStream(VoltPort port) {
-        this(port, null, null, null);
+        this(port, null, null, null, null);
     }
 
     NIOWriteStream (
             VoltPort port,
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
-            QueueMonitor monitor)
+            QueueMonitor monitor,
+            SSLEngine engine)
     {
         m_port = port;
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
+        m_sslEngine = engine;
+        m_isSSLCcnfigured = engine == null ? false : true;
+        m_encBuffer = ByteBuffer.allocate(32 * 1024);
     }
 
     /*
@@ -311,6 +322,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
     }
 
+    private ByteBuffer remainder = null;
+
     /**
      * Does the work of queueing addititional buffers that have been serialized
      * and choosing between gathering and regular writes to the channel. Also splits up very large
@@ -324,7 +337,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     int drainTo (final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
         try {
-            long rc = 0;
+            long rc;
             do {
                 /*
                  * Nothing to write
@@ -333,7 +346,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     return bytesWritten;
                 }
 
-                ByteBuffer buffer = null;
+                ByteBuffer buffer;
                 if (m_currentWriteBuffer == null) {
                     m_currentWriteBuffer = m_queuedBuffers.poll();
                     buffer = m_currentWriteBuffer.b();
@@ -342,21 +355,58 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     buffer = m_currentWriteBuffer.b();
                 }
 
-                rc = channel.write(buffer);
-
-                //Discard the buffer back to a pool if no data remains
-                if (buffer.hasRemaining()) {
-                    if (!m_hadBackPressure) {
-                        backpressureStarted();
-                    }
+                ByteBuffer process;
+                if (remainder != null) {
+                    process = ByteBuffer.allocate(remainder.remaining() + buffer.remaining());
+                    process.put(remainder);
+                    process.put(buffer);
+                    process.flip();
+                    remainder = null;
                 } else {
-                    m_currentWriteBuffer.discard();
-                    m_currentWriteBuffer = null;
+                    process = buffer;
+                }
+
+                while (true) {
+                    rc = 0;
+                    if (process.remaining() == 0) {
+                        break;
+                    }
+
+                    if (process.remaining() < 4) {
+                        remainder = ByteBuffer.allocate(process.remaining());
+                        remainder.put(process);
+                        remainder.flip();
+                        break;
+                    }
+
+                    process.mark();
+                    int messageLen = process.getInt();
+                    if (process.remaining() < messageLen) {
+                        process.reset();
+                        remainder = ByteBuffer.allocate(process.remaining());
+                        remainder.put(process);
+                        remainder.flip();
+                        break;
+                    }
+
+                    ByteBuffer plainTextMessage = ByteBuffer.allocate(messageLen);
+                    process.get(plainTextMessage.array());
+
+                    // encrypt
+                    m_encBuffer.clear();
+                    wrapMessage(plainTextMessage);
+                    ByteBuffer sendMessage = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
+                    sendMessage.putInt(m_encBuffer.remaining());
+                    sendMessage.put(m_encBuffer);
+                    sendMessage.flip();
+                    rc = channel.write(sendMessage);
+                    bytesWritten += rc;
                     m_messagesWritten++;
                 }
-                bytesWritten += rc;
 
-            } while (rc > 0);
+                m_currentWriteBuffer.discard();
+                m_currentWriteBuffer = null;
+            } while (rc > 0 || remainder != null);
         } finally {
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
@@ -378,4 +428,25 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
         return bytesWritten;
     }
+
+    private void wrapMessage(ByteBuffer unwrapped) throws IOException {
+        while (true) {
+            SSLEngineResult result = m_sslEngine.wrap(unwrapped, m_encBuffer);
+            switch (result.getStatus()) {
+                case OK:
+                    m_encBuffer.flip();
+                    return;
+                case BUFFER_OVERFLOW:
+                    int newCapacity = m_encBuffer.capacity() * 2;
+                    ByteBuffer bigger = ByteBuffer.allocate(newCapacity);
+                    m_encBuffer = bigger;
+                    break;  // try again
+                case BUFFER_UNDERFLOW:
+                    throw new IOException("Underflow on ssl wrap of buffer.");
+                case CLOSED:
+                    throw new IOException("SSL engine is closed on ssl wrap of buffer.");
+            }
+        }
+    }
+
 }

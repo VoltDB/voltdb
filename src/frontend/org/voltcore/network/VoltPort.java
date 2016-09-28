@@ -28,6 +28,8 @@ import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 
+import javax.net.ssl.SSLEngine;
+
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
@@ -86,12 +88,15 @@ public class VoltPort implements Connection
     private volatile String m_remoteHostAndAddressAndPort;
     private String m_toString = null;
 
+    private final SSLEngine m_sslEngine;
+
     /** Wrap a socket with a VoltPort */
     public VoltPort(
             VoltNetwork network,
             InputHandler handler,
             InetSocketAddress remoteAddress,
-            NetworkDBBPool pool) {
+            NetworkDBBPool pool,
+            SSLEngine engine) {
         m_network = network;
         m_handler = handler;
         m_remoteSocketAddress = remoteAddress;
@@ -99,6 +104,7 @@ public class VoltPort implements Connection
         m_pool = pool;
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
+        m_sslEngine = engine;
     }
 
     /**
@@ -141,7 +147,8 @@ public class VoltPort implements Connection
                 this,
                 m_handler.offBackPressure(),
                 m_handler.onBackPressure(),
-                m_handler.writestreamMonitor());
+                m_handler.writestreamMonitor(),
+                m_sslEngine);
         m_interestOps = key.interestOps();
     }
 

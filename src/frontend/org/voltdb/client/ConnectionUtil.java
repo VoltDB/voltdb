@@ -18,10 +18,12 @@
 package org.voltdb.client;
 
 import java.io.EOFException;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
@@ -35,6 +37,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
 import javax.security.auth.Subject;
 
 import org.ietf.jgss.GSSContext;
@@ -62,6 +69,11 @@ import com.google_voltpatches.common.collect.FluentIterable;
  */
 public class ConnectionUtil {
 
+    private static final int HANDSHAKE_BUFFER_SIZE = 16 * 1024;
+    private static ByteBuffer myAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+    private static ByteBuffer myNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+    private static ByteBuffer peerAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
+    private static ByteBuffer peerNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
 
     private static class TF implements ThreadFactory {
         @Override
@@ -169,11 +181,141 @@ public class ConnectionUtil {
                 .first();
     }
 
+    private static SSLEngineResult.HandshakeStatus unwrap(SocketChannel socketChannel, SSLEngine engine) throws IOException {
+
+        // handle loss of connection
+        if (socketChannel.read(peerNetData) < 0) {
+
+            // if the ssl engine is already closed, just return null, handshaking has failed.
+            if (engine.isInboundDone() && engine.isOutboundDone()) {
+                return null;
+            }
+            // otherwise, close the engine.
+            try {
+                engine.closeInbound();
+            } catch (SSLException e) {
+                // want to eat this as we're just closing the engine.
+            }
+            engine.closeOutbound();
+            return engine.getHandshakeStatus();
+        }
+
+        // the typical unwrap logic.
+        peerNetData.flip();
+
+        SSLEngineResult.HandshakeStatus hs;
+        SSLEngineResult res;
+        try {
+            res = engine.unwrap(peerNetData, peerAppData);
+            peerNetData.compact();
+            hs = res.getHandshakeStatus();
+        } catch (SSLException e) {
+            // TODO: need to log something like - ("unwrap: see ssl exception " + e.getMessage());
+            engine.closeOutbound();
+            return engine.getHandshakeStatus();
+        }
+
+        SSLEngineResult.Status status = res.getStatus();
+        switch (status) {
+            case OK:
+                break;
+            case BUFFER_OVERFLOW:
+                ByteBuffer bigger = ByteBuffer.allocate(peerAppData.capacity() * 2);
+                peerAppData = bigger;
+                break;
+            case BUFFER_UNDERFLOW:
+                // During handshake, this indicates that there's not yet data to read.  We'll stay
+                // in this state until data shows up in peerNetData.
+                break;
+            case CLOSED:
+                if (engine.isOutboundDone()) {
+                    return null;
+                } else {
+                    engine.closeOutbound();
+                    hs = engine.getHandshakeStatus();
+                }
+                break;
+        }
+        return hs;
+    }
+
+    private static SSLEngineResult.HandshakeStatus wrap(SocketChannel sc, SSLEngine engine) throws IOException {
+        SSLEngineResult res;
+        SSLEngineResult.HandshakeStatus hs;
+        SSLEngineResult.Status status;
+        try {
+            res = engine.wrap(myAppData, myNetData);
+            hs = res.getHandshakeStatus();
+        } catch (SSLException e) {
+            // TODO: log something here
+            engine.closeOutbound();
+            return engine.getHandshakeStatus();
+        }
+        status = res.getStatus();
+        switch (status) {
+            case OK:
+                myNetData.flip();
+                while (myNetData.hasRemaining()) {
+                    sc.write(myNetData);
+                }
+                myNetData.compact();
+                break;
+            case BUFFER_OVERFLOW:
+                ByteBuffer bigger = ByteBuffer.allocate(myNetData.capacity() * 2);
+                myNetData = bigger;
+                break;
+            case BUFFER_UNDERFLOW:
+                // There's nothing in myAppData.  This is a bug...
+                throw new IOException("SSLEngine: nothing in myAppData when wrapping");
+            case CLOSED:
+                // write out any remaining data...
+                myNetData.flip();
+                try {
+                    while (myNetData.hasRemaining()) {
+                        sc.write(myNetData);
+                    }
+                } catch (IOException e) {
+                    // can safely eat/ignore this.
+                }
+                hs = engine.getHandshakeStatus();
+                break;
+        }
+        return hs;
+    }
+
+    private static boolean handshake(SocketChannel socketChannel, SSLEngine engine)
+            throws IOException {
+
+        SSLEngineResult.HandshakeStatus hs = engine.getHandshakeStatus();
+        while (hs != null && hs != SSLEngineResult.HandshakeStatus.FINISHED && hs != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
+            switch (hs) {
+                case NEED_UNWRAP:
+                    hs = unwrap(socketChannel, engine);
+                    break;
+                case NEED_WRAP:
+                    hs = wrap(socketChannel, engine);
+                    break;
+                case NEED_TASK:
+                    Runnable runnable;
+                    while ((runnable = engine.getDelegatedTask()) != null) {
+                        runnable.run();
+                    }
+                    hs = engine.getHandshakeStatus();
+                    break;
+                case FINISHED:
+                    break;
+                case NOT_HANDSHAKING:
+                    break;
+            }
+        }
+        return hs != null;
+    }
+
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
             byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme)
     throws IOException {
-        Object returnArray[] = new Object[3];
+        Object returnArray[] = new Object[4];
         boolean success = false;
         if (addr.isUnresolved()) {
             throw new java.net.UnknownHostException(addr.getHostName());
@@ -185,6 +327,28 @@ public class ConnectionUtil {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
+
+        aChannel.configureBlocking(false);
+        // handshake here.
+        SSLEngine engine;
+        try {
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, "myk5yst15r5".toCharArray());
+            SSLContext sslCtx = SSLContext.getInstance("TLS");
+            sslCtx.init(kmf.getKeyManagers(), null, null);
+            engine = sslCtx.createSSLEngine("client", 5432);
+            engine.setUseClientMode(true);
+            engine.beginHandshake();
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
+
+        if (!handshake(aChannel, engine)) {
+            throw new IOException("SSL handshake failed");
+        }
+
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
         try {
@@ -306,6 +470,7 @@ public class ConnectionUtil {
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
+            returnArray[3] = engine;
 
             aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);

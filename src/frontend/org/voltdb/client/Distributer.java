@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
@@ -396,7 +397,9 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[]) {}
+        public NodeConnection(long ids[], SSLEngine sslEngine) {
+            super(sslEngine);
+        }
 
         /*
          * NodeConnection uses ignoreBackpressure to get rate limiter to not
@@ -586,7 +589,6 @@ class Distributer {
         /**
          * Update the procedures statistics
          * @param procName Name of procedure being updated
-         * @param roundTrip round trip from client queued to client response callback invocation
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
          * @param abort true of the procedure was aborted
          * @param failure true if the procedure failed
@@ -939,9 +941,10 @@ class Distributer {
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
+        final SSLEngine sslEngine = (SSLEngine)socketChannelAndInstanceIdAndBuildString[3];
 
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn);
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, sslEngine);
+        Connection c = m_network.registerChannel( aChannel, cxn, sslEngine);
         cxn.m_connection = c;
 
         synchronized (this) {

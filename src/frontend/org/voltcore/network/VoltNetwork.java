@@ -90,6 +90,8 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
 
+import javax.net.ssl.SSLEngine;
+
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable, IOStatsIntf
 {
@@ -161,7 +163,8 @@ class VoltNetwork implements Runnable, IOStatsIntf
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps,
-            final ReverseDNSPolicy dns) throws IOException {
+            final ReverseDNSPolicy dns,
+            final SSLEngine sslEngine) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
@@ -173,7 +176,8 @@ class VoltNetwork implements Runnable, IOStatsIntf
                                 VoltNetwork.this,
                                 handler,
                                 (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
-                                m_pool);
+                                m_pool,
+                                sslEngine);
                 port.registering();
 
                 /*
