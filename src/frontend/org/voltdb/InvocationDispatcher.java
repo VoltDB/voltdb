@@ -263,10 +263,12 @@ public final class InvocationDispatcher {
         }
         // Check for pause mode restrictions before proceeding any further
         if (!allowPauseModeExecution(handler, catProc, task)) {
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0], "Server is paused and is available in read-only mode - please try again later.",
-                    task.clientHandle);
-        }
+            String msg = "Server is paused and is available in read-only mode - please try again later.";
+            if (VoltDB.instance().isShuttingdown()) {
+                msg = "Server shutdown in progress - new transactions are not processed.";
+            }
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg,task.clientHandle);
+         }
 
         ClientResponseImpl error = null;
         //Check permissions
@@ -402,7 +404,7 @@ public final class InvocationDispatcher {
 
         // Verify that admin mode sysprocs are called from a client on the
         // admin port, otherwise return a failure
-        if (("@Pause".equals(procName) || "@Resume".equals(procName)) && !handler.isAdmin()) {
+        if (("@Pause".equals(procName) || "@Resume".equals(procName) || "@PrepareShutdown".equals(procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
                     procName + " is not available to this client",
                     task.clientHandle);
@@ -473,6 +475,11 @@ public final class InvocationDispatcher {
     }
 
     private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
+        //@Statistics and  @Shutdown are allowed in pause/shutdown mode
+        if (VoltDB.instance().isShuttingdown()) {
+            return procedure.getAllowedinshutdown();
+        }
+
         if (VoltDB.instance().getMode() != OperationMode.PAUSED || handler.isAdmin()) {
             return true;
         }
