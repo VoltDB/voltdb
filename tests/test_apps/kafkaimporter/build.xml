@@ -13,6 +13,7 @@
     <property name="jar.dir"                value="${basedir}"/>
     <property name="voltdbroot.dir"         value="${basedir}/voltdbroot"/>
     <property name="log.dir"                value="${basedir}/log"/>
+    <property name="external.jars"          value="/home/test/jars"/>
 
     <target name="all" depends="client, procedures, formatter"/>
 
@@ -38,7 +39,7 @@
        <fileset dir="${basedir}">
            <include name="gson-2.2.2.jar"/>
        </fileset>
-       <fileset dir="${basedir}">
+       <fileset dir="${external.jars}">
            <include name="json-simple-1.1.1.jar"/>
        </fileset>
     </path>
@@ -77,7 +78,7 @@
     </target>
 
 	<target name="formatter" depends="formatter-compile">
-        <copy file="json-simple-1.1.1.jar" todir="${formatterclasses.dir}"/>
+        <copy file="${external.jars}/json-simple-1.1.1.jar" todir="${formatterclasses.dir}"/>
         <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
             <manifest>
                 <attribute name="Bundle-Activator" value="custom_formatter.formatter.ExampleFormatterFactory" />
@@ -90,6 +91,6 @@
             </manifest>
         </jar>
         <copy file="formatter.jar" todir="${basedir}/../../../bundles"/>
-        <copy file="formatter.jar" todir="${basedir}/../../../../pro/obj/pro/voltdb-ent-6.6/bundles"/>
+        <!-- <copy file="formatter.jar" todir="${basedir}/../../../../pro/obj/pro/voltdb-ent-6.6/bundles"/> -->
     </target>
 </project>
