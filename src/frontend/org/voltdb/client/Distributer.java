@@ -1529,7 +1529,7 @@ class Distributer {
         m_createConnectionUponTopoChangeInProgress.set(true);
         ImmutableSet<Integer> unconnected = m_unconnectedHosts.get();
         if (unconnected != null && !unconnected.isEmpty()) {
-            m_unconnectedHosts.set(ImmutableSet.copyOf(new HashSet<Integer>()));
+            m_unconnectedHosts.compareAndSet(unconnected, ImmutableSet.copyOf(new HashSet<Integer>()));
             for (Integer host : unconnected) {
                 if (!isHostConnected(host)) {
                     for (ClientStatusListenerExt csl : m_listeners) {

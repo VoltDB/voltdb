@@ -117,6 +117,11 @@ public final class ClientImpl implements Client {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
+
+        if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
+            throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
+        }
+
         m_distributer = new Distributer(
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
