@@ -1565,7 +1565,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to create " + VoltZK.sitesPerHost + " node to Zookeeper, dying", false, e);
         }
-        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, "host_" + m_messenger.getHostId());
+        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, String.valueOf(m_messenger.getHostId()));
         try {
             ByteBuffer b = ByteBuffer.allocate(4);
             b.putInt(sitesperhost);
@@ -1590,13 +1590,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         else if (!startAction.doesRejoin()) {
             Map<Integer, Integer> sphMap = new HashMap<>();
             try {
-                List<String> children;
-                    children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
+                List<String> children = m_messenger.getZK().getChildren(VoltZK.sitesPerHost, false);
                 for (String child : children) {
                     byte[] payload = m_messenger.getZK().getData(
                             ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, new Stat());
                     int sitesperhost = ByteBuffer.wrap(payload).getInt();
-                    int hostId = Integer.parseInt(child.split("_")[1]);
+                    int hostId = Integer.parseInt(child);
                     sphMap.put(hostId, sitesperhost);
                 }
             } catch (Exception e) {
@@ -2443,15 +2442,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (m_myHostId == 0) {
             m_clusterSettings.store(m_messenger.getZK());
         }
-//        ClusterConfig config = new ClusterConfig(
-//                m_clusterSettings.get().hostcount(),
-//                clusterType.getSitesperhost(),
-//                clusterType.getKfactor()
-//                );
-//
-//        if (!config.validate()) {
-//            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
-//        }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
     }
