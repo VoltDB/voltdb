@@ -31,6 +31,21 @@ class Host(dict):
         except IndexError:
             self.abort_func('Attribute "%s" not present for host.' % name)
 
+    def get_admininterface(self):
+        """
+        Return the likely admininterface. The precedence rules are the order that
+        we're checking.
+        Implementation note: ipaddress will be set to externalinterface, if set
+        Otherwise it may be any interface.
+        """
+
+        if 'publicinterface' in self and self['publicinterface']:
+            return self['publicinterface']
+        if 'admininterface' in self and self['admininterface']:
+            return self['admininterface']
+        if 'ipaddress' in self and self['ipaddress']:
+            return self['ipaddress']
+        return None
 
 class Hosts(object):
 
@@ -70,6 +85,7 @@ class Hosts(object):
         VOLT.StringArgument('target_host', 'the target HOST name or address'),
     ),
 )
+
 def stop(runner):
 
     # Exec @SystemInformation to find out about the cluster.
@@ -93,8 +109,9 @@ def stop(runner):
         user_info = ', user: %s' % runner.opts.username
     else:
         user_info = ''
-    runner.info('Connecting to host: %s:%d%s' % (chost.hostname, chost.adminport, user_info))
-    runner.voltdb_connect(chost.hostname, chost.adminport,
+    runner.info('Connecting to %s:%d%s (%s) to issue "stop" command' %
+                (chost.get_admininterface(), chost.adminport, user_info, chost.hostname))
+    runner.voltdb_connect(chost.get_admininterface(), chost.adminport,
                           runner.opts.username, runner.opts.password)
 
     # Stop the requested host using exec @StopNode HOST_ID
