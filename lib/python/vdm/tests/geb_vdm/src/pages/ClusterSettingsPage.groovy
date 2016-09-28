@@ -88,6 +88,7 @@ class ClusterSettingsPage extends Page {
         overview { module OverviewModule }
         directories { module DirectoriesModule }
         dr { module DatabaseReplicationModule }
+        selectServer                 {$("#divDbManager > div:nth-child(7) > div > div > div.rightSideServ > form > select")}
     }
 
     static at = {

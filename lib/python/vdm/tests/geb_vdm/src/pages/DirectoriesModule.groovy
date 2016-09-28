@@ -30,7 +30,6 @@ class DirectoriesModule extends Module {
         exportOverflowField         { $(id:"txtExportOverflowDir") }
         commandLogField             { $(id:"txtCommandLogDir") }
         commandLogSnapshotsField    { $(id:"txtCommandLogSnapDir") }
-        selectServer                 {$(class:"defaultServ")}
 
     }
 }
