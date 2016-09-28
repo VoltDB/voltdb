@@ -755,4 +755,13 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void onSyncSnapshotCompletion() {
     }
+
+    @Override
+    public boolean isShuttingdown() {
+        return false;
+    }
+
+    @Override
+    public void setShuttingdown(boolean shuttingdown) {
+    }
 }

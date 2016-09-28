@@ -86,6 +86,17 @@ public interface VoltDBInterface
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
+    /**
+     * Check if the host is in prepare-shutting down state.
+     */
+    public boolean isShuttingdown();
+
+    /**
+     * Set the host to be in shutting down state.When a host is in teh state of being shut down.
+     * All reads and writes except the system stored procedures which are allowed as
+     *specified in SystemProcedureCatalog will be blocked.
+     */
+    public void setShuttingdown(boolean shuttingdown);
     boolean isMpSysprocSafeToExecute(long txnId);
 
     public void startSampler();
