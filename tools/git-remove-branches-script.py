@@ -20,7 +20,8 @@ import time
 import jiratools
 
 # set exclusions if there are any branches that should not be listed
-exclusions = ['master']
+exclusions = ['^master','^release-[0-9.]+\.x$']
+combined_regex= '(' + ')|('.join(exclusions) + ')'
 jira_url = 'https://issues.voltdb.com/'
 gitshowmap = \
     {
@@ -49,7 +50,7 @@ def get_branch_list(merged):
 
     #Filter others from list
     origin_exclusions = ['origin/' + b for b in exclusions]
-    return  list(set(branches) - set(origin_exclusions))
+    return [b for b in branches if not re.match(combined_regex,b.split('origin/')[-1])]
 
 def make_delete_branches_script(branch_infos, dry_run):
     other_args = ''
@@ -62,7 +63,7 @@ def make_delete_branches_script(branch_infos, dry_run):
             (b, other_args)
         comment = make_comment(bi)
         print
-        print comment
+        print comment.encode('utf-8')
         print cmd
 
 def make_comment(bi):
