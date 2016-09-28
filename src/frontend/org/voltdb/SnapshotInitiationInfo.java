@@ -72,7 +72,7 @@ public class SnapshotInitiationInfo
                 parseLegacyParams(params);
                 break;
             case 1:
-                parseJsonParams(params);
+                checkNonceValidity = parseJsonParams(params);
                 break;
             default:
                 m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
@@ -83,8 +83,8 @@ public class SnapshotInitiationInfo
                 break;
         }
 
-        if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",")) && m_nonce.startsWith(MAGIC_NONCE_PREFIX)) {
-            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
+        if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
+            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or start with " + MAGIC_NONCE_PREFIX);
         }
     }
 
@@ -143,8 +143,9 @@ public class SnapshotInitiationInfo
      *
      *   format: one of 'native' or 'csv'.
      */
-    private void parseJsonParams(Object[] params) throws Exception
+    private boolean parseJsonParams(Object[] params) throws Exception
     {
+        boolean checkValidity = true;
         if (params[0] == null) {
             throw new Exception("@SnapshotSave JSON blob is null");
         }
@@ -166,7 +167,7 @@ public class SnapshotInitiationInfo
                             "command logging is not present or enabled.");
                 }
                 // for CL truncation, don't care about any of the rest of the blob.
-                return;
+                return checkValidity;
             }
             else {
                 throw new Exception("Unknown snapshot save service type: " + service);
@@ -200,6 +201,8 @@ public class SnapshotInitiationInfo
             }
         } else {
             m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
+            //This is a valid JSON
+            checkValidity = false;
         }
 
         Object blockingObj = false;
@@ -230,6 +233,7 @@ public class SnapshotInitiationInfo
                     " and should be one of [\"native\" | \"csv\"]");
         }
         m_data = (String)params[0];
+        return checkValidity;
     }
 
     public String getPath()
