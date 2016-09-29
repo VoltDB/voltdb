@@ -163,6 +163,7 @@ public class StatementPartitioning implements Cloneable{
     private StatementPartitioning(boolean inferPartitioning, boolean forceSP) {
         m_inferPartitioning = inferPartitioning;
         m_forceSP = forceSP;
+        //* enable to debug */ System.out.println("DEBUG: StatementPartitioning(" + m_inferPartitioning + ", " + m_forceSP + ")");
     }
 
     public static StatementPartitioning forceSP() {
@@ -228,6 +229,7 @@ public class StatementPartitioning implements Cloneable{
      */
     public void addPartitioningExpression(String fullColumnName, AbstractExpression constExpr,
             VoltType valueType) {
+        //* enable to debug */ System.out.println("DEBUG: addPartitioningExpression(" + fullColumnName + ", " + constExpr + ")");
         if (m_fullColumnName == null) {
             m_fullColumnName = fullColumnName;
         }
@@ -384,9 +386,9 @@ public class StatementPartitioning implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
-            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
-    {
+    public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> scans,
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence) {
+        //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess w/ scans:" + scans.size() + " filters:" + valueEquivalence.size());
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
@@ -399,7 +401,7 @@ public class StatementPartitioning implements Cloneable{
         boolean subqueryHasReceiveNode = false;
         boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
-        for (StmtTableScan tableScan : collection) {
+        for (StmtTableScan tableScan : scans) {
             // Replicated tables don't need filter coverage.
             if (tableScan.getIsReplicated()) {
                 continue;
@@ -470,6 +472,7 @@ public class StatementPartitioning implements Cloneable{
         } // end for each table StmtTableScan in the collection
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
+        //* enable to debug */ System.out.println("DEBUG: analyze4MPAccess found: " + m_countOfIndependentlyPartitionedTables + " = " + eqSets.size() + " + " + unfilteredPartitionKeyCount);
         if (m_countOfIndependentlyPartitionedTables > 1) {
             setJoinValid(false);
             setJoinInvalidReason("This query is not plannable.  "

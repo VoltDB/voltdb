@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
@@ -44,8 +46,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
-
-import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -144,6 +144,12 @@ public class PlannerTestCase extends TestCase {
         return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
     }
 
+    protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, m_defaultParamCount,
+                planForSinglePartitionFalse, m_noJoinOrder);
+    }
+
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
@@ -166,15 +172,22 @@ public class PlannerTestCase extends TestCase {
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder) {
-        // Yes, we ARE assuming that test queries don't contain quoted question marks.
-        int paramCount = StringUtils.countMatches(sql, "?");
-        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
+        try {
+            // Yes, we ARE assuming that test queries don't contain quoted question marks.
+            int paramCount = StringUtils.countMatches(sql, "?");
+            return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
+        }
+        catch (PlanningErrorException pe) {
+            fail("Query: '" + sql + "' threw " + pe);
+            return null; // dead code.
+        }
     }
 
     /** A helper here where the junit test can assert success */
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder) {
+        //* enable to debug */ System.out.println("DEBUG: compileWithJoinOrderToFragments(\"" + sql + "\", " + planForSinglePartition + ", \"" + joinOrder + "\")");
         List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
