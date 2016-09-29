@@ -23,6 +23,7 @@
 #include "common/executorcontext.hpp"
 #include "indexes/tableindex.h"
 #include "TableCatalogDelegate.hpp"
+#include "temptable.h"
 
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(TableRef);
@@ -47,7 +48,7 @@ namespace voltdb {
         setUpBackedTuples();
         m_dirty = false;
         if (needsCatchUp) {
-            catchUpWithExistingData(catchUpFallible);
+            catchUpWithExistingData(engine, catchUpFallible);
         }
         /* // enable to debug
         std::cout << "DEBUG: join view initially there are "
@@ -174,17 +175,17 @@ namespace voltdb {
     // to catch up with the existing data.
     //TODO: *non-grouped views could instead set up a hard-coded initial
     // row as they do in the single-table case to avoid querying empty tables.
-    void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
+    void MaterializedViewHandler::catchUpWithExistingData(VoltDBEngine *engine, bool fallible) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        auto executorList = m_createQueryExecutorVector->getExecutorList();
-        Table *viewContent = ec->executeExecutors(executorList);
+        UniqueTempTableResult viewContent = engine->executePlanFragment(m_createQueryExecutorVector.get());
         TableIterator ti = viewContent->iterator();
         TableTuple tuple(viewContent->schema());
         while (ti.next(tuple)) {
             //* enable to debug */ std::cout << "DEBUG: inserting catchup tuple into " << m_destTable->name() << std::endl;
             m_destTable->insertPersistentTuple(tuple, fallible, true);
         }
-        ec->cleanupExecutorsForSubquery(executorList);
+
+        ec->cleanupAllExecutors();
     }
 
     void MaterializedViewHandler::setUpBackedTuples() {
@@ -268,7 +269,7 @@ namespace voltdb {
         ScopedDeltaTableContext dtContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
-        Table *delta = ec->executeExecutors(executorList);
+        UniqueTempTableResult delta = ec->executeExecutors(executorList);
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
         while (ti.next(deltaTuple)) {
@@ -284,7 +285,6 @@ namespace voltdb {
                 m_destTable->insertPersistentTuple(deltaTuple, fallible);
             }
         }
-        ec->cleanupExecutorsForSubquery(executorList);
     }
 
     void MaterializedViewHandler::mergeTupleForDelete(const TableTuple &deltaTuple) {
@@ -369,7 +369,7 @@ namespace voltdb {
         params[m_groupByColumnCount] = m_existingTuple.getNValue(columnIndex);
         // Then we get the executor vectors we need to run:
         vector<AbstractExecutor*> executorList = m_minMaxExecutorVectors[minMaxColumnIndex]->getExecutorList();
-        Table *resultTable = ec->executeExecutors(executorList);
+        UniqueTempTableResult resultTable = ec->executeExecutors(executorList);
         TableIterator ti = resultTable->iterator();
         TableTuple resultTuple(resultTable->schema());
         if (ti.next(resultTuple)) {
@@ -379,7 +379,6 @@ namespace voltdb {
         for (int i=0; i<=m_groupByColumnCount; i++) {
             params[i] = backups[i];
         }
-        ec->cleanupExecutorsForSubquery(executorList);
         return newValue;
     }
 
@@ -388,7 +387,7 @@ namespace voltdb {
         ScopedDeltaTableContext *dtContext = new ScopedDeltaTableContext(sourceTable);
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
-        Table *delta = ec->executeExecutors(executorList);
+        UniqueTempTableResult delta = ec->executeExecutors(executorList);
         TableIterator ti = delta->iterator();
         TableTuple deltaTuple(delta->schema());
         // The min/max value may need to be re-calculated, so we should terminate the delta table mode early
@@ -415,7 +414,6 @@ namespace voltdb {
                                                             m_updatableIndexList, fallible);
             }
         }
-        ec->cleanupExecutorsForSubquery(executorList);
     }
 
 } // namespace voltdb

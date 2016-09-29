@@ -160,6 +160,25 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t uniqueId,
                                  int64_t undoToken);
 
+        /**
+         * Execute a single, top-level plan fragment.  This method is
+         * used both internally to execute fragments in a batch, and
+         * by clients that execute fragments outside of a stored
+         * procedure context, e.g., when populating a view during a
+         * catalog update.
+         *
+         * This method will produce a unique_ptr-like wrapper around a
+         * temp table, that will automatically delete the contents of
+         * the table when it goes out of scope.
+         *
+         * Callers of this method should take care to call
+         * ExecutorContext::cleanupAllExecutors when finished, since
+         * if the executed fragment may have produced cached
+         * subqueries.
+         */
+        UniqueTempTableResult executePlanFragment(ExecutorVector* executorVector,
+                                                  int64_t* tuplesModified = NULL);
+
         int getUsedParamcnt() const { return m_usedParamcnt; }
 
         // Created to transition existing unit tests to context abstraction.
@@ -452,8 +471,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 int64_t uniqueId,
                                 bool first,
                                 bool last);
-
-        void executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified);
 
         /**
          * Set up the vector of executors for a given fragment id.

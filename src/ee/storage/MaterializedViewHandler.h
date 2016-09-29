@@ -120,7 +120,7 @@ private:
     // This is called to catch up with the existing data in the source tables.
     // It is useful when the view is created after the some data was inserted into the
     // source table(s).
-    void catchUpWithExistingData(bool fallible);
+    void catchUpWithExistingData(VoltDBEngine* engine, bool fallible);
 
     // Find in the view table (m_destTable) for the row that has the same group-by keys as
     // the deltaTuple.

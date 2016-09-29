@@ -472,8 +472,20 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         serializeException(e);
         m_currExecutorVec = NULL;
         m_currentInputDepId = -1;
+        m_executorContext->cleanupAllExecutors();
         return ENGINE_ERRORCODE_ERROR;
     }
+
+    // Most temp table state is cleaned up automatically, but for
+    // subqueries, some results are cached to get better performance.
+    // Clean this up now.
+    m_executorContext->cleanupAllExecutors();
+
+    // If we get here, we've completed execution successfully, or
+    // recovered after an error.  In any case, we should be able to
+    // assert that temp tables are now cleared.
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
+                                   "Output temp tables not cleaned up after execution");
 
     m_currExecutorVec = NULL;
     m_currentInputDepId = -1;
@@ -505,7 +517,8 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-void VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified) {
+UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified) {
+    UniqueTempTableResult result;
     // In version 5.0, fragments may trigger execution of other fragments.
     // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
     // This method only executes top-level fragments.
@@ -518,18 +531,21 @@ void VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* 
     try {
         // Launch the target plan through its top-most executor list.
         executorVector->setupContext(m_executorContext);
-        m_executorContext->executeExecutors(0);
-        m_executorContext->cleanupAllExecutors();
+        result = m_executorContext->executeExecutors(0);
     }
     catch (const SerializableEEException &e) {
         resetExecutionMetadata(executorVector);
         throw;
     }
 
-    *tuplesModified = m_tuplesModifiedStack.top();
+    if (tuplesModified != NULL) {
+        *tuplesModified = m_tuplesModifiedStack.top();
+    }
+
     resetExecutionMetadata(executorVector);
 
     VOLT_DEBUG("Finished executing successfully.");
+    return result;
 }
 
 void VoltDBEngine::resetExecutionMetadata(ExecutorVector* executorVector) {
@@ -538,12 +554,6 @@ void VoltDBEngine::resetExecutionMetadata(ExecutorVector* executorVector) {
         m_tuplesModifiedStack.pop();
     }
     assert (m_tuplesModifiedStack.size() == 0);
-
-    // If we get here, we've completed execution successfully, or
-    // recovered after an error.  In any case, we should be able to
-    // assert that temp tables are now cleared.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
-                                   "Output temp tables not cleaned up after execution");
 
     executorVector->resetLimitStats();
 }
@@ -2043,7 +2053,7 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
         m_tuplesModifiedStack.pop();
         throw;
     }
-    m_executorContext->cleanupAllExecutors();
+
     // restore original DML statement state.
     m_currExecutorVec->setupContext(m_executorContext);
     m_tuplesModifiedStack.pop();
