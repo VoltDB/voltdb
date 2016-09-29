@@ -453,6 +453,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 bool first,
                                 bool last);
 
+        void executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified);
+
         /**
          * Set up the vector of executors for a given fragment id.
          * Get the vector from the cache if the fragment id is there.
@@ -462,7 +464,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void resetExecutionMetadata();
+        void resetExecutionMetadata(ExecutorVector* executorVector);
 
         // -------------------------------------------------
         // Data Members
@@ -470,7 +472,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** True if any fragments in a batch have modified any tuples */
         bool m_dirtyFragmentBatch;
         int m_currentIndexInBatch;
-        int64_t m_allTuplesScanned;
         int64_t m_tuplesProcessedInBatch;
         int64_t m_tuplesProcessedInFragment;
         int64_t m_tuplesProcessedSinceReport;
@@ -558,9 +559,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // n.b. these are 8k each, should be boost shared arrays?
         int64_t m_batchFragmentIdsContainer[MAX_BATCH_COUNT];
         int64_t m_batchDepIdsContainer[MAX_BATCH_COUNT];
-
-        /** number of plan fragments executed so far (diagnostic?) */
-        int m_pfCount;
 
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods
