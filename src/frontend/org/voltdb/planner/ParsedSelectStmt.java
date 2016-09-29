@@ -835,11 +835,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             //
             WindowedExpression windowedExpression = m_windowedExpressions.get(0);
             List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
-            switch (windowedExpression.getExpressionType()) {
+            ExpressionType exprType = windowedExpression.getExpressionType();
+            switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
             case AGGREGATE_WINDOWED_DENSE_RANK:
                 if (orderByExpressions.size() == 0) {
-                    String aggName = ExpressionType.getWindowedAggregateName(windowedExpression.getExpressionType());
+                    String aggName = exprType.symbol().toUpperCase();
                     throw new PlanningErrorException(
                             String.format("Windowed %s function call expressions require an ORDER BY specification.", aggName));
                 }
@@ -850,6 +851,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
                     throw new PlanningErrorException("Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                }
+                break;
+            default:
+                {
+                    String opName = (exprType == null) ? "NULL" : exprType.symbol();
+                    throw new PlanningErrorException("Unknown windowed aggregate function type: " + opName);
                 }
             }
         }

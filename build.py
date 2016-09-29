@@ -109,16 +109,14 @@ if CTX.compilerName() == 'gcc':
     elif (CTX.compilerMajorVersion() == 5):
         CTX.CXX_VERSION_FLAG = "c++11"
     else:
-        print("GCC Version %d.%d.%d is too new\n"
+        print("WARNING: GCC Version %d.%d.%d is newer than the VoltDB Validated compilers.\n"
                % (CTX.compilerMajorVersion(),
                   CTX.compilerMinorVersion(),
                   CTX.compilerPatchLevel()))
-        sys.exit(-1)
 elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="c++11"
 else:
-    print("Unknown compiler %s" % CTX.compilerName())
-    sys.exit(-1)
+    print("WARNING: Unknown compiler %s" % CTX.compilerName())
 print("Building with %s" % CTX.CXX_VERSION_FLAG)
 CTX.CPPFLAGS += " -std=" + CTX.CXX_VERSION_FLAG
 

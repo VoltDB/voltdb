@@ -1516,6 +1516,9 @@ public class ParserDQL extends ParserBase {
         // No current support for WINDOWED_PERCENT_RANK or WINDOWED_CUME_DIST.
         // case Tokens.PERCENT_RANK:
         // case Tokens.CUME_DIST:
+            if (token.tokenType != Tokens.CLOSEBRACKET) {
+                throw Error.error("Expected a right parenthesis (')') here.", "", -1);
+            }
             return null;
         }
         if (token.tokenType == Tokens.DISTINCT) {

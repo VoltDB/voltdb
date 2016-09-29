@@ -379,6 +379,10 @@ public class TestWindowedFunctions extends PlannerTestCase {
         failToCompile("SELECT DENSE_RANK() OVER () AS ARANK " +
                       "FROM AAA;",
                       "Windowed DENSE_RANK function call expressions require an ORDER BY specification.");
+        failToCompile("SELECT RANK(DISTINCT) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
+        failToCompile("SELECT DENSE_RANK(ALL) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
     }
 
     public void testExplainPlanText() {

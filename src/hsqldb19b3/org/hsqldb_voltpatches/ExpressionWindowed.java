@@ -164,14 +164,12 @@ public class ExpressionWindowed extends Expression {
           .append(Tokens.T_OVER + " (");
         if (m_partitionByList.size() > 0) {
             sb.append(Tokens.T_PARTITION + ' ' + Tokens.T_BY + ' ');
+            String sep = "";
             for (int idx = 0; idx < m_partitionByList.size(); idx += 1) {
                 Expression expr = m_partitionByList.get(idx);
-                sb.append(expr.getSQL());
-                if (idx < m_partitionByList.size()-1) {
-                    sb.append(", ");
-                } else {
-                    sb.append(" ");
-                }
+                sb.append(sep)
+                  .append(expr.getSQL());
+                sep = ", ";
             }
         }
         if (m_sortAndSlice != null && m_sortAndSlice.getOrderLength() > 0) {
@@ -183,11 +181,6 @@ public class ExpressionWindowed extends Expression {
                 sb.append(obExpr.getSQL())
                   .append(' ')
                   .append(obOrderByExpression.isDescending() ? Tokens.T_DESC : Tokens.T_ASC);
-                if (idx < m_sortAndSlice.getOrderLength()-1) {
-                    sb.append(", ");
-                } else {
-                    sb.append(" ");
-                }
             }
         }
         sb.append(")");
@@ -230,6 +223,12 @@ public class ExpressionWindowed extends Expression {
         VoltXMLElement winargs = new VoltXMLElement("winargs");
         exp.children.add(winspec);
         exp.children.add(winargs);
+        if (nodes.length > 0) {
+            for (Expression expr : nodes) {
+                winargs.children.add(expr.voltGetXML(context, null));
+            }
+        }
+
         if (m_partitionByList.size() > 0) {
             VoltXMLElement pxe = new VoltXMLElement("partitionbyList");
             winspec.children.add(pxe);
@@ -253,11 +252,6 @@ public class ExpressionWindowed extends Expression {
             }
         }
 
-        if (nodes.length > 0) {
-            for (Expression expr : nodes) {
-                winargs.children.add(expr.voltGetXML(context, null));
-            }
-        }
         return exp;
     }
 }

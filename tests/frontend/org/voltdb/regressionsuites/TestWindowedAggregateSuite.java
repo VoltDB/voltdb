@@ -496,6 +496,16 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+    public void testRankWithEmptyTable() throws Exception {
+        Client client = getClient();
+
+        ClientResponse cr;
+        // Don't insert nothing.  Or, rather, do insert nothing.
+        String sql = "select A, B, C, rank() over (partition by A*A*A, A*A order by B*B) as R from T ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // That's it.  If the EE does not crash we are happy.
+    }
     public void testRankOrderbyExpressions() throws Exception {
         Client client = getClient();
 

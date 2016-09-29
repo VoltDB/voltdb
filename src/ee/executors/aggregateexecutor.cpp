@@ -839,8 +839,7 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     // set the schema first because of the NON-null check in MOVE function
     m_inProgressGroupByKeyTuple.move(NULL);
 
-    char * storage = reinterpret_cast<char*>(
-                                             m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char * storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     return TableTuple(storage, schema);
 }
 
@@ -854,15 +853,13 @@ void AggregateExecutorBase::p_execute_finish()
     m_memoryPool.purge();
 }
 
-// By default, we output one row per group.
-bool AggregateExecutorBase::outputForEachInputRow() const {
-    return false;
-}
-
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
-                                                 ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp,
+                                                 const TupleSchema * schema,
+                                                 TempTable* newTempTable,
+                                                 CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("hash aggregate executor init..");
     m_hash.clear();
@@ -911,8 +908,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
         initAggInstances(aggregateRow);
 
-        char* storage = reinterpret_cast<char*>(
-                                                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         TableTuple passThroughTupleSource = TableTuple(storage, m_inputSchema);
 
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
@@ -955,18 +951,19 @@ AggregateSerialExecutor::~AggregateSerialExecutor() {}
 
 
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
-                                                   ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                   ProgressMonitorProxy* pmp,
+                                                   const TupleSchema * schema,
+                                                   TempTable* newTempTable,
+                                                   CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("serial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-                                                                      params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
-    char* storage = reinterpret_cast<char*>(
-                                            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple(storage, schema);
 
     // for next input tuple
@@ -1021,8 +1018,7 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // We may want to output a row even if the group
     // does not change.  This may happen for windowed operations.
     // So, remember this here.
-    bool emitOnEachInput = outputForEachInputRow();
-    bool outputRow = emitOnEachInput;
+    bool outputRow = m_outputForEachInputRow;
     bool resetAggs = false;
 
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
@@ -1050,7 +1046,7 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     if (resetAggs) {
         m_aggregateRow->resetAggs();
     }
-    if (resetAggs || emitOnEachInput) {
+    if (resetAggs || m_outputForEachInputRow) {
         // record the new group scanned tuple
         // We want to do this if we are emitting an
         // output row for each input row, since the
@@ -1099,11 +1095,13 @@ void AggregateSerialExecutor::p_execute_finish()
 AggregatePartialExecutor::~AggregatePartialExecutor() {}
 
 TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
-                                                    ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                    ProgressMonitorProxy* pmp,
+                                                    const TupleSchema * schema,
+                                                    TempTable* newTempTable,
+                                                    CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("partial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-                                                                      params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
@@ -1208,8 +1206,8 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
 }
-
 // TODO: Refactoring the last half of the above function with HASH aggregation
+
 void AggregatePartialExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
     for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {

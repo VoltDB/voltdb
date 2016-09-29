@@ -1527,7 +1527,7 @@ public class Expression {
         prototypes.put(OpTypes.MATCH_UNIQUE_SIMPLE,  null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_PARTIAL, null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_FULL,    null); // not yet supported ExpressionLogical
-        // grouped aggregate functions
+        // unwindowed aggregate functions
         prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
         prototypes.put(OpTypes.APPROX_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "approx_count_distinct"));
         prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));

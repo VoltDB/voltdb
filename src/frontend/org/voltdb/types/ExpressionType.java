@@ -38,7 +38,6 @@ import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.expressions.WindowedExpression;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  *
@@ -261,13 +260,5 @@ public enum ExpressionType {
         m_windowedAggName = new HashMap<>();
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_RANK, "RANK");
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK, "DENSE_RANK");
-    }
-
-    public static String getWindowedAggregateName(ExpressionType expressionType) {
-        String answer = m_windowedAggName.get(expressionType);
-        if (answer == null) {
-            throw new PlanningErrorException("Illegal windowed function name " + expressionType.name());
-        }
-        return answer;
     }
 }
