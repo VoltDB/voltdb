@@ -200,6 +200,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
+#if   defined(VOLT_TRACE_ENABLED)
+            int tuple_ctr = 0;
+#endif
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(),
                        ++tuple_ctr,

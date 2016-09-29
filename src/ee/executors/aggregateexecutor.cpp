@@ -1068,10 +1068,12 @@ void AggregateSerialExecutor::p_execute_finish()
         if (m_noInputRows || m_failPrePredicateOnFirstRow) {
             VOLT_TRACE("finalizing after no input rows..");
             // No input rows means either no group rows (when grouping) or an empty table row (otherwise).
-            // Note the difference between these two cases:
+            // Note the difference between these three cases:
             //   SELECT SUM(A) FROM BBB,            when BBB has no tuple, produces one output row.
+            //   SELECT RANK() OVER ( PARTITION BY A ORDER BY A ),
+            //                                      when BBB has no tuple, produces no output row.
             //   SELECT SUM(A) FROM BBB GROUP BY C, when BBB has no tuple, produces no output row.
-            if (m_groupByKeySchema->columnCount() == 0) {
+            if (! emptyInputMeansEmptyOutput()) {
                 VOLT_TRACE("no input row, but output an empty result row for the whole table.");
                 initAggInstances(m_aggregateRow);
                 if (insertOutputTuple(m_aggregateRow)) {

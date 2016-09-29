@@ -225,6 +225,21 @@ protected:
     virtual bool outputForEachInputRow() const;
 
     /**
+     * For some queries, an empty input table means an empty output
+     * table.  For others and empty input table causes a single
+     * output row to be synthesized.  For example, in the three
+     * queries below, the number of output rows varies when BBB
+     * is an empty table.
+     *   SELECT SUM(A) FROM BBB;
+     *     This produces a single synthesized row.
+     *   SELECT SUM(A) FRON BBB GROUP BY C;
+     *      This produces no output rows.
+     *   SELECT RANK() OVER (PARTITION BY A ORDER BY B) FROM BBB;
+     *      This produces no output rows.
+     */
+    bool emptyInputMeansEmptyOutput() const;
+
+    /**
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
      * aggregation.
@@ -258,6 +273,13 @@ protected:
 private:
     TupleSchema* constructGroupBySchema(bool partial);
 };
+
+inline bool AggregateExecutorBase::emptyInputMeansEmptyOutput() const {
+    // We use outputForEachInputRow as a proxy for a
+    // PartitionByPlanNode, which is what we really
+    // want here.
+    return ((m_groupByKeySchema->columnCount() > 0) || outputForEachInputRow());
+}
 
 typedef boost::unordered_map<TableTuple,
                              AggregateRow*,
