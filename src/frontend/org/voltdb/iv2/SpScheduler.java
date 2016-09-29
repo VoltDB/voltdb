@@ -1005,9 +1005,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
-            if (!msg.isForReplay()) {
-                advanceTxnEgo();
-            }
+            advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
 
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
