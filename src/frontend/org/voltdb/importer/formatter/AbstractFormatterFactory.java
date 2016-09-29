@@ -34,7 +34,7 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      */
     @Override
     public final void start(BundleContext context) throws Exception {
-        context.registerService(this.getClass().getName(), this, null);
+        context.registerService(AbstractFormatterFactory.class, this, null);
     }
 
     @Override
