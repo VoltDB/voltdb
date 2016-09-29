@@ -48,7 +48,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     private transient RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
-    private transient int m_producerPartitionId;  // TODO snapshot might not like this
+    private transient int m_producerPartitionId;
 
     /**
      * Returns a canonical range that can be added to the internal range

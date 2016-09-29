@@ -29,5 +29,5 @@ public interface DRConsumerMpCoordinator {
 
     void processClientResponse(int handle, ClientResponse response);
 
-    void notifyOfPartitionLeaderPromotion(int partitionId);
+    void becomeLeader();
 }

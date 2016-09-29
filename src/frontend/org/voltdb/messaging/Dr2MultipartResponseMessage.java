@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
+    private boolean m_drain;
     private int m_producerPartitionId;
     private ClientResponseImpl m_response;
 
@@ -33,8 +34,17 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     }
 
     public Dr2MultipartResponseMessage(int producerPartitionId, ClientResponseImpl response)  {
+        m_drain = false;
         m_producerPartitionId = producerPartitionId;
         m_response = response;
+    }
+
+    public static Dr2MultipartResponseMessage createDrainMessage(int producerPID) {
+        final Dr2MultipartResponseMessage msg = new Dr2MultipartResponseMessage();
+        msg.m_drain = true;
+        msg.m_producerPartitionId = producerPID;
+        msg.m_response = null;
+        return msg;
     }
 
     public int getProducerPartitionId() {
@@ -45,10 +55,15 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         return m_response;
     }
 
+    public boolean isDrain() {
+        return m_drain;
+    }
+
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        m_drain = buf.get() == 1;
+        m_producerPartitionId = buf.getInt();
         if (buf.remaining() > 0) {
-            m_producerPartitionId = buf.getInt();
             m_response = new ClientResponseImpl();
             m_response.initFromBuffer(buf);
         }
@@ -57,9 +72,12 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_RESPONSE_ID);
-
+        buf.put((byte) (m_drain ? 1 : 0));
         buf.putInt(m_producerPartitionId);
-        m_response.flattenToBuffer(buf);
+
+        if (!m_drain) {
+            m_response.flattenToBuffer(buf);
+        }
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -67,8 +85,12 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
 
     @Override
     public int getSerializedSize() {
-        int size = super.getSerializedSize();
-        size += (4 + m_response.getSerializedSize());
+        int size = super.getSerializedSize()
+                   + 1  // drain or not
+                   + 4; // producer partition ID
+        if (!m_drain) {
+            size += m_response.getSerializedSize();
+        }
         return size;
     }
 }

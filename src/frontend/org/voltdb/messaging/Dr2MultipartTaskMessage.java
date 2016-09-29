@@ -25,22 +25,54 @@ import java.nio.ByteBuffer;
 
 public class Dr2MultipartTaskMessage extends VoltMessage {
 
-    StoredProcedureInvocation m_invocation;
+    private int m_producerPID;
+    private boolean m_drain;
+
+    private long m_lastExecutedMPUniqueID;
+
+    private StoredProcedureInvocation m_invocation;
 
     Dr2MultipartTaskMessage() {
         super();
     }
 
-    public Dr2MultipartTaskMessage(StoredProcedureInvocation invocation) {
+    public Dr2MultipartTaskMessage(StoredProcedureInvocation invocation, long lastExecutedMPUniqueID) {
         m_invocation = invocation;
+        m_lastExecutedMPUniqueID = lastExecutedMPUniqueID;
+        m_producerPID = -1;
+        m_drain = false;
+    }
+
+    public static Dr2MultipartTaskMessage createDrainMessage(int producerPID) {
+        final Dr2MultipartTaskMessage msg = new Dr2MultipartTaskMessage();
+        msg.m_producerPID = producerPID;
+        msg.m_drain = true;
+        msg.m_invocation = null;
+        msg.m_lastExecutedMPUniqueID = Long.MIN_VALUE;
+        return msg;
     }
 
     public StoredProcedureInvocation getSpi() {
         return m_invocation;
     }
 
+    public long getLastExecutedMPUniqueID() {
+        return m_lastExecutedMPUniqueID;
+    }
+
+    public boolean isDrain() {
+        return m_drain;
+    }
+
+    public int getProducerPID() {
+        return m_producerPID;
+    }
+
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        m_producerPID = buf.getInt();
+        m_drain = buf.get() == 1;
+        m_lastExecutedMPUniqueID = buf.getLong();
         if (buf.remaining() > 0) {
             m_invocation = new StoredProcedureInvocation();
             m_invocation.initFromBuffer(buf);
@@ -52,6 +84,9 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_TASK_ID);
+        buf.putInt(m_producerPID);
+        buf.put((byte) (m_drain ? 1 : 0));
+        buf.putLong(m_lastExecutedMPUniqueID);
 
         if (m_invocation != null) {
             m_invocation.flattenToBuffer(buf);
@@ -63,7 +98,10 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     @Override
     public int getSerializedSize() {
-        int size = super.getSerializedSize();
+        int size = super.getSerializedSize()
+                   + 4  // producer partition ID
+                   + 1  // is drain or not
+                   + 8; // last executed MP unique ID
         if (m_invocation != null) {
             size += m_invocation.getSerializedSize();
         }
