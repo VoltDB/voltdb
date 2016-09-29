@@ -46,7 +46,7 @@ public abstract class AbstractImporterFactory implements BundleActivator
     @Override
     public final void start(BundleContext context) throws Exception
     {
-        context.registerService(this.getClass().getName(), this, null);
+        context.registerService(AbstractImporterFactory.class, this, null);
     }
 
     @Override
