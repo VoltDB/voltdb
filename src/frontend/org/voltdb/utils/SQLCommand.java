@@ -940,7 +940,9 @@ public class SQLCommand
                                                              .put( 1, Arrays.asList("varchar")).build()
                 );
         Procedures.put("@SnapshotSave",
-                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("varchar", "varchar", "bit")).
+                put( 1, Arrays.asList("varchar")).build()
+                );
         Procedures.put("@SnapshotScan",
                 ImmutableMap.<Integer, List<String>>builder().put( 1,
                 Arrays.asList("varchar")).build());
