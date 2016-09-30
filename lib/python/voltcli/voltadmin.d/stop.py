@@ -33,7 +33,7 @@ class Host(dict):
 
     def get_admininterface(self):
         """
-        Return the likely admininterface. 
+        Return the likely admininterface.
         Implementation note: Currently, ipaddress will be set to externalinterface
         if set by user, otherwise server selects any interface.
         """
