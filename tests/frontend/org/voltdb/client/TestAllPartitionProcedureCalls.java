@@ -126,7 +126,7 @@ public class TestAllPartitionProcedureCalls {
         for (ClientResponseWithPartitionKey response : responses) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
             String msg = response.response.getStatusString();
-            assertTrue(msg.contains("procedure invocation targeted at invalid procedure"));
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
         }
 
         // check multipart
@@ -134,7 +134,7 @@ public class TestAllPartitionProcedureCalls {
         for (ClientResponseWithPartitionKey response : responses) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
             String msg = response.response.getStatusString();
-            assertTrue(msg.contains("procedure invocation targeted at invalid procedure"));
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
         }
 
         // check wrong-partitioning
@@ -142,7 +142,7 @@ public class TestAllPartitionProcedureCalls {
         for (ClientResponseWithPartitionKey response : responses) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
             String msg = response.response.getStatusString();
-            assertTrue(msg.contains("procedure invocation targeted at invalid procedure"));
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
         }
     }
 
