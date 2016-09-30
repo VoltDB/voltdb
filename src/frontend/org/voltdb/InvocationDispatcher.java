@@ -300,6 +300,18 @@ public final class InvocationDispatcher {
             }
         }
 
+        // check for allPartition invocation and provide a nice error if it's misused
+        if (task.getAllPartition()) {
+            // must be single partition and must be partitioned on parameter 0
+            if (!catProc.getSinglepartition() || (catProc.getPartitionparameter() != 0) || catProc.getSystemproc()) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0], "Invalid procedure for all-partition execution. " +
+                                 "Targeted procedure must be partitioned, must be partitioned on the first parameter, " +
+                                 "and must not be a system procedure.",
+                        task.clientHandle);
+            }
+        }
+
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 

@@ -45,7 +45,9 @@ import java.nio.ByteBuffer;
  *
  */
 public abstract class ProcedureInvocationExtensions {
-    public static final byte BATCH_TIMEOUT = 1;        // batch timeout is only extension for now
+    public static final byte BATCH_TIMEOUT = 1;  // batch timeout
+    public static final byte ALL_PARTITION = 2; // whether proc is part of run-everywhere
+
     private static final int INTEGER_SIZE = 4;
 
     public static byte readNextType(ByteBuffer buf) {
@@ -61,13 +63,28 @@ public abstract class ProcedureInvocationExtensions {
     public static int readBatchTimeout(ByteBuffer buf) {
         int len = readLength(buf);
         if (len != INTEGER_SIZE) {
-            throw new IllegalStateException("Batch timeout serialization length expected to be 4");
+            throw new IllegalStateException(
+                    "Batch timeout extension serialization length expected to be 4");
         }
         int timeout = buf.getInt();
         if ((timeout < 0) && (timeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
             throw new IllegalStateException("Invalid timeout value deserialized: " + timeout);
         }
         return timeout;
+    }
+
+    public static void writeAllPartitionWithTypeByte(ByteBuffer buf) {
+        buf.put(ALL_PARTITION);
+        writeLength(buf, 0);
+    }
+
+    public static boolean readAllPartition(ByteBuffer buf) {
+        int len = readLength(buf);
+        if (len != 0) {
+            throw new IllegalStateException(
+                    "All-Partition extension serialization length expected to be 0");
+        }
+        return true;
     }
 
     public static void skipUnknownExtension(ByteBuffer buf) {
