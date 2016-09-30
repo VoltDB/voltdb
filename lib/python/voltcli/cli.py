@@ -211,7 +211,6 @@ class BaseArgument(object):
         self.help      = help
         self.min_count = kwargs.get('min_count', 1)
         self.max_count = kwargs.get('max_count', 1)
-        self.optional = utility.kwargs_get_boolean(kwargs, 'optional', default=False)
         # A max_count value of None is interpreted as infinity.
         if self.max_count is None:
             self.max_count = sys.maxint
@@ -383,11 +382,7 @@ class CLIParser(ExtendedHelpOptionParser):
             # exhausting all the argument specs, unless it's the last argument
             # spec and it's optional.
             if iarg > len(args) or (iarg == len(args) and arg.min_count > 0):
-                if not arg.optional:
-                    missing.append((arg.name, arg.help))
-                else:
-                    setattr(verb_opts, arg.name, None)
-                    iarg +=1
+                missing.append((arg.name, arg.help))
             else:
                 value = None
                 # The last argument can have repeated arguments. If more than

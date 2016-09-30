@@ -37,7 +37,6 @@ public class SnapshotInitiationInfo
     private String m_data;
     private boolean m_truncationRequest;
     private SnapshotPathType m_stype;
-    public static final String MAGIC_NONCE_PREFIX = "MANUAL";
 
     /**
      * Construct the object given the parameters directly.
@@ -66,25 +65,20 @@ public class SnapshotInitiationInfo
         m_format = SnapshotFormat.NATIVE;
         m_data = null;
         m_truncationRequest = false;
-        boolean checkNonceValidity = true;
-        switch (params.length) {
-            case 3:
-                parseLegacyParams(params);
-                break;
-            case 1:
-                checkNonceValidity = parseJsonParams(params);
-                break;
-            default:
-                m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
-                m_stype = SnapshotPathType.SNAP_AUTO;
-                m_path = VoltDB.instance().getSnapshotPath();
-                //We will always generate a good valid nonce.
-                checkNonceValidity = false;
-                break;
+
+        if (params.length == 3) {
+            parseLegacyParams(params);
+        }
+        else if (params.length == 1) {
+            parseJsonParams(params);
+        }
+        else {
+            throw new Exception("@SnapshotSave requires 3 parameters " +
+                    "(Path, nonce, and blocking) or alternatively a single JSON blob. ");
         }
 
-        if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
-            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or start with " + MAGIC_NONCE_PREFIX);
+        if (m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(","))) {
+            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,)");
         }
     }
 
@@ -143,9 +137,8 @@ public class SnapshotInitiationInfo
      *
      *   format: one of 'native' or 'csv'.
      */
-    private boolean parseJsonParams(Object[] params) throws Exception
+    private void parseJsonParams(Object[] params) throws Exception
     {
-        boolean checkValidity = true;
         if (params[0] == null) {
             throw new Exception("@SnapshotSave JSON blob is null");
         }
@@ -167,7 +160,7 @@ public class SnapshotInitiationInfo
                             "command logging is not present or enabled.");
                 }
                 // for CL truncation, don't care about any of the rest of the blob.
-                return checkValidity;
+                return;
             }
             else {
                 throw new Exception("Unknown snapshot save service type: " + service);
@@ -175,14 +168,9 @@ public class SnapshotInitiationInfo
         }
 
         m_stype = SnapshotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString()));
-        if (jsObj.has(SnapshotUtil.JSON_URIPATH)) {
-            m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
-            if (m_path.isEmpty()) {
-                throw new Exception("uripath cannot be empty");
-            }
-        } else {
-            m_stype = SnapshotPathType.SNAP_AUTO;
-            m_path = "file:///" + SnapshotUtil.getRealPath(m_stype, null);
+        m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
+        if (m_path.isEmpty()) {
+            throw new Exception("uripath cannot be empty");
         }
         URI pathURI = new URI(m_path);
         String pathURIScheme = pathURI.getScheme();
@@ -194,15 +182,10 @@ public class SnapshotInitiationInfo
                     " if this is a file path then you must prepend file://");
         }
         m_path = pathURI.getPath();
-        if (jsObj.has(SnapshotUtil.JSON_NONCE)) {
-            m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            if (m_nonce.isEmpty()) {
-                throw new Exception("nonce cannot be empty");
-            }
-        } else {
-            m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
-            //This is a valid JSON
-            checkValidity = false;
+
+        m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+        if (m_nonce.isEmpty()) {
+            throw new Exception("nonce cannot be empty");
         }
 
         Object blockingObj = false;
@@ -233,7 +216,6 @@ public class SnapshotInitiationInfo
                     " and should be one of [\"native\" | \"csv\"]");
         }
         m_data = (String)params[0];
-        return checkValidity;
     }
 
     public String getPath()
