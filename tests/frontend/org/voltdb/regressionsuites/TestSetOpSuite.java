@@ -571,7 +571,7 @@ public class TestSetOpSuite extends RegressionSuite {
     }
 
     /**
-     * A.PKEY intersect all (E.PC except all F.PC)
+     * A.PKEY > 1 intersect all (E.PC except all F.PC)
      * PKEY and PC are partitioning columns for A, E, and F tables
      * @throws NoConnectionsException
      * @throws IOException
@@ -580,8 +580,8 @@ public class TestSetOpSuite extends RegressionSuite {
     public void testMultipleSetOperations7() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
-        client.callProcedure("InsertA", 0, 0); // in A but not in E-F. Eliminated by final INTERSECT
-        client.callProcedure("InsertA", 1, 1); // in A and in E-F. In final result set
+        client.callProcedure("InsertA", 0, 0); // not in A
+        client.callProcedure("InsertA", 1, 1); // not in A
         client.callProcedure("InsertA", 2, 1); // in A and in E-F. In final result set
         client.callProcedure("InsertA", 3, 2); // in A but not in E-F. Eliminated by final INTERSECT
         client.callProcedure("InsertA", 4, 2); // in A and in E-F. In final result set
@@ -596,11 +596,11 @@ public class TestSetOpSuite extends RegressionSuite {
         client.callProcedure("InsertF", 3, 0); // in E and F. Eliminated by E-F
         client.callProcedure("InsertF", 4, 3); // in E and F. Eliminated by E-F
         client.callProcedure("InsertF", 5, 3); // not in E. Eliminated by E-F
-        String sql = "SELECT PKEY FROM A INTERSECT ALL "
+        String sql = "SELECT PKEY FROM A WHERE PKEY > 1 INTERSECT ALL "
                 + "(SELECT PC FROM E EXCEPT ALL SELECT PC FROM F) ORDER BY PKEY;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertEquals(3, vt.getRowCount());
-        validateTableOfScalarLongs(vt, new long[]{1,2,4});
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2,4});
 
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         String explainPlan = vt.toString();
@@ -608,6 +608,119 @@ public class TestSetOpSuite extends RegressionSuite {
         assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP INTERSECT_ALL"));
 
     }
+
+    /**
+     * A.PKEY = 1 intersect all (E.PC = 1 except all F.PC)
+     * PKEY and PC are partitioning columns for A, E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMultipleSetOperations8() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+        client.callProcedure("InsertA", 0, 0); // not in A
+        client.callProcedure("InsertA", 1, 1); // in A and in E-F. In final result set
+        client.callProcedure("InsertA", 2, 1); // not in A
+        client.callProcedure("InsertA", 3, 2); // not in A
+        client.callProcedure("InsertA", 4, 2); // not in A
+        client.callProcedure("InsertA", 5, 2); // not in A
+        client.callProcedure("InsertE", 1, 0); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertE", 1, 0); // in E and in E-F.
+        client.callProcedure("InsertE", 2, 1); // not in E
+        client.callProcedure("InsertE", 3, 2); // not in E
+        client.callProcedure("InsertE", 4, 2); // not in E
+        client.callProcedure("InsertE", 4, 3); // not in E
+        client.callProcedure("InsertF", 1, 1); // in E and F. Eliminated by E-F
+        client.callProcedure("InsertF", 3, 0); // not in E. Eliminated by E-F
+        client.callProcedure("InsertF", 4, 3); // not in E. Eliminated by E-F
+        client.callProcedure("InsertF", 5, 3); // not in E. Eliminated by E-F
+        String sql = "SELECT PKEY FROM A WHERE PKEY = 1 INTERSECT ALL "
+                + "(SELECT PC FROM E WHERE PC = 1 EXCEPT ALL SELECT PC FROM F) ORDER BY PKEY;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{1});
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP INTERSECT_ALL"));
+
+    }
+
+    /**
+     * (A.PKEY WHERE PKEY = ?) union (E.PC WHERE PC = ?)
+     * PKEY and PC are partitioning columns for A, E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMPSetOperationsPushDown1()
+    throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        client.callProcedure("InsertA", 0, 0); // in A, so IN final result.
+        client.callProcedure("InsertA", 1, 1); // not in A, NOT IN final result.
+        client.callProcedure("InsertE", 0, 0); // not in F, NOT IN final result.
+        client.callProcedure("InsertE", 1, 1); // not in F, NOT IN final result.
+        client.callProcedure("InsertE", 4, 4); // not in F, NOT IN final result.
+        client.callProcedure("InsertE", 5, 5); // in F. so IN final result.
+        client.callProcedure("InsertE", 8, 8); // not in F, NOT IN final result.
+        sql = "(SELECT PKEY FROM A WHERE PKEY = 0) UNION (SELECT PC FROM E WHERE PC = 5) order by PKEY;";
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 5});
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION"));
+
+        // One more time with parameters
+        sql = "(SELECT PKEY FROM A WHERE PKEY = ?) UNION (SELECT PC FROM E WHERE PC = ?) order by PKEY;";
+
+        vt = client.callProcedure("@AdHoc", sql, 0, 5).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 5});
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION"));
+    }
+
+    /**
+     * (E.PC) except (A.PKEY WHERE PKEY = ?)
+     * PKEY and PC are partitioning columns for A, E, and F tables
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMPSetOperationsPushDown2()
+    throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        client.callProcedure("InsertA", 0, 0); // in F and not in A, so IN final result.
+        client.callProcedure("InsertA", 1, 1); // in F and in A, NOT IN final result.
+        client.callProcedure("InsertE", 0, 0); // in F and not in A, so IN final result.
+        client.callProcedure("InsertE", 1, 1); // in F and in A, NOT IN final result.
+        client.callProcedure("InsertE", 4, 4); // in F and not in A, so IN final result.
+        client.callProcedure("InsertE", 5, 5); // in F and not in A, so IN final result.
+        client.callProcedure("InsertE", 8, 8); // in F and not in A, so IN final result.
+        sql = "(SELECT PC FROM E) EXCEPT (SELECT PKEY FROM A WHERE PKEY = 1) order by PC;";
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 4, 5, 8});
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP EXCEPT"));
+    }
+
 
     /**
      * (E.PC, C.PKEY WHERE E.PC = C.PKEY) union (F.PC)

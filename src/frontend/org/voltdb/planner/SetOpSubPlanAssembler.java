@@ -114,15 +114,17 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             // Evaluate whether the SetOP node can be safely pushed down below the Send/Receive pair
             // in case of multi partitioned query. For this to happen all children  must
             // satisfy the following conditions:
-            //  - each statement must be a MP statement with a trivial coordinator fragment
+            //  - each statement must be a MP statement with a trivial coordinator fragment or
+            //      a SP plan with inferred partitioning
             //  - each statement output must contain at least one partitioning column from its distributed tables
             //  - all statements must agree on the position of at least one partitioning column
             //    in their respective output schemas
             // The above requirements guarantee that the given set op can be run disjointly on each
             // individual partition and the results can be simply aggregated at the coordinator
             if (canPushSetOpDown) {
-                // Is statement MP and has a trivial  coordinator?
-                canPushSetOpDown = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
+                // Is statement MP and has a trivial  coordinator or it is  SP with an inferred partitioning?
+                canPushSetOpDown = (partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph))
+                        || partitioning.isInferredSingle();
                 if (canPushSetOpDown) {
                     // Extract partition column(s) from the child
                     Set<Integer> partitionColumns = extractPartitioningColumn(bestChildPlan.rootPlanGraph);
@@ -148,8 +150,8 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
 
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
             if (m_setOpPartitioning.requiresTwoFragments()) {
-                if ((partitioning.requiresTwoFragments() && !canPushSetOpDown)
-                        || statementPartitionExpression != null) {
+                if ((partitioning.requiresTwoFragments() || statementPartitionExpression != null)
+                    && !canPushSetOpDown) {
                     // If two child statements need to use a second fragment,
                     // the set op node must be pushed down to the partition fragments.
                     // Otherwise, the coordinator expects a single-table result from each partition.
@@ -169,11 +171,10 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 m_setOpPartitioning = partitioning;
                 continue;
             }
-            if (partitioning.requiresTwoFragments()) {
+            if (partitioning.requiresTwoFragments() && !canPushSetOpDown) {
                 // Again, currently the coordinator of a two-fragment plan is not allowed to
                 // target a particular partition, so neither can the union of the coordinator
                 // and a statement that wants to run single-partition.
-                assert(!canPushSetOpDown);
                 throw new PlanningErrorException(
                         "Statements are too complex in set operation using multiple partitioned tables.");
             }
@@ -181,7 +182,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
-            if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
+            if ( ! commonPartitionExpression.equals(statementPartitionExpression) && !canPushSetOpDown) {
                 throw new PlanningErrorException(
                         "Statements use conflicting partitioned table filters in set operation or sub-query.");
             }
@@ -191,7 +192,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         m_planSelector.m_planId = planId;
 
         // Add and link children plans. Push down the SetOP if needed
-        return buildSetOpPlan(setOpPlanNode, childrenPlans, m_setOpPartitioning.requiresTwoFragments() && canPushSetOpDown);
+        return buildSetOpPlan(setOpPlanNode, childrenPlans, canPushSetOpDown);
     }
 
     /**
@@ -303,10 +304,11 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                     childParent = childPlan;
                     childPlan = newChildPlan;
                 }
-                // Remove child Send/Receive nodes
-                assert(childPlan instanceof MergeReceivePlanNode || childPlan instanceof ReceivePlanNode);
-                childPlan = childPlan.getChild(0).getChild(0);
-                childPlan.clearParents();
+                // Remove child Send/Receive nodes if any
+                if(childPlan instanceof MergeReceivePlanNode || childPlan instanceof ReceivePlanNode) {
+                    childPlan = childPlan.getChild(0).getChild(0);
+                    childPlan.clearParents();
+                }
                 // Add simplified child plan to its parent
                 childParent.addAndLinkChild(childPlan);
             }

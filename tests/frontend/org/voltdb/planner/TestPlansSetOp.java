@@ -615,6 +615,30 @@ public class TestPlansSetOp extends PlannerTestCase {
       PlanNodeType[] coordinatorTypes;
       PlanNodeType[] setOpChildren;
 
+      // Select from distributed T9 and T10 is a SP plan while T5 is a MP. T1.A and T5.E are partitioning columns
+      pns = compileToFragments("select T1.A from T1 where T1.A = 3 union select T5.E from T5");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+      // Selects from distributed T9 and T10 are SP plans. T1.A and T10.A are partitioning columns
+      pns = compileToFragments("select A from T9 where A = 3 except select A from T10 where A = 4");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+      // Selects from distributed T9 and T10 are SP plans. T1.A and T10.A are partitioning columns
+      pns = compileToFragments("select A from T9 where A = ? except select A from T10 where A = ?");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+      // Selects from distributed T9 and T5 are MP plans.
+      pns = compileToFragments("select T9.A from T9 where T9.A + T9.B > 3 union select T5.E from T5");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
       // Union of two distributed selects
       pns = compileToFragments("select AT9.A AA from T9 AT9 union select AT10.A A2 from T10 AT10");
       coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
@@ -636,8 +660,7 @@ public class TestPlansSetOp extends PlannerTestCase {
       checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
       // Union of two distributed selects - select from distributed T1 still requires a MP plan
-      // because of the T1.A + 0 = 3 expression. The 'alternative' version T1.A = 3 makes
-      // the first select a SP and the whole UNION is rejected (failtToCmpile below)
+      // because of the T1.A + 0 = 3 expression.
       pns = compileToFragments("select T1.A from T1 where T1.A + 0 = 3 union select T5.E from T5");
       coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
       setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
@@ -722,12 +745,12 @@ public class TestPlansSetOp extends PlannerTestCase {
       // column A in the second position
       failToCompile("select A, B A from T9 union select B A, A from T10",
               "Statements are too complex in set operation using multiple partitioned tables.");
+      // Partitioning columns position mismatch. T9.A and T10.A are partitioning columns
+      failToCompile("select T9.B, T9.A from T9 where T9.A = 3 union select T10.A, T10.B from T10",
+            "Statements are too complex in set operation using multiple partitioned tables.");
       // No partitioning column in the first child output. The non-partitioning column B is aliased to
       // the partitioning column A.
       failToCompile("select B A from T9 union select A from T10",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      // Select from distributed T1 does not require a MP plan. T5.E is a partitioning column
-      failToCompile("select T1.A from T1 where T1.A = 3 union select T5.E from T5",
               "Statements are too complex in set operation using multiple partitioned tables.");
       // Partitioning columns (T9.A and T10.A) position mismatch
       failToCompile("select T9.A, T9.B from T9 union select T10.B, T10.A from T10",
