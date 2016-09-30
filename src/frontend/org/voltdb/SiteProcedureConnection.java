@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.zip.CRC32;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -113,6 +114,8 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,

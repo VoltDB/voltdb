@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -344,6 +345,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -375,6 +378,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         clearPsetAndEnsureCapacity(allPsetSize);
         for (int i = 0; i < batchSize; ++i) {
+            int paramStart = psetBuffer.position();
             if (parameterSets[i] instanceof ByteBuffer) {
                 ByteBuffer buf = (ByteBuffer) parameterSets[i];
                 psetBuffer.put(buf);
@@ -390,6 +394,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                " and with params: " +
                                                pset.toJSONString(), exception);
                 }
+            }
+            if (isWriteFrag[i]) {
+                psetBuffer.limit(psetBuffer.position());
+                psetBuffer.position(paramStart);
+                writeCRC.update(psetBuffer);
+                assert(psetBuffer.remaining() == 0);
+                psetBuffer.limit(allPsetSize);
             }
         }
         // checkMaxFsSize();

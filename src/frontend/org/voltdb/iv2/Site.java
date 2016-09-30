@@ -29,6 +29,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -1431,6 +1432,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,
@@ -1444,6 +1447,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
+                isWriteFrag,
+                writeCRC,
                 sqlTexts,
                 txnId,
                 spHandle,

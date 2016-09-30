@@ -27,6 +27,7 @@ import java.nio.channels.SocketChannel;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.CRC32;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -924,6 +925,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -936,7 +939,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             for (int i = 0; i < numFragmentIds; ++i) {
                 // pset can be ByteBuffer or ParameterSet instance
                 if (parameterSets[i] instanceof ByteBuffer) {
+                    ByteBuffer buf = (ByteBuffer) parameterSets[i];
+                    int paramStart = buf.position();
                     fser.write((ByteBuffer) parameterSets[i]);
+                    if (isWriteFrag[i]) {
+                        buf.position(paramStart);
+                        writeCRC.update(buf);
+                    }
                 }
                 else {
                     ParameterSet pset = (ParameterSet) parameterSets[i];
@@ -944,6 +953,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     pset.flattenToBuffer(buf);
                     buf.flip();
                     fser.write(buf);
+                    if (isWriteFrag[i]) {
+                        buf.position(0);
+                        writeCRC.update(buf);
+                    }
                 }
             }
         } catch (final IOException exception) {
@@ -994,14 +1007,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
             final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
-                spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets, isWriteFrag, writeCRC,
+                txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         if (m_perFragmentTimingEnabled) {
             m_executionTimes = new long[numFragmentIds];

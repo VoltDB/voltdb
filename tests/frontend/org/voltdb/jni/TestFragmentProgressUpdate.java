@@ -25,6 +25,7 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
@@ -49,7 +50,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import static org.mockito.Mockito.verify;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -132,6 +132,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -185,6 +187,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
 
@@ -221,6 +225,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { deleteStmt.getSqltext() },
                 3, 3, 2, 42, WRITE_TOKEN, false);
 
@@ -236,6 +242,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
@@ -291,6 +299,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
@@ -468,6 +478,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                     fragIds,
                     null,
                     paramSets,
+                    new boolean[] { false },
+                    null,
                     sqlTexts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);

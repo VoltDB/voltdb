@@ -317,6 +317,8 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
+                        new boolean[] { false },
+                        null,
                         stmtText == null ? null : new String[] { stmtText },
                         m_txnState.txnId,
                         m_txnState.m_spHandle,

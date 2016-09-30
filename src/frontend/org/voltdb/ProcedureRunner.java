@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.zip.CRC32;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -142,7 +142,7 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
+    protected final CRC32 m_inputCRC = new CRC32();
 
     // running procedure info
     //  - track the current call to voltExecuteSQL for logging progress
@@ -1629,6 +1629,7 @@ public class ProcedureRunner {
        long[] fragmentIds = new long[batchSize];
        String[] sqlTexts = new String[batchSize];
        int succeededFragmentsCount = 0;
+       boolean[] isWriteFrag = new boolean[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1642,6 +1643,7 @@ public class ProcedureRunner {
                params[i] = qs.params;
            }
            sqlTexts[i] = qs.stmt.getText();
+           isWriteFrag[i] = !qs.stmt.isReadOnly;
            i++;
        }
 
@@ -1654,6 +1656,8 @@ public class ProcedureRunner {
                    fragmentIds,
                    null,
                    params,
+                   isWriteFrag,
+                   m_inputCRC,
                    sqlTexts,
                    m_txnState.txnId,
                    m_txnState.m_spHandle,

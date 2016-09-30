@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.zip.CRC32;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -629,6 +630,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,
@@ -656,8 +659,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
 
             int bufferHint = Math.min(m_currentBatchIndex,1);
-            FastDeserializer results = coreExecutePlanFragments(bufferHint, numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken, traceOn);
+            FastDeserializer results = coreExecutePlanFragments(bufferHint, numFragmentIds, planFragmentIds,
+                    inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
+                    uniqueId, undoQuantumToken, traceOn);
 
             if (traceOn) {
                 final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
@@ -688,6 +692,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            boolean[] isWriteFrag,
+            CRC32 writeCRC,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,
