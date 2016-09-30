@@ -27,11 +27,11 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class PartitionIntegerTestProc extends VoltProcedure {
+public class PartitionedTestProcNonZeroPartitioningParam extends VoltProcedure {
 
     public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM TABLE_INT_PARTITION;");
 
-    public VoltTable[] run(int partitionKey) {
+    public VoltTable[] run(int partitionKey, int partitionParam) {
         voltQueueSQL(stmt);
         return voltExecuteSQL(true);
      }

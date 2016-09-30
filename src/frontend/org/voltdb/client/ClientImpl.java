@@ -247,9 +247,24 @@ public final class ClientImpl implements Client {
     }
 
     /**
+     * Same as the namesake without allPartition option.
+     */
+    public ClientResponse callProcedureWithClientTimeout(
+            int batchTimeout,
+            String procName,
+            long clientTimeout,
+            TimeUnit unit,
+            Object... parameters)
+                    throws IOException, NoConnectionsException, ProcCallException
+    {
+        return callProcedureWithClientTimeout(batchTimeout, false, procName, clientTimeout, unit, parameters);
+    }
+
+    /**
      * Synchronously invoke a procedure call blocking until a result is available.
      *
      * @param batchTimeout procedure invocation batch timeout.
+     * @param allPartition whether this is an all-partition invocation
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
@@ -260,6 +275,7 @@ public final class ClientImpl implements Client {
      */
     public ClientResponse callProcedureWithClientTimeout(
             int batchTimeout,
+            boolean allPartition,
             String procName,
             long clientTimeout,
             TimeUnit unit,
@@ -267,7 +283,7 @@ public final class ClientImpl implements Client {
                     throws IOException, NoConnectionsException, ProcCallException
     {
         ProcedureInvocation invocation
-            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
+            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, allPartition, procName, parameters);
         return internalSyncCallProcedure(unit.toNanos(clientTimeout), invocation);
     }
 
@@ -310,10 +326,27 @@ public final class ClientImpl implements Client {
         return callProcedureWithClientTimeout(
                 callback,
                 batchTimeout,
+                false,
                 procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
                 TimeUnit.NANOSECONDS,
                 parameters);
+    }
+
+    /**
+     * Same as the namesake without allPartition option.
+     */
+    public boolean callProcedureWithClientTimeout(
+            ProcedureCallback callback,
+            int batchTimeout,
+            String procName,
+            long clientTimeout,
+            TimeUnit clientTimeoutUnit,
+            Object... parameters)
+                    throws IOException, NoConnectionsException
+    {
+        return callProcedureWithClientTimeout(
+                callback, batchTimeout, false, procName, clientTimeout, clientTimeoutUnit, parameters);
     }
 
     /**
@@ -323,6 +356,7 @@ public final class ClientImpl implements Client {
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param timeout timeout for the procedure
+     * @param allPartition whether this is an all-partition invocation
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
@@ -330,6 +364,7 @@ public final class ClientImpl implements Client {
     public boolean callProcedureWithClientTimeout(
             ProcedureCallback callback,
             int batchTimeout,
+            boolean allPartition,
             String procName,
             long clientTimeout,
             TimeUnit clientTimeoutUnit,
@@ -341,7 +376,7 @@ public final class ClientImpl implements Client {
         }
 
         ProcedureInvocation invocation
-                = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
+                = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, allPartition, procName, parameters);
 
         return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
     }
@@ -843,7 +878,11 @@ public final class ClientImpl implements Client {
             partitionCount--;
             OnePartitionProcedureCallback cb = new OnePartitionProcedureCallback(counter, key, partitionCount, responses, callback);
             try {
-                if (!callProcedure(cb, procedureName, args)) {
+                // Call the more complex method to ensure that the allPartition flag for the invocation is
+                // set to true. This gives a nice error message if the target procedure is incompatible.
+                if (!callProcedureWithClientTimeout(cb, BatchTimeoutOverrideType.NO_TIMEOUT, true,
+                        procedureName, Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, args))
+                {
                     final ClientResponse r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
                             "The procedure is not queued for execution.");
                     throw new ProcCallException(r, null, null);
