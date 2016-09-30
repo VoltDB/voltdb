@@ -1388,8 +1388,10 @@ template<class TABLE> void VoltDBEngine::initMaterializedViews(catalog::Table *c
         if ( ! destTable->materializedViewHandler() || destTable->materializedViewHandler()->isDirty() ) {
             // The newly-added handler will at the same time trigger
             // the uninstallation of the previous (if exists) handler.
-            new MaterializedViewHandler(destTable, mvHandlerInfo, this,
-                    destTable->isPersistentTableEmpty(), false);
+            MaterializedViewHandler *handler = new MaterializedViewHandler(destTable, mvHandlerInfo, this);
+            if (destTable->isPersistentTableEmpty()) {
+                handler->catchUpWithExistingData(this, false);
+            }
         }
     }
 }

@@ -35,9 +35,7 @@ namespace voltdb {
 
     MaterializedViewHandler::MaterializedViewHandler(PersistentTable* destTable,
                                                      catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
-                                                     VoltDBEngine* engine,
-                                                     bool needsCatchUp,
-                                                     bool catchUpFallible) :
+                                                     VoltDBEngine* engine) :
             m_destTable(destTable),
             m_index(destTable->primaryKeyIndex()),
             m_groupByColumnCount(mvHandlerInfo->groupByColumnCount()) {
@@ -47,14 +45,6 @@ namespace voltdb {
         setUpMinMaxQueries(mvHandlerInfo, engine);
         setUpBackedTuples();
         m_dirty = false;
-        if (needsCatchUp) {
-            catchUpWithExistingData(engine, catchUpFallible);
-        }
-        /* // enable to debug
-        std::cout << "DEBUG: join view initially there are "
-                  << m_destTable->activeTupleCount()
-                  << " tuples in " << m_destTable->name() << std::endl;
-        //*/
     }
 
     MaterializedViewHandler::~MaterializedViewHandler() {
@@ -186,6 +176,11 @@ namespace voltdb {
         }
 
         ec->cleanupAllExecutors();
+        /* // enable to debug
+        std::cout << "DEBUG: join view initially there are "
+                  << m_destTable->activeTupleCount()
+                  << " tuples in " << m_destTable->name() << std::endl;
+        //*/
     }
 
     void MaterializedViewHandler::setUpBackedTuples() {

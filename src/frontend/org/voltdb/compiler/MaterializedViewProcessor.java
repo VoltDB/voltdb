@@ -229,7 +229,7 @@ public class MaterializedViewProcessor {
                 } // end for each source table
 
                 compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
-                compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
+                compileCreateQueryAndUpdateCatalog(db, viewName, query, xmlquery, mvHandlerInfo);
                 mvHandlerInfo.setGroupbycolumncount(stmt.m_groupByColumns.size());
 
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
@@ -637,6 +637,7 @@ public class MaterializedViewProcessor {
     }
 
     private void compileCreateQueryAndUpdateCatalog(Database db,
+                                                    String viewName,
                                                     String query,
                                                     VoltXMLElement xmlquery,
                                                     MaterializedViewHandlerInfo mvHandlerInfo)
@@ -664,6 +665,11 @@ public class MaterializedViewProcessor {
                           null, // no user-supplied join order
                           DeterminismMode.FASTER,
                           StatementPartitioning.inferPartitioning());
+        if (! createQueryInfer.getParameters().isEmpty()) {
+            String msg = "The SELECT query for VIEW \"" + viewName + "\" contains parameters, which is not allowed.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
