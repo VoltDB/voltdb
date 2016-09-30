@@ -182,7 +182,7 @@ public class SnapshotInitiationInfo
             }
         } else {
             m_stype = SnapshotPathType.SNAP_AUTO;
-            m_path = "file:///" + SnapshotUtil.getRealPath(m_stype, null);
+            m_path = "file:///" + VoltDB.instance().getCommandLogSnapshotPath();
         }
         URI pathURI = new URI(m_path);
         String pathURIScheme = pathURI.getScheme();
