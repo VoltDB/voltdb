@@ -33,14 +33,11 @@ class Host(dict):
 
     def get_admininterface(self):
         """
-        Return the likely admininterface. The precedence rules are the order that
-        we're checking.
-        Implementation note: ipaddress will be set to externalinterface, if set
-        Otherwise it may be any interface.
+        Return the likely admininterface. 
+        Implementation note: Currently, ipaddress will be set to externalinterface
+        if set by user, otherwise server selects any interface.
         """
 
-        if 'publicinterface' in self and self['publicinterface']:
-            return self['publicinterface']
         if 'admininterface' in self and self['admininterface']:
             return self['admininterface']
         if 'ipaddress' in self and self['ipaddress']:
