@@ -28,6 +28,7 @@ public class AsyncCompilerWork implements Serializable {
     }
     private static final long serialVersionUID = 6588086204761949082L;
 
+    private boolean serverInitiated;
     final long replySiteId;
 
     final boolean shouldShutdown;
@@ -66,6 +67,16 @@ public class AsyncCompilerWork implements Serializable {
         if (completionHandler == null) {
             throw new IllegalArgumentException("Completion handler can't be null");
         }
+    }
+
+    public boolean isServerInitiated()
+    {
+        return serverInitiated;
+    }
+
+    public void setServerInitiated(boolean serverInitiated)
+    {
+        this.serverInitiated = serverInitiated;
     }
 
     @Override

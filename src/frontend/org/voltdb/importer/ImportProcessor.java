@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,10 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleException;
-import org.osgi.framework.ServiceReference;
-import org.osgi.framework.launch.Framework;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -38,6 +35,7 @@ import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.importer.formatter.FormatterBuilder;
+import org.voltdb.modular.ModuleManager;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -46,9 +44,9 @@ import com.google_voltpatches.common.base.Throwables;
 public class ImportProcessor implements ImportDataProcessor {
 
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
-    private final Map<String, BundleWrapper> m_bundles = new HashMap<String, BundleWrapper>();
-    private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
-    private final Framework m_framework;
+    private final Map<String, ModuleWrapper> m_bundles = new HashMap<String, ModuleWrapper>();
+    private final Map<String, ModuleWrapper> m_bundlesByName = new HashMap<String, ModuleWrapper>();
+    private final ModuleManager m_moduleManager;
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
@@ -57,25 +55,25 @@ public class ImportProcessor implements ImportDataProcessor {
     public ImportProcessor(
             int myHostId,
             ChannelDistributer distributer,
-            Framework framework,
+            ModuleManager moduleManager,
             ImporterStatsCollector statsCollector,
             String clusterTag)
-            throws BundleException {
-        m_framework = framework;
+    {
+        m_moduleManager = moduleManager;
         m_distributer = distributer;
         m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
         m_clusterTag = clusterTag;
     }
 
     //This abstracts OSGi based and class based importers.
-    public class BundleWrapper {
-        private final Bundle m_bundle;
+    public class ModuleWrapper {
+        private final URI m_bundleURI;
         private AbstractImporterFactory m_importerFactory;
         private ImporterLifeCycleManager m_importerTypeMgr;
 
-        public BundleWrapper(Object o, Bundle bundle) {
-            m_bundle = bundle;
-            m_importerFactory = (AbstractImporterFactory) o;
+        public ModuleWrapper(AbstractImporterFactory importerFactory, URI bundleURI) {
+            m_bundleURI = bundleURI;
+            m_importerFactory = importerFactory;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
             m_importerTypeMgr = new ImporterLifeCycleManager(
                     m_importerFactory, m_distributer, m_clusterTag);
@@ -99,8 +97,8 @@ public class ImportProcessor implements ImportDataProcessor {
                 if (m_importerFactory != null) {
                     m_importerTypeMgr.stop();
                 }
-                if (m_bundle != null) {
-                    m_bundle.stop();
+                if (m_bundleURI != null) {
+                    m_moduleManager.unload(m_bundleURI);
                 }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
@@ -118,22 +116,17 @@ public class ImportProcessor implements ImportDataProcessor {
 
         FormatterBuilder formatterBuilder = config.getFormatterBuilder();
         try {
-            BundleWrapper wrapper = m_bundles.get(bundleJar);
+            ModuleWrapper wrapper = m_bundles.get(bundleJar);
             if (wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
-
-                    Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
-                    bundle.start();
-                    ServiceReference<?> refs[] = bundle.getRegisteredServices();
-                    //Must have one service only.
-                    ServiceReference<?> reference = refs[0];
-                    if (reference == null) {
+                    URI bundleURI = URI.create(bundleJar);
+                    AbstractImporterFactory importerFactory = m_moduleManager
+                            .getService(bundleURI, AbstractImporterFactory.class);
+                    if (importerFactory == null) {
                         m_logger.error("Failed to initialize importer from: " + bundleJar);
-                        bundle.stop();
                         return;
                     }
-                    Object o = bundle.getBundleContext().getService(reference);
-                    wrapper = new BundleWrapper(o, bundle);
+                    wrapper = new ModuleWrapper(importerFactory, bundleURI);
                 } else {
                     //Class based importer.
                     Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -141,8 +134,9 @@ public class ImportProcessor implements ImportDataProcessor {
                         m_logger.error("Failed to initialize importer from: " + bundleJar);
                         return;
                     }
-
-                     wrapper = new BundleWrapper(reference.newInstance(), null);
+                    AbstractImporterFactory importerFactory =
+                            (AbstractImporterFactory)reference.newInstance();
+                    wrapper = new ModuleWrapper(importerFactory, null);
                 }
                 String name = wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
@@ -162,7 +156,7 @@ public class ImportProcessor implements ImportDataProcessor {
     @Override
     public int getPartitionsCount() {
         int count = 0;
-        for (BundleWrapper wapper : m_bundles.values()) {
+        for (ModuleWrapper wapper : m_bundles.values()) {
             if (wapper != null) {
                 count += wapper.getConfigsCount();
             }
@@ -176,7 +170,7 @@ public class ImportProcessor implements ImportDataProcessor {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
-                for (BundleWrapper bw : m_bundles.values()) {
+                for (ModuleWrapper bw : m_bundles.values()) {
                     try {
                         bw.m_importerTypeMgr.readyForData();
                     } catch (Exception ex) {
@@ -197,7 +191,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 try {
                     //Stop all the bundle wrappers.
-                    for (BundleWrapper bw : m_bundles.values()) {
+                    for (ModuleWrapper bw : m_bundles.values()) {
                         try {
                             bw.stop();
                         } catch (Exception ex) {

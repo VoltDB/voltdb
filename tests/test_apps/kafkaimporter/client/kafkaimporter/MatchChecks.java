@@ -188,7 +188,7 @@ public class MatchChecks {
                     importStats.getString("PROCEDURE_NAME") + ", " + importStats.getLong("SUCCESSES") + ", " +
                     importStats.getLong("FAILURES") + ", " + importStats.getLong("OUTSTANDING_REQUESTS") + ", " +
                     importStats.getLong("RETRIES");
-            //log.info("statsString:" + statsString);
+            log.info("statsString:" + statsString);
         }
         return statsString;
     }
@@ -220,11 +220,13 @@ public class MatchChecks {
 
         while (importStats.advanceRow()) {
             int statnum = 0;
-            stats[statnum++] = importStats.getLong("SUCCESSES");
-            stats[statnum++] = importStats.getLong("FAILURES");
-            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
-            stats[statnum++] = importStats.getLong("RETRIES");
+            log.info("getImportValues: " + importStats.getString("PROCEDURE_NAME"));
+            stats[statnum] = importStats.getLong("SUCCESSES"); log.info("\tSUCCESSES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("FAILURES"); log.info("\tFAILURES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("OUTSTANDING_REQUESTS"); log.info("\tOUTSTANDING_REQUESTS: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("RETRIES"); log.info("\tRETRIES: " + stats[statnum++]);
         }
+
         return stats;
     }
 

@@ -117,6 +117,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
+  bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
 end
 
 begin Table                                  "A table (relation) in the database"

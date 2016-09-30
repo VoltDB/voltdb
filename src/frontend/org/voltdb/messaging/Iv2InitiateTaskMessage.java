@@ -190,12 +190,11 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getInitiatorHSId()));
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
-        sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId)).append("\n");
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" UNIQUE ID ").append(m_uniqueId).append(" (").append(UniqueIdGenerator.toString(m_uniqueId));
         sb.append(")").append("\n");
         sb.append(") TRUNC HANDLE ");
-        sb.append(getTruncationHandle()).append("\n");
+        sb.append(TxnEgo.txnIdToString(getTruncationHandle())).append("\n");
         sb.append("SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle())).append("\n");
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");

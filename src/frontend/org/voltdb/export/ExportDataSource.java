@@ -726,7 +726,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             if (m_endOfStream && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
-                fut.set(null);
+                try {
+                    fut.set(null);
+                } catch (RejectedExecutionException reex) {
+                    //We are closing source.
+                }
                 if (m_onDrain != null) {
                     m_onDrain.run();
                 }
@@ -770,9 +774,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
-                fut.set(
-                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                first_unpolled_block.uso() + first_unpolled_block.totalUso()));
+                try {
+                    fut.set(
+                            new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                                    first_unpolled_block.uso() + first_unpolled_block.totalUso()));
+                } catch (RejectedExecutionException reex) {
+                    //We are closing source.
+                }
                 m_pollFuture = null;
             }
         } catch (Throwable t) {

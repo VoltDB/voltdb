@@ -266,7 +266,7 @@ public class AsyncCompilerAgent {
                 return;
             }
 
-            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            if (!allowPausedModeWork(w)) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Server is paused and is available in read-only mode - please try again later.",
@@ -279,8 +279,14 @@ public class AsyncCompilerAgent {
         }
     }
 
+    private boolean allowPausedModeWork(AsyncCompilerWork w) {
+         return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
+                 w.isServerInitiated() ||
+                 w.adminConnection);
+    }
+
     void handleCatalogChangeWork(final CatalogChangeWork w) {
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+        if (!allowPausedModeWork(w)) {
             AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Server is paused and is available in read-only mode - please try again later.",
