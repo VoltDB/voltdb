@@ -2499,7 +2499,7 @@ public abstract class CatalogUtil {
             // outdir
             PropertyType outdir = new PropertyType();
             outdir.setName("outdir");
-            outdir.setValue(VoltDB.instance().getVoltDBRootPath() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            outdir.setValue(DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
             // k-safe file export
