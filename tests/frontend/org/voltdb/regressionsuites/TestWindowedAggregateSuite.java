@@ -253,36 +253,42 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     // rank1 is the rank for partition by A, order by B
     // rank2 is the rank for partition by A, AA, order by B
     private long expected[][] = new long[][] {
-        // A     AA   B     C    rank1   rank2
-        {  1L,  301L, 1L,  101L, 1L,      1L},
-        {  1L,  301L, 1L,  102L, 1L,      1L},
-
-        {  1L,  302L, 2L,  201L, 3L,      1L},
-        {  1L,  302L, 2L,  202L, 3L,      1L},
-        {  1L,  302L, 3L,  203L, 5L,      3L},
-
-        {  2L,  303L, 1L, 1101L, 1L,      1L},
-        {  2L,  303L, 1L, 1102L, 1L,      1L},
-        {  2L,  303L, 2L, 1201L, 3L,      3L},
-
-        {  2L,  304L, 2L, 1202L, 3L,      1L},
-        {  2L,  304L, 3L, 1203L, 5L,      2L},
-
-        { 20L,  305L, 1L, 2101L, 1L,      1L},
-        { 20L,  305L, 1L, 2102L, 1L,      1L},
-        { 20L,  305L, 2L, 2201L, 3L,      3L},
-
-        { 20L,  306L, 2L, 2202L, 3L,      1L},
-        { 20L,  306L, 3L, 2203L, 5L,      2L},
+        // A     AA   B     C    rank1   rank2   rank3
+        //--------------------------------------
+        {  1L,  301L, 1L,  101L, 1L,      1L,      1L},
+        {  1L,  301L, 1L,  102L, 1L,      1L,      1L},
+        //======================================
+        {  1L,  302L, 2L,  201L, 3L,      1L,      2L},
+        {  1L,  302L, 2L,  202L, 3L,      1L,      2L},
+        //======================================
+        {  1L,  302L, 3L,  203L, 5L,      3L,      3L},
+        //--------------------------------------
+        {  2L,  303L, 1L, 1101L, 1L,      1L,      1L},
+        {  2L,  303L, 1L, 1102L, 1L,      1L,      1L},
+        //======================================
+        {  2L,  303L, 2L, 1201L, 3L,      3L,      2L},
+        {  2L,  304L, 2L, 1202L, 3L,      1L,      2L},
+        //======================================
+        {  2L,  304L, 3L, 1203L, 5L,      2L,      3L},
+        //--------------------------------------
+        { 20L,  305L, 1L, 2101L, 1L,      1L,      1L},
+        { 20L,  305L, 1L, 2102L, 1L,      1L,      1L},
+        //======================================
+        { 20L,  305L, 2L, 2201L, 3L,      3L,      2L},
+        { 20L,  306L, 2L, 2202L, 3L,      1L,      2L},
+        //======================================
+        { 20L,  306L, 3L, 2203L, 5L,      2L,      3L},
+        //--------------------------------------
     };
 
     // Names for the column indices.
-    final int colA      = 0;
-    final int colAA     = 1;
-    final int colB      = 2;
-    final int colC      = 3;
-    final int colR_A    = 4;
-    final int colR_AA   = 5;
+    final int colA          = 0;
+    final int colAA         = 1;
+    final int colB          = 2;
+    final int colC          = 3;
+    final int colR_A        = 4;
+    final int colR_AA       = 5;
+    final int colR_dense    = 6;
 
     public void testRankWithString() throws Exception {
         Client client = getClient();
@@ -434,30 +440,38 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
 
     }
 
-    public void testRank() throws Exception {
+    public void validateRankFunction(String sql, int expectedCol) throws Exception {
         Client client = getClient();
 
         long input[][] = expected.clone();
         shuffleArrayOfLongs(input);
         ClientResponse cr;
         VoltTable vt;
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE T");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         for (long [] row : input) {
             cr = client.callProcedure("T.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
-        String sql = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],       vt.getLong(0));
+            assertEquals(msg, expected[rowIdx][colB],       vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colC],       vt.getLong(2));
+            assertEquals(msg, expected[rowIdx][expectedCol],vt.getLong(3));
         }
     }
 
+    public void testRank() throws Exception {
+        validateRankFunction("select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
+                             colR_dense);
+        validateRankFunction("select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
+                              colR_A);
+    }
     public void testRankMultPartitionBys() throws Exception {
         Client client = getClient();
 
@@ -482,6 +496,16 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
     }
 
+    public void testRankWithEmptyTable() throws Exception {
+        Client client = getClient();
+
+        ClientResponse cr;
+        // Don't insert nothing.  Or, rather, do insert nothing.
+        String sql = "select A, B, C, rank() over (partition by A*A*A, A*A order by B*B) as R from T ORDER BY A, B, C, R;";
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // That's it.  If the EE does not crash we are happy.
+    }
     public void testRankOrderbyExpressions() throws Exception {
         Client client = getClient();
 
