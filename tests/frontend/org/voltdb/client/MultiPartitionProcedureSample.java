@@ -27,7 +27,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class PartitionIntegerTestProc extends VoltProcedure {
+public class MultiPartitionProcedureSample extends VoltProcedure {
 
     public final SQLStmt stmt = new SQLStmt("SELECT count(*) FROM TABLE_INT_PARTITION;");
 
