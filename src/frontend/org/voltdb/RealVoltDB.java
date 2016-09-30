@@ -1587,6 +1587,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 replicas.removeAll(MpInitiator.MP_INIT_PID);
                 masters.remove(MpInitiator.MP_INIT_PID);
                 topo = clusterConfig.getTopology(hostGroups, replicas, masters);
+                m_messenger.registerGroupTags(hostGroups);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);
             }
@@ -1594,6 +1595,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (!startAction.doesRejoin()) {
                 topo = registerClusterConfig(topo);
             }
+
         }
         return topo;
     }
