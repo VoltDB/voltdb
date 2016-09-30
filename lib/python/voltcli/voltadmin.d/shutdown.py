@@ -47,7 +47,8 @@ def shutdown(runner):
             checkstats.check_importer(runner)
             runner.info('Cluster is ready for shutdown')
         except (KeyboardInterrupt, SystemExit):
-            runner.info('The cluster shutdown process is stopped. The cluster is still in Paused state.')
+            runner.info('The cluster shutdown process is stopped. The cluster is still in paused state.')
+            runner.info('You may resume the cluster with command voltadmin resume or shutdown the cluster with command voltadmin shutdown --force.')
             return
     response = runner.call_proc('@Shutdown', [], [], check_status = False)
     print response
