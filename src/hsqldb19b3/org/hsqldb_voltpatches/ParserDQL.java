@@ -1485,16 +1485,20 @@ public class ParserDQL extends ParserBase {
     private Expression readAggregate() {
 
         int        tokenT = token.tokenType;
-        Expression e;
+        Expression aggExpr;
 
         read();
         readThis(Tokens.OPENBRACKET);
 
-        e = readAggregateExpression(tokenT);
+        aggExpr = readAggregateExpression(tokenT);
 
         readThis(Tokens.CLOSEBRACKET);
+        if (token.tokenType == Tokens.OVER) {
+            read();
+            aggExpr = readWindowSpecification(tokenT, aggExpr);
+        }
 
-        return e;
+        return aggExpr;
     }
 
     private Expression readAggregateExpression(int tokenT) {
@@ -1503,6 +1507,20 @@ public class ParserDQL extends ParserBase {
         boolean distinct = false;
         boolean all      = false;
 
+        // If this is one of the RANK family, it takes no
+        // parameters.  So, just return null here.  The caller
+        // will know what to do with this.
+        switch (tokenT) {
+        case Tokens.RANK:
+        case Tokens.DENSE_RANK:
+        // No current support for WINDOWED_PERCENT_RANK or WINDOWED_CUME_DIST.
+        // case Tokens.PERCENT_RANK:
+        // case Tokens.CUME_DIST:
+            if (token.tokenType != Tokens.CLOSEBRACKET) {
+                throw Error.error("Expected a right parenthesis (')') here.", "", -1);
+            }
+            return null;
+        }
         if (token.tokenType == Tokens.DISTINCT) {
             distinct = true;
 
@@ -1554,23 +1572,28 @@ public class ParserDQL extends ParserBase {
         return aggregateExp;
     }
 
-    private Expression readRank(boolean isPercent) {
+    /**
+     * This is a minimal parsing of the Window Specification.  We only use
+     * partition by and order by lists.  There is a lot of complexity in the
+     * full SQL specification which we don't parse at all.
+     *
+     * @param tokenT
+     * @param aggExpr
+     * @return
+     */
+    private Expression readWindowSpecification(int tokenT, Expression aggExpr) {
         SortAndSlice sortAndSlice = null;
 
-        read();
-        readThis(Tokens.OPENBRACKET);
-        readThis(Tokens.CLOSEBRACKET);
-        readThis(Tokens.OVER);
         readThis(Tokens.OPENBRACKET);
 
-        List<Expression> partitionByList = new ArrayList<Expression>();
+        List<Expression> partitionByList = new ArrayList<>();
         if (token.tokenType == Tokens.PARTITION) {
             read();
             readThis(Tokens.BY);
 
             while (true) {
-                Expression e = XreadValueExpression();
-                partitionByList.add(e);
+                Expression partitionExpr = XreadValueExpression();
+                partitionByList.add(partitionExpr);
 
                 if (token.tokenType == Tokens.COMMA) {
                     read();
@@ -1580,19 +1603,36 @@ public class ParserDQL extends ParserBase {
             }
         }
 
-        if (token.tokenType != Tokens.ORDER) {
-            throw unexpectedToken();
+        if (token.tokenType == Tokens.ORDER) {
+            // order by clause
+            read();
+            readThis(Tokens.BY);
+            sortAndSlice = XreadOrderBy();
         }
-        // order by clause
-        read();
-        readThis(Tokens.BY);
-        sortAndSlice = XreadOrderBy();
-
         readThis(Tokens.CLOSEBRACKET);
 
-        ExpressionRank erank = new ExpressionRank(sortAndSlice, partitionByList, isPercent);
+        // We don't really care about aggExpr any more.  It has the
+        // aggregate expression as a non-windowed expression.  We do
+        // care about its parameters and whether it's specified as
+        // unique though.
+        assert(aggExpr == null || aggExpr instanceof ExpressionAggregate);
+        Expression nodes[];
+        boolean isDistinct;
+        if (aggExpr != null) {
+            ExpressionAggregate winAggExpr = (ExpressionAggregate)aggExpr;
+            nodes = winAggExpr.nodes;
+            isDistinct = winAggExpr.isDistinctAggregate;
+        } else {
+            nodes = Expression.emptyExpressionArray;
+            isDistinct = false;
+        }
+        ExpressionWindowed windowedExpr = new ExpressionWindowed(tokenT,
+                                                                 nodes,
+                                                                 isDistinct,
+                                                                 sortAndSlice,
+                                                                 partitionByList);
 
-        return erank;
+        return windowedExpr;
     }
 
     //--------------------------------------
@@ -1935,9 +1975,7 @@ public class ParserDQL extends ParserBase {
             case Tokens.SOME :
             case Tokens.EVERY :
             case Tokens.COUNT :
-            // A VoltDB extension APPROX_COUNT_DISTINCT
             case Tokens.APPROX_COUNT_DISTINCT :
-            // End of VoltDB extension
             case Tokens.MAX :
             case Tokens.MIN :
             case Tokens.SUM :
@@ -1946,6 +1984,8 @@ public class ParserDQL extends ParserBase {
             case Tokens.STDDEV_SAMP :
             case Tokens.VAR_POP :
             case Tokens.VAR_SAMP :
+            case Tokens.RANK :
+            case Tokens.DENSE_RANK:
                 return readAggregate();
 
             case Tokens.NEXT :
@@ -1956,12 +1996,6 @@ public class ParserDQL extends ParserBase {
                 // CLI function names
                 break;
 
-            case Tokens.RANK :
-                return readRank(false);
-
-            // No support for PERCENT_RANK here.
-            // case Tokens.PERCENT_RANK :
-            //    return readRank(true);
 
             default :
                 if (isCoreReservedKey()) {
@@ -3044,6 +3078,10 @@ public class ParserDQL extends ParserBase {
                 rewind(position);
 
                 e = readAggregateExpression(tokenT);
+
+                if (e == null) {
+                    throw Error.error("Unsupported aggregate expression " + Tokens.getKeyword(tokenT), "", 0);
+                }
 
                 readThis(Tokens.CLOSEBRACKET);
         }

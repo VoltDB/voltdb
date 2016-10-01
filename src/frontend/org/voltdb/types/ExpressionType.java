@@ -128,11 +128,16 @@ public enum ExpressionType {
     // For one thing, windowed aggregates have class WindowedExpression.class,
     // and non-windowed aggregates have class AggregateExpression.class.
     //
-    // We only support RANK now, but when we support different
+    // We only support RANK and DENSE_RANK now.  But when we support different
     // aggregate functions we will want to keep them as
     // separate ExpressionType enumerals.
     // ----------------------------
     AGGREGATE_WINDOWED_RANK       (WindowedExpression.class,  70, "RANK"),
+    AGGREGATE_WINDOWED_DENSE_RANK (WindowedExpression.class,  71, "DENSE_RANK"),
+    // No support for PERCENT_RANK yet.
+    // AGGREGATE_WINDOWED_PERCENT_RANK(WindowedExpression.class, 72, "PERCENT_RANK"),
+    // No support for CUME_DIST yet.
+    // AGGREGATE_WINDOWED_CUME_DIST  (WindowedExpression.class,  73, "CUME_DIST"),
 
     // ----------------------------
     // Function
@@ -244,6 +249,16 @@ public enum ExpressionType {
     }
 
     public boolean isNullary() {
-        return this == ExpressionType.AGGREGATE_COUNT_STAR || this == ExpressionType.AGGREGATE_WINDOWED_RANK;
+        return this == ExpressionType.AGGREGATE_COUNT_STAR
+                || this == ExpressionType.AGGREGATE_WINDOWED_RANK
+                || this == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK;
+    }
+
+    private static Map<ExpressionType, String> m_windowedAggName;
+
+    static {
+        m_windowedAggName = new HashMap<>();
+        m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_RANK, "RANK");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK, "DENSE_RANK");
     }
 }

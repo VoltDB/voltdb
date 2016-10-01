@@ -352,19 +352,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
-                      "Use of both windowed RANK() and GROUP BY in a single query is not supported.");
+                      "Use of both a windowed function call and GROUP BY in a single query is not supported.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
-                      "Only one windowed RANK() expression may appear in a selection list.");
+                      "Only one windowed function call may appear in a selection list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Windowed RANK() expressions can have only one ORDER BY expression in their window.");
+                      "Windowed function call expressions can have only one ORDER BY expression in their window.");
 
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
-                      "Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                      "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
         // Windowed expressions can only appear in the selection list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
-                      "Windowed RANK() expressions can only appear in the selection list of a query or subquery.");
+                      "Windowed function call expressions can only appear in the selection list of a query or subquery.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery
@@ -373,6 +373,16 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
                       "WHERE ALPHA.C <> BBB.C;",
                       "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
+        failToCompile("SELECT RANK() OVER () AS ARANK " +
+                      "FROM AAA;",
+                      "Windowed RANK function call expressions require an ORDER BY specification.");
+        failToCompile("SELECT DENSE_RANK() OVER () AS ARANK " +
+                      "FROM AAA;",
+                      "Windowed DENSE_RANK function call expressions require an ORDER BY specification.");
+        failToCompile("SELECT RANK(DISTINCT) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
+        failToCompile("SELECT DENSE_RANK(ALL) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
     }
 
     public void testExplainPlanText() {
