@@ -34,8 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
@@ -46,6 +44,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+
+import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -454,7 +454,6 @@ public class PlannerTestCase extends TestCase {
     private static void ensureTable(int data[][]) {
         // Ensure there is at least one row, and that
         // all rows have the same length.
-        assertTrue(data.length > 0);
         for (int idx = 1; idx < data.length; idx += 1) {
             assertTrue(data[idx].length == data[0].length);
         }
@@ -486,6 +485,9 @@ public class PlannerTestCase extends TestCase {
         }
         public int getColCount() {
             // TODO Auto-generated method stub
+            if (m_data.length == 0) {
+                return 0;
+            }
             return m_data[0].length;
         }
         public Object getColumnNamesName() {
@@ -736,7 +738,10 @@ public class PlannerTestCase extends TestCase {
             return m_expectedOutput.length;
         }
         public int    getColCount() {
-            return m_expectedOutput[0].length;
+            if (m_expectedOutput.length > 0) {
+                return m_expectedOutput[0].length;
+            }
+            return 0;
         }
         public String getColCountName() {
             return String.format("NUM_OUTPUT_COLS_%s", m_testName.toUpperCase());
