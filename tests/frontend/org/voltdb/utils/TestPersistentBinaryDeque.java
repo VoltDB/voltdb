@@ -91,7 +91,6 @@ public class TestPersistentBinaryDeque {
     public static TreeSet<String> getSortedDirectoryListing() {
         TreeSet<String> names = new TreeSet<String>();
         for (File f : TEST_DIR.listFiles()) {
-            if (f.getName().endsWith("pbd.cursors")) continue;
             names.add(f.getName());
         }
         return names;
@@ -464,9 +463,8 @@ public class TestPersistentBinaryDeque {
         //Make sure a single file with the appropriate data is created
         m_pbd.offer(defaultContainer());
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 2, files.length);
-        assertTrue( "pbd_nonce.0.pbd".equals(files[0].getName()) || "pbd_nonce.0.pbd".equals(files[1].getName()));
-        assertTrue( "pbd_nonce.pbd.cursors".equals(files[0].getName()) || "pbd_nonce.pbd.cursors".equals(files[1].getName()));
+        assertEquals( 1, files.length);
+        assertTrue( "pbd_nonce.0.pbd".equals(files[0].getName()));
 
         //Now make sure the current write file is stolen and a new write file created
         BBContainer retval = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
@@ -486,7 +484,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(defaultContainer());
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 4, files.length);
+        assertEquals( 3, files.length);
         Set<String> actualFiles = Sets.newHashSet();
         for (File f : files) {
             actualFiles.add(f.getName());
@@ -495,7 +493,6 @@ public class TestPersistentBinaryDeque {
         for (int i = 0; i < 3; i++) {
             expectedFiles.add("pbd_nonce." + i + ".pbd");
         }
-        expectedFiles.add("pbd_nonce.pbd.cursors");
         Assert.assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
@@ -517,7 +514,7 @@ public class TestPersistentBinaryDeque {
         for (int i = 0; i < 5; i++) {
             m_pbd.offer(defaultContainer());
         }
-        assertEquals(2, TEST_DIR.listFiles().length);
+        assertEquals(1, TEST_DIR.listFiles().length);
 
         // Read one buffer from the segment so that it's considered being polled from.
         reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
@@ -526,7 +523,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(defaultContainer());
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 4, files.length);
+        assertEquals( 3, files.length);
         Set<String> actualFiles = Sets.newHashSet();
         for (File f : files) {
             actualFiles.add(f.getName());
@@ -535,7 +532,6 @@ public class TestPersistentBinaryDeque {
         for (int i = 0; i < 3; i++) {
             expectedFiles.add("pbd_nonce." + i + ".pbd");
         }
-        expectedFiles.add("pbd_nonce.pbd.cursors");
         Assert.assertEquals(expectedFiles, actualFiles);
 
         //Now make sure the current write file is stolen and a new write file created
@@ -556,7 +552,7 @@ public class TestPersistentBinaryDeque {
             assertFalse(reader.isEmpty());
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 4, files.length);
+        assertEquals( 3, files.length);
 
         //Now create two buffers with different data to push at the front
         final ByteBuffer buffer1 = getFilledBuffer(16);
@@ -628,7 +624,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(defaultContainer());
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals( 4, files.length);
+        assertEquals( 3, files.length);
 
         m_pbd.sync();
         m_pbd.close();
@@ -828,7 +824,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals(4, files.length);
+        assertEquals(3, files.length);
 
         m_pbd.sync();
         m_pbd.close();
@@ -875,7 +871,7 @@ public class TestPersistentBinaryDeque {
         }
         File files[] = TEST_DIR.listFiles();
         //We have the default pbd and new one.
-        assertEquals(4, files.length);
+        assertEquals(2, files.length);
 
         small_pbd.sync();
         small_pbd.close();
@@ -931,7 +927,7 @@ public class TestPersistentBinaryDeque {
             m_pbd.offer(DBBPool.wrapBB(getFilledBuffer(ii)));
         }
         File files[] = TEST_DIR.listFiles();
-        assertEquals(4, files.length);
+        assertEquals(3, files.length);
         m_pbd.sync();
         m_pbd.close();
         m_pbd = null;
@@ -1038,7 +1034,7 @@ public class TestPersistentBinaryDeque {
         for (int i = 0; i < total; i++) {
             m_pbd.offer(defaultContainer());
         }
-        assertEquals(2, TEST_DIR.listFiles().length);
+        assertEquals(1, TEST_DIR.listFiles().length);
 
         // Read read all the buffers from the segment (isEmpty() returns true)
         for (int i = 0; i < total; i++) {
@@ -1047,17 +1043,15 @@ public class TestPersistentBinaryDeque {
 
         assert(reader.isEmpty());
         File files[] = TEST_DIR.listFiles();
-        assertEquals(2, files.length);
-        assert(files[0].getName().equals("pbd_nonce.0.pbd") || files[1].getName().equals("pbd_nonce.0.pbd"));
-        assert(files[0].getName().equals("pbd_nonce.pbd.cursors") || files[1].getName().equals("pbd_nonce.pbd.cursors"));
+        assertEquals(1, files.length);
+        assert(files[0].getName().equals("pbd_nonce.0.pbd"));
 
         m_pbd.offer(defaultContainer());
 
         files = TEST_DIR.listFiles();
         // Make sure a new segment was created and the old segment was deleted
-        assertEquals(2, files.length);
-        assert(files[0].getName().equals("pbd_nonce.1.pbd") || files[1].getName().equals("pbd_nonce.1.pbd"));
-        assert(files[0].getName().equals("pbd_nonce.pbd.cursors") || files[1].getName().equals("pbd_nonce.pbd.cursors"));
+        assertEquals(1, files.length);
+        assert(files[0].getName().equals("pbd_nonce.1.pbd"));
     }
 
     @Before

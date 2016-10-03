@@ -326,48 +326,62 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
+    private interface XMLElementExpressionParser {
+        AbstractExpression parse(AbstractParsedStmt stmt,
+                                 VoltXMLElement element);
+    }
+
+    private static Map<String, XMLElementExpressionParser> m_exprParsers;
+
+    static {
+        m_exprParsers = new HashMap<>();
+        m_exprParsers.put("value",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseValueExpression(element));
+        m_exprParsers.put("vector",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseVectorExpression(element));
+        m_exprParsers.put("columnref",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseColumnRefExpression(element));
+        m_exprParsers.put("operation",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseOperationExpression(element));
+        m_exprParsers.put("aggregation",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseAggregationExpression(element));
+        m_exprParsers.put("asterisk",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> null);
+        m_exprParsers.put("win_aggregation",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseWindowedAggregationExpression(element));
+        m_exprParsers.put("function",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseFunctionExpression(element));
+        m_exprParsers.put("tablesubquery",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseSubqueryExpression(element));
+        m_exprParsers.put("row",
+                          (AbstractParsedStmt stmt, VoltXMLElement element)
+                              -> stmt.parseRowExpression(element));
+    }
+
+    /**
+     * Given a VoltXMLElement expression node, translate it into an
+     * AbstractExpression.  This is mostly a lookup in the table
+     * m_exprParsers.
+     */
     private AbstractExpression parseExpressionNode(VoltXMLElement exprNode) {
         String elementName = exprNode.name.toLowerCase();
         AbstractExpression retval = null;
 
-        if (elementName.equals("value")) {
-            retval = parseValueExpression(exprNode);
-        }
-        else if (elementName.equals("vector")) {
-            retval = parseVectorExpression(exprNode);
-        }
-        else if (elementName.equals("columnref")) {
-            retval = parseColumnRefExpression(exprNode);
-        }
-        else if (elementName.equals("operation")) {
-            retval = parseOperationExpression(exprNode);
-        }
-        else if (elementName.equals("aggregation")) {
-            retval = parseAggregationExpression(exprNode);
-            if (m_aggregationList != null) {
-                ExpressionUtil.finalizeValueTypes(retval);
-                m_aggregationList.add(retval);
-            }
-        }
-        else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(exprNode);
-        }
-        else if (elementName.equals("asterisk")) {
-            return null;
-        }
-        else if (elementName.equals("tablesubquery")) {
-            retval = parseSubqueryExpression(exprNode);
-        }
-        else if (elementName.equals("row")) {
-            retval = parseRowExpression(exprNode);
-        }
-        else if (elementName.equals("rank")) {
-            retval = parseRankValueExpression(exprNode);
-        }
-        else {
+        XMLElementExpressionParser parser = m_exprParsers.get(elementName);
+        if (parser == null) {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
-        assert(retval != null);
+        retval = parser.parse(this, exprNode);
+        assert("asterisk".equals(elementName) || retval != null);
         return retval;
     }
 
@@ -535,8 +549,14 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
+    private AbstractExpression parseWindowedAggregationExpression(VoltXMLElement exprNode) {
         int id = Integer.parseInt(exprNode.attributes.get("id"));
+        String optypeName = exprNode.attributes.get("optype");
+        ExpressionType optype = ExpressionType.get(optypeName);
+        if (optype == ExpressionType.INVALID) {
+            throw new PlanningErrorException("Undefined windowed function call " + optypeName);
+        }
+
         // If this is not in the display column list, and the id is not the id of
         // the windowed expression, then this is an error.
         if (!m_parsingInDisplayColumns) {
@@ -551,37 +571,45 @@ public abstract class AbstractParsedStmt {
                     return we.getDisplayListExpression();
                 }
             }
-            throw new PlanningErrorException("Windowed RANK() expressions can only appear in the selection list of a query or subquery.");
+            throw new PlanningErrorException("Windowed function call expressions can only appear in the selection list of a query or subquery.");
         }
-        // Parse individual rank expressions
+        // Parse individual aggregate expressions
         List<AbstractExpression> partitionbyExprs = new ArrayList<>();
         List<AbstractExpression> orderbyExprs = new ArrayList<>();
         List<SortDirectionType>  orderbyDirs  = new ArrayList<>();
+        List<AbstractExpression> aggParams    = new ArrayList<>();
 
-        for (VoltXMLElement ele : exprNode.children) {
-            if (ele.name.equals("partitionbyList")) {
-                for (int i = 0; i < ele.children.size(); i++) {
-                    VoltXMLElement childNode = ele.children.get(i);
-                    AbstractExpression expr = parseExpressionNode(childNode);
-                    ExpressionUtil.finalizeValueTypes(expr);
-                    partitionbyExprs.add(expr);
+        for (VoltXMLElement childEle : exprNode.children) {
+            if (childEle.name.equals("winspec")) {
+                for (VoltXMLElement ele : childEle.children) {
+                    if (ele.name.equals("partitionbyList")) {
+                        for (int i = 0; i < ele.children.size(); i++) {
+                            VoltXMLElement childNode = ele.children.get(i);
+                            AbstractExpression expr = parseExpressionNode(childNode);
+                            ExpressionUtil.finalizeValueTypes(expr);
+                            partitionbyExprs.add(expr);
+                        }
+                    } else if (ele.name.equals("orderbyList")) {
+                        for (int i = 0; i < ele.children.size(); i++) {
+                            VoltXMLElement childNode = ele.children.get(i);
+                            SortDirectionType sortDir
+                                = Boolean.valueOf(childNode.attributes.get("decending"))
+                                    ? SortDirectionType.DESC
+                                    : SortDirectionType.ASC;
+
+                            AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                            ExpressionUtil.finalizeValueTypes(expr);
+                            orderbyExprs.add(expr);
+                            orderbyDirs.add(sortDir);
+                        }
+                    }
                 }
-
-            } else if (ele.name.equals("orderbyList")) {
-                for (int i = 0; i < ele.children.size(); i++) {
-                    VoltXMLElement childNode = ele.children.get(i);
-                    SortDirectionType sortDir
-                        = Boolean.valueOf(childNode.attributes.get("decending"))
-                            ? SortDirectionType.DESC
-                            : SortDirectionType.ASC;
-
-                    AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
-                    ExpressionUtil.finalizeValueTypes(expr);
-                    orderbyExprs.add(expr);
-                    orderbyDirs.add(sortDir);
+            } else if (childEle.name.equals("winargs")) {
+                for (VoltXMLElement ele : childEle.children) {
+                    aggParams.add(parseExpressionNode(ele));
                 }
             } else {
-                throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
+                throw new PlanningErrorException("Invalid windowed expression found: " + childEle.name);
             }
         }
 
@@ -590,10 +618,11 @@ public abstract class AbstractParsedStmt {
         if (exprNode.attributes.containsKey("alias")) {
             alias = exprNode.attributes.get("alias");
         }
-        WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
+        WindowedExpression rankExpr = new WindowedExpression(optype,
                                                              partitionbyExprs,
                                                              orderbyExprs,
                                                              orderbyDirs,
+                                                             aggParams,
                                                              id);
         ExpressionUtil.finalizeValueTypes(rankExpr);
         // Only offset 0 is useful.  But we keep the index anyway.
@@ -1011,7 +1040,7 @@ public abstract class AbstractParsedStmt {
         // The design fully abstracts other volt classes from the XML serialization.
         // So, this goes here instead of in derived Expression implementations.
 
-        assert (exprNode.children.size() == 1);
+        assert (exprNode.children.size() <= 1);
 
         // get the single required child node
         VoltXMLElement childExprNode = exprNode.children.get(0);
@@ -1031,6 +1060,10 @@ public abstract class AbstractParsedStmt {
         String node;
         if ((node = exprNode.attributes.get("distinct")) != null && Boolean.parseBoolean(node)) {
             expr.setDistinct();
+        }
+        if (m_aggregationList != null) {
+            ExpressionUtil.finalizeValueTypes(expr);
+            m_aggregationList.add(expr);
         }
         return expr;
     }

@@ -129,6 +129,7 @@ public class ParsedColInfo implements Cloneable {
 
             if ((child.name.equals("operation") == false) &&
                     (child.name.equals("aggregation") == false) &&
+                    (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
                     (child.name.equals("rank") == false)) {
                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);

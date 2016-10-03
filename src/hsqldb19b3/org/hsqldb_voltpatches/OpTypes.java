@@ -101,8 +101,39 @@ public interface OpTypes {
         MULTICOLUMN          = 97
         // A VoltDB extension APPROX_COUNT_DISTINCT
         , APPROX_COUNT_DISTINCT = 98
-        , RANK                  = 99
-        , PERCENT_RANK          = 100 // reserved but not used
+        // The WindowedAggregate operators go here.  There
+        // will be some duplication with the grouped aggregate
+        // operators.  That is to say, MAX, MIN, and so forth
+        // will be windowed and grouped both.  We can tell from
+        // the syntax which one we are using, and we use different
+        // OpType enumerals to distinguish.
+        , WINDOWED_RANK         = 99
+        , WINDOWED_DENSE_RANK   = 100
+        , WINDOWED_PERCENT_RANK = 101 // reserved but not used
+        , WINDOWED_CUME_DIST    = 102 // reserved but not used
         // End VoltDB extension
     ;
+
+    /**
+     * Return the name of an OpType.  It's surprising we only
+     * need this for windowed aggregates.  These are used only
+     * for error messages.
+     *
+     * @param opType
+     * @return
+     */
+    static String aggregateName(int opType) {
+        switch (opType) {
+        case WINDOWED_RANK:
+            return "RANK";
+        case WINDOWED_DENSE_RANK:
+            return "DENSE_RANK";
+        case WINDOWED_PERCENT_RANK:
+            return "PERCENT_RANK";
+        case WINDOWED_CUME_DIST:
+            return "CUME_DIST";
+        default:
+            return "UnsupportedOp(" + opType + ")";
+        }
+    }
 }

@@ -826,7 +826,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Check for windowed expressions.
         if (m_windowedExpressions.size() > 0) {
             if (m_windowedExpressions.size() > 1) {
-                throw new PlanningErrorException("Only one windowed RANK() expression may appear in a selection list.");
+                throw new PlanningErrorException("Only one windowed function call may appear in a selection list.");
             }
             //
             // This could be an if statement, but I think it's better to
@@ -835,18 +835,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             //
             WindowedExpression windowedExpression = m_windowedExpressions.get(0);
             List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
-            switch (windowedExpression.getExpressionType()) {
+            ExpressionType exprType = windowedExpression.getExpressionType();
+            switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
+            case AGGREGATE_WINDOWED_DENSE_RANK:
                 if (orderByExpressions.size() == 0) {
-                    throw new PlanningErrorException("Windowed RANK() expressions need an ORDER BY expression.");
+                    String aggName = exprType.symbol().toUpperCase();
+                    throw new PlanningErrorException(
+                            String.format("Windowed %s function call expressions require an ORDER BY specification.", aggName));
                 }
                 if (orderByExpressions.size() > 1) {
                     // This is perhaps slightly misleading.
-                    throw new PlanningErrorException("Windowed RANK() expressions can have only one ORDER BY expression in their window.");
+                    throw new PlanningErrorException("Windowed function call expressions can have only one ORDER BY expression in their window.");
                 }
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
-                    throw new PlanningErrorException("Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                    throw new PlanningErrorException("Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                }
+                break;
+            default:
+                {
+                    String opName = (exprType == null) ? "NULL" : exprType.symbol();
+                    throw new PlanningErrorException("Unknown windowed aggregate function type: " + opName);
                 }
             }
         }
@@ -855,7 +865,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
         if (hasWindowedExpression()) {
             throw new PlanningErrorException(
-                    "Use of both windowed RANK() and GROUP BY in a single query is not supported.");
+                    "Use of both a windowed function call and GROUP BY in a single query is not supported.");
         }
         for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child);
@@ -2196,33 +2206,49 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public boolean isDML() { return false; }
 
     /**
-     * Return true iff all the windowed expressions have a table partition column
-     * in their partition by list.  Since we only support one windowed expression
-     * now, this returns true if there are no windowed expressions.
+     * Return true iff all the windowed partition expressions have a table partition column
+     * in their partition by list, and if there is one such windowed partition expression.  If there are
+     * no windowed expressions, we return false.  Note that there can only be one windowed
+     * expression currently, so this is more general than it needs to be.
      *
      * @return
      */
     public boolean isPartitionColumnInWindowedAggregatePartitionByList() {
-        for (WindowedExpression we : getWindowedExpressions()) {
-            List<AbstractExpression> partitionByExprs = we.getPartitionByExpressions();
-            for (AbstractExpression ae : partitionByExprs) {
-                if ( ! (ae instanceof TupleValueExpression ) ) {
-                    continue;
-                }
-                TupleValueExpression tve = (TupleValueExpression)ae;
-                String tableAlias    = tve.getTableAlias();
-                String columnName    = tve.getColumnName();
-                StmtTableScan scanTable = getStmtTableScanByAlias(tableAlias);
-                if (scanTable == null || scanTable.getPartitioningColumns() == null) {
-                    continue;
-                }
-                for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
-                    if (pcol != null && pcol.getColumnName().equals(columnName)) {
-                        return true;
-                    }
+        if (getWindowedExpressions().size() == 0) {
+            return false;
+        }
+        // We can't really have more than one Windowed Aggregate Expression.  If
+        // we ever do, this should fail gracelessly.
+        assert(getWindowedExpressions().size() == 1);
+        WindowedExpression we = getWindowedExpressions().get(0);
+        List<AbstractExpression> partitionByExprs = we.getPartitionByExpressions();
+        boolean foundPartExpr = false;
+        for (AbstractExpression ae : partitionByExprs) {
+            if ( ! (ae instanceof TupleValueExpression ) ) {
+                continue;
+            }
+            TupleValueExpression tve = (TupleValueExpression)ae;
+            String tableAlias    = tve.getTableAlias();
+            String columnName    = tve.getColumnName();
+            StmtTableScan scanTable = getStmtTableScanByAlias(tableAlias);
+            if (scanTable == null || scanTable.getPartitioningColumns() == null) {
+                continue;
+            }
+            boolean foundPartCol = false;
+            for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
+                if (pcol != null && pcol.getColumnName().equals(columnName)) {
+                    foundPartCol = true;
+                    break;
                 }
             }
+            // If we found a partition column, then we don't
+            // need to look at any other partition by expressions
+            // in this windowed expression.
+            if (foundPartCol) {
+                foundPartExpr = true;
+                break;
+            }
         }
-        return false;
+        return foundPartExpr;
     }
 }
