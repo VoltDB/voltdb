@@ -158,6 +158,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -1586,7 +1587,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 final Map<Integer, Long> masters = m_cartographer.getHSIdsForSinglePartitionMasters();
                 replicas.removeAll(MpInitiator.MP_INIT_PID);
                 masters.remove(MpInitiator.MP_INIT_PID);
-                topo = clusterConfig.getTopology(hostGroups, replicas, masters);
+                topo = clusterConfig.getTopology(hostGroups, replicas, masters, Lists.newArrayList());
                 m_messenger.registerGroupTags(hostGroups);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);

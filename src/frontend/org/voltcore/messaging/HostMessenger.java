@@ -1073,6 +1073,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostGroups;
     }
 
+    public Map<Integer, ExtensibleGroupTag> getGroupTags()
+            throws KeeperException, InterruptedException, JSONException
+    {
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        final List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+
+        for (String child : children) {
+            final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
+            // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
+            ExtensibleGroupTag groupTag = new ExtensibleGroupTag(info.m_rackAwarenessGroup, info.m_buddyGroup);
+            hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), groupTag);
+        }
+        return hostGroups;
+    }
+
     /**
      * Rewrite the calculated buddy group tag into cluster
      */

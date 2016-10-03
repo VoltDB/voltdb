@@ -22,6 +22,7 @@
  */
 package org.voltdb.compiler;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,7 +56,7 @@ public class TestClusterCompiler extends TestCase
         topology.put(0, new ExtensibleGroupTag("0", "0"));
         topology.put(1, new ExtensibleGroupTag("0", "0"));
         topology.put(2, new ExtensibleGroupTag("0", "0"));
-        JSONObject obj = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
+        JSONObject obj = config.getTopology(topology, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
         config.validate();
         System.out.println(obj.toString(4));
         JSONArray partitions = obj.getJSONArray("partitions");
@@ -107,7 +108,7 @@ public class TestClusterCompiler extends TestCase
         ClusterConfig config = new ClusterConfig(1, 6, 0);
         Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
         topology.put(0, new ExtensibleGroupTag("0", "0"));
-        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
+        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
         assertEquals(1, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
         assertEquals(0, topo.getInt("kfactor"));
@@ -124,7 +125,7 @@ public class TestClusterCompiler extends TestCase
         Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
         topology.put(0, new ExtensibleGroupTag("0", "0"));
         topology.put(1, new ExtensibleGroupTag("0", "0"));
-        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
+        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
         assertEquals(0, topo.getInt("kfactor"));
@@ -143,7 +144,7 @@ public class TestClusterCompiler extends TestCase
         Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
         topology.put(0, new ExtensibleGroupTag("0", "0"));
         topology.put(1, new ExtensibleGroupTag("0", "0"));
-        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
+        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
         assertEquals(1, topo.getInt("kfactor"));
@@ -160,7 +161,7 @@ public class TestClusterCompiler extends TestCase
         Map<Integer, ExtensibleGroupTag> topology = Maps.newHashMap();
         topology.put(0, new ExtensibleGroupTag("0", "0"));
         topology.put(1, new ExtensibleGroupTag("0", "0"));
-        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>());
+        JSONObject topo = config.getTopology(topology, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
         assertEquals(2, topo.getInt("hostcount"));
         assertEquals(6, topo.getInt("sites_per_host"));
         assertEquals(1, topo.getInt("kfactor"));
@@ -228,7 +229,7 @@ public class TestClusterCompiler extends TestCase
                 // Invalid config, skip
                 continue;
             }
-            final JSONObject initialTopo = initialConfig.getTopology(rejoinHostGroup, HashMultimap.create(), new HashMap<>());
+            final JSONObject initialTopo = initialConfig.getTopology(rejoinHostGroup, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
 
             final Multimap<Integer, Integer> partitionToHosts = HashMultimap.create();
             final Multimap<Integer, Integer> hostPartitions = HashMultimap.create();
@@ -286,7 +287,7 @@ public class TestClusterCompiler extends TestCase
                 final int rejoinHostId = rejoin.getKey() + fullHostGroup.size();
                 System.out.println("Rejoining H" + rejoin.getKey() + " as H" + rejoinHostId + " in group " + rejoin.getValue().m_rackAwarenessGroup);
                 rejoinHostGroup.put(rejoinHostId, rejoin.getValue());
-                final JSONObject rejoinTopo = initialConfig.getTopology(rejoinHostGroup, replicas, masters);
+                final JSONObject rejoinTopo = initialConfig.getTopology(rejoinHostGroup, replicas, masters, new ArrayList<>());
                 final List<Integer> partitionsOnRejoinHost = ClusterConfig.partitionsForHost(rejoinTopo, rejoinHostId);
 
                 // Verify rejoined host first. Partitions on rejoined host should have
@@ -549,7 +550,7 @@ public class TestClusterCompiler extends TestCase
             final ClusterConfig config = new ClusterConfig(hostGroups.size(), sites, kfactor);
             System.out.println("Running config " + hostGroups.size() + " hosts, " + sites + " sitesperhost, k=" + kfactor);
             if (config.validate()) {
-                final JSONObject topo = config.getTopology(hostGroups, HashMultimap.create(), new HashMap<>());
+                final JSONObject topo = config.getTopology(hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>());
                 verifyTopology(hostGroups, topo);
             } else {
                 System.out.println(config.getErrorMsg());

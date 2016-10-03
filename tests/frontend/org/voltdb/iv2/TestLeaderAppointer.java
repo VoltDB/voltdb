@@ -30,6 +30,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +133,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
-                                    null, m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()), m_mpi, stats, false);
+                                    null, m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -281,7 +282,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     false);
@@ -528,7 +529,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>()),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     true);

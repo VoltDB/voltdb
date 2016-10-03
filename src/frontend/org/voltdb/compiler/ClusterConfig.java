@@ -111,28 +111,6 @@ public class ClusterConfig
         topo.put("hostcount", config.getHostCount() + newHosts);
     }
 
-    /**
-     * Add new partitions to the topology.
-     * @param topo          The topology that will be added to.
-     * @param partToHost    A map of new partitions to their corresponding replica host IDs.
-     * @throws JSONException
-     */
-    public static void addPartitions(JSONObject topo, Multimap<Integer, Integer> partToHost)
-        throws JSONException
-    {
-        JSONArray partitions = topo.getJSONArray("partitions");
-        for (Map.Entry<Integer, Collection<Integer>> e : partToHost.asMap().entrySet()) {
-            int partition = e.getKey();
-            Collection<Integer> hosts = e.getValue();
-
-            JSONObject partObj = new JSONObject();
-            partObj.put("partition_id", partition);
-            partObj.put("replicas", hosts);
-
-            partitions.put(partObj);
-        }
-    }
-
     public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)
     {
         m_hostCount = hostCount;
@@ -780,6 +758,7 @@ public class ClusterConfig
             Map<Integer, String> buddyGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
+            List<Integer> partitionsToAdd,
             int hostCount,
             int partitionCount,
             int sitesPerHost)
@@ -791,9 +770,7 @@ public class ClusterConfig
         Multimaps.invertFrom(partitionReplicas, HSIdToReplicas);
         HSIdToReplicas.keySet().stream().forEach(
                 HSId -> nonRejoinHostIds.add(CoreUtils.getHostIdFromHSId(HSId)));
-        // Assume one rejoin node at a time
         Set<Integer> rejoinHostIds = Sets.difference(liveHostIds, nonRejoinHostIds);
-        assert rejoinHostIds.size() == 1;
 
         // Find the current buddy topology (exclude the rejoined node)
         Map<String, Set<Integer>> buddyGroupToHostIds = Maps.newHashMap();
@@ -805,33 +782,38 @@ public class ClusterConfig
             }
         }
 
-        // Invert the rack aware group
-        Map<String, Set<Integer>> rackGroupToHostIds = Maps.newHashMap();
-        for (Entry<Integer, String> e : rackAwareGroups.entrySet()) {
-            rackGroupToHostIds.putIfAbsent(e.getValue(), Sets.newTreeSet());
-            Set<Integer> hostIds = rackGroupToHostIds.get(e.getValue());
-            hostIds.add(e.getKey());
-        }
-        // Add rejoined node to the first candidate group so that they
-        // doesn't belong to same rack group (if there are more than two rack groups)
-        boolean found = false;
-        for (Integer rejoinHostId : rejoinHostIds) {
-            String rackGroup = rackAwareGroups.get(rejoinHostId);
-            Set<Integer> members = rackGroupToHostIds.get(rackGroup);
-            // prefer the group with least nodes
-            for (Set<Integer> candidate : sortBuddyGroupsBySize(buddyGroupToHostIds)) {
-                if (rackGroupToHostIds.size() == 1 || !members.containsAll(candidate)) {
-                    candidate.add(rejoinHostId);
-                    found = true;
-                    break;
+        if (!partitionsToAdd.isEmpty()) {
+            //elasticJoin
+            String newTag = String.valueOf(buddyGroupToHostIds.size());
+            buddyGroupToHostIds.put(newTag, Sets.newTreeSet());
+            Set<Integer> hostIds = buddyGroupToHostIds.get(newTag);
+            hostIds.addAll(rejoinHostIds);
+        } else {
+            // Invert the rack aware group
+            Map<String, Set<Integer>> rackGroupToHostIds = Maps.newHashMap();
+            for (Entry<Integer, String> e : rackAwareGroups.entrySet()) {
+                rackGroupToHostIds.putIfAbsent(e.getValue(), Sets.newTreeSet());
+                Set<Integer> hostIds = rackGroupToHostIds.get(e.getValue());
+                hostIds.add(e.getKey());
+            }
+            // Add rejoined node to the first candidate group so that they
+            // doesn't belong to same rack group (if there are more than two rack groups)
+            boolean found = false;
+            for (Integer rejoinHostId : rejoinHostIds) {
+                String rackGroup = rackAwareGroups.get(rejoinHostId);
+                Set<Integer> members = rackGroupToHostIds.get(rackGroup);
+                // prefer the group with least nodes
+                for (Set<Integer> candidate : sortBuddyGroupsBySize(buddyGroupToHostIds)) {
+                    if (rackGroupToHostIds.size() == 1 || !members.containsAll(candidate)) {
+                        candidate.add(rejoinHostId);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    throw new RuntimeException("Failed to rejoin the node " + rejoinHostId + " due to the provided placement groups");
                 }
             }
-            if (found) {
-                break;
-            }
-        }
-        if (!found) {
-            throw new RuntimeException("Failed to rejoin the node due to the provided placement groups");
         }
         // Assign partitions based on current buddy topology
         List<BuddyGroupConfiguration> configs = Lists.newArrayList();
@@ -850,8 +832,14 @@ public class ClusterConfig
                     Maps.filterValues(partitionMasters,
                             HSId -> buddyHostIds.contains(CoreUtils.getHostIdFromHSId(HSId)));
             List<Partition> subPartitions = Lists.newArrayList();
-            subPartitionMaster.forEach(
-                    (k, v) -> subPartitions.add(new Partition(k, getReplicationFactor() + 1)));
+            if (subPartitionMaster.isEmpty()) {
+                //elasticJoin
+                partitionsToAdd.forEach(
+                        k -> subPartitions.add(new Partition(k, getReplicationFactor() + 1)));
+            } else {
+                subPartitionMaster.forEach(
+                        (k, v) -> subPartitions.add(new Partition(k, getReplicationFactor() + 1)));
+            }
             configs.add(new BuddyGroupConfiguration(subRAGroup, subBuddyGroup, subPartitionReps,
                     subPartitionMaster, subPartitions, sitesPerHost));
         }
@@ -886,6 +874,7 @@ public class ClusterConfig
             Map<Integer, ExtensibleGroupTag> hostGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
+            List<Integer> partitionsToAdd,
             int hostCount,
             int partitionCount,
             int sitesPerHost) throws JSONException {
@@ -898,7 +887,7 @@ public class ClusterConfig
         if (!partitionReplicas.isEmpty()) {
             return rejoinNodeToBuddyGroup(rackAwareGroups,
                     buddyGroups, partitionReplicas, partitionMasters,
-                    hostCount, partitionCount, sitesPerHost);
+                    partitionsToAdd, hostCount, partitionCount, sitesPerHost);
         } else {
             return assignNodeToBuddyGroup(rackAwareGroups,
                     buddyGroups, partitionReplicas, partitionMasters,
@@ -1023,6 +1012,7 @@ public class ClusterConfig
             Map<Integer, ExtensibleGroupTag> hostGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
+            List<Integer> partitionsToAdd,
             int hostCount,
             int partitionCount,
             int sitesPerHost) throws JSONException, KeeperException, InterruptedException {
@@ -1030,7 +1020,8 @@ public class ClusterConfig
         List<Partition> partitions = new ArrayList<>();
         List<BuddyGroupConfiguration> buddyConfigs = getBuddyGroupTopology(
                 hostGroups, partitionReplicas, partitionMasters,
-                hostCount, partitionCount, sitesPerHost);
+                partitionsToAdd, hostCount, partitionCount,
+                sitesPerHost);
         for (BuddyGroupConfiguration config : buddyConfigs) {
             assignPartitions(config);
             partitions.addAll(config.m_partitions);
@@ -1334,13 +1325,15 @@ public class ClusterConfig
             Map<Integer, ExtensibleGroupTag> hostGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
+            List<Integer> partitionsToAdd,
             int hostCount,
             int partitionCount,
             int sitesPerHost ) throws JSONException {
         JSONObject topo;
         try {
             topo = rackAwarePlacement(hostGroups, partitionReplicas,
-                    partitionMasters, hostCount, partitionCount, sitesPerHost);
+                                      partitionMasters, partitionsToAdd,
+                                      hostCount, partitionCount, sitesPerHost);
         } catch (Exception e) {
             e.printStackTrace();
             hostLog.error("Unable to use optimal replica placement strategy. " +
@@ -1356,10 +1349,14 @@ public class ClusterConfig
     // rejoin clones this from an existing server.
     public JSONObject getTopology(Map<Integer, ExtensibleGroupTag> hostGroups,
                                   Multimap<Integer, Long> partitionReplicas,
-                                  Map<Integer, Long> partitionMasters) throws JSONException
+                                  Map<Integer, Long> partitionMasters,
+                                  List<Integer> partitionsToAdd) throws JSONException
     {
         int hostCount = getHostCount();
         int partitionCount = partitionMasters.isEmpty() ? getPartitionCount() : partitionMasters.size();
+        if (!partitionsToAdd.isEmpty()) {
+            partitionCount += partitionsToAdd.size();
+        }
         int sitesPerHost = getSitesPerHost();
 
         if (hostCount != hostGroups.size() && partitionReplicas.isEmpty() && partitionMasters.isEmpty()) {
@@ -1372,7 +1369,7 @@ public class ClusterConfig
                                              hostCount, partitionCount, sitesPerHost);
         } else {
             topo = groupAwarePlacementStrategy(hostGroups, partitionReplicas,
-                    partitionMasters, hostCount, partitionCount, sitesPerHost);
+                    partitionMasters, partitionsToAdd, hostCount, partitionCount, sitesPerHost);
         }
 
         if (hostLog.isDebugEnabled()) {
