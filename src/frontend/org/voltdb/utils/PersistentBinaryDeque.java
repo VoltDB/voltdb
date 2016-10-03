@@ -250,7 +250,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private final TreeMap<Long, PBDSegment> m_segments = new TreeMap<>();
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
-    private RandomAccessFile m_cursorsWriter;
     private int m_numObjects;
     private int m_numDeleted;
 
@@ -390,8 +389,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         writeSegment.openForWrite(true);
 
         m_numObjects = countNumObjects();
-        // load saved cursors
-        readCursorFile(new File(m_path, m_nonce + ".pbd.cursors"));
         assertions();
     }
 
@@ -402,21 +399,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         return numObjects;
-    }
-
-    private void readCursorFile(File file) {
-        try {
-            m_cursorsWriter = new RandomAccessFile(file, "rwd");
-            String cursorId = null;
-            while ((cursorId=m_cursorsWriter.readUTF()) != null) {
-                m_readCursors.put(cursorId, new ReadCursor(cursorId, m_numDeleted));
-                m_cursorsWriter.readUTF();
-            }
-        } catch(EOFException e) {
-            // Nothing to read
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override
@@ -687,15 +669,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (reader == null) {
             reader = new ReadCursor(cursorId, m_numDeleted);
             m_readCursors.put(cursorId, reader);
-            persistCursor(cursorId);
         }
 
         return reader;
-    }
-
-    private void persistCursor(String cursorId) throws IOException {
-        m_cursorsWriter.writeUTF(cursorId);
-        m_cursorsWriter.writeUTF(System.getProperty("line.separator"));
     }
 
     private boolean canDeleteSegment(PBDSegment segment) throws IOException {
@@ -739,7 +715,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments.values()) {
             segment.close();
         }
-        m_cursorsWriter.close();
         m_closed = true;
     }
 

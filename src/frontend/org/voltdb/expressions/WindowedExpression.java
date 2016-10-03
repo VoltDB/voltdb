@@ -47,8 +47,9 @@ public class WindowedExpression extends AbstractExpression {
     public static SortDirectionType DEFAULT_ORDER_BY_DIRECTION = SortDirectionType.ASC;
 
     private List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
-    private List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
-    private List<SortDirectionType>  m_orderByDirections = new ArrayList<>();
+    private List<AbstractExpression> m_orderByExpressions     = new ArrayList<>();
+    private List<SortDirectionType>  m_orderByDirections      = new ArrayList<>();
+    private List<AbstractExpression> m_aggArguments           = new ArrayList<>();
 
     // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
     // the display list has a TVE which references the column which holds the values this aggregate
@@ -69,12 +70,14 @@ public class WindowedExpression extends AbstractExpression {
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
             List<SortDirectionType>  orderByDirections,
+            List<AbstractExpression> aggArguments,
             int                      id)
     {
         super(operationType);
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);
         m_orderByDirections.addAll(orderByDirections);
+        m_aggArguments.addAll(aggArguments);
         setValueType(VoltType.BIGINT);
         setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
         m_xmlID = id;
@@ -101,6 +104,10 @@ public class WindowedExpression extends AbstractExpression {
         return m_orderByDirections;
     }
 
+    public List<AbstractExpression> getAggregateArguments() {
+        return m_aggArguments;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (super.equals(obj) && obj instanceof WindowedExpression) {
@@ -120,6 +127,7 @@ public class WindowedExpression extends AbstractExpression {
         hash += m_orderByDirections.hashCode();
         hash += m_orderByExpressions.hashCode();
         hash += m_partitionByExpressions.hashCode();
+        hash += m_aggArguments.hashCode();
         return hash;
     }
 
@@ -149,6 +157,9 @@ public class WindowedExpression extends AbstractExpression {
         for (AbstractExpression sortExpr : m_orderByExpressions) {
             list.addAll(sortExpr.findAllSubexpressionsOfClass(aeClass));
         }
+        for (AbstractExpression aggExpr : m_aggArguments) {
+            list.addAll(aggExpr.findAllSubexpressionsOfClass(aeClass));
+        }
         return list;
     }
 
@@ -167,16 +178,12 @@ public class WindowedExpression extends AbstractExpression {
                 return true;
             }
         }
-        return false;
-    }
-
-    public SortDirectionType getSortIndexOfPartitionByExpression(AbstractExpression partitionByExpression) {
-        for (int idx = 0; idx < m_orderByExpressions.size(); idx += 1) {
-            if (partitionByExpression.equals(m_orderByExpressions.get(idx))) {
-                return m_orderByDirections.get(idx);
+        for (AbstractExpression aggExpr : m_aggArguments) {
+            if (aggExpr.hasAnySubexpressionOfClass(aeClass)) {
+                return true;
             }
         }
-        return SortDirectionType.INVALID;
+        return false;
     }
 
     /**

@@ -255,7 +255,7 @@ public:
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
         voltdb::TableIterator &iter = result->iterator();
-        if (!iter.hasNext()) {
+        if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }
