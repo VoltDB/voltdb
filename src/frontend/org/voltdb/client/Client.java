@@ -520,6 +520,6 @@ public interface Client {
      * @throws IOException if there is a Java network or connection problem.
      * @throws ProcCallException on any VoltDB specific failure.
      */
-    boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName, Object... params)
+    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName, Object... params)
             throws IOException, NoConnectionsException, ProcCallException;
 }
