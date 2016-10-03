@@ -74,13 +74,16 @@ public class SnapshotInitiationInfo
             case 1:
                 checkNonceValidity = parseJsonParams(params);
                 break;
-            default:
+            case 0:
                 m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
                 m_stype = SnapshotPathType.SNAP_AUTO;
                 m_path = VoltDB.instance().getSnapshotPath();
                 //We will always generate a good valid nonce.
                 checkNonceValidity = false;
                 break;
+            default:
+                throw new Exception("@SnapshotSave requires 3 parameters " +
+                        "(Path, nonce, and blocking) or alternatively a single JSON blob. or no parameters to save snapshot in autoshnapshot directory.");
         }
 
         if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
