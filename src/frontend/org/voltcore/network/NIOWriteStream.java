@@ -100,7 +100,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_monitor = monitor;
         m_sslEngine = engine;
         m_isSSLCcnfigured = engine == null ? false : true;
-        m_encBuffer = ByteBuffer.allocate(32 * 1024);
+        m_encBuffer = ByteBuffer.allocate((int) (VoltPort.SSL_CHUNK_SIZE * 1.2));
     }
 
     /*
@@ -254,30 +254,88 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             updateLastPendingWriteTimeAndQueueBackpressure();
 
-            m_queuedWrites.offer(new DeferredSerialization() {
-                @Override
-                public void serialize(ByteBuffer outbuf) {
-                    for (ByteBuffer buf : b) {
-                        outbuf.put(buf);
+            // TOOD: safe to assume we always queue one message in a buffer?
+            // TODO: if v3 is enabled.
+            for (ByteBuffer buf : b) {
+                if (m_isSSLCcnfigured) {
+                    while (buf.remaining() > 5) {
+                        buf.mark();
+                        int messsageLen = buf.getInt();
+                        int version = (int) buf.get();
+                        // TODO: to make testing easier...
+                        // if (version == 3) {
+                        if (true) {
+                            ByteBuffer messageBuf = ByteBuffer.allocate(messsageLen - 1);
+                            buf.get(messageBuf.array(), 0, messsageLen - 1);
+                            try {
+                                encryptBuffer(messageBuf, messsageLen);
+                            } catch (IOException e) {
+                                // TODO: need to do something here.
+                            }
+                        } else {
+                            buf.reset();
+                            offerBuffer(buf, buf.remaining());
+                        }
                     }
+                } else {
+                   offerBuffer(buf, buf.remaining());
                 }
-
-                @Override
-                public void cancel() {}
-
-                @Override
-                public int getSerializedSize() {
-                    int sum = 0;
-                    for (ByteBuffer buf : b) {
-                        buf.position(0);
-                        sum += buf.remaining();
-                    }
-                    return sum;
-                }
-            });
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            }
         }
-        return;
+    }
+
+    private void encryptBuffer(ByteBuffer message, int fullMessageLength) throws IOException {
+        // need to be at position five in buf.  That is, have read the length of the
+        // full message and the version.
+        if (message.remaining() < VoltPort.SSL_CHUNK_SIZE) {
+            encryptChunk(message, fullMessageLength);
+        } else {
+            ByteBuffer chunk = ByteBuffer.allocate(VoltPort.SSL_CHUNK_SIZE);
+            while (message.remaining() > 0) {
+                if (message.remaining() > VoltPort.SSL_CHUNK_SIZE) {
+                    message.get(chunk.array(), 0, VoltPort.SSL_CHUNK_SIZE);
+                    encryptChunk(chunk, fullMessageLength);
+                } else {
+                    chunk.put(message);
+                    chunk.flip();
+                    encryptChunk(chunk, fullMessageLength);
+                }
+                chunk.clear();
+            }
+        }
+    }
+
+    private void encryptChunk(ByteBuffer messageChunk, int fullMessageLength) throws IOException {
+        m_encBuffer.clear();
+        encryptMessage(messageChunk);
+        int encryptedChunkSize = m_encBuffer.remaining() + 9;
+        ByteBuffer encryptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 9);
+        encryptedChunk.putInt(m_encBuffer.remaining() + 5);
+        encryptedChunk.put((byte) 3);
+        encryptedChunk.putInt(fullMessageLength);
+        encryptedChunk.put(m_encBuffer);
+        encryptedChunk.flip();
+
+        offerBuffer(encryptedChunk, encryptedChunkSize);
+    }
+
+    private void offerBuffer(final ByteBuffer buf, final int bufLen) {
+        m_queuedWrites.offer(new DeferredSerialization() {
+            @Override
+            public void serialize(ByteBuffer outbuf) {
+                outbuf.put(buf);
+            }
+
+            @Override
+            public void cancel() {}
+
+            @Override
+            public int getSerializedSize() {
+                return bufLen;
+            }
+        });
+
+        m_port.setInterests( SelectionKey.OP_WRITE, 0);
     }
 
     /**
@@ -322,8 +380,6 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
     }
 
-    private ByteBuffer remainder = null;
-
     /**
      * Does the work of queueing addititional buffers that have been serialized
      * and choosing between gathering and regular writes to the channel. Also splits up very large
@@ -337,7 +393,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     int drainTo (final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
         try {
-            long rc;
+            long rc = 0;
             do {
                 /*
                  * Nothing to write
@@ -346,7 +402,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     return bytesWritten;
                 }
 
-                ByteBuffer buffer;
+                ByteBuffer buffer = null;
                 if (m_currentWriteBuffer == null) {
                     m_currentWriteBuffer = m_queuedBuffers.poll();
                     buffer = m_currentWriteBuffer.b();
@@ -355,58 +411,21 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     buffer = m_currentWriteBuffer.b();
                 }
 
-                ByteBuffer process;
-                if (remainder != null) {
-                    process = ByteBuffer.allocate(remainder.remaining() + buffer.remaining());
-                    process.put(remainder);
-                    process.put(buffer);
-                    process.flip();
-                    remainder = null;
+                rc = channel.write(buffer);
+
+                //Discard the buffer back to a pool if no data remains
+                if (buffer.hasRemaining()) {
+                    if (!m_hadBackPressure) {
+                        backpressureStarted();
+                    }
                 } else {
-                    process = buffer;
-                }
-
-                while (true) {
-                    rc = 0;
-                    if (process.remaining() == 0) {
-                        break;
-                    }
-
-                    if (process.remaining() < 4) {
-                        remainder = ByteBuffer.allocate(process.remaining());
-                        remainder.put(process);
-                        remainder.flip();
-                        break;
-                    }
-
-                    process.mark();
-                    int messageLen = process.getInt();
-                    if (process.remaining() < messageLen) {
-                        process.reset();
-                        remainder = ByteBuffer.allocate(process.remaining());
-                        remainder.put(process);
-                        remainder.flip();
-                        break;
-                    }
-
-                    ByteBuffer plainTextMessage = ByteBuffer.allocate(messageLen);
-                    process.get(plainTextMessage.array());
-
-                    // encrypt
-                    m_encBuffer.clear();
-                    wrapMessage(plainTextMessage);
-                    ByteBuffer sendMessage = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
-                    sendMessage.putInt(m_encBuffer.remaining());
-                    sendMessage.put(m_encBuffer);
-                    sendMessage.flip();
-                    rc = channel.write(sendMessage);
-                    bytesWritten += rc;
+                    m_currentWriteBuffer.discard();
+                    m_currentWriteBuffer = null;
                     m_messagesWritten++;
                 }
+                bytesWritten += rc;
 
-                m_currentWriteBuffer.discard();
-                m_currentWriteBuffer = null;
-            } while (rc > 0 || remainder != null);
+            } while (rc > 0);
         } finally {
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
@@ -429,7 +448,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return bytesWritten;
     }
 
-    private void wrapMessage(ByteBuffer unwrapped) throws IOException {
+    private void encryptMessage(ByteBuffer unwrapped) throws IOException {
         while (true) {
             SSLEngineResult result = m_sslEngine.wrap(unwrapped, m_encBuffer);
             switch (result.getStatus()) {

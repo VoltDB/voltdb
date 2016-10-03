@@ -29,10 +29,15 @@ import java.util.concurrent.RejectedExecutionException;
 import org.voltcore.logging.VoltLogger;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
 
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
+    /** For v3 (SSL) messages, the decrypted size of the message chunks. */
+    public static final int SSL_CHUNK_SIZE = 8 * 1024;
+
     /** The network this port participates in */
     private final VoltNetwork m_network;
 
@@ -89,6 +94,9 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
+    private ByteBuffer m_decBuffer;
+    private ByteBuffer m_assembledV3Message;
+    private ByteBuffer m_v3MessageChunk;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
@@ -105,6 +113,9 @@ public class VoltPort implements Connection
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         m_sslEngine = engine;
+        m_decBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));  // overflows if allocated at chunk size, though it seems it shouldn't
+        m_assembledV3Message = null;
+        m_v3MessageChunk = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
     }
 
     /**
@@ -182,8 +193,19 @@ public class VoltPort implements Connection
                      */
                     try {
                         while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            m_handler.handleMessage( message, this);
-                            m_messagesRead++;
+                            if (isV3Message(message)) {
+                                ByteBuffer assembledMessage;
+                                if ((assembledMessage = assembleV3Message(message)) != null) {
+                                    m_handler.handleMessage(assembledMessage, this);
+                                    m_messagesRead++;
+                                    // TODO: make sure assembledMessage doesn't need to be copied
+                                    // TODO: before m_assembledV3Message is cleared.
+                                    m_assembledV3Message = null;
+                                }
+                            } else {
+                                m_handler.handleMessage( message, this);
+                                m_messagesRead++;
+                            }
                         }
                     }
                     catch (VoltProtocolHandler.BadMessageLength e) {
@@ -202,6 +224,58 @@ public class VoltPort implements Connection
             synchronized(m_lock) {
                 assert(m_running == true);
                 m_running = false;
+            }
+        }
+    }
+
+    private boolean isV3Message(ByteBuffer message) {
+        message.mark();
+        byte version = message.get();
+        message.reset();
+        return ((int) version) == 3;
+    }
+
+    private ByteBuffer assembleV3Message(ByteBuffer fullMessageChunk) throws IOException {
+        fullMessageChunk.get();  // the version
+        int fullUnwrappedMessageLength = fullMessageChunk.getInt();
+        if (m_assembledV3Message == null) {
+            m_assembledV3Message = ByteBuffer.allocate(fullUnwrappedMessageLength);
+            m_assembledV3Message.put((byte) 3);
+        }
+
+        m_v3MessageChunk.clear();
+        while (m_v3MessageChunk.capacity() < fullMessageChunk.remaining()) {
+            ByteBuffer bigger = ByteBuffer.allocate(m_v3MessageChunk.capacity() * 2);
+            m_v3MessageChunk = bigger;
+        }
+        m_v3MessageChunk.put(fullMessageChunk);
+        m_v3MessageChunk.flip();
+
+        decryptMessage(m_sslEngine, m_v3MessageChunk);
+        m_assembledV3Message.put(m_decBuffer);
+        m_decBuffer.clear();
+        if (m_assembledV3Message.position() == fullUnwrappedMessageLength) {
+            m_assembledV3Message.flip();
+            return m_assembledV3Message;
+        }
+        return null;
+    }
+
+    private void decryptMessage(SSLEngine engine, ByteBuffer message) throws IOException {
+        while (true) {
+            SSLEngineResult result = engine.unwrap(message, m_decBuffer);
+            switch (result.getStatus()) {
+                case OK:
+                    m_decBuffer.flip();
+                    return;
+                case BUFFER_OVERFLOW:
+                    ByteBuffer bigger = ByteBuffer.allocate(m_decBuffer.capacity() * 2);
+                    m_decBuffer = bigger;
+                    break;  // try again
+                case BUFFER_UNDERFLOW:
+                    throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
+                case CLOSED:
+                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
             }
         }
     }

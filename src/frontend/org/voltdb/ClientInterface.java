@@ -881,7 +881,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin, sslEngine);
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -916,10 +916,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final String m_username;
 
         public ClientInputHandler(String username,
-                                  boolean isAdmin,
-                                  SSLEngine sslEngine)
+                                  boolean isAdmin)
         {
-            super(sslEngine);
             m_username = username.intern();
             m_isAdmin = isAdmin;
         }

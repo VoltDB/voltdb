@@ -30,7 +30,7 @@ import org.voltdb.utils.SerializationHelper;
  */
 public class ProcedureInvocation {
 
-    public static final byte CURRENT_MOST_RECENT_VERSION = ProcedureInvocationType.VERSION2.getValue();
+    public static final byte CURRENT_MOST_RECENT_VERSION = ProcedureInvocationType.VERSION3.getValue();
 
     private final long m_clientHandle;
     private final String m_procName;

@@ -398,7 +398,7 @@ class Distributer {
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
         public NodeConnection(long ids[], SSLEngine sslEngine) {
-            super(sslEngine);
+            super();
         }
 
         /*
