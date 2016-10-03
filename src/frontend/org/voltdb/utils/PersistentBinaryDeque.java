@@ -137,10 +137,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         @Override
         public int getNumObjects() throws IOException {
-            if (m_closed) {
-                throw new IOException("Reader " + m_cursorId + " has been closed");
+            synchronized(PersistentBinaryDeque.this) {
+                if (m_closed) {
+                    throw new IOException("Reader " + m_cursorId + " has been closed");
+                }
+                return m_numObjects - m_numObjectsDeleted - m_numRead;
             }
-            return m_numObjects - m_numObjectsDeleted - m_numRead;
         }
 
         /*
@@ -816,7 +818,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public int getNumObjects() throws IOException {
+    public synchronized int getNumObjects() throws IOException {
         int numObjects = 0;
         for (PBDSegment segment : m_segments.values()) {
             numObjects += segment.getNumEntries();
