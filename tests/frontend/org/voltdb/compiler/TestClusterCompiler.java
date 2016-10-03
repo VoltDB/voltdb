@@ -194,11 +194,11 @@ public class TestClusterCompiler extends TestCase
     {
         ImmutableMap<Integer, ExtensibleGroupTag> topology = new ImmutableMap.Builder<Integer, ExtensibleGroupTag>()
                                                  .put(0, new ExtensibleGroupTag("0", "0"))
-                                                 .put(1, new ExtensibleGroupTag("0", "0"))
-                                                 .put(2, new ExtensibleGroupTag("1", "0"))
-                                                 .put(3, new ExtensibleGroupTag("1", "0"))
+                                                 .put(1, new ExtensibleGroupTag("0", "1"))
+                                                 .put(2, new ExtensibleGroupTag("1", "1"))
+                                                 .put(3, new ExtensibleGroupTag("1", "2"))
                                                  .put(4, new ExtensibleGroupTag("2", "0"))
-                                                 .put(5, new ExtensibleGroupTag("2", "0"))
+                                                 .put(5, new ExtensibleGroupTag("2", "2"))
                                                  .build();
         killAndRejoinNodes(topology, 1, 2);
     }
@@ -207,12 +207,12 @@ public class TestClusterCompiler extends TestCase
     {
         ImmutableMap<Integer, ExtensibleGroupTag> topology = new ImmutableMap.Builder<Integer, ExtensibleGroupTag>()
                                                  .put(0, new ExtensibleGroupTag("0", "0"))
-                                                 .put(1, new ExtensibleGroupTag("0", "0"))
+                                                 .put(1, new ExtensibleGroupTag("0", "1"))
                                                  .put(2, new ExtensibleGroupTag("0", "0"))
                                                  .put(3, new ExtensibleGroupTag("0", "0"))
                                                  .put(4, new ExtensibleGroupTag("1", "0"))
-                                                 .put(5, new ExtensibleGroupTag("1", "0"))
-                                                 .put(6, new ExtensibleGroupTag("1", "0"))
+                                                 .put(5, new ExtensibleGroupTag("1", "1"))
+                                                 .put(6, new ExtensibleGroupTag("1", "1"))
                                                  .build();
         killAndRejoinNodes(topology, 2, 3);
     }

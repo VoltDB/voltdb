@@ -687,7 +687,7 @@ public class ClusterConfig
             int sitesPerHost,
             int partitionCount)
     {
-        Map<String, Integer> sizingPlan = Maps.newHashMap();
+        Map<String, Integer> sizingPlan = Maps.newTreeMap();
         // see what's the best sizing of buddy group
         int optimalBuddyGroups = hostCount / (m_replicationFactor + 1);
         int remainder = hostCount % optimalBuddyGroups;
@@ -696,7 +696,7 @@ public class ClusterConfig
             sizingPlan.put(String.valueOf(groupId), size);
         }
 
-        Map<String, Set<Integer>> buddyGroupToHostIds = Maps.newHashMap();
+        Map<String, Set<Integer>> buddyGroupToHostIds = Maps.newTreeMap();
         // buddy these nodes up based on rack aware topology
         boolean singleRackGroup = rackAwareGroups.values().stream().distinct().count() == 1;
         if (singleRackGroup) {
