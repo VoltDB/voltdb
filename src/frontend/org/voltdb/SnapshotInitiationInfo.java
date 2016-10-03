@@ -87,7 +87,7 @@ public class SnapshotInitiationInfo
         }
 
         if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
-            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or start with " + MAGIC_NONCE_PREFIX);
+            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
         }
     }
 
