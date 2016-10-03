@@ -34,6 +34,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PBDSegment.PBDSegmentReader;
@@ -757,6 +758,16 @@ public class PersistentBinaryDeque implements BinaryDeque {
             size += segment.size();
         }
         return size;
+    }
+
+    public synchronized Pair<Integer, Long> getBufferCountAndSize() throws IOException {
+        int count = 0;
+        long size = 0;
+        for (PBDSegment segment : m_segments.values()) {
+            count += segment.getNumEntries();
+            size += segment.size();
+        }
+        return Pair.of(count, size);
     }
 
     @Override
