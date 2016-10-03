@@ -460,6 +460,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_numResultDependencies = 0;
     size_t numResultDependenciesCountOffset = m_resultOutput.reserveBytes(4);
 
+    // In version 5.0, fragments may trigger execution of other fragments.
+    // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
+    // This method only executes top-level fragments.
+    assert(m_tuplesModifiedStack.size() == 0);
+
     int64_t tuplesModified = 0;
     try {
         // execution lists for planfragments are cached by planfragment id
@@ -519,11 +524,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
 UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified) {
     UniqueTempTableResult result;
-    // In version 5.0, fragments may trigger execution of other fragments.
-    // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
-    // This method only executes top-level fragments.
-    assert(m_tuplesModifiedStack.size() == 0);
-
     // set this to zero for dml operations
     m_tuplesModifiedStack.push(0);
 

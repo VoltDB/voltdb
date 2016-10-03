@@ -2131,6 +2131,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 + "WHERE T3.f4 = ? "
                 + "group by t3.f5;",
                 "The SELECT query for VIEW \"V\" contains parameters, which is not allowed.");
+
+        verifyStmtFails(client,
+                "create view v as "
+                + "select t3.f5, count(*) "
+                + "FROM t3_eng_11119 as t3 "
+                + "WHERE T3.f4 = ? "
+                + "group by t3.f5;",
+                "The SELECT query for VIEW \"V\" contains parameters, which is not allowed.");
     }
 
     /**

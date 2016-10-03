@@ -112,6 +112,11 @@ public class MaterializedViewProcessor {
             }
             assert(stmt != null);
 
+            if (stmt.getParameters().length > 0) {
+                String msg = "The SELECT query for VIEW \"" + destTable.getTypeName() + "\" contains parameters, which is not allowed.";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+
             String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited world view
             checkViewMeetsSpec(viewName, stmt);
@@ -665,10 +670,6 @@ public class MaterializedViewProcessor {
                           null, // no user-supplied join order
                           DeterminismMode.FASTER,
                           StatementPartitioning.inferPartitioning());
-        if (! createQueryInfer.getParameters().isEmpty()) {
-            String msg = "The SELECT query for VIEW \"" + viewName + "\" contains parameters, which is not allowed.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
 
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
