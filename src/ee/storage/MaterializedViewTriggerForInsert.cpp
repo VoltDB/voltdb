@@ -54,13 +54,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
     // include all target table indexes except the actual primary key index on the group by columns.
-    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
-    BOOST_FOREACH(TableIndex *index, targetIndexes) {
-        if (index != m_index) {
-            m_updatableIndexList.push_back(index);
-        }
-    }
-
+    initUpdatableIndexList();
     allocateBackedTuples();
 
     VOLT_TRACE("Finished MaterializedViewTriggerForInsert initialization...");
@@ -74,6 +68,33 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
         delete m_aggExprs[ii];
     }
     m_target->decrementRefcount();
+}
+
+void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
+    // Note that if the way we initialize this m_updatableIndexList changes in the future, 
+    //   we also need to change the condition to detect when the m_updatableIndexList
+    //   should be refreshed in the updateDefinition() function.
+    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    m_updatableIndexList.clear();
+    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+        if (index != m_index) {
+            m_updatableIndexList.push_back(index);
+        }
+    }
+}
+
+void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
+{
+    setTargetTable(destTable);
+    // destTable->allIndexes().size() will be at least ONE because
+    //   we always create an index on the group by keys on view destination tables.
+    // Currently, m_updatableIndexList will include all the indices except the primary key index.
+    // So destTable->allIndexes().size() == m_updatableIndexList.size() + 1
+    // Here we only test the count of indices because indices cannot be changed
+    //   after being created.
+    if (destTable->allIndexes().size() != m_updatableIndexList.size() + 1) {
+        initUpdatableIndexList();
+    }
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
