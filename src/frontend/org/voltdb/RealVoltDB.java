@@ -3569,11 +3569,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         int.class,
                         String.class,
                         ClientInterface.class,
+                        Cartographer.class,
                         byte.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                         m_messenger.getHostId(),
                         drProducerHost,
                         m_clientInterface,
+                        m_cartographer,
                         drConsumerClusterId);
                 m_globalServiceElector.registerService(m_consumerDRGateway);
             } catch (Exception e) {
