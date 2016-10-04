@@ -2123,6 +2123,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     public void testCreateViewWithParams() throws Exception {
         Client client = getClient();
 
+        String expectedMsg = "Materialized view \"V\" contains placeholders \\(\\?\\), "
+                + "which are not allowed in the SELECT query for a view.";
         verifyStmtFails(client,
                 "create view v as "
                 + "select t3.f5, count(*) "
@@ -2130,7 +2132,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 + "ON T1.f1 = T3.f4 "
                 + "WHERE T3.f4 = ? "
                 + "group by t3.f5;",
-                "The SELECT query for VIEW \"V\" contains parameters, which is not allowed.");
+                expectedMsg);
 
         verifyStmtFails(client,
                 "create view v as "
@@ -2138,7 +2140,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 + "FROM t3_eng_11119 as t3 "
                 + "WHERE T3.f4 = ? "
                 + "group by t3.f5;",
-                "The SELECT query for VIEW \"V\" contains parameters, which is not allowed.");
+                expectedMsg);
     }
 
     /**

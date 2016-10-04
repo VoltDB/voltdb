@@ -112,11 +112,6 @@ public class MaterializedViewProcessor {
             }
             assert(stmt != null);
 
-            if (stmt.getParameters().length > 0) {
-                String msg = "The SELECT query for VIEW \"" + destTable.getTypeName() + "\" contains parameters, which is not allowed.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-
             String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited world view
             checkViewMeetsSpec(viewName, stmt);
@@ -469,6 +464,11 @@ public class MaterializedViewProcessor {
         int displayColCount = stmt.m_displayColumns.size();
         StringBuffer msg = new StringBuffer();
         msg.append("Materialized view \"" + viewName + "\" ");
+
+        if (stmt.getParameters().length > 0) {
+            msg.append("contains placeholders (?), which are not allowed in the SELECT query for a view.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
 
         List <AbstractExpression> checkExpressions = new ArrayList<>();
 
