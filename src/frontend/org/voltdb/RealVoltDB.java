@@ -2365,9 +2365,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_config.m_placementGroup != null) {
             hmconfig.rackAwarenessgroup = m_config.m_placementGroup;
         }
-        if (m_config.m_buddyGroup != null) {
-            hmconfig.buddyGroup = m_config.m_buddyGroup;
-        }
+        // default buddy group, clusterConfig will calculate the right group
+        // once all hosts is in cluster
+        hmconfig.buddyGroup = "0";
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;
