@@ -2120,6 +2120,45 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(numExc, 2);
     }
 
+    public void testEng11203() throws Exception {
+        // This test case has AdHoc DDL, so it cannot be ran in the HSQL backend.
+        if (! isHSQL()) {
+            Client client = getClient();
+            Object[] initialRow = {"ENG_11203", 1, 2, 4};
+            Object[] secondRow = {"ENG_11203", 6, 2, 4};
+            // This test case tests ENG-11203, verifying that on single table views,
+            // if a new index was created on the view target table, this new index
+            // will be properly tracked by the MaterializedViewTriggerForInsert.
+
+            // - 1 - Insert the initial data into the view source table.
+            insertRow(client, initialRow);
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "SELECT * FROM V_ENG_11203").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 1, 1}}, vt);
+
+            // - 2 - Now add a new index on the view target table.
+            try {
+                client.callProcedure("@AdHoc", "CREATE INDEX I_ENG_11203 ON V_ENG_11203(a, b);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on the single table view V_ENG_11203.");
+            }
+
+            // - 3 - Insert another row of data.
+            insertRow(client, secondRow);
+            vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG_11203").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 2, 6}}, vt);
+
+            // - 4 - Start to delete rows.
+            // If the new index was not tracked properly, the server will start to crash
+            // because the newly-inserted row was not inserted into the index.
+            deleteRow(client, initialRow);
+            deleteRow(client, secondRow);
+            vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG_11203").getResults()[0];
+            assertContentOfTable(new Object[][] {}, vt);
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
