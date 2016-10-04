@@ -94,9 +94,11 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
+    private final boolean m_isSSLCcnfigured;
     private ByteBuffer m_decBuffer;
-    private ByteBuffer m_assembledV3Message;
-    private ByteBuffer m_v3MessageChunk;
+    private ByteBuffer m_assembled_SSL_Message;
+    private ByteBuffer m_ssl_messageChunk;
+    private int m_fullMessageLength;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
@@ -113,9 +115,11 @@ public class VoltPort implements Connection
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         m_sslEngine = engine;
+        m_isSSLCcnfigured = engine == null ? false : true;
         m_decBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));  // overflows if allocated at chunk size, though it seems it shouldn't
-        m_assembledV3Message = null;
-        m_v3MessageChunk = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
+        m_assembled_SSL_Message = null;
+        m_ssl_messageChunk = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
+        m_fullMessageLength = 0;
     }
 
     /**
@@ -193,14 +197,14 @@ public class VoltPort implements Connection
                      */
                     try {
                         while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            if (isV3Message(message)) {
+                            if (m_isSSLCcnfigured) {
                                 ByteBuffer assembledMessage;
                                 if ((assembledMessage = assembleV3Message(message)) != null) {
                                     m_handler.handleMessage(assembledMessage, this);
                                     m_messagesRead++;
                                     // TODO: make sure assembledMessage doesn't need to be copied
                                     // TODO: before m_assembledV3Message is cleared.
-                                    m_assembledV3Message = null;
+                                    m_assembled_SSL_Message = null;
                                 }
                             } else {
                                 m_handler.handleMessage( message, this);
@@ -228,35 +232,26 @@ public class VoltPort implements Connection
         }
     }
 
-    private boolean isV3Message(ByteBuffer message) {
-        message.mark();
-        byte version = message.get();
-        message.reset();
-        return ((int) version) == 3;
-    }
-
     private ByteBuffer assembleV3Message(ByteBuffer fullMessageChunk) throws IOException {
-        fullMessageChunk.get();  // the version
-        int fullUnwrappedMessageLength = fullMessageChunk.getInt();
-        if (m_assembledV3Message == null) {
-            m_assembledV3Message = ByteBuffer.allocate(fullUnwrappedMessageLength);
-            m_assembledV3Message.put((byte) 3);
+        m_ssl_messageChunk.clear();
+        while (m_ssl_messageChunk.capacity() < fullMessageChunk.remaining()) {
+            ByteBuffer bigger = ByteBuffer.allocate(m_ssl_messageChunk.capacity() * 2);
+            m_ssl_messageChunk = bigger;
         }
+        m_ssl_messageChunk.put(fullMessageChunk);
+        m_ssl_messageChunk.flip();
 
-        m_v3MessageChunk.clear();
-        while (m_v3MessageChunk.capacity() < fullMessageChunk.remaining()) {
-            ByteBuffer bigger = ByteBuffer.allocate(m_v3MessageChunk.capacity() * 2);
-            m_v3MessageChunk = bigger;
+        decryptMessage(m_sslEngine, m_ssl_messageChunk);
+
+        if (m_assembled_SSL_Message == null) {
+            m_fullMessageLength = m_decBuffer.getInt();
+            m_assembled_SSL_Message = ByteBuffer.allocate(m_fullMessageLength);
         }
-        m_v3MessageChunk.put(fullMessageChunk);
-        m_v3MessageChunk.flip();
-
-        decryptMessage(m_sslEngine, m_v3MessageChunk);
-        m_assembledV3Message.put(m_decBuffer);
+        m_assembled_SSL_Message.put(m_decBuffer);
         m_decBuffer.clear();
-        if (m_assembledV3Message.position() == fullUnwrappedMessageLength) {
-            m_assembledV3Message.flip();
-            return m_assembledV3Message;
+        if (m_assembled_SSL_Message.position() == m_fullMessageLength) {
+            m_assembled_SSL_Message.flip();
+            return m_assembled_SSL_Message;
         }
         return null;
     }

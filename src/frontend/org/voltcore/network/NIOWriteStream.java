@@ -82,6 +82,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     private final SSLEngine m_sslEngine;
     private final boolean m_isSSLCcnfigured;
     private  ByteBuffer m_encBuffer;
+    private final ByteBuffer m_messageChunk;
+
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null, null);
@@ -101,6 +103,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_sslEngine = engine;
         m_isSSLCcnfigured = engine == null ? false : true;
         m_encBuffer = ByteBuffer.allocate((int) (VoltPort.SSL_CHUNK_SIZE * 1.2));
+        m_messageChunk = ByteBuffer.allocate(VoltPort.SSL_CHUNK_SIZE);
     }
 
     /*
@@ -258,24 +261,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             // TODO: if v3 is enabled.
             for (ByteBuffer buf : b) {
                 if (m_isSSLCcnfigured) {
-                    while (buf.remaining() > 5) {
-                        buf.mark();
-                        int messsageLen = buf.getInt();
-                        int version = (int) buf.get();
-                        // TODO: to make testing easier...
-                        // if (version == 3) {
-                        if (true) {
-                            ByteBuffer messageBuf = ByteBuffer.allocate(messsageLen - 1);
-                            buf.get(messageBuf.array(), 0, messsageLen - 1);
-                            try {
-                                encryptBuffer(messageBuf, messsageLen);
-                            } catch (IOException e) {
-                                // TODO: need to do something here.
-                            }
-                        } else {
-                            buf.reset();
-                            offerBuffer(buf, buf.remaining());
-                        }
+                    try {
+                        encryptBuffer(buf);
+                    } catch (IOException e) {
+                        // TODO: need to do something here.
                     }
                 } else {
                    offerBuffer(buf, buf.remaining());
@@ -284,39 +273,35 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
     }
 
-    private void encryptBuffer(ByteBuffer message, int fullMessageLength) throws IOException {
+    private void encryptBuffer(ByteBuffer message) throws IOException {
         // need to be at position five in buf.  That is, have read the length of the
         // full message and the version.
         if (message.remaining() < VoltPort.SSL_CHUNK_SIZE) {
-            encryptChunk(message, fullMessageLength);
+            encryptChunk(message);
         } else {
-            ByteBuffer chunk = ByteBuffer.allocate(VoltPort.SSL_CHUNK_SIZE);
             while (message.remaining() > 0) {
                 if (message.remaining() > VoltPort.SSL_CHUNK_SIZE) {
-                    message.get(chunk.array(), 0, VoltPort.SSL_CHUNK_SIZE);
-                    encryptChunk(chunk, fullMessageLength);
+                    message.get(m_messageChunk.array(), 0, VoltPort.SSL_CHUNK_SIZE);
+                    encryptChunk(m_messageChunk);
                 } else {
-                    chunk.put(message);
-                    chunk.flip();
-                    encryptChunk(chunk, fullMessageLength);
+                    m_messageChunk.put(message);
+                    m_messageChunk.flip();
+                    encryptChunk(m_messageChunk);
                 }
-                chunk.clear();
+                m_messageChunk.clear();
             }
         }
     }
 
-    private void encryptChunk(ByteBuffer messageChunk, int fullMessageLength) throws IOException {
+    private void encryptChunk(ByteBuffer messageChunk) throws IOException {
         m_encBuffer.clear();
         encryptMessage(messageChunk);
-        int encryptedChunkSize = m_encBuffer.remaining() + 9;
-        ByteBuffer encryptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 9);
-        encryptedChunk.putInt(m_encBuffer.remaining() + 5);
-        encryptedChunk.put((byte) 3);
-        encryptedChunk.putInt(fullMessageLength);
+        ByteBuffer encryptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
+        encryptedChunk.putInt(m_encBuffer.remaining());
         encryptedChunk.put(m_encBuffer);
         encryptedChunk.flip();
 
-        offerBuffer(encryptedChunk, encryptedChunkSize);
+        offerBuffer(encryptedChunk, encryptedChunk.remaining());
     }
 
     private void offerBuffer(final ByteBuffer buf, final int bufLen) {
