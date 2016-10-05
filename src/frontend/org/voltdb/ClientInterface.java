@@ -100,8 +100,6 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLException;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -353,7 +351,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -403,149 +401,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             }
-        }
-
-        private Object[] unwrap(SocketChannel socketChannel, SSLEngine engine, ByteBuffer myAppData, ByteBuffer peerAppData, ByteBuffer peerNetData) throws IOException {
-
-            ByteBuffer myPeerAppData = peerAppData;
-
-            // handle loss of connection
-            if (socketChannel.read(peerNetData) < 0) {
-
-                // if the ssl engine is already closed, just return null, handshaking has failed.
-                if (engine.isInboundDone() && engine.isOutboundDone()) {
-                    return null;
-                }
-                // otherwise, close the engine.
-                try {
-                    engine.closeInbound();
-                } catch (SSLException e) {
-                    // want to eat this as we're just closing the engine.
-                }
-                engine.closeOutbound();
-                return new Object[] {engine.getHandshakeStatus(), myPeerAppData};
-            }
-
-            // the typical unwrap logic.
-            peerNetData.flip();
-
-            SSLEngineResult.HandshakeStatus hs;
-            SSLEngineResult res;
-            try {
-                res = engine.unwrap(peerNetData, peerAppData);
-                peerNetData.compact();
-                hs = res.getHandshakeStatus();
-            } catch (SSLException e) {
-                System.err.println("unwrap: see ssl exception " + e.getMessage());
-                engine.closeOutbound();
-                return new Object[]{engine.getHandshakeStatus(), myPeerAppData};
-            }
-
-            SSLEngineResult.Status status = res.getStatus();
-            switch (status) {
-                case OK:
-                    break;
-                case BUFFER_OVERFLOW:
-                    ByteBuffer bigger = ByteBuffer.allocate(peerAppData.capacity() * 2);
-                    myPeerAppData = bigger;
-                    break;
-                case BUFFER_UNDERFLOW:
-                    // During handshake, this indicates that there's not yet data to read.  We'll stay
-                    // in this state until data shows up in peerNetData.
-                    break;
-                case CLOSED:
-                    if (engine.isOutboundDone()) {
-                        return null;
-                    } else {
-                        engine.closeOutbound();
-                        hs = engine.getHandshakeStatus();
-                    }
-                    break;
-            }
-            return new Object[]{hs, myPeerAppData};
-        }
-
-        private Object[] wrap(SocketChannel sc, SSLEngine engine, ByteBuffer myAppData, ByteBuffer myNetData) throws IOException {
-
-            ByteBuffer myMyNetData = myNetData;
-            SSLEngineResult res;
-            SSLEngineResult.HandshakeStatus hs;
-            SSLEngineResult.Status status;
-            try {
-                res = engine.wrap(myAppData, myNetData);
-                hs = res.getHandshakeStatus();
-            } catch (SSLException e) {
-                hostLog.fatal("Failed wrap in ssl handshake" + e.getMessage());
-                engine.closeOutbound();
-                return new Object[] {engine.getHandshakeStatus(), myMyNetData};
-            }
-            status = res.getStatus();
-            switch (status) {
-                case OK:
-                    myNetData.flip();
-                    while (myNetData.hasRemaining()) {
-                        sc.write(myNetData);
-                    }
-                    myNetData.compact();
-                    break;
-                case BUFFER_OVERFLOW:
-                    ByteBuffer bigger = ByteBuffer.allocate(myNetData.capacity() * 2);
-                    myMyNetData = bigger;
-                    break;
-                case BUFFER_UNDERFLOW:
-                    // There's nothing in myAppData.  This is a bug...
-                    throw new IOException("SSLEngine: nothing in myAppData when wrapping");
-                case CLOSED:
-                    // write out any remaining data...
-                    myNetData.flip();
-                    try {
-                        while (myNetData.hasRemaining()) {
-                            sc.write(myNetData);
-                        }
-                    } catch (IOException e) {
-                        // can safely eat/ignore this.
-                    }
-                    hs = engine.getHandshakeStatus();
-                    break;
-            }
-            return new Object[] {hs, myMyNetData};
-        }
-
-        private boolean handshake(SocketChannel socketChannel, SSLEngine engine)
-                throws IOException {
-
-            ByteBuffer myAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
-            ByteBuffer myNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
-            ByteBuffer peerAppData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
-            ByteBuffer peerNetData = ByteBuffer.allocate(HANDSHAKE_BUFFER_SIZE);
-
-            SSLEngineResult.HandshakeStatus hs = engine.getHandshakeStatus();
-            while (hs != null && hs != SSLEngineResult.HandshakeStatus.FINISHED && hs != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING) {
-                switch (hs) {
-                    case NEED_UNWRAP:
-                        Object[] unwrapRes = unwrap(socketChannel, engine, myAppData, peerAppData, peerNetData);
-                        hs = (SSLEngineResult.HandshakeStatus) unwrapRes[0];
-                        peerAppData = (ByteBuffer) unwrapRes[1];
-                        break;
-                    case NEED_WRAP:
-                        Object[] wrapRes = wrap(socketChannel, engine, myAppData, myNetData);
-                        hs = (SSLEngineResult.HandshakeStatus) wrapRes[0];
-                        myNetData = (ByteBuffer) wrapRes[1];
-                        break;
-                    case NEED_TASK:
-                        Runnable runnable;
-                        while ((runnable = engine.getDelegatedTask()) != null) {
-                            runnable.run();
-                        }
-                        hs = engine.getHandshakeStatus();
-                        break;
-                    case FINISHED:
-                        break;
-                    case NOT_HANDSHAKING:
-                        break;
-                }
-            }
-            return hs != null;
         }
 
         @Override
@@ -607,12 +462,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     SSLEngine engine = sslCtx.createSSLEngine();
                     engine.setUseClientMode(false);
                     engine.setNeedClientAuth(false);
-                    engine.beginHandshake();
 
-                    if (!handshake(socket, engine)) {
+                    SSLHandshaker handshaker = new SSLHandshaker(socket, engine);
+                    if (!handshaker.handshake()) {
                         throw new IOException("SSL handshake failed");
                     }
-
 
                     final AuthRunnable authRunnable = new AuthRunnable(socket, engine);
                     while (true) {
@@ -657,7 +511,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
