@@ -957,6 +957,8 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
             catalogUpdateTask.setParams(catalog,dep);
 
+            //A connection with positive id will be thrown into live client statistics. The connection does not support stats.
+            //Thus make the connection id as a negative constant to skip the stats collection.
             final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                     ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update"
                     );
