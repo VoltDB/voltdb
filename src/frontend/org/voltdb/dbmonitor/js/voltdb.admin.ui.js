@@ -66,8 +66,6 @@ function loadAdminPage() {
         snapshotPriority: $("#snapshotpriority"),
         memoryLimitSize: $("#memoryLimitSize"),
         memoryLimitSizeUnit: $("#memoryLimitSizeUnit"),
-        //        diskLimitSize: $("#diskLimitSize"),
-        //        diskLimitSizeUnit: $("#diskLimitSizeUnit"),
         clientPort: $('#clientport'),
         adminPort: $('#adminport'),
         httpPort: $('#httpport'),
@@ -258,7 +256,6 @@ function loadAdminPage() {
             min: 1,
             max: 99,
             digits: true
-            //regex: /[^0-9\.]/ // "^[0-9]+(\.[0-9]{0,4})?$"
         },
         memoryLimitMessages: {
             required: "This field is required",
@@ -571,7 +568,6 @@ function loadAdminPage() {
             adminEditObjects.loadingSecurity.show();
 
             userList.hide();
-            //userListEditable.hide();
             adminEditObjects.loadingUserList.show();
         }
         else if (state == editStates.ShowOkCancel) {
@@ -584,7 +580,6 @@ function loadAdminPage() {
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
 
             userList.show();
-            //userListEditable.show();
             adminEditObjects.loadingUserList.hide();
         }
         else {
@@ -605,7 +600,6 @@ function loadAdminPage() {
     adminEditObjects.LinkSecurityEdit.on("click", function () {
         if (adminEditObjects.securityStateOriginal.linkSecurityEdit == true) {
             toggleSecurityEdit(editStates.ShowOkCancel);
-            //VoltDbAdminConfig.getEditUserList(adminClusterObjects.userListObj);
         }
     });
 
@@ -2819,10 +2813,8 @@ function loadAdminPage() {
                     featuresNames.push(newFeatureNames[i].value);
                     $(newFeatureNames[i]).rules("add", {
                         required: true,
-                        //regex:/^[a-zA-Z0-9_\-.]+$/,
                         messages: {
                             required: "This field is required",
-                            //regex: 'Only alphabets, numbers, <br/> _, - and . are allowed.'
                         }
                     });
                 }
@@ -4212,7 +4204,6 @@ function loadAdminPage() {
             setSnapShotUnit(spanshotUnit);
             adminClusterObjects.userListObj = adminConfigValues.users;
             getUserList(adminConfigValues.users);
-            //getEditUserList(adminConfigValues.users);
             getExportProperties(adminConfigValues.configuration);
             //dr setting
             getDrMode(adminConfigValues.drListen);
@@ -4222,12 +4213,10 @@ function loadAdminPage() {
 
 
             getDiskLimits(adminConfigValues.disklimit);
-            //adminConfigValues.drListen = false;
             if (VoltDbUI.isDRInfoRequired) {
                 adminEditObjects.labelDrId.text(adminConfigValues.drId);
                 adminEditObjects.chkDrMasterValue = adminConfigValues.drListen;
                 adminEditObjects.iconDrMasterOption.removeClass().addClass(getOnOffClass(adminConfigValues.drListen));
-                //adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 if (!VoltDbAdminConfig.isDrMasterEditMode)
                     adminEditObjects.txtDrMaster.text(getOnOffText(adminConfigValues.drListen));
                 adminEditObjects.labelReplicaSource.text(adminConfigValues.drConnectionSource == "" ? "" : "(source: " + adminConfigValues.drConnectionSource + ")");
@@ -4351,7 +4340,6 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < data.length; i++) {
-                    //var module = VoltDbAdminConfig.escapeHtml(data[i].module);
                     var type = data[i].type ? VoltDbAdminConfig.escapeHtml(data[i].type) : "";
                     var enabled = data[i].enabled;
                     var importProperty = data[i].property;
@@ -4612,7 +4600,6 @@ function loadAdminPage() {
 
         };
 
-        //var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
         var configureQueryTimeout = function (adminConfigValues) {
 
             if (adminConfigValues.queryTimeout == null) {
@@ -4741,7 +4728,6 @@ function insRow() {
     var x = document.getElementById('secTbl');
     var new_row = x.rows[1].cloneNode(true);
     var len = x.rows.length;
-    //new_row.cells[0].innerHTML = len;//sn number increment
 
     var inp1 = new_row.cells[1].getElementsByTagName('input')[0];
     inp1.id = 'input' + (len - 1);
