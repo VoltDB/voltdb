@@ -46,7 +46,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
-import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -958,9 +957,8 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
             catalogUpdateTask.setParams(catalog,dep);
 
-            final long alternateConnectionId = ClientInterface.RESTORE_SCHEMAS_CID;
             final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                    alternateConnectionId, "Empty database snapshot restore catalog update"
+                    ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update"
                     );
             final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
                 @Override
@@ -969,7 +967,7 @@ public final class InvocationDispatcher {
                 }
                 @Override
                 public long connectionId() {
-                    return alternateConnectionId;
+                    return ClientInterface.RESTORE_SCHEMAS_CID;
                 }
             };
 
