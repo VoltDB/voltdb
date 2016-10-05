@@ -958,7 +958,7 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
             catalogUpdateTask.setParams(catalog,dep);
 
-            final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
+            final long alternateConnectionId = ClientInterface.RESTORE_SCHEMAS_CID;
             final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                     alternateConnectionId, "Empty database snapshot restore catalog update"
                     );
