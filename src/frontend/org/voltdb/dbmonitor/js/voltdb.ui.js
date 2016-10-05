@@ -945,8 +945,6 @@ var loadPage = function (serverName, portid) {
 
             });
             popup.open("#stopConfirmationPop", undefined, srcElement);
-            //$('#errorLabel').text("Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster. Use shutdown to stop the cluster.");
-            //popup.open("#divStopServerError", undefined, srcElement);
         };
 
 
@@ -987,7 +985,6 @@ var loadPage = function (serverName, portid) {
                 var hostCount = deploymentDetails.DETAILS.HOSTCOUNT;
                 //check whether command log is enabled or not
                 VoltDbUI.isCommandLogEnabled = deploymentDetails.DETAILS.COMMANDLOGSTATUS;
-                //
                 var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
                 if (clusterDetails != undefined) {
                     if (clusterDetails.MODE != undefined && clusterDetails.VERSION != undefined && clusterDetails.BUILDSTRING != undefined && clusterDetails.UPTIME != undefined) {
@@ -1024,12 +1021,10 @@ var loadPage = function (serverName, portid) {
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
                 $("#addNewConfigLink").hide();
-                //$("#addNewImportConfigLink").hide();
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
             }
         };
-        //
     };
 
     var showHideCmdlogDataAndCharts = function (cmdLogStatus, graphView, currentTab) {
@@ -1302,26 +1297,6 @@ var loadPage = function (serverName, portid) {
                 drTablesInputSelector.attr("checked", false);
             }
         }
-
-        //Commented after task VMC-253 Sujesh
-
-        //var showHideLastLineClass = function (showDrTable) {
-        //    if (showDrTable) {
-        //        $("#liTables").removeClass("last");
-        //        $("#liDrTables").addClass("last");
-        //        $("#liCommandLogTables").removeClass("last");
-        //    } else {
-        //        if (!(VoltDbUI.isCommandLogEnabled == "true")) {
-        //            $("#liTables").addClass("last");
-        //            $("#liDrTables").removeClass("last");
-        //            $("#liCommandLogTables").removeClass("last");
-        //        } else {
-        //            $("#liTables").removeClass("last");
-        //            $("#liDrTables").removeClass("last");
-        //            $("#liCommandLogTables").addClass("last");
-        //        }
-        //    }
-        //};
 
         var loadProcedureInformations = function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
@@ -1662,8 +1637,6 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
 
             voltDbRenderer.GetSnapshotStatus(function (snapshotDetails) {
-                //cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
-                //cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
                 cmdLogDetails[getCurrentServer()].SNAPSHOTS = snapshotDetails[getCurrentServer()];
                 MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
             });
@@ -1850,10 +1823,6 @@ var loadPage = function (serverName, portid) {
                         alert("iphone resolution mode");
                         $("#drMasterSection").css("min-height", "380px");
                     }
-                    //else if ($(window).width() == '751') {
-                    //    $("#drMasterSection").css("min-height", "350px");
-                    //}
-                    //console.log(screen.width + "*" + screen.height);
                 },
 
                 "sDom": 'p<"tblScroll drScroll"t>',
@@ -1903,7 +1872,6 @@ var loadPage = function (serverName, portid) {
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
 
             var htmlcontent = "";
-            // if (!$.isEmptyObject(response)) {
             for (var key in response) {
                 htmlcontent = htmlcontent + "<tr>";
                 htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
@@ -1983,7 +1951,6 @@ var loadPage = function (serverName, portid) {
             $(".paginate_enabled_previous").attr("title", "Previous Page");
             $(".paginate_enabled_previous").attr("title", "Previous Page");
 
-            //  }
         });
 
         $('#filterHostID').on('keyup', function () {
@@ -2426,8 +2393,6 @@ var loadPage = function (serverName, portid) {
         refreshGraphAndData(VoltDbUI.getFromLocalStorage("graph-view"), VoltDbUI.CurrentTab);
     }, 5000);
 
-    //refreshGraphAndDataInLoop(getRefreshTime(), VoltDbUI.getCookie("graph-view"));
-
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
@@ -2619,16 +2584,6 @@ var showHideGraph = function (userpreferences) {
         $("#chartPartitionIdleTime").hide();
     else
         $("#chartPartitionIdleTime").show();
-
-    //if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
-    //    if (userpreferences["DrReplicationRate"] == true) {
-    //        $("#ChartDrReplicationRate").show();
-    //    } else {
-    //        $("#ChartDrReplicationRate").hide();
-    //    }
-    //} else {
-    //
-    //}
 
     if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' && VoltDbUI.drConsumerState != '' ){
         if (userpreferences["DrReplicationRate"] == true) {

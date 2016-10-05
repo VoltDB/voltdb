@@ -269,18 +269,6 @@
             },
             callback: function (p) {
                 ChartCpu.useInteractiveGuideline(true);
-                //var tooltip = ChartCpu.tooltip;
-                //tooltip.gravity('s');
-                //tooltip.contentGenerator(function (d) {
-                //    var html = '';
-                //    d.series.forEach(function (elem) {
-                //        html += "<h3>"
-                //            + elem.key + "</h3>";
-                //    });
-                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-                //    return html;
-                //});
                 return ChartCpu;
             }
         });
@@ -313,19 +301,6 @@
             },
             callback: function (p) {
                 ChartRam.useInteractiveGuideline(true);
-                //var tooltip = ChartRam.tooltip;
-
-                //tooltip.contentGenerator(function (d) {
-                //    var html = '';
-                //    d.series.forEach(function (elem) {
-                //        html += "<h3>"
-                //            + elem.key + "</h3>";
-                //    });
-                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-                //    return html;
-                //});
-
                 return ChartCpu;
             }
         });
@@ -358,23 +333,6 @@
             },
             callback: function(p) {
                 ChartLatency.useInteractiveGuideline(true);
-                //var tooltip = ChartLatency.tooltip;
-
-                //tooltip.contentGenerator(function (d) {
-                //    var html = '';
-                //    d.series.forEach(function (elem) {
-                //        html += "<h3>"
-                //            + elem.key + "</h3>";
-                //    });
-                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-                //    //d.series.forEach(function (elem) {
-                //    //    html += "<table><tr><td colspan='3'><strong class='x=value'>" + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</strong></td></tr></thead>" +
-                //    //        "<tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(27,135,200);'</div></td><td class='key'>Latency</td><td class='value'>" + parseFloat(d.point.y).toFixed(2) + "</td></tr></tbody>";
-                //    //});
-
-                //    return html;
-                //});
                 return ChartLatency;
             }
         });
@@ -408,17 +366,6 @@
            },
            callback: function(p) {
                ChartTransactions.useInteractiveGuideline(true);
-               //var tooltip = ChartTransactions.tooltip;
-               //tooltip.contentGenerator(function (d) {
-               //    var html = '';
-               //    d.series.forEach(function (elem) {
-               //        html += "<h3>"
-               //            + elem.key + "</h3>";
-               //    });
-               //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-               //    return html;
-               //});
                return ChartTransactions;
            }
         });
@@ -485,17 +432,6 @@
             },
             callback: function() {
                 ChartDrReplicationRate.useInteractiveGuideline(true);
-                //var tooltip = ChartDrReplicationRate.tooltip;
-                //tooltip.contentGenerator(function (d) {
-                //    debugger;
-                //    var html = '';
-                //    d.series.forEach(function (elem) {
-                //        html += "<h3>"
-                //            + elem.key + "</h3>";
-                //    });
-                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-                //    return html;
-                //});
                 return ChartDrReplicationRate;
             }
         });
@@ -529,17 +465,6 @@
            },
             callback:function() {
                ChartCommandlog.useInteractiveGuideline(true);
-               //var tooltip = ChartCommandlog.tooltip;
-               //tooltip.contentGenerator(function (d) {
-               //    var html = '';
-               //    d.series.forEach(function (elem) {
-               //        html += "<h3>"
-               //            + elem.key + "</h3>";
-               //    });
-               //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-               //    return html;
-               //});
                return ChartCommandlog;
            }
         });
@@ -971,7 +896,6 @@
             }
 
             if(monitor.latFirstData){
-                //var currentTime = new Date();
                 if(latencyArr.length > 0 && !(currentTime.getTime() - (new Date(latencyArr[latencyArr.length - 1].timestamp)).getTime() > MonitorGraphUI.enumMaxTimeGap.secGraph)){
                     dataLat = []
                     for(var i = 0; i< latencyArr.length; i++){
@@ -2171,7 +2095,6 @@
                         .call(ChartCommandlog);
                 }
 
-                //cmdLogOverlay = []
                 $('.overlayGraph').detach()
 
                 for(var i = 0; i < dataOverlay.length; i++){
