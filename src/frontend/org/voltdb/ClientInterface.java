@@ -79,6 +79,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.SSLHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;

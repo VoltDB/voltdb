@@ -50,7 +50,6 @@ import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.SSLHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 

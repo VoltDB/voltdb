@@ -1,4 +1,4 @@
-package org.voltdb;
+package org.voltdb.client;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
