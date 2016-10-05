@@ -248,7 +248,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final TransactionState txn = m_outstandingTxns.get(key.m_txnId);
             if (txn == null || txn.isDone()) {
                 m_outstandingTxns.remove(key.m_txnId);
-                setRepairLogTruncationHandle(key.m_spHandle);
+                // for MP write txns, we should use it's first SpHandle in the TransactionState
+                // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
+                long m_safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
+                setRepairLogTruncationHandle(m_safeSpHandle);
             }
 
             VoltMessage resp = counter.getLastResponse();
