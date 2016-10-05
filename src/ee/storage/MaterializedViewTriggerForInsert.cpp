@@ -71,8 +71,8 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
-    // Note that if the way we initialize this m_updatableIndexList changes in the future, 
-    //   we also need to change the condition to detect when the m_updatableIndexList
+    // Note that if the way we initialize this m_updatableIndexList changes in the future,
+    //   we will also need to change the condition to detect when the m_updatableIndexList
     //   should be refreshed in the updateDefinition() function.
     const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
     m_updatableIndexList.clear();
@@ -83,18 +83,9 @@ void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
     }
 }
 
-void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-{
+void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo) {
     setTargetTable(destTable);
-    // destTable->allIndexes().size() will be at least ONE because
-    //   we always create an index on the group by keys on view destination tables.
-    // Currently, m_updatableIndexList will include all the indices except the primary key index.
-    // So destTable->allIndexes().size() == m_updatableIndexList.size() + 1
-    // Here we only test the count of indices because indices cannot be changed
-    //   after being created.
-    if (destTable->allIndexes().size() != m_updatableIndexList.size() + 1) {
-        initUpdatableIndexList();
-    }
+    initUpdatableIndexList();
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
