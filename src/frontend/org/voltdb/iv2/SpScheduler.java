@@ -1283,8 +1283,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
-            tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                    "to" + TxnEgo.txnIdToString(newHandle));
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                        "to" + TxnEgo.txnIdToString(newHandle));
+            }
         }
     }
 
