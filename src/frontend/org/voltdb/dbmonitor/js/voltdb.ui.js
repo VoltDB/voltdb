@@ -5,25 +5,6 @@ var table = '';
 $(document).ready(function () {
     $("#helppopup").load("help.htm", function () {
     });
-     var defaultValue = 30;
-
-     if ($.cookie("retainedTimeInterval") != undefined){
-        defaultValue = $.cookie("retainedTimeInterval")
-     }
-
-     $( "#slider-range-min" ).slider({
-                  range: "min",
-                  value: defaultValue,
-                  min: 0,
-                  max: 100,
-                  slide: function( event, ui ) {
-                    $( "#timeInterval" ).val(ui.value );
-                    $.cookie("retainedTimeInterval", ui.value, { expires: 365 })
-                  }
-                });
-
-
-     $( "#timeInterval" ).val( defaultValue );
 
     //clear the localStorage for DataTables in DR Section
 
