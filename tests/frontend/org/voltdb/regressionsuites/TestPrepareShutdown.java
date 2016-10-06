@@ -23,9 +23,14 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.TestCSVFormatterSuiteBase;
 import org.voltdb.VoltDB;
@@ -36,7 +41,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.VoltFile;
 
 public class TestPrepareShutdown extends RegressionSuite
 {
@@ -45,7 +49,6 @@ public class TestPrepareShutdown extends RegressionSuite
     }
 
     public void testPrepareShutdown() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         final Client client2 = this.getClient();
         for (int i = 0; i < 50; i++) {
             client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);
@@ -117,6 +120,106 @@ public class TestPrepareShutdown extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
+        }
+    }
+
+    public void testShutdownSave() throws Exception {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        final Client client2 = this.getClient();
+        for (int i = 0; i < 50; i++) {
+            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);
+        }
+
+        //push import data async
+        String[] myData = new String[5000];
+        for (int i =0; i < 5000; i++) {
+            myData[i] = i + ",1,2,3,4,5,6,7,8,9,10";
+        }
+        TestCSVFormatterSuiteBase.pushDataAsync(7001, myData);
+
+        final Client client = getAdminClient();
+        ClientResponse resp = client.callProcedure("@PrepareShutdown");
+        assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+        long sigil = resp.getResults()[0].asScalarLong();
+
+        //test sys proc that is not allowed.
+        try {
+            client2.callProcedure("@SystemInformation", "OVERVIEW");
+            fail("Unallowed sys proc is executed.");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@SystemInformation:" + e.getMessage());
+            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+        }
+
+        //test query that is not allowed
+        try {
+            client2.callProcedure("ArbitraryDurationProc", 0);
+            fail("Unallowed proc is executed.");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("ArbitraryDurationProc:" + e.getMessage());
+            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+        }
+        long sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            resp = client2.callProcedure("@Statistics", "liveclients", 0);
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = resp.getResults()[0];
+            long trxn=0, bytes=0, msg=0;
+            if (t.advanceRow()) {
+                trxn = t.getLong(6);
+                bytes = t.getLong(7);
+                msg = t.getLong(8);
+                sum =  trxn + bytes + msg;
+            }
+            System.out.printf("Outstanding transactions: %d, buffer bytes :%d, response messages:%d\n", trxn, bytes, msg);
+            Thread.sleep(2000);
+        }
+        assertTrue (sum == 0);
+
+        //check import OUTSTANDING_REQUESTS
+       sum = Long.MAX_VALUE;
+        while (sum > 0) {
+            resp = client2.callProcedure("@Statistics", "IMPORTER", 0);
+            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+            VoltTable t = resp.getResults()[0];
+            if (t.advanceRow()) {
+                sum = t.getLong(8);
+            }
+            System.out.printf("Outstanding importer transactions: %d\n", sum);
+            Thread.sleep(500);
+        }
+        assertTrue (sum == 0);
+        try{
+            client.callProcedure("@Shutdown", sigil);
+            fail("@Shutdown fails via admin mode");
+        } catch (ProcCallException e) {
+            //if execution reaches here, it indicates the expected exception was thrown.
+            System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
+        }
+        LocalCluster cluster = (LocalCluster)m_config;
+        File snapDH = getSnapshotPathForHost(cluster);
+
+        File terminusFH = new File(snapDH.getParentFile(), VoltDB.TERMINUS_MARKER);
+        assertTrue("terminus file is not accessible",
+                terminusFH.exists() && terminusFH.isFile() && terminusFH.canRead());
+        String nonce;
+        try (BufferedReader br = new BufferedReader(new FileReader(terminusFH))) {
+            nonce = br.readLine();
+        }
+        assertTrue("no nonce written to terminus file", nonce != null && !nonce.trim().isEmpty());
+        File finishedFH = new File(snapDH, nonce + "-host_0.finished");
+        assertTrue("snapshot did not finish", finishedFH.exists() && finishedFH.isFile());
+    }
+
+    static File getSnapshotPathForHost(LocalCluster cluster) {
+        if (cluster.isNewCli()) {
+            return new File(cluster.getServerSpecificRoot("0"), "snapshots");
+        } else {
+            List<File> subRoots = cluster.getSubRoots();
+            return new File (subRoots.get(0), "/tmp/" + System.getProperty("user.name") + "/snapshots");
         }
     }
 

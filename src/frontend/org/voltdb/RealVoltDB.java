@@ -97,6 +97,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
+import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
@@ -135,6 +136,7 @@ import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.PathSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
@@ -193,7 +195,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     // Managed voltdb directories settings
-    volatile private PathSettings m_paths;
+    volatile PathSettings m_paths;
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
@@ -393,7 +395,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigDirectory(File voltdbroot) {
-        return new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
+        return new VoltFile(voltdbroot, Constants.CONFIG_DIR);
     }
 
     private File getConfigLogDeployment() {
@@ -2046,7 +2048,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
                             catalog,
-                            m_clusterSettings,
+                            new DbSettings(m_clusterSettings, m_paths),
                             new byte[] {},
                             null,
                             deploymentBytes,
@@ -3374,6 +3376,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
+        /*
+         * Remove the terminus file if it is there, which is written on shutdown --save
+         */
+        new File(m_paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER).delete();
 
         /*
          * Command log is already initialized if this is a rejoin or a join
@@ -3686,7 +3692,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @throws IOException
      */
    static String setupDefaultDeployment(VoltLogger logger, File voltdbroot) throws IOException {
-        File configInfoDir = new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
+        File configInfoDir = new VoltFile(voltdbroot, Constants.CONFIG_DIR);
         configInfoDir.mkdirs();
 
         File depFH = new VoltFile(configInfoDir, "deployment.xml");

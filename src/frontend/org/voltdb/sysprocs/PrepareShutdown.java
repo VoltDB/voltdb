@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 
 /**
@@ -32,10 +33,16 @@ import org.voltdb.VoltTable;
 public class PrepareShutdown extends Pause
 {
     @Override
-    public VoltTable[] run(SystemProcedureExecutionContext ctx){
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
+        super.run(ctx);
+
+        long status = VoltSystemProcedure.STATUS_OK;
         if (ctx.isLowestSiteId()){
             VoltDB.instance().setShuttingdown(true);
+            status = m_stat.getMzxid();
         }
-        return super.run(ctx);
+        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
+        t.addRow(status);
+        return (new VoltTable[] {t});
     }
 }

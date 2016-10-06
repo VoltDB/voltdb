@@ -20,12 +20,17 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
+import org.apache.zookeeper_voltpatches.KeeperException.Code;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltdb.DependencyPair;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -34,6 +39,8 @@ import org.voltdb.VoltZK;
 
 public class Pause extends VoltSystemProcedure
 {
+    protected volatile Stat m_stat = null;
+
     @Override
     public void init() {}
 
@@ -54,14 +61,36 @@ public class Pause extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx)
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        if (ctx.isLowestSiteId())
+        VoltDBInterface voltdb = VoltDB.instance();
+        OperationMode opMode = voltdb.getMode();
+
+        if (ctx.isLowestSiteId() && opMode != OperationMode.PAUSED)
         {
-            VoltDB.instance().setMode(OperationMode.PAUSED);
+            ZooKeeper zk = voltdb.getHostMessenger().getZK();
             try {
-                VoltDB.instance().getHostMessenger().getZK().setData(
-                        VoltZK.operationMode,
-                        OperationMode.PAUSED.getBytes(), -1);
-                VoltDB.instance().getHostMessenger().pause();
+                Stat stat;
+                OperationMode zkMode = null;
+                Code code;
+                do {
+                    stat = new Stat();
+                    code = Code.OK;
+                    try {
+                        byte [] data = zk.getData(VoltZK.operationMode, false, stat);
+                        zkMode = data == null ? opMode : OperationMode.valueOf(data);
+                        if (zkMode == OperationMode.PAUSED) {
+                            break;
+                        }
+                        stat = zk.setData(VoltZK.operationMode,
+                                OperationMode.PAUSED.getBytes(), stat.getVersion());
+                    } catch (BadVersionException ex) {
+                        code = ex.code();
+                    }
+                } while (zkMode != OperationMode.PAUSED && code != Code.BADVERSION);
+
+                m_stat = stat;
+                voltdb.setMode(OperationMode.PAUSED);
+                voltdb.getHostMessenger().pause();
+
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

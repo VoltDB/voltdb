@@ -133,6 +133,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.PathSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
@@ -1080,12 +1081,12 @@ public abstract class CatalogUtil {
                 .build();
     }
 
-    public final static ClusterSettings asClusterSettings(String deploymentURL) {
-        return asClusterSettings(parseDeployment(deploymentURL));
+    public final static DbSettings asDbSettings(String deploymentURL) {
+        return asDbSettings(parseDeployment(deploymentURL));
     }
 
-    public final static ClusterSettings asClusterSettings(DeploymentType depl) {
-        return ClusterSettings.create(asClusterSettingsMap(depl));
+    public final static DbSettings asDbSettings(DeploymentType depl) {
+        return new DbSettings(depl);
     }
 
     /**
