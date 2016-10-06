@@ -45,8 +45,8 @@ class Cluster extends Module {
         promotecancel               { $("#promoteConfirmCancel") }
         promoteok                   { $("#promoteConfirmOk") }
         title                       { $("#admin > div.adminWrapper > div.adminLeft > h1") }
-        pausebutton                 { $("#pauseConfirmation", class:"resume", text:"Pause") }
-        resumebutton                { $("#resumeConfirmation", class:"pause", text:"Resume") }
+        pausebutton                 { $("#pauseConfirmation") }
+        resumebutton                { $("#resumeConfirmation") }
         resumeok                    { $("#btnResumeConfirmationOk") }
         pauseok                     { $("#btnPauseConfirmationOk") }
         pausecancel                 { $("#btnPauseConfirmationCancel") }

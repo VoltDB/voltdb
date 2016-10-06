@@ -37,6 +37,7 @@ public class ProcedureInvocation {
     private byte m_procNameBytes[] = null;
     private final int m_batchTimeout;
     private final ParameterSet m_parameters;
+    private final boolean m_allPartition;
 
     // pre-cache this for serialization
     // this duplicates some other code, but it's nice to keep the client code
@@ -44,10 +45,14 @@ public class ProcedureInvocation {
     private static final Charset UTF8Encoding = Charset.forName("UTF-8");
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
-        this(handle, BatchTimeoutOverrideType.NO_TIMEOUT, procName, parameters);
+        this(handle, BatchTimeoutOverrideType.NO_TIMEOUT, false, procName, parameters);
     }
 
     public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
+        this(handle, batchTimeout, false, procName, parameters);
+    }
+
+    public ProcedureInvocation(long handle, int batchTimeout, boolean allPartition, String procName, Object... parameters) {
         if ((batchTimeout < 0) && (batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
             throw new IllegalArgumentException("Timeout value can't be negative." );
         }
@@ -59,6 +64,7 @@ public class ProcedureInvocation {
                             : ParameterSet.emptyParameterSet());
 
         m_batchTimeout = batchTimeout;
+        m_allPartition = allPartition;
     }
 
     /** return the clientHandle value */
@@ -68,28 +74,6 @@ public class ProcedureInvocation {
 
     public String getProcName() {
         return m_procName;
-    }
-
-    public int getSerializedSize() {
-        // convert proc name to bytes if needed
-        if (m_procNameBytes == null) {
-            m_procNameBytes = m_procName.getBytes(UTF8Encoding);
-        }
-
-        // if batch extension present, then 6 bytes long, otherwise 0
-        // 6 is one byte for ext type, one for size, and 4 for integer value
-        int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
-
-        int size =
-            1 + // type
-            4 + m_procNameBytes.length + // procname
-            8 + // client handle
-            1 + // extension count
-            batchExtensionSize + // timeout ext
-            m_parameters.getSerializedSize(); // parameters
-        assert(size > 0); // sanity
-        //System.err.printf("Serializing call to %s at %d bytes.\n", getProcName(), size);
-        return size;
     }
 
     public int getPassedParamCount() {
@@ -108,6 +92,33 @@ public class ProcedureInvocation {
         return m_batchTimeout;
     }
 
+    public boolean getAllPartition() {
+        return m_allPartition;
+    }
+
+    public int getSerializedSize() {
+        // convert proc name to bytes if needed
+        if (m_procNameBytes == null) {
+            m_procNameBytes = m_procName.getBytes(UTF8Encoding);
+        }
+
+        // get extension sizes - if not present, size is 0 for each
+        // 6 is one byte for ext type, one for size, and 4 for integer value
+        int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
+        // 2 is one byte for ext type, one for size
+        int allPartitionExtensionSize = m_allPartition ? 2 : 0;
+
+        int size =
+            1 + // type
+            4 + m_procNameBytes.length + // procname
+            8 + // client handle
+            1 + // extension count
+            batchExtensionSize + allPartitionExtensionSize + // extensions
+            m_parameters.getSerializedSize(); // parameters
+        assert(size > 0); // sanity
+        return size;
+    }
+
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         // convert proc name to bytes if needed
         if (m_procNameBytes == null) {
@@ -120,13 +131,18 @@ public class ProcedureInvocation {
 
         buf.putLong(m_clientHandle);
 
-        // there is one possible extension
-        if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
-            buf.put((byte) 0); // extension count
-        }
-        else {
-            buf.put((byte) 1); // extension count
+        // there are two possible extensions, count which apply
+        byte extensionCount = 0;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
+        if (m_allPartition) ++extensionCount;
+        // write the count as one byte
+        buf.put(extensionCount);
+        // write any extensions that apply
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
             ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, m_batchTimeout);
+        }
+        if (m_allPartition) {
+            ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
         }
 
         m_parameters.flattenToBuffer(buf);

@@ -68,16 +68,6 @@ public class TestAllPartitionProcedureCalls {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestAllPartitionProcedureCalls.class.getResource("allpartitioncall.sql"));
-        project.addPartitionInfo("TABLE_INT_PARTITION", "value_number1");
-        project.addPartitionInfo("TABLE_STRING_PARTITION", "value_string");
-
-        project.addProcedures(new VoltProjectBuilder.ProcedureInfo(PartitionIntegerTestProc.class,
-                "TABLE_INT_PARTITION.value_number1"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionStringTestProc.class,
-                        "TABLE_STRING_PARTITION.value_string"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionFailureTestProc.class,
-                        "TABLE_INT_PARTITION.value_number1")
-                );
 
         boolean success = cluster.compile(project);
         assertTrue(success);
@@ -127,6 +117,34 @@ public class TestAllPartitionProcedureCalls {
         asyncTest(clientWithAffinity, "PartitionIntegerTestProc");
      }
 
+    @Test
+    public void testCallInvalidPartitionProcedure() throws Exception {
+        ClientResponseWithPartitionKey[] responses;
+
+        // check sysproc
+        responses = client.callAllPartitionProcedure("@Statistics", "MEMORY");
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+
+        // check multipart
+        responses = client.callAllPartitionProcedure("MultiPartitionProcedureSample", 0);
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+
+        // check wrong-partitioning
+        responses = client.callAllPartitionProcedure("PartitionedTestProcNonZeroPartitioningParam", 0, 1);
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+    }
 
     @Test
     public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {

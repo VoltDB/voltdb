@@ -64,7 +64,7 @@ def get_stats(runner, component):
             if retry == 0:
                 runner.error("Unable to collect %s statistics from the cluster" % component)
             else:
-                sleep(1)
+                time.sleep(1)
                 retry -= 1
                 continue
         if status <> 1:

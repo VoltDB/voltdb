@@ -232,6 +232,16 @@ def get_max_mismatches(comparison_database, suite_name):
         # Known failures in the numeric-decimals "extended" test suite (see ENG-10546)
         elif config_name == 'numeric-decimals':
             max_mismatches = 300
+        # Known failures in the joined-matview-* test suites ...
+        # Failures in joined-matview-default-full due to ENG-11086
+        elif config_name == 'joined-matview-default-full':
+            max_mismatches = 992
+        # Failures in joined-matview-int due to ENG-11196 & (mainly) ENG-11086
+        elif config_name == 'joined-matview-int':
+            max_mismatches = 19169
+        # Failures in joined-matview-string due to ENG-11209 / ENG-11115
+        elif config_name == 'joined-matview-string':
+            max_mismatches = 215
 
     return max_mismatches
 

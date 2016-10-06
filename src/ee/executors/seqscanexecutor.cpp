@@ -112,7 +112,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Seq Scan :\n %s", output_table->debug().c_str());
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", node->getOutputTable()->debug().c_str());
         return true;
     }
 
@@ -200,8 +200,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
+#if   defined(VOLT_TRACE_ENABLED)
+            int tuple_ctr = 0;
+#endif
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                       tuple.debug(input_table->name()).c_str(),
+                       ++tuple_ctr,
                        (int)input_table->activeTupleCount());
             pmp.countdownProgress();
 

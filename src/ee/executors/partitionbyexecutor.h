@@ -30,9 +30,9 @@ class PartitionByExecutor: public AggregateSerialExecutor {
 public:
     PartitionByExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AggregateSerialExecutor(engine, abstract_node) {
+        m_outputForEachInputRow = true;
     }
     virtual ~PartitionByExecutor();
-    bool outputForEachInputRow() const;
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 };

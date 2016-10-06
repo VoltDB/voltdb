@@ -183,19 +183,18 @@ public class RepairLog
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
             // We can't repair read only SP transactions. Just don't log them to the repair log.
-            if (ctm.isReadOnly()) {
+            // Restart transaction do not need to be repaired here, don't log them as well.
+            if (ctm.isReadOnly() || ctm.isRestart()) {
                 return;
             }
 
-            if (!ctm.isRestart()) {
-                truncate(ctm.getTruncationHandle(), IS_MP);
-                m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
-                //Restore will send a complete transaction message with a lower mp transaction id because
-                //the restore transaction precedes the loading of the right mp transaction id from the snapshot
-                //Hence Math.max
-                m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
-                m_lastSpHandle = ctm.getSpHandle();
-            }
+            truncate(ctm.getTruncationHandle(), IS_MP);
+            m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+            m_lastSpHandle = ctm.getSpHandle();
         }
         else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
@@ -279,7 +278,9 @@ public class RepairLog
         Collections.sort(items, m_handleComparator);
 
         int ofTotal = items.size() + 1;
-        tmLog.debug("Responding with " + ofTotal + " repair log parts.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Responding with " + ofTotal + " repair log parts.");
+        }
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 

@@ -46,7 +46,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
-import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -297,6 +296,18 @@ public final class InvocationDispatcher {
 
                     task.setBatchTimeout(systemTimeout);
                 }
+            }
+        }
+
+        // check for allPartition invocation and provide a nice error if it's misused
+        if (task.getAllPartition()) {
+            // must be single partition and must be partitioned on parameter 0
+            if (!catProc.getSinglepartition() || (catProc.getPartitionparameter() != 0) || catProc.getSystemproc()) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0], "Invalid procedure for all-partition execution. " +
+                                 "Targeted procedure must be partitioned, must be partitioned on the first parameter, " +
+                                 "and must not be a system procedure.",
+                        task.clientHandle);
             }
         }
 
@@ -946,9 +957,10 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
             catalogUpdateTask.setParams(catalog,dep);
 
-            final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
+            //A connection with positive id will be thrown into live client statistics. The connection does not support stats.
+            //Thus make the connection id as a negative constant to skip the stats collection.
             final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                    alternateConnectionId, "Empty database snapshot restore catalog update"
+                    ClientInterface.RESTORE_SCHEMAS_CID, "Empty database snapshot restore catalog update"
                     );
             final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
                 @Override
@@ -957,7 +969,7 @@ public final class InvocationDispatcher {
                 }
                 @Override
                 public long connectionId() {
-                    return alternateConnectionId;
+                    return ClientInterface.RESTORE_SCHEMAS_CID;
                 }
             };
 
