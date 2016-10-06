@@ -22,7 +22,7 @@ from voltcli import checkstats
     description = 'Shutdown the running VoltDB cluster.',
     options = (
         VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default = False),
-        VOLT.BooleanOption('-s', '--save', 'save', 'immediate shutdown', default = False),
+        VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default = False),
     )
 )
 def shutdown(runner):
@@ -30,8 +30,8 @@ def shutdown(runner):
         runner.abort_with_help('You cannot specify both --force and --save options.')
     shutdown_params = []
     columns = []
-	snapsigil = 0
-	runner.info('Cluster shutdown in progress.')
+    snapsigil = 0
+    runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
         try:
             runner.info('Preparing for shutdown')
@@ -51,11 +51,11 @@ def shutdown(runner):
             runner.info('Completing outstanding importer requests.')
             checkstats.check_importer(runner)
             runner.info('Cluster is ready for shutdown')
+            if runner.opts.save:
+                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
+                shutdown_params =  [snapsigil]
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
-        if runner.opts.save:
-            columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
-            shutdown_params =  [snapsigil]
     response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status = False)
     print response

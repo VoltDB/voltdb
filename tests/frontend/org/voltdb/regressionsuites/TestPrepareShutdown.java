@@ -41,6 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestPrepareShutdown extends RegressionSuite
 {
@@ -124,6 +125,7 @@ public class TestPrepareShutdown extends RegressionSuite
     }
 
     public void testShutdownSave() throws Exception {
+        if (!MiscUtils.isPro()) return;
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         final Client client2 = this.getClient();

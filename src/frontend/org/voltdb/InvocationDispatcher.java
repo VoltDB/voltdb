@@ -949,6 +949,11 @@ public final class InvocationDispatcher {
             final AuthUser user
             )
     {
+        // shutdown save snapshot is available for Pro edition only
+        if (!MiscUtils.isPro()) {
+            task.setParams();
+            dispatch(task, handler, ccxn, user);
+        }
         Object p0 = task.getParams().getParam(0);
         if (!(p0 instanceof Long)) {
             return gracefulFailureResponse(
@@ -1020,9 +1025,8 @@ public final class InvocationDispatcher {
         saveSnapshotTask.setProcName("@SnapshotSave");
         saveSnapshotTask.setParams(snapshotJson);
 
-        final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
         final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                alternateConnectionId, "Blocking Shutdown Snapshot Save"
+                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Shutdown Snapshot Save"
                 );
         final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
             @Override
@@ -1031,7 +1035,7 @@ public final class InvocationDispatcher {
             }
             @Override
             public long connectionId() {
-                return alternateConnectionId;
+                return ClientInterface.SHUTDONW_SAVE_CID;
             }
         };
 

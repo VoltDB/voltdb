@@ -83,7 +83,7 @@ public class VoltDB {
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
-    public static final String TERMINUS_MARKER = ".terminus";
+    public static final String TERMINUS_MARKER = ".shutdown_snapshot";
     public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
     public static final String DEFAULT_CLUSTER_NAME = "database";
