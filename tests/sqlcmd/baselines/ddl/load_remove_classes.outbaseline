@@ -76,8 +76,7 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
-@SnapshotSave             	varchar
+@SnapshotSave             
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -112,8 +111,7 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
-@SnapshotSave             	varchar
+@SnapshotSave             
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -212,8 +210,7 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
-@SnapshotSave             	varchar
+@SnapshotSave             
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
