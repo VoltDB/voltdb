@@ -185,13 +185,45 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // If using this somewhere new, consider if you're being lazy.
         void updateExecutorContextUndoQuantumForTest();
 
-        // Executors can call this to note a certain number of tuples have been
-        // scanned or processed.index
-        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType);
+        /**
+         * Called just before a potentially long-running operation
+         * begins execution.
+         *
+         * Track total tuples accessed for this query.  Set up
+         * statistics for long running operations thru m_engine if
+         * total tuples accessed passes the threshold.
+         */
+        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
+            m_lastAccessedPlanNodeType = planNodeType;
+            return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
+        }
+
+        /**
+         * Called periodically during a long-running operation to see
+         * if we need to report a long-running fragment.
+         */
         inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                                int64_t tuplesProcessed);
+                                                                int64_t tuplesProcessed) {
+            m_tuplesProcessedSinceReport += tuplesProcessed;
+            if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
+                reportProgressToTopend(limits);
+            }
+            return m_tupleReportThreshold; // size of next batch
+        }
+
+        /**
+         * Called when a long-running operation completes.
+         */
         inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                                  int64_t tuplesProcessed);
+                                                                  int64_t tuplesProcessed) {
+            try {
+                pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
+            } catch(const SerializableEEException &e) {
+                e.serialize(getExceptionOutputSerializer());
+            }
+
+            m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+        }
 
         // If an insert will fail due to row limit constraint and user
         // has defined a delete action to make space, this method
@@ -658,38 +690,6 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
     m_resultOutput.initializeWithPosition(m_reusedResultBuffer, m_reusedResultCapacity, headerSize);
     m_exceptionOutput.initializeWithPosition(m_exceptionBuffer, m_exceptionBufferCapacity, headerSize);
     *reinterpret_cast<int32_t*>(m_exceptionBuffer) = voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
-}
-
-/**
- * Track total tuples accessed for this query.
- * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
- */
-inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType)
-{
-    m_lastAccessedPlanNodeType = planNodeType;
-    return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
-}
-
-inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                                      int64_t tuplesProcessed)
-{
-    m_tuplesProcessedSinceReport += tuplesProcessed;
-    if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-        reportProgressToTopend(limits);
-    }
-    return m_tupleReportThreshold; // size of next batch
-}
-
-inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits *limits,
-                                                                        int64_t tuplesProcessed)
-{
-    try {
-        pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
-    } catch(const SerializableEEException &e) {
-        e.serialize(getExceptionOutputSerializer());
-    }
-
-    m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
 }
 
 } // namespace voltdb

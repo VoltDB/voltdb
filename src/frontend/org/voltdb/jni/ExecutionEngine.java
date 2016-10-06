@@ -461,19 +461,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         // Timing out (canceling) versus just reporting something taking a long time
         sb.append(timeout ? " is timed out at " : " is taking a long time to execute -- at least ");
-        sb.append(String.format("%.2f seconds spent accessing %d tuples. ",
+        sb.append(String.format("%.2f seconds spent accessing %d tuples.",
                 latency / 1000.0, m_lastTuplesAccessed));
 
-        // Type of plan node executing, and index in batch in known.
-        sb.append("Current plan fragment " + PlanNodeType.get(planNodeTypeAsInt).name());
+        // Type of plan node executing, and index in batch if known.
+        sb.append(" Current plan fragment " + PlanNodeType.get(planNodeTypeAsInt).name());
         if (indexFromFragmentTask >= 0) {
             sb.append(" in call " + m_currentBatchIndex + " to voltExecuteSQL");
         }
-        sb.append(" on site " + CoreUtils.hsIdToString(m_siteId) + ". ");
+        sb.append(" on site " + CoreUtils.hsIdToString(m_siteId) + ".");
 
         if (m_currMemoryInBytes > 0 && m_peakMemoryInBytes > 0) {
-            sb.append("Current temp table uses " + m_currMemoryInBytes + " bytes memory,"
-                    + " and the peak usage of memory for temp table is " + m_peakMemoryInBytes + " bytes.");
+            sb.append(" Current temp table uses " + m_currMemoryInBytes + " bytes memory,"
+                    + " and the peak usage of memory for temp tables is " + m_peakMemoryInBytes + " bytes.");
         }
 
         if (m_sqlTexts != null
