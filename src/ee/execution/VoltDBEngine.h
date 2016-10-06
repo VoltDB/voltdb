@@ -170,8 +170,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Executors can call this to note a certain number of tuples have been
         // scanned or processed.index
         inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType);
-        inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
-        inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
+        inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                                int64_t tuplesProcessed);
+        inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                                  int64_t tuplesProcessed);
 
         // If an insert will fail due to row limit constraint and user
         // has defined a delete action to make space, this method
@@ -440,7 +442,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Call into the topend with information about how executing a plan fragment is going.
          */
-        void reportProgressToTopend();
+        void reportProgressToTopend(const TempTableLimits* limits);
 
         /**
          * Execute a single plan fragment.
@@ -656,19 +658,21 @@ inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(PlanNodeType
     return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
 }
 
-inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
+inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                                      int64_t tuplesProcessed)
 {
     m_tuplesProcessedSinceReport += tuplesProcessed;
     if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-        reportProgressToTopend();
+        reportProgressToTopend(limits);
     }
     return m_tupleReportThreshold; // size of next batch
 }
 
-inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
+inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits *limits,
+                                                                        int64_t tuplesProcessed)
 {
     try {
-        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+        pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
     } catch(const SerializableEEException &e) {
         e.serialize(getExceptionOutputSerializer());
     }

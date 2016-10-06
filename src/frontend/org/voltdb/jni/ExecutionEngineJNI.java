@@ -226,7 +226,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
+    protected void coreLoadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
@@ -239,7 +239,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(long timestamp, final String catalogDiffs) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));

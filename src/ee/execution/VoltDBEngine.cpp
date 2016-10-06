@@ -425,6 +425,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_stringPool.purge();
     }
 
+    m_currentIndexInBatch = -1;
+
     return failures;
 }
 
@@ -2049,16 +2051,18 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgressToTopend() {
-    assert(m_currExecutorVec);
+void VoltDBEngine::reportProgressToTopend(const TempTableLimits *limits) {
+
+    int64_t allocated = limits != NULL ? limits->getAllocated() : -1;
+    int64_t peak = limits != NULL ? limits->getPeakMemoryInBytes() : -1;
 
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         m_lastAccessedPlanNodeType,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
-                                        m_currExecutorVec->limits().getAllocated(),
-                                        m_currExecutorVec->limits().getPeakMemoryInBytes());
+                                        allocated,
+                                        peak);
     m_tuplesProcessedSinceReport = 0;
 
     if (tupleReportThreshold < 0) {
