@@ -71,8 +71,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
 
         //popup query ok and cancel
-        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel", text:"Cancel")}
-        okpopupquery            { $("#btnQueryDatabasePausedErrorOk", text:"Ok")}
+        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel") }
+        okpopupquery            { $("#btnQueryDatabasePausedErrorOk") }
         switchadminport         { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(3) > span")}
         queryexecutionerror     { $("#queryDatabasePausedInnerErrorPopup > div.overlay-title", text:"Query Execution Error")}
         queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}

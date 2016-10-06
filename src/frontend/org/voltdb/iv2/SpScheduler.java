@@ -1267,12 +1267,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void setRepairLogTruncationHandle(long newHandle)
     {
-        if (newHandle < m_repairLogTruncationHandle) {
-            throw new RuntimeException("Updating truncation point from " +
-                    TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                    "to" + TxnEgo.txnIdToString(newHandle));
-        }
-
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
 
@@ -1286,6 +1280,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
             }
             scheduleRepairLogTruncateMsg();
+        } else {
+            // As far as I know, they are cases that will move truncation handle backwards.
+            // These include node failures (promotion phase) and node rejoin (early rejoin phase).
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                        "to" + TxnEgo.txnIdToString(newHandle));
+            }
         }
     }
 
