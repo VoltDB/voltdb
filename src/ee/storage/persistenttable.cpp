@@ -494,11 +494,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             assert(destEmptyTable);
             auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
             bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
-            new MaterializedViewHandler(destEmptyTable,
-                                        mvHandlerInfo,
-                                        engine,
-                                        populateInitialTuple,
-                                        fallible);
+            MaterializedViewHandler *newHandler = new MaterializedViewHandler(destEmptyTable,
+                                                                              mvHandlerInfo,
+                                                                              engine);
+            if (populateInitialTuple) {
+                newHandler->catchUpWithExistingData(engine, fallible);
+            }
         }
     }
 

@@ -29,8 +29,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -54,6 +52,8 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
+
+import junit.framework.Test;
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
@@ -2118,6 +2118,29 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         assertEquals(numExc, 2);
+    }
+
+    public void testCreateViewWithParams() throws Exception {
+        Client client = getClient();
+
+        String expectedMsg = "Materialized view \"V\" contains placeholders \\(\\?\\), "
+                + "which are not allowed in the SELECT query for a view.";
+        verifyStmtFails(client,
+                "create view v as "
+                + "select t3.f5, count(*) "
+                + "FROM t3_eng_11119 as t3 INNER JOIN T1_eng_11119 as t1 "
+                + "ON T1.f1 = T3.f4 "
+                + "WHERE T3.f4 = ? "
+                + "group by t3.f5;",
+                expectedMsg);
+
+        verifyStmtFails(client,
+                "create view v as "
+                + "select t3.f5, count(*) "
+                + "FROM t3_eng_11119 as t3 "
+                + "WHERE T3.f4 = ? "
+                + "group by t3.f5;",
+                expectedMsg);
     }
 
     /**

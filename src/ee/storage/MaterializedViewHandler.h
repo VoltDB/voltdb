@@ -54,13 +54,22 @@ public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
     MaterializedViewHandler(PersistentTable* targetTable,
                             catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
-                            VoltDBEngine* engine,
-                            bool needsCatchUp,
-                            bool catchUpFallible);
+                            VoltDBEngine* engine);
+
     ~MaterializedViewHandler();
     // We maintain the source table list here to register / de-register the view handler on the source tables.
     void addSourceTable(PersistentTable *sourceTable);
     void dropSourceTable(PersistentTable *sourceTable);
+
+    // This is called to catch up with the existing data in the source tables.
+    // It is useful when the view is created after the some data was inserted into the
+    // source table(s).
+    //
+    // This must be done outside of the constructor, since the
+    // catching up executes a plan fragment which may throw an
+    // exception.
+    void catchUpWithExistingData(VoltDBEngine* engine, bool fallible);
+
     PersistentTable *destTable() const { return m_destTable; }
     /* A view handler becomes dirty (and needs to be recreated) when:
      * 1. One of the source table is re-created. This may result from:
@@ -116,11 +125,6 @@ private:
                             VoltDBEngine *engine);
     // Set up the m_existingTuple and the m_updatedTuple.
     void setUpBackedTuples();
-
-    // This is called to catch up with the existing data in the source tables.
-    // It is useful when the view is created after the some data was inserted into the
-    // source table(s).
-    void catchUpWithExistingData(bool fallible);
 
     // Find in the view table (m_destTable) for the row that has the same group-by keys as
     // the deltaTuple.
