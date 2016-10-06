@@ -229,7 +229,7 @@ public class MaterializedViewProcessor {
                 } // end for each source table
 
                 compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
-                compileCreateQueryAndUpdateCatalog(db, viewName, query, xmlquery, mvHandlerInfo);
+                compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
                 mvHandlerInfo.setGroupbycolumncount(stmt.m_groupByColumns.size());
 
                 for (int i=0; i<stmt.m_displayColumns.size(); i++) {
@@ -642,7 +642,6 @@ public class MaterializedViewProcessor {
     }
 
     private void compileCreateQueryAndUpdateCatalog(Database db,
-                                                    String viewName,
                                                     String query,
                                                     VoltXMLElement xmlquery,
                                                     MaterializedViewHandlerInfo mvHandlerInfo)
