@@ -27,8 +27,8 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
-@SnapshotSave               varchar
-@SnapshotSave               varchar, varchar, bit
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -71,6 +71,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -100,6 +102,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -169,6 +173,8 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -216,6 +222,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -271,6 +279,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -327,6 +337,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -382,6 +394,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave                   varchar
+@SnapshotSave                   varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
