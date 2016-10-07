@@ -160,6 +160,25 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t uniqueId,
                                  int64_t undoToken);
 
+        /**
+         * Execute a single, top-level plan fragment.  This method is
+         * used both internally to execute fragments in a batch, and
+         * by clients that execute fragments outside of a stored
+         * procedure context, e.g., when populating a view during a
+         * catalog update.
+         *
+         * This method will produce a unique_ptr-like wrapper around a
+         * temp table, that will automatically delete the contents of
+         * the table when it goes out of scope.
+         *
+         * Callers of this method should take care to call
+         * ExecutorContext::cleanupAllExecutors when finished, since
+         * if the executed fragment may have produced cached
+         * subqueries.
+         */
+        UniqueTempTableResult executePlanFragment(ExecutorVector* executorVector,
+                                                  int64_t* tuplesModified = NULL);
+
         int getUsedParamcnt() const { return m_usedParamcnt; }
 
         // Created to transition existing unit tests to context abstraction.
@@ -462,7 +481,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void resetExecutionMetadata();
+        void resetExecutionMetadata(ExecutorVector* executorVector);
 
         // -------------------------------------------------
         // Data Members
@@ -470,7 +489,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** True if any fragments in a batch have modified any tuples */
         bool m_dirtyFragmentBatch;
         int m_currentIndexInBatch;
-        int64_t m_allTuplesScanned;
         int64_t m_tuplesProcessedInBatch;
         int64_t m_tuplesProcessedInFragment;
         int64_t m_tuplesProcessedSinceReport;
@@ -558,9 +576,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // n.b. these are 8k each, should be boost shared arrays?
         int64_t m_batchFragmentIdsContainer[MAX_BATCH_COUNT];
         int64_t m_batchDepIdsContainer[MAX_BATCH_COUNT];
-
-        /** number of plan fragments executed so far (diagnostic?) */
-        int m_pfCount;
 
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods

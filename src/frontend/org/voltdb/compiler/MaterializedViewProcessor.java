@@ -465,6 +465,11 @@ public class MaterializedViewProcessor {
         StringBuffer msg = new StringBuffer();
         msg.append("Materialized view \"" + viewName + "\" ");
 
+        if (stmt.getParameters().length > 0) {
+            msg.append("contains placeholders (?), which are not allowed in the SELECT query for a view.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
         List <AbstractExpression> checkExpressions = new ArrayList<>();
 
         int i;
@@ -664,6 +669,7 @@ public class MaterializedViewProcessor {
                           null, // no user-supplied join order
                           DeterminismMode.FASTER,
                           StatementPartitioning.inferPartitioning());
+
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
