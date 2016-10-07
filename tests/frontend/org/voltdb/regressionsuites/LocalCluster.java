@@ -1668,7 +1668,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
         cl.m_leader = config.m_leader;
-        cl.m_coordinators = ImmutableSortedSet.copyOf(cl.m_coordinators);
+        cl.m_coordinators = ImmutableSortedSet.copyOf(config.m_coordinators);
     }
 
     public static boolean isMemcheckDefined() {
