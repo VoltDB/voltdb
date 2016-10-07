@@ -46,7 +46,7 @@ public class TestDRConsumerDrIdTracker {
 
     @Before
     public void setUp() throws IOException {
-        tracker = DRConsumerDrIdTracker.createPartitionTracker(-1L, 0L, 0L);
+        tracker = DRConsumerDrIdTracker.createPartitionTracker(-1L, 0L, 0L, 0);
     }
 
     @After
@@ -131,7 +131,7 @@ public class TestDRConsumerDrIdTracker {
 
         tracker.append(90L, 90L, 0L, 0L);
 
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(5L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(5L, 0L, 0L, 0);
         // This should insert a new entry before the beginning
         tracker2.append(6L, 6L, 0L, 0L);
         expectedMap.add(DRConsumerDrIdTracker.range(6L, 6L));
@@ -188,7 +188,7 @@ public class TestDRConsumerDrIdTracker {
         tracker.append(40L, 40L, 0L, 0L);
         tracker.append(50L, 60L, 0L, 0L);
 
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(6L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(6L, 0L, 0L, 0);
         // overlaps with the beginning of the first entry
         tracker2.append(7L, 8L, 0L, 0L);
         expectedMap.add(DRConsumerDrIdTracker.range(8L, 9L));
@@ -214,7 +214,7 @@ public class TestDRConsumerDrIdTracker {
     @Test
     public void testAppendToEmptyTracker() {
         RangeSet<Long> expectedMap = TreeRangeSet.create();
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(5L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(5L, 0L, 0L, 0);
         expectedMap.add(DRConsumerDrIdTracker.range(5L, 5L));
         tracker2.append(11L, 11L, 0L, 0L);
         expectedMap.add(DRConsumerDrIdTracker.range(11L, 11L));
@@ -233,7 +233,7 @@ public class TestDRConsumerDrIdTracker {
     public void testAppendNeighborTracker() throws Exception {
         RangeSet<Long> expectedMap = TreeRangeSet.create();
         tracker.append(6L, 10L, 0L, 0L);
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(2L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(2L, 0L, 0L, 0);
         expectedMap.add(DRConsumerDrIdTracker.range(2L, 2L));
         tracker2.append(11L, 11L, 0L, 0L);
         expectedMap.add(DRConsumerDrIdTracker.range(6L, 11L));
@@ -253,7 +253,7 @@ public class TestDRConsumerDrIdTracker {
         RangeSet<Long> expectedMap = TreeRangeSet.create();
         tracker.append(6L, 10L, 0L, 0L);
         tracker.append(15L, 20L, 0L, 0L);
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(20L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(20L, 0L, 0L, 0);
         expectedMap.add(DRConsumerDrIdTracker.range(20L, 20L));
         tracker2.append(22L, 30L, 0L, 0L);
         expectedMap.add(DRConsumerDrIdTracker.range(22L, 30L));
@@ -284,7 +284,7 @@ public class TestDRConsumerDrIdTracker {
     public void testJsonSerialization() throws Exception {
         tracker.append(5L, 5L, 0L, 0L);
         tracker.append(15L, 20L, 0L, 0L);
-        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(17L, 0L, 0L);
+        DRConsumerDrIdTracker tracker2 = DRConsumerDrIdTracker.createPartitionTracker(17L, 0L, 0L, 0);
         tracker2.append(20L, 25L, 0L, 0L);
         tracker2.append(28L, 28L, 0L, 0L);
         Map<Integer, DRConsumerDrIdTracker> perProducerPartitionTrackers = new HashMap<Integer, DRConsumerDrIdTracker>();

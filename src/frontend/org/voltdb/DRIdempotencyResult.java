@@ -17,21 +17,29 @@
 
 package org.voltdb;
 
-// Interface through which the outside world can interact with the consumer side
-// of DR. Currently, there's not much to do here, since the subsystem is
-// largely self-contained
-public interface ConsumerDRGateway extends Promotable {
+public enum DRIdempotencyResult {
+    SUCCESS((byte) 0),    // Is the expect next DR ID
+    DUPLICATE((byte) -1), // Is a duplicate DR ID seen before
+    GAP((byte) 1);        // Is way in the future
 
-    void updateCatalog(CatalogContext catalog);
+    private final byte m_id;
+    DRIdempotencyResult(byte id) {
+        m_id = id;
+    }
 
-    boolean isActive();
+    public byte id() {
+        return m_id;
+    }
 
-    void initialize(boolean resumeReplication);
-
-    void shutdown(boolean blocking) throws InterruptedException;
-
-    void restart() throws InterruptedException;
-
-    DRConsumerMpCoordinator getDRConsumerMpCoordinator();
-
+    public static DRIdempotencyResult fromID(byte id) {
+        if (SUCCESS.id() == id) {
+            return SUCCESS;
+        } else if (DUPLICATE.id() == id) {
+            return DUPLICATE;
+        } else if (GAP.id() == id) {
+            return GAP;
+        } else {
+            throw new IllegalArgumentException("Invalid DRIdempotencyResult ID " + id);
+        }
+    }
 }
