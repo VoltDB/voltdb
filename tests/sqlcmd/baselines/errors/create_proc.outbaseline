@@ -27,6 +27,8 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave               varchar
+@SnapshotSave               varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit

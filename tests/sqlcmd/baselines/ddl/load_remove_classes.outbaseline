@@ -77,6 +77,8 @@ Command succeeded.
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
 @SnapshotSave             
+@SnapshotSave               varchar
+@SnapshotSave               varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit

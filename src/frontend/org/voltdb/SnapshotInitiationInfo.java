@@ -82,8 +82,7 @@ public class SnapshotInitiationInfo
                 checkNonceValidity = false;
                 break;
             default:
-                throw new Exception("@SnapshotSave requires 3 parameters " +
-                        "(Path, nonce, and blocking) or alternatively a single JSON blob. or no parameters to save snapshot in autoshnapshot directory.");
+                throw new IllegalArgumentException("Invalid number of parameters, " + params.length + ". @SnapshotSave allows, 0, 1, or 3 parameters.");
         }
 
         if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
