@@ -653,7 +653,7 @@ public class CommandLine extends VoltDB.Configuration
 
         cmdline.add("host");
         if (!m_coordinators.isEmpty()) {
-            cmdline.add(m_coordinators.first());
+            cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
         } else {
             cmdline.add(m_leader);
         }
