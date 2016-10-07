@@ -53,6 +53,7 @@ import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.HostHeaderCustomizer;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
@@ -927,7 +928,9 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, String publicIntf, int port,
+            HttpsType httpsType, boolean mustListen
+            ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
@@ -961,12 +964,19 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+            if (httpsType == null || !httpsType.isEnabled()) { // basic HTTP
+                HttpConfiguration httpCfg = new HttpConfiguration();
+
+                if (publicIntf != null && !publicIntf.trim().isEmpty()) {
+                    httpCfg.addCustomizer(new HostHeaderCustomizer(publicIntf));
+                }
+                HttpConnectionFactory factory = new HttpConnectionFactory(httpCfg);
+
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
-                connector = new ServerConnector(m_server);
+                connector = new ServerConnector(m_server, factory);
 
-                if (intf != null && intf.length() > 0) {
+                if (intf != null && !intf.trim().isEmpty()) {
                     connector.setHost(intf);
                 }
                 connector.setPort(port);
@@ -975,7 +985,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
-                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
+                m_server.addConnector(getSSLServerConnector(httpsType, intf, publicIntf, port));
             }
 
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
@@ -1049,7 +1059,7 @@ public class HTTPAdminListener {
         }
     }
 
-    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
+    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, String publicIntf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
@@ -1080,13 +1090,16 @@ public class HTTPAdminListener {
         httpsConfig.setSecurePort(port);
         //Add this customizer to indicate we are in https land
         httpsConfig.addCustomizer(new SecureRequestCustomizer());
+        if (publicIntf != null && !publicIntf.trim().isEmpty()) {
+            httpsConfig.addCustomizer(new HostHeaderCustomizer(publicIntf));
+        }
         HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
 
         // SSL Connector
         ServerConnector connector = new ServerConnector(m_server,
             new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
             factory);
-        if (intf != null && intf.length() > 0) {
+        if (intf != null && !intf.trim().isEmpty()) {
             connector.setHost(intf);
         }
         connector.setPort(port);
