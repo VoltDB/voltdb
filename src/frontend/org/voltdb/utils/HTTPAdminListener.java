@@ -53,7 +53,6 @@ import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Handler;
-import org.eclipse.jetty.server.HostHeaderCustomizer;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
@@ -93,6 +92,7 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class HTTPAdminListener {
 
@@ -107,6 +107,8 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+
+    final String m_publicIntf;
 
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
@@ -146,6 +148,11 @@ public class HTTPAdminListener {
 
         protected String getHostHeader() {
             if (m_hostHeader != null) {
+                return m_hostHeader;
+            }
+
+            if (!m_publicIntf.isEmpty()) {
+                m_hostHeader = m_publicIntf;
                 return m_hostHeader;
             }
 
@@ -934,6 +941,12 @@ public class HTTPAdminListener {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
+        String resolvedIntf = intf == null ? "" : intf.trim().isEmpty() ? ""
+                : HostAndPort.fromHost(intf).withDefaultPort(port).toString();
+
+        m_publicIntf = publicIntf == null ? resolvedIntf : publicIntf.trim().isEmpty() ? resolvedIntf
+                : HostAndPort.fromHost(publicIntf).withDefaultPort(port).toString();
+
         /*
          * Don't force us to look at a huge pile of threads
          */
@@ -965,16 +978,9 @@ public class HTTPAdminListener {
         ServerConnector connector = null;
         try {
             if (httpsType == null || !httpsType.isEnabled()) { // basic HTTP
-                HttpConfiguration httpCfg = new HttpConfiguration();
-
-                if (publicIntf != null && !publicIntf.trim().isEmpty()) {
-                    httpCfg.addCustomizer(new HostHeaderCustomizer(publicIntf));
-                }
-                HttpConnectionFactory factory = new HttpConnectionFactory(httpCfg);
-
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
-                connector = new ServerConnector(m_server, factory);
+                connector = new ServerConnector(m_server);
 
                 if (intf != null && !intf.trim().isEmpty()) {
                     connector.setHost(intf);
@@ -985,7 +991,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
-                m_server.addConnector(getSSLServerConnector(httpsType, intf, publicIntf, port));
+                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
             }
 
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
@@ -1059,7 +1065,7 @@ public class HTTPAdminListener {
         }
     }
 
-    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, String publicIntf, int port)
+    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
@@ -1090,9 +1096,6 @@ public class HTTPAdminListener {
         httpsConfig.setSecurePort(port);
         //Add this customizer to indicate we are in https land
         httpsConfig.addCustomizer(new SecureRequestCustomizer());
-        if (publicIntf != null && !publicIntf.trim().isEmpty()) {
-            httpsConfig.addCustomizer(new HostHeaderCustomizer(publicIntf));
-        }
         HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
 
         // SSL Connector
