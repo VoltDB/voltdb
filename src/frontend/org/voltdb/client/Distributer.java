@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
@@ -397,7 +398,7 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[], SSLEngine sslEngine) {
+        public NodeConnection(long ids[]) {
             super();
         }
 
@@ -927,23 +928,29 @@ class Distributer {
     }
 
     void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
+            throws UnknownHostException, IOException
+    {
+        createConnection(host, program, password, port, scheme, null);
+    }
+
+    void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme, SSLContext sslContext)
     throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
-        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
+        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme, sslContext);
     }
 
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme, SSLContext sslContext)
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslContext);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
         final SSLEngine sslEngine = (SSLEngine)socketChannelAndInstanceIdAndBuildString[3];
 
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, sslEngine);
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
         Connection c = m_network.registerChannel( aChannel, cxn, sslEngine);
         cxn.m_connection = c;
 

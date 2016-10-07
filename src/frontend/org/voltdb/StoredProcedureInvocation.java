@@ -335,8 +335,6 @@ public class StoredProcedureInvocation implements JSONString {
             case VERSION2:
                 initVersion2FromBuffer(buf);
                 break;
-            case VERSION3:
-                initVersion2FromBuffer(buf);
         }
 
         // ensure extension count is correct

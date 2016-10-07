@@ -90,7 +90,8 @@ public class VoltNetworkPool {
 
     public Connection registerChannel(
             final SocketChannel channel,
-            final InputHandler handler, SSLEngine sslEngine) throws IOException {
+            final InputHandler handler,
+            final SSLEngine sslEngine) throws IOException {
         return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS, sslEngine);
     }
 
@@ -99,7 +100,7 @@ public class VoltNetworkPool {
             final InputHandler handler,
             final int interestOps,
             final ReverseDNSPolicy dns,
-            SSLEngine sslEngine) throws IOException {
+            final SSLEngine sslEngine) throws IOException {
         //Start with a round robin base policy
         VoltNetwork vn = m_networks[(int)(m_nextNetwork.getAndIncrement() % m_networks.length)];
         //Then do a load based policy which is a little racy

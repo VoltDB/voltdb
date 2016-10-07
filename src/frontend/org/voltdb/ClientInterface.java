@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -28,7 +27,6 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -98,7 +96,6 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
@@ -254,7 +251,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
-        private SSLContext sslCtx;
+        private final SSLContext m_sslContext;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -262,7 +259,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLContext sslContext)
         {
             m_interface = intf;
             m_network = network;
@@ -283,6 +280,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new RuntimeException(e);
             }
             m_serverSocket = socket;
+            m_sslContext = sslContext;
         }
 
         public void start() throws IOException {
@@ -303,18 +301,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     CoreUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
-            }
-
-            try {
-                KeyStore ks = KeyStore.getInstance("JKS");
-                ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
-                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-                kmf.init(ks, "myk5yst15r5".toCharArray());
-                sslCtx = SSLContext.getInstance("TLS");
-                sslCtx.init(kmf.getKeyManagers(), null, null);
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new IOException(e);
             }
 
             m_running = true;
@@ -460,16 +446,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // do the handshaking here.
                     socket.configureBlocking(false);
 
-                    SSLEngine engine = sslCtx.createSSLEngine();
-                    engine.setUseClientMode(false);
-                    engine.setNeedClientAuth(false);
+                    SSLEngine sslEngine = null;
+                    if (m_sslContext != null) {
+                        sslEngine = m_sslContext.createSSLEngine();
+                        sslEngine.setUseClientMode(false);
+                        sslEngine.setNeedClientAuth(false);
 
-                    SSLHandshaker handshaker = new SSLHandshaker(socket, engine);
-                    if (!handshaker.handshake()) {
-                        throw new IOException("SSL handshake failed");
+                        SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
+                        if (!handshaker.handshake()) {
+                            throw new IOException("XXX SSL handshake failed");
+                        }
                     }
 
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, engine);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -1111,29 +1100,36 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             int clientPort,
             InetAddress adminIntf,
             int adminPort,
-            long timestampTestingSalt) throws Exception {
+            long timestampTestingSalt,
+            SSLContext sslContext) throws Exception {
 
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer);
+                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, sslContext);
 
         return ci;
     }
 
     ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
+                    CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
+                    Cartographer cartographer) throws Exception {
+        this(clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, null);
+    }
+
+    ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
-            Cartographer cartographer) throws Exception {
+            Cartographer cartographer, SSLContext sslContext) throws Exception {
         m_catalogContext.set(context);
         m_snapshotDaemon = new SnapshotDaemon(context);
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
-        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
+        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, sslContext);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
+        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();

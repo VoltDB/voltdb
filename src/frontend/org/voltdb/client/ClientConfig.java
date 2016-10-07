@@ -22,6 +22,7 @@ import java.security.Principal;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
@@ -56,6 +57,7 @@ public class ClientConfig {
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
+    SSLContext m_sslContext;
 
 
     final static String getUserNameFromSubject(Subject subject) {
@@ -188,6 +190,10 @@ public class ClientConfig {
         m_listener = listener;
         m_cleartext = cleartext;
         m_hashScheme = scheme;
+    }
+
+    public void setSSLContext(SSLContext sslContext) {
+        m_sslContext = sslContext;
     }
 
     /**

@@ -18,12 +18,10 @@
 package org.voltdb.client;
 
 import java.io.EOFException;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
@@ -37,7 +35,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
@@ -146,15 +143,22 @@ public class ConnectionUtil {
                                                       byte[] hashedPassword, int port,
                                                       final Subject subject, ClientAuthScheme scheme) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, null);
+    }
+
+    public static Object[] getAuthenticatedConnection(String host, String username,
+                                                      byte[] hashedPassword, int port,
+                                                      final Subject subject, ClientAuthScheme scheme, SSLContext sslContext) throws IOException {
+        String service = subject == null ? "database" : Constants.KERBEROS;
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslContext);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslContext);
     }
 
     private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
@@ -175,7 +179,7 @@ public class ConnectionUtil {
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
     throws IOException {
         Object returnArray[] = new Object[4];
         boolean success = false;
@@ -191,24 +195,15 @@ public class ConnectionUtil {
         }
 
         aChannel.configureBlocking(false);
-        // handshake here.
-        SSLEngine engine;
-        try {
-            KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, "myk5yst15r5".toCharArray());
-            SSLContext sslCtx = SSLContext.getInstance("TLS");
-            sslCtx.init(kmf.getKeyManagers(), null, null);
-            engine = sslCtx.createSSLEngine("client", 5432);
-            engine.setUseClientMode(true);
-        } catch (Exception e) {
-            throw new IOException(e);
-        }
 
-        SSLHandshaker handshaker = new SSLHandshaker(aChannel, engine);
-        if (!handshaker.handshake()) {
-            throw new IOException("SSL handshake failed");
+        SSLEngine sslEngine = null;
+        if (sslContext != null) {
+            sslEngine = sslContext.createSSLEngine("client", 5432);
+            sslEngine.setUseClientMode(true);
+            SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
+            if (!handshaker.handshake()) {
+                throw new IOException("SSL handshake failed");
+            }
         }
 
         final long retvals[] = new long[4];
@@ -332,7 +327,7 @@ public class ConnectionUtil {
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
-            returnArray[3] = engine;
+            returnArray[3] = sslEngine;
 
             aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);

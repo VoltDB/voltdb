@@ -94,7 +94,7 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
-    private final boolean m_isSSLCcnfigured;
+    private final boolean m_isSSLConfigured;
     private ByteBuffer m_decBuffer;
     private ByteBuffer m_assembled_SSL_Message;
     private ByteBuffer m_ssl_messageChunk;
@@ -106,7 +106,7 @@ public class VoltPort implements Connection
             InputHandler handler,
             InetSocketAddress remoteAddress,
             NetworkDBBPool pool,
-            SSLEngine engine) {
+            SSLEngine sslEngine) {
         m_network = network;
         m_handler = handler;
         m_remoteSocketAddress = remoteAddress;
@@ -114,8 +114,8 @@ public class VoltPort implements Connection
         m_pool = pool;
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
-        m_sslEngine = engine;
-        m_isSSLCcnfigured = engine == null ? false : true;
+        m_sslEngine = sslEngine;
+        m_isSSLConfigured = m_sslEngine == null ? false : true;
         m_decBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));  // overflows if allocated at chunk size, though it seems it shouldn't
         m_assembled_SSL_Message = null;
         m_ssl_messageChunk = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
@@ -197,7 +197,7 @@ public class VoltPort implements Connection
                      */
                     try {
                         while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            if (m_isSSLCcnfigured) {
+                            if (m_isSSLConfigured) {
                                 ByteBuffer assembledMessage;
                                 if ((assembledMessage = assembleV3Message(message)) != null) {
                                     m_handler.handleMessage(assembledMessage, this);
@@ -258,19 +258,21 @@ public class VoltPort implements Connection
 
     private void decryptMessage(SSLEngine engine, ByteBuffer message) throws IOException {
         while (true) {
-            SSLEngineResult result = engine.unwrap(message, m_decBuffer);
-            switch (result.getStatus()) {
-                case OK:
-                    m_decBuffer.flip();
-                    return;
-                case BUFFER_OVERFLOW:
-                    ByteBuffer bigger = ByteBuffer.allocate(m_decBuffer.capacity() * 2);
-                    m_decBuffer = bigger;
-                    break;  // try again
-                case BUFFER_UNDERFLOW:
-                    throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
-                case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
+            synchronized (engine) {
+                SSLEngineResult result = engine.unwrap(message, m_decBuffer);
+                switch (result.getStatus()) {
+                    case OK:
+                        m_decBuffer.flip();
+                        return;
+                    case BUFFER_OVERFLOW:
+                        ByteBuffer bigger = ByteBuffer.allocate(m_decBuffer.capacity() * 2);
+                        m_decBuffer = bigger;
+                        break;  // try again
+                    case BUFFER_UNDERFLOW:
+                        throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
+                    case CLOSED:
+                        throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
+                }
             }
         }
     }

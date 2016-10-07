@@ -36,6 +36,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.security.KeyStore;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -161,6 +162,10 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1053,6 +1058,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
+            SSLContext sslContext = null;
+            try {
+                KeyStore ks = KeyStore.getInstance("JKS");
+                ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+                kmf.init(ks, "myk5yst15r5".toCharArray());
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(kmf.getKeyManagers(), null, null);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                return;
+            }
+
             // Create the client interface
             try {
                 InetAddress clientIntf = null;
@@ -1076,7 +1094,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_timestampTestingSalt);
+                        m_config.m_timestampTestingSalt,
+                        sslContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -1713,7 +1732,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * <li>moves the deployment file under the config directory
      * </ul>
      * @param config
-     * @param dt a {@link DeploymentTypel}
+     * @param dt a {@link DeploymentType}
      */
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 

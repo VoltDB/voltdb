@@ -29,8 +29,7 @@ package org.voltdb.client;
 public enum ProcedureInvocationType {
     ORIGINAL((byte) 0),              // original version pre 6.7
     VERSION1((byte) 1),              // version with individual timeout support (pre 6.7)
-    VERSION2((byte) 2),               // slightly extensible v6.7 and up
-    VERSION3((byte) 3);              // SSL encrypted
+    VERSION2((byte) 2);               // slightly extensible v6.7 and up
     // REPLICATED ((byte) (1 << 7)); // -128 - no longer used - will throw RuntimeException
 
     private final byte m_value;
@@ -51,8 +50,6 @@ public enum ProcedureInvocationType {
             return VERSION1;
         case 2:
             return VERSION2;
-        case 3:
-            return VERSION3;
         default:
             throw new RuntimeException("Unknown ProcedureInvocationType " + b);
         }

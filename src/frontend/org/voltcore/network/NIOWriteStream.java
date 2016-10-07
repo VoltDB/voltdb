@@ -26,6 +26,7 @@ import java.util.ArrayDeque;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltdb.client.SSLMessageEncrypter;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -79,10 +80,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
-    private final SSLEngine m_sslEngine;
-    private final boolean m_isSSLCcnfigured;
-    private  ByteBuffer m_encBuffer;
-    private final ByteBuffer m_messageChunk;
+    private final boolean m_isSSLConfigured;
+    private final SSLMessageEncrypter m_sslEncrypter;
 
 
     NIOWriteStream(VoltPort port) {
@@ -100,10 +99,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
-        m_sslEngine = engine;
-        m_isSSLCcnfigured = engine == null ? false : true;
-        m_encBuffer = ByteBuffer.allocate((int) (VoltPort.SSL_CHUNK_SIZE * 1.2));
-        m_messageChunk = ByteBuffer.allocate(VoltPort.SSL_CHUNK_SIZE);
+        m_isSSLConfigured = engine == null ? false : true;
+        m_sslEncrypter = engine == null ? null : new SSLMessageEncrypter(engine);
     }
 
     /*
@@ -201,11 +198,37 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 ds.cancel();
                 return;
             }
-            updateLastPendingWriteTimeAndQueueBackpressure();
-            m_queuedWrites.offer(ds);
-            m_port.setInterests( SelectionKey.OP_WRITE, 0);
+            enqueueDS(ds);
         }
         return;
+    }
+
+    private void enqueueDS(final DeferredSerialization ds) {
+        if (m_isSSLConfigured) {
+            try {
+                int serializedSize = ds.getSerializedSize();
+                if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) {
+                    return;
+                }
+                ByteBuffer message = ByteBuffer.allocate(serializedSize);
+                ds.serialize(message);
+                message.flip();
+
+                m_sslEncrypter.setMessage(message);
+                while (m_sslEncrypter.hasNext()) {
+                    ByteBuffer encrypted = m_sslEncrypter.next();
+                    if (encrypted != null) {
+                        offerBuffer(encrypted, encrypted.remaining());
+                    }
+                }
+            } catch (IOException e) {
+                // TODO: do something with this...
+            }
+        } else {
+            updateLastPendingWriteTimeAndQueueBackpressure();
+            m_queuedWrites.offer(ds);
+            m_port.setInterests(SelectionKey.OP_WRITE, 0);
+        }
     }
 
     /*
@@ -219,9 +242,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             @Override
             public void run() {
                 synchronized (NIOWriteStream.this) {
-                    updateLastPendingWriteTimeAndQueueBackpressure();
-                    m_queuedWrites.offer(ds);
-                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
+                    enqueueDS(ds);
                 }
             }
         });
@@ -257,51 +278,20 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             updateLastPendingWriteTimeAndQueueBackpressure();
 
-            // TOOD: safe to assume we always queue one message in a buffer?
-            // TODO: if v3 is enabled.
             for (ByteBuffer buf : b) {
-                if (m_isSSLCcnfigured) {
-                    try {
-                        encryptBuffer(buf);
-                    } catch (IOException e) {
-                        // TODO: need to do something here.
+                if (m_isSSLConfigured) {
+                    m_sslEncrypter.setMessage(buf);
+                    while (m_sslEncrypter.hasNext()) {
+                        ByteBuffer encrypted = m_sslEncrypter.next();
+                        if (encrypted != null) {
+                            offerBuffer(encrypted, encrypted.remaining());
+                        }
                     }
                 } else {
-                   offerBuffer(buf, buf.remaining());
+                    offerBuffer(buf, buf.remaining());
                 }
             }
         }
-    }
-
-    private void encryptBuffer(ByteBuffer message) throws IOException {
-        // need to be at position five in buf.  That is, have read the length of the
-        // full message and the version.
-        if (message.remaining() < VoltPort.SSL_CHUNK_SIZE) {
-            encryptChunk(message);
-        } else {
-            while (message.remaining() > 0) {
-                if (message.remaining() > VoltPort.SSL_CHUNK_SIZE) {
-                    message.get(m_messageChunk.array(), 0, VoltPort.SSL_CHUNK_SIZE);
-                    encryptChunk(m_messageChunk);
-                } else {
-                    m_messageChunk.put(message);
-                    m_messageChunk.flip();
-                    encryptChunk(m_messageChunk);
-                }
-                m_messageChunk.clear();
-            }
-        }
-    }
-
-    private void encryptChunk(ByteBuffer messageChunk) throws IOException {
-        m_encBuffer.clear();
-        encryptMessage(messageChunk);
-        ByteBuffer encryptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
-        encryptedChunk.putInt(m_encBuffer.remaining());
-        encryptedChunk.put(m_encBuffer);
-        encryptedChunk.flip();
-
-        offerBuffer(encryptedChunk, encryptedChunk.remaining());
     }
 
     private void offerBuffer(final ByteBuffer buf, final int bufLen) {
@@ -432,25 +422,4 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
         return bytesWritten;
     }
-
-    private void encryptMessage(ByteBuffer unwrapped) throws IOException {
-        while (true) {
-            SSLEngineResult result = m_sslEngine.wrap(unwrapped, m_encBuffer);
-            switch (result.getStatus()) {
-                case OK:
-                    m_encBuffer.flip();
-                    return;
-                case BUFFER_OVERFLOW:
-                    int newCapacity = m_encBuffer.capacity() * 2;
-                    ByteBuffer bigger = ByteBuffer.allocate(newCapacity);
-                    m_encBuffer = bigger;
-                    break;  // try again
-                case BUFFER_UNDERFLOW:
-                    throw new IOException("Underflow on ssl wrap of buffer.");
-                case CLOSED:
-                    throw new IOException("SSL engine is closed on ssl wrap of buffer.");
-            }
-        }
-    }
-
 }

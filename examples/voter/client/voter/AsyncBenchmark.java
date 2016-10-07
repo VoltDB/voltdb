@@ -42,6 +42,8 @@
 
 package voter;
 
+import java.io.FileInputStream;
+import java.security.KeyStore;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -58,6 +60,9 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 
 public class AsyncBenchmark {
 
@@ -172,6 +177,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
+        clientConfig.setSSLContext(config.getSSLContext());
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
         client = ClientFactory.createClient(clientConfig);
@@ -454,6 +460,19 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         VoterConfig config = new VoterConfig();
         config.parse(AsyncBenchmark.class.getName(), args);
+
+        SSLContext sslContext;
+        try {
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, "myk5yst15r5".toCharArray());
+            sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(kmf.getKeyManagers(), null, null);
+        } catch (Exception e) {
+            return;
+        }
+        config.setSSLContext(sslContext);
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         benchmark.runBenchmark();

@@ -32,6 +32,7 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,6 +50,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -68,6 +70,9 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.history.FileHistory;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 
 public class SQLCommand
 {
@@ -599,7 +604,6 @@ public class SQLCommand
     /**
      *
      * @param fileInfo  The FileInfo object describing the file command (or stdin)
-     * @param script    The line reader object to read from
      * @throws Exception
      */
     private static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader)
@@ -1372,6 +1376,20 @@ public class SQLCommand
         // Create connection
         ClientConfig config = new ClientConfig(user, password);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+
+        SSLContext sslContext = null;
+        try {
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, "myk5yst15r5".toCharArray());
+            sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(kmf.getKeyManagers(), null, null);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+            return;
+        }
+        config.setSSLContext(sslContext);
 
         try {
             // if specified enable kerberos

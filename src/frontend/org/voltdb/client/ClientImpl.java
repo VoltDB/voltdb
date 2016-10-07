@@ -44,6 +44,8 @@ import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
+import javax.net.ssl.SSLContext;
+
 /**
  *  A client that connects to one or more nodes in a VoltCluster
  *  and provides methods to call stored procedures and receive
@@ -78,6 +80,7 @@ public final class ClientImpl implements Client {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
+    private final SSLContext m_sslContext;
 
     /**
      * These threads belong to the network thread pool
@@ -104,9 +107,6 @@ public final class ClientImpl implements Client {
      * Also provide a hint indicating the expected serialized size of
      * most outgoing procedure invocations. This helps size initial allocations
      * for serializing network writes
-     * @param expectedOutgoingMessageSize Expected size of procedure invocations in bytes
-     * @param maxArenaSizes Maximum size arenas in the memory pool should grow to
-     * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
         m_distributer = new Distributer(
@@ -150,6 +150,7 @@ public final class ClientImpl implements Client {
             m_distributer.m_rateLimiter.setLimits(
                     config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
         }
+        m_sslContext = config.m_sslContext;
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
@@ -205,7 +206,7 @@ public final class ClientImpl implements Client {
             throw new IOException("New connection authorization credentials do not match previous credentials for client.");
         }
 
-        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme);
+        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme, m_sslContext);
     }
 
     /**
@@ -322,8 +323,6 @@ public final class ClientImpl implements Client {
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure
-     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
@@ -917,7 +916,6 @@ public final class ClientImpl implements Client {
 
         /**
          * Callback initialization
-         * @param responseWaiter The count down latch
          * @param partitionKey  The partition where the call back works on
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array
