@@ -27,6 +27,7 @@
 
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace voltdb {
 
@@ -36,6 +37,14 @@ extern const int64_t VOLT_EPOCH_IN_MILLIS;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+
+class TempTable;
+class TempTableTupleDeleter;
+
+// UniqueTempTableResult is a smart pointer wrapper around a temp
+// table.  It doesn't delete the temp table, but it will delete the
+// contents of the table when it goes out of scope.
+typedef std::unique_ptr<TempTable, TempTableTupleDeleter> UniqueTempTableResult;
 
 /*
  * EE site global data required by executors at runtime.
@@ -216,15 +225,49 @@ class ExecutorContext {
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 
-    Table* executeExecutors(int subqueryId);
-    Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                            int subqueryId = 0);
+    /**
+     * Execute all the executors in the given vector.
+     *
+     * This method will clean up intermediate temporary results, and
+     * return the result table of the last executor.
+     *
+     * The class UniqueTempTableResult is a smart pointer-like object
+     * that will delete the rows of the temp table when it goes out of
+     * scope.
+     *
+     * In absence of subqueries, which cache their results for
+     * performance, this method takes care of all cleanup
+     * aotomatically.
+     */
+    UniqueTempTableResult executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+                                           int subqueryId = 0);
 
+    /**
+     * Similar to above method.  Execute the executors associated with
+     * the given subquery ID, as defined in m_executorsMap.
+     */
+    UniqueTempTableResult executeExecutors(int subqueryId);
+
+    /**
+     * Return the result produced by the given subquery.
+     */
     Table* getSubqueryOutputTable(int subqueryId) const;
 
+    /**
+     * Cleanup all the executors in m_executorsMap (includes top-level
+     * enclosing fragments and any subqueries), and delete any tuples
+     * in temp tables used by the executors.
+     */
     void cleanupAllExecutors();
 
+    /**
+     * Clean up the executors in the given list.
+     */
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
+
+    /**
+     * Clean up the executors for the given subquery, as contained in m_executorsMap.
+     */
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
     void setDrStream(AbstractDRTupleStream *drStream);
@@ -278,6 +321,11 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
+};
+
+class TempTableTupleDeleter {
+public:
+    void operator()(TempTable* tbl) const;
 };
 
 }
