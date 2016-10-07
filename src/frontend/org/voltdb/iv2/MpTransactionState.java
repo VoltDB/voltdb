@@ -33,6 +33,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
@@ -318,6 +319,7 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
+                    tmLog.warn(VoltDB.GenerateThreadDump());
                 }
             }
         }
