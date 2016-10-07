@@ -139,7 +139,7 @@ typedef boost::multi_index::multi_index_container<
 class EnginePlanSet : public PlanSet { };
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-    : m_currentIndexInBatch(0),
+    : m_currentIndexInBatch(-1),
       m_allTuplesScanned(0),
       m_tuplesProcessedInBatch(0),
       m_tuplesProcessedInFragment(0),
@@ -391,6 +391,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_stringPool.purge();
     }
 
+    m_currentIndexInBatch = -1;
+
     return failures;
 }
 
@@ -614,7 +616,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  * processCatalogAdditions(..) for dumb reasons.
  */
 void
-VoltDBEngine::processCatalogDeletes(int64_t timestamp )
+VoltDBEngine::processCatalogDeletes(int64_t timestamp)
 {
     std::vector<std::string> deletion_vector;
     m_catalog->getDeletedPaths(deletion_vector);
@@ -1898,16 +1900,18 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgressToTopend() {
-    assert(m_currExecutorVec);
+void VoltDBEngine::reportProgressToTopend(const TempTableLimits *limits) {
+
+    int64_t allocated = limits != NULL ? limits->getAllocated() : -1;
+    int64_t peak = limits != NULL ? limits->getPeakMemoryInBytes() : -1;
 
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         m_lastAccessedPlanNodeType,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
-                                        m_currExecutorVec->limits().getAllocated(),
-                                        m_currExecutorVec->limits().getPeakMemoryInBytes());
+                                        allocated,
+                                        peak);
     m_tuplesProcessedSinceReport = 0;
 
     if (tupleReportThreshold < 0) {

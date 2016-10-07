@@ -75,6 +75,12 @@ class AbstractExecutor {
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
 
+    /** The temp output table for this executor.  May be null for a
+     *  SEND node! */
+    const TempTable* getTempOutputTable() const {
+        return m_tmpOutputTable;
+    }
+
     /**
      * Returns the plannode that generated this executor.
      */

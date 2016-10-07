@@ -125,11 +125,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
+    public void coreLoadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
     }
 
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long txnId, final String catalogDiffs) throws EEException {
     }
 
     @Override
