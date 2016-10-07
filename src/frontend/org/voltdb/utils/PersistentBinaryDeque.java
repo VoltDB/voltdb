@@ -761,10 +761,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized void closeAndDelete() throws IOException {
         if (m_closed) return;
         m_closed = true;
+        m_readCursors.clear();
+
         for (PBDSegment qs : m_segments.values()) {
             m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
             closeAndDeleteSegment(qs);
         }
+        m_cursorsWriter.close();
     }
 
     public static class ByteBufferTruncatorResponse extends TruncatorResponse {
