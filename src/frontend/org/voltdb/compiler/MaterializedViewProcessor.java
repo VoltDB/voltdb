@@ -245,7 +245,7 @@ public class MaterializedViewProcessor {
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
                 }
-                mvHandlerInfo.setIssafefornonemptytables(isSafeForNonemptyTables);
+                mvHandlerInfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
             }
             else { // =======================================================================================
                 // Materialized view on single table
@@ -380,7 +380,7 @@ public class MaterializedViewProcessor {
                     destTable.setIsreplicated(false);
                     setGroupedTablePartitionColumn(matviewinfo, srcTable.getPartitioncolumn());
                 }
-                matviewinfo.setIssafefornonemptytables(isSafeForNonemptyTables);
+                matviewinfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
             } // end if single table view materialized view.
         }
     }
