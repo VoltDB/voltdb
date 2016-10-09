@@ -277,14 +277,8 @@
                         }
 
                     });
-                } //else {
-                //    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
-                //        lconnection = connection;
-                //    });
-
-                //}
+                }
                 return lconnection;
-
 
             } catch (e) {
                 console.log(e.message);

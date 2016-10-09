@@ -35,6 +35,7 @@ import java.util.Calendar;
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 class DbMonitorTest extends TestBase {
+    int count = 0
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         int count = 0
@@ -43,7 +44,8 @@ class DbMonitorTest extends TestBase {
             try {
                 when: 'click the DB Monitor link (if needed)'
                 page.openDbMonitorPage()
-                browser.driver.executeScript("localStorage.clear()")
+                browser.driver.executeScript("localStorage.removeItem('user-preferences_null')")
+                browser.driver.executeScript("localStorage.removeItem('user-preferences_8080')")
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
 
@@ -252,21 +254,21 @@ class DbMonitorTest extends TestBase {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.banner.isDisplayed() }
+        waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
     def "header image exists" () {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.image.isDisplayed() }
+        waitFor(waitTime) { header.image.isDisplayed() }
     }
 
     def "header username exists" () {
         when:
         at DbMonitorPage
         then:
-        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
     def "header logout exists" () {
@@ -279,8 +281,7 @@ class DbMonitorTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
 
@@ -988,24 +989,22 @@ class DbMonitorTest extends TestBase {
     }
 
     //server cpu
-    def "check min value in server cpu days"(){
-        int count = 0
-
+    def checkMinAndMaxValueInServerCpuDays() {
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
+            page.chooseGraphView("Minutes")
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax = ""
         String stringMin = ""
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1023,6 +1022,7 @@ class DbMonitorTest extends TestBase {
             }
         }
 
+        when:
         String monthMax = page.changeToMonth(stringMax)
         String monthMin = page.changeToMonth(stringMin)
 
@@ -1031,6 +1031,7 @@ class DbMonitorTest extends TestBase {
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
+        then:
         println(intDateMax)
         println(intDateMin)
         if(monthMax.equals(monthMin)) {
@@ -1053,12 +1054,10 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server cpu days"(){
-        int count = 0
-
+/*    def checkMaxValueInServerCpuDays(){
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
@@ -1115,9 +1114,9 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
-    }
+    }*/
 
-    def "check min value in server cpu minutes"(){
+/*    def "check min value in server cpu minutes"(){
         int count = 0
 
         when:
@@ -1158,26 +1157,23 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
-    }
+    }*/
 
-    def "check max value in server cpu minutes"(){
-        int count = 0
-
+    def checkMinAndMaxValueInServerCpuMinutes() {
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Minutes")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1194,7 +1190,7 @@ class DbMonitorTest extends TestBase {
         String result = page.compareTime(stringMax, stringMin)
 
         if(result.equals("minutes")) {
-            println("The maximum value is " + stringMax + " and the time is in " + result )
+            println("The maximum and minimum values are " + stringMax + " and " + stringMin + "respectively and the time is in " + result )
             assert true
         }
         else {
@@ -1203,24 +1199,21 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in server cpu seconds"(){
-        int count = 0
-
+    def checkMinAndMaxValueInServerCpuSeconds() {
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1237,7 +1230,7 @@ class DbMonitorTest extends TestBase {
         String result = page.compareTime(stringMax, stringMin)
 
         if(result.equals("seconds")) {
-            println("The minimum value is " + stringMin + " and the time is in " + result )
+            println("The minimum and maximum values are " + stringMin + " and " + stringMax + " and the time is in " + result )
             assert true
         }
         else {
@@ -1246,24 +1239,21 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server cpu seconds"(){
-        int count = 0
-
+   /* def "check max value in server cpu seconds"(){
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Seconds")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1287,27 +1277,24 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in seconds")
             assert false
         }
-    }
+    }*/
 
     //for server ram
-    def checkMinValueInServerRamDays(){
-        int count = 0
-
+    def checkMaxAndMinValueInServerRamDays(){
         when:
         // This loop is used to gain time.
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             page.chooseGraphView("Days")
             if(graphView.text().equals("")) {
                 break
             }
         }
-        count = 0
         then:
         String stringMax = ""
         String stringMin = ""
 
-        while(count<numberOfTrials) {
+        for (count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -1336,7 +1323,7 @@ class DbMonitorTest extends TestBase {
 
         if(monthMax.equals(monthMin)) {
             if(intDateMax > intDateMin) {
-                println("The minimum value is " + stringMin + " and the time is in Days")
+                println("The minimum and maximum values are " + stringMin + " and " + stringMax + " and the time is in Days")
             }
             else {
                 println("FAIL: Date of Max is less than that of date of Min for same month")
@@ -1354,7 +1341,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def CheckMaxValueInServerRamDays(){
+    /*def CheckMaxValueInServerRamDays(){
         int count = 0
 
         when:
@@ -1427,9 +1414,9 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
-    }
+    }*/
 
-    def "check min value in server ram minutes"(){
+    def checkMinAndMinValueInServerRamMinutes() {
         int count = 0
 
         when:
@@ -1463,7 +1450,7 @@ class DbMonitorTest extends TestBase {
         String result = page.compareTime(stringMax, stringMin)
 
         if(result.equals("minutes")) {
-            println("The minimum value is " + stringMin + " and the time is in " + result )
+            println("The minimum and maximum values are " + stringMin + " and " + stringMax + " and the time is in " + result )
             assert true
         }
         else {
@@ -1472,7 +1459,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server ram minutes"(){
+   /* def "check max value in server ram minutes"(){
         int count = 0
 
         when:
@@ -1513,7 +1500,7 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
-    }
+    }*/
 
     def "check min value in server ram seconds"(){
         int count = 0
@@ -2258,26 +2245,18 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    // for partition idle graph
-    def CheckMinValueInPartitionIdleGraphWithRespectToSeconds() {
-        int count = 0
+    // for partition idle graphs
+    def checkMinValueInPartitionIdleGraphWithRespectToSeconds() {
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
 
-        when:
-        page.chooseGraphView("Minutes")
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Seconds")
-            if(graphView.text().equals("")) {
-                break
-            }
-        }
         count = 0
         then:
         String stringMax
         String stringMin
 
-        while(count<numberOfTrials) {
+        for(count=0; count<numberOfTrials; count++) {
             count++
             try {
                 waitFor(waitTime) {
@@ -2303,10 +2282,12 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in Partition Idle graph with respect to seconds"(){
-        int count = 0
-
-        when:
+    def checkMaxValueInPartitionIdleGraphWithRespectToSeconds() {
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
+        report "hello"
+        /*and:
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -2314,12 +2295,12 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-        }
+        }*/
         count = 0
         then:
         String stringMax
         String stringMin
-
+        report "before"
         while(count<numberOfTrials) {
             count++
             try {
@@ -2346,12 +2327,15 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in seconds")
             assert false
         }
+
+        page.closePartitionIdleGraph()
     }
 
-    def CheckMinValueInClusterPartitionIdlegraphWithRespecttoMinutes(){
-        int count = 0
-
-        when:
+    def checkMinAndMaxValueInClusterPartitionIdleGraphWithRespectToMinutes(){
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
+        and:
         // This loop is used to gain time.
         waitFor(10){page.chooseGraphView("Days")}
         while(count<numberOfTrials) {
@@ -2390,9 +2374,11 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
+
+        page.closePartitionIdleGraph()
     }
 
-    def "check max value in cluster Partition Idle graph with respect to minutes"(){
+    /*def checkMaxValueInClusterPartitionIdleGraphWithRespectToMinutes() {
         int count = 0
 
         when:
@@ -2433,13 +2419,12 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
-    }
+    }*/
 
-    def checkMinValueInClusterPartitionIdleGraphWithRespectToDays(){
-        int count = 0
-
-        when:
-        // This loop is used to gain time.
+    def checkMinAndMaxValueInClusterPartitionIdleGraphWithRespectToDays(){
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
         waitFor(waitTime){ page.chooseGraphView("Minutes")}
         while(count<numberOfTrials) {
             count++
@@ -2498,9 +2483,11 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
+
+        page.closePartitionIdleGraph()
     }
 
-    def checkMaxValueInClusterPartitionIdlegraphWithRespecttoDays(){
+    /*def checkMaxValueInClusterPartitionIdlegraphWithRespecttoDays(){
         int count = 0
 
         when:
@@ -2566,9 +2553,9 @@ class DbMonitorTest extends TestBase {
                 assert false
             }
         }
-    }
+    }*/
 
-    def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
+    def clickDisplayPreferencesAddAndRemovePartitionIdleTime() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -2586,12 +2573,12 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-        then: 'no Partition Idle Time displayed'
+        then: 'Partition Idle Time displayed'
         page.serverCpuDisplayed()
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        !page.partitionIdleTimeDisplayed()
+        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -2607,24 +2594,23 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-        then: 'Partition Idle Time displayed along with others'
+        then: 'No Partition Idle Time displayed'
         page.serverCpuDisplayed()
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        !page.partitionIdleTimeDisplayed()
     }
 
-    def "Check server legends visible in Graph Partition Idle Time"(){
-
-        // for testing , 4 server legends are visible
-
-        when: 'server partition legends is visible'
+    def checkServerLegendsVisibleInGraphPartitionIdleTime() {
+        when: "Open Partition Graph if not open"
+        if (!partitiongraphmin.isDisplayed())
+            page.openPartitionIdleGraph()
+        and: 'server partition legends is visible'
         waitFor(10){    page.localpartition.isDisplayed()
             page.clusterwide.isDisplayed()
             page.multipartition.isDisplayed()
         }
-
         then: 'check those server partition legends and print them'
         if(page.localpartition.text()=="Local partitions"){
             println("grey partition displayed as: " +page.localpartition.text())}
@@ -2634,6 +2620,7 @@ class DbMonitorTest extends TestBase {
             println("Orange partition displayed as: " +page.multipartition.text())}
         else {println("No server legends are visible")}
 
+        page.closePartitionIdleGraph()
     }
 
 
@@ -2965,10 +2952,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        // page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Server Cpu and again add Server Cpu"() {
+    def clickDisplayPreferencesRemoveServerCpuAndAddServerCpu() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -2991,7 +2978,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3012,10 +2998,9 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Server RAM and again add Server RAM"() {
+    def clickDisplayPreferencesRemoveServerRamAndAddServerRam() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3058,10 +3043,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        //page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
+    def clickDisplayPreferencesRemoveClusterLatencyAndAddClusterLatency() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3105,10 +3090,10 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        // page.partitionIdleTimeDisplayed()
     }
 
-    def "click display preferences remove Cluster Transactions and again add Cluster Transactions"() {
+    def clickDisplayPreferencesRemoveClusterTransactionsAndAddClusterTransactions() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3131,7 +3116,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         !page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3152,7 +3136,6 @@ class DbMonitorTest extends TestBase {
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemovePartitionIdleTimeAndAgainAddPartitionIdleTime() {
@@ -3173,12 +3156,12 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-        then: 'no Partition Idle Time displayed'
+        then: 'Partition Idle Time displayed'
         page.serverCpuDisplayed()
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-//        !page.partitionIdleTimeDisplayed()
+        page.partitionIdleTimeDisplayed()
 
         when: 'click Display Preference button'
         page.openDisplayPreference()
@@ -3194,12 +3177,12 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-        then: 'Partition Idle Time displayed along with others'
+        then: 'No Partition Idle Time displayed'
         page.serverCpuDisplayed()
         page.serverRamDisplayed()
         page.clusterLatencyDisplayed()
         page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
+        !page.partitionIdleTimeDisplayed()
     }
 
     def clickDisplayPreferencesRemoveStoredProceduresAndAgainAddStoredProcedures() {

@@ -142,7 +142,7 @@ function async-benchmark-help() {
 # Disable the comments to get latency report
 function async-benchmark() {
     jars-ifneeded
-    echo java -classpath $CLIENTCLASSPATH \
+    java -classpath $CLIENTCLASSPATH \
         client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --duration=180 \

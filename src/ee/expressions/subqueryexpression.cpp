@@ -121,7 +121,12 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
 
     // Out of luck. Need to run the executors. Clean up the output tables with cached results
     exeContext->cleanupExecutorsForSubquery(m_subqueryId);
-    exeContext->executeExecutors(m_subqueryId);
+    UniqueTempTableResult result = exeContext->executeExecutors(m_subqueryId);
+
+    // We don't want this temp table to be cleaned up; we want it to
+    // persist for use by the consumer, and to cache the result so it
+    // can be reused.
+    result.release();
 
     if (context == NULL) {
         // Preserve the value for the next run. Only 'other' parameters need to be copied
