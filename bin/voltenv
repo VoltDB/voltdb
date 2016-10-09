@@ -67,9 +67,6 @@ function envhelp() {
     echo "voltenv clientclasspath"
     echo "  Print out a classpath that contains the VoltDB client jars"
     echo
-    echo "voltenv clientclasspath"
-    echo "  Print out a classpath that contains the VoltDB client jars"
-    echo
     echo "A common use for this file is to source it from other scripts"
     echo " in order to set up the VoltDB environment."
     echo
@@ -97,11 +94,11 @@ function checkpath() {
     # find voltdb binaries in either installation or distribution directory.
     if [ -n "$PATH_VOLTDB_BIN" ]; then
         if [ "$PATH_VOLTDB_BIN" != "$VOLTDB_BIN" ]; then
-            echo "Warning: VoltDB exists in your path at:"
-            echo "    $PATH_VOLTDB_BIN"
-            echo "  But this script is using VoltDB at: "
-            echo "    $VOLTDB_BIN"
-            echo
+            echo "Warning: VoltDB exists in your path at:" >&2
+            echo "    $PATH_VOLTDB_BIN" >&2
+            echo "  But this script is using VoltDB at: " >&2
+            echo "    $VOLTDB_BIN" >&2
+            echo >&2
         fi
     else
         # assume this is the examples folder for a kit
@@ -109,19 +106,20 @@ function checkpath() {
         echo "For ease of use, add the VoltDB bin directory to your path: "
         echo "    $VOLTDB_BIN"
         echo
+        exit 1
     fi
 }
 
 # if this script is run directly:
 # Run the target passed as the first arg on the command line
 # If no first arg, do nothing
-if [ "${0}" = "$SOURCE" ]; then
-    if [ $# -gt 1 ]; then
-        envhelp
-        exit 0
-    elif [ $# = 1 ]; then
-        $1
-    fi
-else
+if [ "${0}" != "$SOURCE" ]; then
     checkpath
+fi
+
+if [ $# -gt 1 ]; then
+    envhelp
+    exit 0
+elif [ $# = 1 ]; then
+    $1
 fi
