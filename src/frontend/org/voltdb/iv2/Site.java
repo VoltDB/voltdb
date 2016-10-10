@@ -42,6 +42,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -421,18 +422,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         /**
          * Check to see if binary log is expected (start DR id adjacent to last received DR id)
-         *
-         * @return 0 expected, -1 duplicated binary log, 1 future binary log
          */
         @Override
-        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                             long lastReceivedDRId)
+        public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                            long lastReceivedDRId)
         {
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
                 // Don't have a tracker for this cluster
                 if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
-                    return (byte)0;
+                    return DRIdempotencyResult.SUCCESS;
                 } else {
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
@@ -447,7 +446,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (targetTracker == null) {
                     // Don't have a tracker for this partition
                     if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
-                        return (byte)0;
+                        return DRIdempotencyResult.SUCCESS;
                     } else {
                         if (drLog.isTraceEnabled()) {
                             drLog.trace(String.format("P%d binary log site idempotency check failed. " +
@@ -463,11 +462,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     final long lastDrId = targetTracker.getLastDrId();
                     if (lastDrId == lastReceivedDRId) {
                         // This is what we expected
-                        return (byte)0;
+                        return DRIdempotencyResult.SUCCESS;
                     }
                     if (lastDrId > lastReceivedDRId) {
                         // This is a duplicate
-                        return (byte)-1;
+                        return DRIdempotencyResult.DUPLICATE;
                     }
 
                     if (drLog.isTraceEnabled()) {
@@ -479,7 +478,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                 }
             }
-            return (byte)1;
+            return DRIdempotencyResult.GAP;
         }
 
         @Override

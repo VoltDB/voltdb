@@ -614,10 +614,6 @@ public class VoltDB {
                 }
             }
 
-            if (!m_publicInterface.isEmpty()) {
-                m_httpPortInterface = m_publicInterface;
-            }
-
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);

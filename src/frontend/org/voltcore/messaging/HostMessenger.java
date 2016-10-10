@@ -276,6 +276,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int REBALANCE_SITE_ID = -9;
     public static final int SNAPSHOT_DAEMON_ID = -10;
     public static final int SNAPSHOT_IO_AGENT_ID = -11;
+    public static final int DR_CONSUMER_MP_COORDINATOR_ID = -12;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;

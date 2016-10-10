@@ -92,6 +92,7 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class HTTPAdminListener {
 
@@ -106,6 +107,8 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+
+    final String m_publicIntf;
 
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
@@ -145,6 +148,11 @@ public class HTTPAdminListener {
 
         protected String getHostHeader() {
             if (m_hostHeader != null) {
+                return m_hostHeader;
+            }
+
+            if (!m_publicIntf.isEmpty()) {
+                m_hostHeader = m_publicIntf;
                 return m_hostHeader;
             }
 
@@ -927,9 +935,17 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, String publicIntf, int port,
+            HttpsType httpsType, boolean mustListen
+            ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+
+        String resolvedIntf = intf == null ? "" : intf.trim().isEmpty() ? ""
+                : HostAndPort.fromHost(intf).withDefaultPort(port).toString();
+
+        m_publicIntf = publicIntf == null ? resolvedIntf : publicIntf.trim().isEmpty() ? resolvedIntf
+                : HostAndPort.fromHost(publicIntf).withDefaultPort(port).toString();
 
         /*
          * Don't force us to look at a huge pile of threads
@@ -961,12 +977,12 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+            if (httpsType == null || !httpsType.isEnabled()) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
                 connector = new ServerConnector(m_server);
 
-                if (intf != null && intf.length() > 0) {
+                if (intf != null && !intf.trim().isEmpty()) {
                     connector.setHost(intf);
                 }
                 connector.setPort(port);
@@ -1086,7 +1102,7 @@ public class HTTPAdminListener {
         ServerConnector connector = new ServerConnector(m_server,
             new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
             factory);
-        if (intf != null && intf.length() > 0) {
+        if (intf != null && !intf.trim().isEmpty()) {
             connector.setHost(intf);
         }
         connector.setPort(port);
