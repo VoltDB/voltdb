@@ -1588,19 +1588,24 @@ public class CatalogDiffEngine {
     }
 
     public String[] reasonsWhyTablesMustBeEmpty() {
-        List<String> answer = new ArrayList<>();
+    	String answer[] = new String[m_tablesThatMustBeEmpty.size()];
+    	int idx = 0;
         for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
             List<String> tableNames = entry.getValue().getTableNames();
-            answer.add(String.join("+", tableNames));
+            String tableString = String.join("+", tableNames);
+            answer[idx] = tableString;
+            idx += 1;
         }
-        return (String[])answer.toArray();
+        return answer;
     }
 
     public String[] tablesThatMustBeEmpty() {
-        List<String> answer = new ArrayList<>();
+    	String answer[] = new String[m_tablesThatMustBeEmpty.size()];
+    	int idx = 0;
         for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
-            answer.add(entry.getValue().getErrorMessage());
+        	answer[idx] = entry.getValue().getErrorMessage();
+        	idx += 1;
         }
-        return (String[])answer.toArray();
+        return answer;
     }
 }
