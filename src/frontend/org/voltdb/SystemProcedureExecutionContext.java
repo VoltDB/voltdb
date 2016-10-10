@@ -86,8 +86,8 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                         long lastReceivedDRId);
+    public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                        long lastReceivedDRId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);

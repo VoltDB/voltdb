@@ -473,7 +473,8 @@ public class Inits {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, String publicInterface,
+                int httpPortStart, boolean findAny, boolean mustListen) {
 
             boolean success = false;
             int httpPort = httpPortStart;
@@ -482,7 +483,7 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, httpsType, mustListen
                             );
                     success = true;
                     break;
@@ -533,17 +534,17 @@ public class Inits {
             }
             // if set by cli use that.
             if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
-                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, m_config.m_httpPort, false, true);
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
                 httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
-                setupHttpServer("", httpPort, true, false);
+                setupHttpServer("", "", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
-                setupHttpServer("", httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, httpPort, false, true);
             }
         }
     }
