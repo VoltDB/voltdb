@@ -2143,6 +2143,68 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 expectedMsg);
     }
 
+    public void testEng11203() throws Exception {
+        // This test case has AdHoc DDL, so it cannot be ran in the HSQL backend.
+        if (! isHSQL()) {
+            Client client = getClient();
+            Object[][] initialRows = {{"ENG_11203_A", 1, 2, 4}, {"ENG_11203_B", 1, 2, 4}};
+            Object[][] secondRows = {{"ENG_11203_A", 6, 2, 4}, {"ENG_11203_B", 6, 2, 4}};
+            // This test case tests ENG-11203, verifying that on single table views,
+            // if a new index was created on the view target table, this new index
+            // will be properly tracked by the MaterializedViewTriggerForInsert.
+
+            // - 1 - Insert the initial data into the view source table.
+            insertRow(client, initialRows[0]);
+            insertRow(client, initialRows[1]);
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 1, 1}}, vt);
+            vt = client.callProcedure("@AdHoc",
+                    "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 1, 1}}, vt);
+
+            // - 2 - Now add a new index on the view target table.
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE INDEX I_ENG_11203_SINGLE ON V_ENG_11203_SINGLE(a, b);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on the single table view V_ENG_11203_SINGLE.");
+            }
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE INDEX I_ENG_11203_JOIN ON V_ENG_11203_JOIN(a, b);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on the joined table view V_ENG_11203_JOIN.");
+            }
+
+            // - 3 - Insert another row of data.
+            insertRow(client, secondRows[0]);
+            insertRow(client, secondRows[1]);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 2, 6}}, vt);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 4, 6}}, vt);
+
+            // - 4 - Start to delete rows.
+            // If the new index was not tracked properly, the server will start to crash
+            // because the newly-inserted row was not inserted into the index.
+            deleteRow(client, initialRows[0]);
+            deleteRow(client, initialRows[1]);
+            deleteRow(client, secondRows[0]);
+            deleteRow(client, secondRows[1]);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {}, vt);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {}, vt);
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
