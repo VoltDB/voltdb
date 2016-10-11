@@ -158,7 +158,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // Reexamine the sets of sets and see if any of them has
         // one empty element.  If not, then add the respective
         // error message to the output message
-        String msg = "Unable to amke requested schema change:\n";
+        String msg = "Unable to make requested schema change:\n";
         boolean allOk = true;
         for (int idx = 0; idx < allTableSets.size(); idx += 1) {
             List<String> tableNames = allTableSets.get(idx);

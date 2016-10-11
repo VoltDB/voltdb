@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -115,7 +116,7 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private final Map<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();;
+    private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();;
 
     //Track new tables to help determine which export table is new or
     //modified
@@ -193,6 +194,28 @@ public class CatalogDiffEngine {
      */
     public boolean requiresSnapshotIsolation() {
         return m_requiresSnapshotIsolation;
+    }
+
+    public String[] tablesThatMustBeEmpty() {
+        String answer[] = new String[m_tablesThatMustBeEmpty.size()];
+        int idx = 0;
+        for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
+            List<String> tableNames = entry.getValue().getTableNames();
+            String tableString = String.join("+", tableNames);
+            answer[idx] = tableString;
+            idx += 1;
+        }
+        return answer;
+    }
+
+    public String[] reasonsWhyTablesMustBeEmpty() {
+        String answer[] = new String[m_tablesThatMustBeEmpty.size()];
+        int idx = 0;
+        for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
+            answer[idx] = entry.getValue().getErrorMessage();
+            idx += 1;
+        }
+        return answer;
     }
 
     public boolean worksWithElastic() {
@@ -551,9 +574,9 @@ public class CatalogDiffEngine {
 
     /**
      * @return null if the change is not possible under any circumstances.
-     * Return two strings if it is possible if the table is empty.
-     * String 1 is name of a table if the change could be made if the table of that name had no tuples.
-     * String 2 is the error message to show the user if that table isn't empty.
+     * Return a TablePopulationRequirements object if it is possible if the table is empty.
+     * The return object will have an error message and also a set of table
+     * names one of which must be empty.
      */
     protected TablePopulationRequirements  checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect,
                                                                                final ChangeType changeType) {
@@ -571,7 +594,7 @@ public class CatalogDiffEngine {
             retval.setErrorMessage(
                     String.format(
                             "Unable to add unique index %s because table %s is not empty.",
-                            idx.getTypeName(),
+                            indexName,
                             tableName));
             return retval;
         }
@@ -605,6 +628,7 @@ public class CatalogDiffEngine {
                 return null;
             }
             String tableName = parent.getTypeName();
+            retval = new TablePopulationRequirements(tableName);
             retval.addTableName(tableName);
             retval.setErrorMessage(
                     String.format(
@@ -1157,9 +1181,11 @@ public class CatalogDiffEngine {
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
             TablePopulationRequirements response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
+            List<TablePopulationRequirements> responseList = null;
             if (response != null) {
-                processModifyResponses(errorMessage, Collections.singletonList(response));
+                responseList = Collections.singletonList(response);
             }
+            processModifyResponses(errorMessage, responseList);
         }
 
         // write the commands to make it so
@@ -1587,25 +1613,4 @@ public class CatalogDiffEngine {
         return sb.toString();
     }
 
-    public String[] reasonsWhyTablesMustBeEmpty() {
-    	String answer[] = new String[m_tablesThatMustBeEmpty.size()];
-    	int idx = 0;
-        for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
-            List<String> tableNames = entry.getValue().getTableNames();
-            String tableString = String.join("+", tableNames);
-            answer[idx] = tableString;
-            idx += 1;
-        }
-        return answer;
-    }
-
-    public String[] tablesThatMustBeEmpty() {
-    	String answer[] = new String[m_tablesThatMustBeEmpty.size()];
-    	int idx = 0;
-        for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
-        	answer[idx] = entry.getValue().getErrorMessage();
-        	idx += 1;
-        }
-        return answer;
-    }
 }
