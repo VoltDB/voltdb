@@ -85,12 +85,20 @@ public class CatalogDiffEngine {
         public final String getObjectName() {
             return m_objectName;
         }
+        @Override
+        public String toString() {
+            StringBuffer sb = new StringBuffer();
+            sb.append(m_objectName != null ? m_objectName : "<<NULL>>")
+              .append(", Names: \"" + String.join(", ", m_tableNames + "\""))
+              .append(", Msg: \"" + m_errorMessage + "\"");
+            return sb.toString();
+        }
         private String m_objectName           = null;
         private List<String> m_tableNames     = new ArrayList<>();
         private String       m_errorMessage   = null;
     }
 
-    //*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
+    /*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
     /// A flag that controls output for debugging.
     private boolean m_triggeredVerbosity = false;
     /// A string that dynamically controls the verbose output flag, enabling it for the
@@ -543,6 +551,16 @@ public class CatalogDiffEngine {
                 return null;
             }
             return "Materialized views with unsafe operations may only be created on empty source tables.";
+        }
+
+        else if (suspect instanceof MaterializedViewHandlerInfo) {
+            if ( ! m_inStrictMatViewDiffMode) {
+                MaterializedViewHandlerInfo mvSuspect = (MaterializedViewHandlerInfo)suspect;
+                if (mvSuspect.getIssafewithnonemptysources()) {
+                    return null;
+                }
+                return "Materialized views with unsafe operations may only be created on empty source tables.";
+            }
         }
 
         else if (isTableLimitDeleteStmt(suspect)) {

@@ -55,16 +55,16 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void notestUnsafeOperators() throws Exception {
+    public void testUnsafeOperators() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "create view vv as select a, count(*), max(a+a) from alpha group by a");
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cr.getStatus());
         cr = client.callProcedure("ALPHA.insert", 0, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("BETA.insert", 0, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc", "create view vv as select a from alpha");
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, cr.getStatus());
         String msg = cr.getAppStatusString();
         System.out.printf("Status: %s\n", msg);
     }
