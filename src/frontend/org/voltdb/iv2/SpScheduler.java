@@ -53,6 +53,8 @@ import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -399,6 +401,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
+        }
+        else if (message instanceof DummyTransactionTaskMessage) {
+            handleDummyTransactionTaskMessage((DummyTransactionTaskMessage) message);
+        }
+        else if (message instanceof DummyTransactionResponseMessage) {
+            handleDummyTransactionResponseMessage((DummyTransactionResponseMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -1142,6 +1150,67 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
     }
+
+    private void handleDummyTransactionTaskMessage(DummyTransactionTaskMessage message)
+    {
+        DummyTransactionTaskMessage msg = message;
+        if (m_isLeader) {
+            TxnEgo ego = advanceTxnEgo();
+            long newSpHandle = ego.getTxnId();
+
+            msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle);
+
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, msg);
+
+                DuplicateCounter counter = new DuplicateCounter(
+                        HostMessenger.VALHALLA,
+                        msg.getTxnId(),
+                        m_replicaHSIds,
+                        msg);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+            }
+        } else {
+            setMaxSeenTxnId(msg.getSpHandle());
+        }
+        Iv2Trace.logDummyTransactionTaskMessage(msg, m_mailbox.getHSId());
+
+        DummyTransactionTask task = new DummyTransactionTask(m_mailbox,
+                new SpTransactionState(msg), m_pendingTasks);
+        // This read only DummyTransactionTask is to help flushing the task queue,
+        // including tasks in command log queue as well.
+        ListenableFuture<Object> durabilityBackpressureFuture =
+                m_cl.log(null, msg.getSpHandle(), null,  m_durabilityListener, task);
+        // Durability future is always null for sync command logging
+        // the transaction will be delivered again by the CL for execution once durable
+        // Async command logging has to offer the task immediately with a Future for backpressure
+        if (m_cl.canOfferTask()) {
+            assert durabilityBackpressureFuture != null;
+            m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
+        }
+    }
+
+    private void handleDummyTransactionResponseMessage(DummyTransactionResponseMessage message) {
+        final long spHandle = message.getSpHandle();
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
+        if (counter == null) {
+            // this will be on SPI without k-safety or replica only with k-safety
+            setRepairLogTruncationHandle(spHandle);
+            if (!m_isLeader) {
+                m_mailbox.send(message.getSPIHSId(), message);
+            }
+            return;
+        }
+
+        int result = counter.offer(message);
+        if (result == DuplicateCounter.DONE) {
+            // DummyTransactionResponseMessage ends on SPI
+            m_duplicateCounters.remove(dcKey);
+            setRepairLogTruncationHandle(spHandle);
+        }
+    }
+
 
     @Override
     public void setCommandLog(CommandLog cl) {

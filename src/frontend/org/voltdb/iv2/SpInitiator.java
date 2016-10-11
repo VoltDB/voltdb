@@ -40,6 +40,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -175,6 +176,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    // After SP leader promotion, a DummyTransactionTaskMessage is generated from the new leader.
+                    // This READ ONLY message will serve as a synchronization point on all replicas of this
+                    // partition, like normal SP write transaction that has to finish executing on all replicas.
+                    // In this way, the leader can make sure all replicas have finished replaying
+                    // all their repair logs entries.
+                    // From now on, the new leader is safe to accept new transactions. See ENG-11110.
+                    m_initiatorMailbox.deliver(new DummyTransactionTaskMessage());
                 }
                 else {
                     // The only known reason to fail is a failed replica during
