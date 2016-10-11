@@ -1369,21 +1369,21 @@
             if(localStorage.cpuDetailsMin != undefined)
                 cpuDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
             else{
-                cpuDetailsArrMin = JSON.stringify(convertDataFormat(cpuDataMin))
+                cpuDetailsArrMin = JSON.stringify(convertDataFormat(cpuDataMin, 'timestamp', 'percentUsed'))
                 cpuDetailsArrMin = JSON.parse(cpuDetailsArrMin)
             }
 
             if(localStorage.cpuDetailsDay != undefined)
                 cpuDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsDay))
             else {
-                cpuDetailsArrDay = JSON.stringify(convertDataFormat(cpuDataDay))
+                cpuDetailsArrDay = JSON.stringify(convertDataFormat(cpuDataDay, 'timestamp', 'percentUsed'))
                 cpuDetailsArrDay = JSON.parse(cpuDetailsArrDay)
             }
 
             if(localStorage.cpuDetails != undefined){
                 cpuDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
             } else{
-                cpuDetailsArr =  JSON.stringify(convertDataFormat(cpuData))
+                cpuDetailsArr =  JSON.stringify(convertDataFormat(cpuData, 'timestamp', 'percentUsed'))
                 cpuDetailsArr =  JSON.parse(cpuDetailsArr)
             }
 
@@ -1755,21 +1755,21 @@
             if(localStorage.drDetailsMin != undefined){
                 drDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsMin))
             } else {
-                drDetailsArrMin =  JSON.stringify(convertDataFormat(drDataMin, 'timestamp', 'outstandingTxn'))
+                drDetailsArrMin =  JSON.stringify(convertDataFormat(drDataMin, 'timestamp', 'replicationRate'))
                 drDetailsArrMin = JSON.parse(drDetailsArrMin)
             }
 
             if(localStorage.drDetailsDay != undefined){
                 drDetailsArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetailsDay))
             } else {
-                drDetailsArrDay =  JSON.stringify(convertDataFormat(drDataDay, 'timestamp', 'outstandingTxn'))
+                drDetailsArrDay =  JSON.stringify(convertDataFormat(drDataDay, 'timestamp', 'replicationRate'))
                 drDetailsArrDay = JSON.parse(drDetailsArrDay)
             }
 
             if(localStorage.drDetails != undefined){
                 drDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.drDetails))
             } else {
-                drDetailsArr =  JSON.stringify(convertDataFormat(drData, 'timestamp', 'outstandingTxn'))
+                drDetailsArr =  JSON.stringify(convertDataFormat(drData, 'timestamp', 'replicationRate'))
                 drDetailsArr = JSON.parse(drDetailsArr)
             }
 
@@ -2124,10 +2124,13 @@
             cmdLogMinCount++;
         };
 
-        var convertDataFormat = function(cmdLogData){
+        var convertDataFormat = function(rawData, key1, key2){
             var requiredFormat = []
-            for(var i = 0; i < cmdLogData.length; i++){
-                requiredFormat.push({"timestamp": cmdLogData[i].x, "outstandingTxn": cmdLogData[i].y})
+            for(var i = 0; i < rawData.length; i++){
+                var newObj = {};
+                newObj[key1] = rawData[i].x;
+                newObj[key2] = rawData[i].y;
+                requiredFormat.push(newObj)
             }
             return requiredFormat;
         }
