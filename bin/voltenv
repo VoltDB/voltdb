@@ -106,7 +106,6 @@ function checkpath() {
         echo "For ease of use, add the VoltDB bin directory to your path: "
         echo "    $VOLTDB_BIN"
         echo
-        exit 1
     fi
 }
 
