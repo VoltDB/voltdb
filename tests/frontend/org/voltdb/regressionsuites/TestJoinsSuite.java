@@ -44,7 +44,7 @@ public class TestJoinsSuite extends RegressionSuite {
 
     // Operators that should be safe and effective for use as partition key
     // filters to minimally enable partition table joins.
-    private static final String[] JOIN_OPS = {"="};//TODO SOON:{"=", "IS NOT DISTINCT FROM"};
+    private static final String[] JOIN_OPS = {"=", "IS NOT DISTINCT FROM"};
 
     public TestJoinsSuite(String name) {
         super(name);
@@ -391,7 +391,7 @@ public class TestJoinsSuite extends RegressionSuite {
             validateRowCount(client, query, 3);
         }
 
-        anotherJoinOp = "IS NOT DISTINCT FROM";//JOIN_OPS[1];
+        anotherJoinOp = JOIN_OPS[1];
         query = "SELECT * FROM R4 JOIN R2 " +
                 "ON R4.A " + joinOp + " R2.A " +
                 "AND R4.G " + anotherJoinOp + " R2.C;";
@@ -424,7 +424,7 @@ public class TestJoinsSuite extends RegressionSuite {
                         "AND P4.G " + anotherJoinOp + " R2.C;";
         validateRowCount(client, query, 1);
 
-        anotherJoinOp = "IS NOT DISTINCT FROM";//JOIN_OPS[1];
+        anotherJoinOp = JOIN_OPS[1];
         query = "SELECT * FROM P4 JOIN R2 " +
                 "ON P4.A " + joinOp + " R2.A " +
                 "AND P4.G " + anotherJoinOp + " R2.C;";

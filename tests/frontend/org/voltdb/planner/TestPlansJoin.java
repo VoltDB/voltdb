@@ -62,7 +62,7 @@ public class TestPlansJoin extends PlannerTestCase {
         static JoinOp EQUAL =
                 new JoinOp("=", ExpressionType.COMPARE_EQUAL);
 
-        static JoinOp[] JOIN_OPS = new JoinOp[] {EQUAL};//SOON:, NOT_DISTINCT};
+        static JoinOp[] JOIN_OPS = new JoinOp[] {EQUAL, NOT_DISTINCT};
 
         @Override
         public String toString() { return m_string; }
@@ -622,7 +622,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertNotNull(n.getInlinePlanNode(PlanNodeType.INDEXSCAN));
 
         // Test ORDER BY optimization on indexed self-join, ordering by LHS
-        pn = compile("SELECT X.A FROM R5 X, R5 Y WHERE X.A = Y.A ORDER BY X.A");
+        pn = compile("SELECT X.A FROM R5 X, R5 Y WHERE X.A " + joinOp + " Y.A ORDER BY X.A");
         n = pn.getChild(0);
         assertTrue(n instanceof ProjectionPlanNode);
         n = n.getChild(0);
@@ -634,7 +634,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(((IndexScanPlanNode) c0).getTargetTableAlias().equalsIgnoreCase("X"));
 
         // Test ORDER BY optimization on indexed self-join, ordering by RHS
-        pn = compile("SELECT X.A FROM R5 X, R5 Y WHERE X.A = Y.A ORDER BY Y.A");
+        pn = compile("SELECT X.A FROM R5 X, R5 Y WHERE X.A " + joinOp + " Y.A ORDER BY Y.A");
         n = pn.getChild(0);
         assertTrue(n instanceof ProjectionPlanNode);
         n = n.getChild(0);
@@ -650,7 +650,7 @@ public class TestPlansJoin extends PlannerTestCase {
         // These MAY become valid optimization cases when ENG-4728 is done,
         // using transitive equality to determine that the ORDER BY clause can be re-expressed
         // as being based on only one of the two table scans.
-        pn = compile("SELECT X.A, X.C FROM R4 X, R4 Y WHERE X.A = Y.A ORDER BY X.A, Y.C");
+        pn = compile("SELECT X.A, X.C FROM R4 X, R4 Y WHERE X.A " + joinOp + " Y.A ORDER BY X.A, Y.C");
         n = pn.getChild(0);
         assertTrue(n instanceof ProjectionPlanNode);
         n = n.getChild(0);
@@ -658,7 +658,7 @@ public class TestPlansJoin extends PlannerTestCase {
         n = n.getChild(0);
         assertTrue(n instanceof NestLoopIndexPlanNode);
 
-        pn = compile("SELECT X.A FROM R4 X, R4 Y WHERE X.A = Y.A ORDER BY Y.A, X.C");
+        pn = compile("SELECT X.A FROM R4 X, R4 Y WHERE X.A " + joinOp + " Y.A ORDER BY Y.A, X.C");
         n = pn.getChild(0);
         assertTrue(n instanceof ProjectionPlanNode);
         n = n.getChild(0);
@@ -1202,10 +1202,6 @@ public class TestPlansJoin extends PlannerTestCase {
         // Distributed inner  and replicated outer tables -NLJ/IndexScan
         lpn = compileToFragments("SELECT * FROM R3 LEFT JOIN P2 ON R3.A " + joinOp + " P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL");
         assertEquals(2, lpn.size());
-        for (AbstractPlanNode apn: lpn) {
-            System.out.println(apn.toExplainPlanString());
-        }
-
         n = lpn.get(0).getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertEquals(JoinType.LEFT, ((NestLoopPlanNode) n).getJoinType());
@@ -1472,7 +1468,7 @@ public class TestPlansJoin extends PlannerTestCase {
        compile("SELECT C, C FROM R1 GROUP BY C ORDER BY C;");
    }
 
-    private void perJoinOpTestUsingColumns() {
+    public void testUsingColumns() {
         // Test USING column
         AbstractPlanNode pn = compile("SELECT MAX(R1.A), C FROM R1 FULL JOIN R2 USING (C) WHERE C > 0 GROUP BY C ORDER BY C");
 
@@ -1632,11 +1628,15 @@ public class TestPlansJoin extends PlannerTestCase {
         for (JoinOp joinOp : JoinOp.JOIN_OPS) {
             sql = "SELECT P1.A, P1.C, P3.A, P3.F " +
                     "FROM P1 FULL JOIN P3 " +
-                    "ON P1.A " + joinOp + " P3.A AND P1.A = 1 AND P3.F = 1 " +
+                    "ON P1.A " + joinOp + " P3.A AND P1.A = ? AND P3.F = 1 " +
                     "ORDER BY P1.A, P1.C, P3.A, P3.F";
-            // DOES NOT COMPILE
-            // explained = buildExplainPlan(compileToFragments(sql));
-            // assertTrue(explained.contains("NEST LOOP FULL JOIN"));
+            explained = buildExplainPlan(compileToFragments(sql));
+            if (joinOp == JoinOp.EQUAL) { // weaken test for now
+                assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
+            }
+            else {
+                assertTrue(explained.contains("NEST LOOP FULL JOIN"));
+            }
             sql = "SELECT R1.A, R1.C, R3.A, R3.C " +
                     "FROM R1 FULL JOIN R3 " +
                     "ON R3.A " + joinOp + " R1.A AND R3.A < 2 " +
@@ -1645,6 +1645,9 @@ public class TestPlansJoin extends PlannerTestCase {
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             if (joinOp == JoinOp.EQUAL) { // weaken test for now
                 assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
+            }
+            else {
+                assertTrue(explained.contains("NEST LOOP FULL JOIN"));
             }
             sql = "SELECT LHS.A, LHS.C, RHS.A, RHS.C " +
                     "FROM R3 LHS FULL JOIN R3 RHS " +
