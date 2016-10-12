@@ -159,9 +159,11 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
             assertEquals(0, resp.getResults()[0].getRowCount()); // no classes in catalog
+            m_client.close();
+            cluster.shutDown();
         }
-        finally {
-            teardownSystem();
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -223,9 +225,11 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
                 fail("Should be able to call fully consistent procedure");
             }
             assertEquals(10L, resp.getResults()[0].asScalarLong());
+            m_client.close();
+            cluster.shutDown();
         }
-        finally {
-            teardownSystem();
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

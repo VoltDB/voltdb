@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -1417,11 +1418,12 @@ public class LocalCluster implements VoltServerConfig {
 
         if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" + error;
+                StringBuilder failString = new StringBuilder();
+                final Iterator<String> iter = EEProcess.m_valgrindErrors.iterator();
+                while (iter.hasNext()) {
+                    failString.append("\n" + iter.next());
                 }
-                org.junit.Assert.fail(failString);
+                org.junit.Assert.fail(failString.toString());
             }
         }
 
