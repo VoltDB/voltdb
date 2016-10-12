@@ -2347,9 +2347,8 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                indexOfNewDatabase = createNewDatabase("name_src1")
+                indexOfNewDatabase = createNewDatabase("name_src")
                 println("The index of database " + indexOfNewDatabase)
-                report "hello"
                 break
             } catch(Exception e) {
                 //deleteDatabase(create_DatabaseTest_File)
@@ -2358,15 +2357,11 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
         then: 'Choose new database'
-//        chooseDatabase(indexOfNewDatabase, "name_src")
-
         int countNext = 0
-//        for (count = 0; count < numberOfTrials; count++) {
         try {
             for(countNext=0; countNext<numberOfTrials; countNext++) {
                 try {
                     waitFor { buttonAddDatabase.isDisplayed() }
-//                        break
                 } catch(geb.waiting.WaitTimeoutException exception) {
                     currentDatabase.click()
                 }
@@ -2450,8 +2445,11 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
         when:"select server from dropdown"
-//        selectserver.value("new_server")
+
         report "hello2"
+//        page.chooseSelectOption('Default Setting')
+//          page.selectserver.click()
+//            selectOption.click()
 
         then:"check directory values"
         directories.rootDestinationField.isDisplayed()
@@ -2552,6 +2550,5 @@ class ClusterConfigurationTest extends TestBase {
         indexOfNewDatabase = 1
         chooseDatabase(indexOfNewDatabase, "Database")
         deleteNewDatabase(indexToDelete, "name_src")
-        deleteNewDatabase(indexToDelete, "name_src1")
     }
 }
