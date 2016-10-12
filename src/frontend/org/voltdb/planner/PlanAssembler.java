@@ -366,7 +366,8 @@ public class PlanAssembler {
             // per-join-order basis, and so, so must this analysis.
             HashMap<AbstractExpression, Set<AbstractExpression>>
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
-            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.allScans(), valueEquivalence);
+            Collection<StmtTableScan> scans = parsedStmt.allScans();
+            m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
         }
         m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
