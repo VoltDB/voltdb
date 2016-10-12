@@ -30,7 +30,7 @@ def shutdown(runner):
         runner.abort_with_help('You cannot specify both --force and --save options.')
     shutdown_params = []
     columns = []
-    snapsigil = 0
+    zk_pause_txnid = 0
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
         try:
@@ -38,7 +38,7 @@ def shutdown(runner):
             resp = runner.call_proc('@PrepareShutdown', [], [])
             if resp.status() != 1:
                 runner.abort('The preparation for shutdown failed with status: %d' % resp.response.statusString)
-            snapsigil = resp.table(0).tuple(0).column_integer(0)
+            zk_pause_txnid = resp.table(0).tuple(0).column_integer(0)
             runner.info('The cluster is paused prior to shutdown.')
             runner.info('Writing out all queued export data')
             status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
@@ -53,7 +53,7 @@ def shutdown(runner):
             runner.info('Cluster is ready for shutdown')
             if runner.opts.save:
                 columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
-                shutdown_params =  [snapsigil]
+                shutdown_params =  [zk_pause_txnid]
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
