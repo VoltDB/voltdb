@@ -694,6 +694,51 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9389();
         subTestENG9533();
         subTestENG9796();
+        subTestENG11256();
+    }
+
+    private void subTestENG11256() throws Exception {
+        Client client = getClient();
+        validateDMLTupleCount(client, "INSERT INTO R1 VALUES(1, 'A', 12, 0.6)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R1 VALUES(2, 'A', 12, 0.2)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R1 VALUES(3, 'B', 34, 0.0)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R1 VALUES(4, 'B', 34, 0.7)", 1);
+
+        validateDMLTupleCount(client, "INSERT INTO R2 VALUES(5, 'C', 56, 0.8)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R2 VALUES(6, 'C', 56, 0.5)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R2 VALUES(7, 'D', 78, 0.9)", 1);
+        validateDMLTupleCount(client, "INSERT INTO R2 VALUES(8, 'D', 78, 0.3)", 1);
+
+        String[] filterOps = new String[] { " <> ", " IS DISTINCT FROM " };
+        for (String filterOp : filterOps) {
+            long expected = " <> ".equals(filterOp) ? 4 : 0;
+            String query;
+            String start = "SELECT count(*) FROM R1 PARENT WHERE DESC NOT IN (";
+            String end = " ON LHS.ID = RHS.ID " +
+                    "WHERE LHS.ID " + filterOp + " PARENT.NUM);";
+            // Zero result rows because values from R1 always have matches in
+            // R1 JOIN R1.
+
+            query = start +
+                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R1 RHS " + end;
+            validateTableOfLongs(client, query, new long[][] {{0}});
+            query = start +
+                    "SELECT LHS.DESC FROM R1 LHS FULL JOIN R2 RHS " + end;
+            validateTableOfLongs(client, query, new long[][] {{0}});
+            // An IS DISTINCT FROM bug in the HSQL backend causes it
+            // to always to return 0 rows,
+            // which is only correct for <>.
+            // Remove this condition when ENG-11256 is fixed.
+            if (isHSQL() && expected != 0) {
+                query = start +
+                        "SELECT LHS.DESC FROM R2 LHS FULL JOIN R1 RHS " + end;
+                validateTableOfLongs(client, query, new long[][] {{expected}});
+            }
+            query = start +
+                    "SELECT LHS.DESC FROM R2 LHS FULL JOIN R2 RHS " + end;
+            validateTableOfLongs(client, query, new long[][] {{4}});
+        }
+        truncateTables(client, new String[]{"R1", "R2"});
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -2657,6 +2702,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             20, 11, "bar", 99.0, 12, "baz", 111.0,
             20, 11, "bar", 99.0, 12, "baz", 111.0
             }}, vt);
+        truncateTables(client, new String[] {"p1", "r1", "r2"});
     }
 
     //

@@ -38,8 +38,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -59,6 +57,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -462,7 +462,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static private void validateTableOfLongs(String messagePrefix,
+    private static void validateTableOfLongs(String messagePrefix,
             VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         if (expected.length != vt.getRowCount()) {
@@ -479,6 +479,14 @@ public class RegressionSuite extends TestCase {
         for (int i=0; i < len; i++) {
             validateRowOfLongs(messagePrefix + " at row " + (i+1) + ", ", vt, expected[i]);
         }
+    }
+
+    protected void validateRowCount(Client client, String query, int expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+        int actual = result.getRowCount();
+        assertEquals("Wrong row count from query '" + query + "'",
+                expected, actual);
     }
 
     public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
@@ -1178,13 +1186,15 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    protected static void truncateTables(Client client, String[] tables) throws IOException, ProcCallException {
+    protected static void truncateTables(Client client, String... tables)
+            throws IOException, ProcCallException {
         for (String tb : tables) {
             truncateTable(client, tb);
         }
     }
 
-    protected static void truncateTable(Client client, String tb) throws IOException, ProcCallException {
+    protected static void truncateTable(Client client, String tb)
+            throws IOException, ProcCallException {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
