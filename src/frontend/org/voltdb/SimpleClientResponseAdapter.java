@@ -171,12 +171,16 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
 
     @Override
     public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
+        while (dsIter.hasNext()) {
+            enqueue(dsIter.next());
+        }
     }
 
     @Override
     public void enqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
+        while (dsIter.hasNext()) {
+            enqueue(dsIter.next());
+        }
     }
 
     @Override
@@ -185,10 +189,9 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             // serialize() touches not-threadsafe state around Initiator
             // stats.  In the normal code path, this is protected by a lock
             // in NIOWriteStream.enqueue().
-            ByteBuffer buf = null;
+            ByteBuffer buf;
             synchronized(this) {
-                buf = ByteBuffer.allocate(ds.getSerializedSize());
-                ds.serialize(buf);
+                buf = ds.serialize(ByteBuffer.allocate(0));
             }
             if (buf == null) {
                 throw new UnsupportedOperationException();

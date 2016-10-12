@@ -23,10 +23,10 @@ public class SSLDeferredSerialization implements DeferredSerialization {
         ByteBuffer allocated = encrypt(m_src, encryptInto);
         if (allocated == null) {
             // encrypt used dst, put the length on dst.
-            int newPosition = encryptInto.position();
+            int amountEncrypted = encryptInto.position();
             dst.position(initialDstPosition);
-            dst.putInt(newPosition - initialDstPosition - 4);
-            dst.position(newPosition);
+            dst.putInt(amountEncrypted);
+            dst.position(dst.position() + amountEncrypted);
         } else {
             // reset the position on dst
             dst.position(initialDstPosition);
