@@ -52,7 +52,6 @@ def save(runner):
     elif dir_specified:
         runner.abort('When a DIRECTORY is given a NONCE must be specified as well.')
     else:
-        runner.opts.blocking = 'true'
         runner.opts.format = 'native'
         runner.opts.tables = None
         runner.opts.skip_tables = None

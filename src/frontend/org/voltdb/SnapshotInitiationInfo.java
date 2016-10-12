@@ -78,6 +78,7 @@ public class SnapshotInitiationInfo
                 m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
                 m_stype = SnapshotPathType.SNAP_AUTO;
                 m_path = VoltDB.instance().getSnapshotPath();
+                m_blocking = false;
                 //We will always generate a good valid nonce.
                 checkNonceValidity = false;
                 break;
