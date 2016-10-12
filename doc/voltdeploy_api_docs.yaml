@@ -214,6 +214,18 @@ paths:
                       type: string
                     zookeeper-listener:
                       type: string
+                    voltdbroot:
+                      type: string
+                    snapshots:
+                      type: string
+                    commandlogsnapshot:
+                      type: string
+                    droverflow:
+                      type: string
+                    exportoverflow:
+                      type: string
+                    commandlog:
+                      type: string
               status:
                 type: integer
               statusString:
@@ -277,6 +289,18 @@ paths:
                     type: string
                   zookeeper-listener:
                     type: string
+                  voltdbroot:
+                    type: string
+                  snapshots:
+                    type: string
+                  commandlogsnapshot:
+                    type: string
+                  droverflow:
+                    type: string
+                  exportoverflow:
+                    type: string
+                  commandlog:
+                    type: string
               status:
                 type: integer
               statusString:
@@ -333,6 +357,18 @@ paths:
                   replication-listener:
                     type: string
                   zookeeper-listener:
+                    type: string
+                  voltdbroot:
+                    type: string
+                  snapshots:
+                    type: string
+                  commandlogsnapshot:
+                    type: string
+                  droverflow:
+                    type: string
+                  exportoverflow:
+                    type: string
+                  commandlog:
                     type: string
               status:
                 type: integer
@@ -1765,5 +1801,3 @@ definitions:
           
         
       
-           
-            

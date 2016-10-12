@@ -547,6 +547,146 @@ class UpdateServer(Server):
         else:
             print "The database list is empty"
 
+    def test_update_voltdbroot_directories(self):
+        """
+        Ensure update server is working
+        """
+
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'voltdbroot': 'test_voltdbroot'}
+                response = requests.put(url, json=data, headers=headers)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
+    def test_update_snapshots_directories(self):
+        """
+        Ensure update server is working
+        """
+
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'snapshots': 'test_snapshot'}
+                response = requests.put(url, json=data, headers=headers)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
+    def test_update_commandlogsnapshot_directories(self):
+        """
+        Ensure update server is working
+        """
+
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'commandlogsnapshot': 'test_commandlogsnapshot'}
+                response = requests.put(url, json=data, headers=headers)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
+    def test_update_export_overflow_directories(self):
+        """
+        Ensure update server is working
+        """
+
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'exportoverflow': 'test_overflow'}
+                response = requests.put(url, json=data, headers=headers)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
+    def test_update_dr_overflow_directories(self):
+        """
+        Ensure update server is working
+        """
+
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'droverflow': 'test_dr_overflow'}
+                response = requests.put(url, json=data, headers=headers)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
     def test_validate_invalid_server(self):
         """
         Validate duplicate the port
