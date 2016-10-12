@@ -27,13 +27,16 @@ public class SSLDeferredSerializationIterator implements Iterator<DeferredSerial
             List<DeferredSerialization> dsList = new ArrayList<>();
             while (buf.remaining() > 0) {
                 if (buf.remaining() < Constants.SSL_CHUNK_SIZE) {
-                    dsList.add(new SSLDeferredSerialization(sslEngine, buf.slice()));
+                    ByteBuffer chunk = buf.slice();
+                    dsList.add(new SSLDeferredSerialization(sslEngine, chunk));
                     buf.position(buf.limit());
                 } else {
                     int oldLimit = buf.limit();
-                    buf.limit(buf.limit() + Constants.SSL_CHUNK_SIZE);
-                    dsList.add(new SSLDeferredSerialization(sslEngine, buf.slice()));
-                    buf.position(buf.limit());
+                    int newPosition = buf.position() + Constants.SSL_CHUNK_SIZE;
+                    buf.limit(newPosition);
+                    ByteBuffer chunk = buf.slice();
+                    dsList.add(new SSLDeferredSerialization(sslEngine, chunk));
+                    buf.position(newPosition);
                     buf.limit(oldLimit);
                 }
             }
