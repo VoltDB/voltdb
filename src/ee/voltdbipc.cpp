@@ -405,10 +405,16 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    delete m_engine;
-    delete [] m_reusedResultBuffer;
-    delete [] m_tupleBuffer;
-    delete [] m_exceptionBuffer;
+    // If m_engine is NULL, the voltdbipc process did not even
+    // receive an initialize command and all those buffer pointers remain NULL.
+    // Attempting to release those NULL buffer pointers will cause valgrind to
+    // throw "Conditional jump or move depends on uninitialised value(s)" error.
+    if (m_engine != NULL) {
+        delete m_engine;
+        delete [] m_reusedResultBuffer;
+        delete [] m_tupleBuffer;
+        delete [] m_exceptionBuffer;
+    }
 }
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {

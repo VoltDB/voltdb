@@ -26,6 +26,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +47,7 @@ public class EEProcess {
     private Thread m_stderrParser = null;
     private Thread m_stdoutParser = null;
     private int m_port;
+    private int m_siteCount;
 
     private final boolean verbose = true;
 
@@ -155,6 +158,7 @@ public class EEProcess {
                 siteCountString = siteCountString.substring(0, siteCountString.indexOf(" =="));
                 int siteCount2 = Integer.valueOf(siteCountString);
                 assert(siteCount2 == siteCount);
+                m_siteCount = siteCount;
             }
 
             // expecting "== port = NUMBER ==" to be line 3, where NUMBER is listening port
@@ -310,11 +314,38 @@ public class EEProcess {
         }
     }
 
+    // In some tests there is no client initiated and the IPC server will hang
+    // waiting for the incoming messages.
+    // Push EOFs to IPC processes in this case can help end the hanging situation.
+    private void signalShutDown() {
+        Socket ipcSocket;
+        PrintWriter ipcWriter;
+        try {
+            // Need to send as many EOFs as m_siteCount.
+            for (int i=0; i<m_siteCount; i++) {
+                // The connection will be closed once an EOF is sent.
+                // So we need to re-open the connection if we want to send another EOF.
+                ipcSocket = new Socket("localhost", m_port);
+                if (! ipcSocket.isConnected()) {
+                    ipcSocket.close();
+                    return;
+                }
+                ipcWriter = new PrintWriter(ipcSocket.getOutputStream());
+                // 0x04 is the code for EOF.
+                ipcWriter.write("\004");
+                ipcWriter.flush();
+                ipcWriter.close();
+                ipcSocket.close();
+            }
+        } catch (IOException e) {}
+    }
+
     public void waitForShutdown() throws InterruptedException {
         if (m_eeProcess != null) {
             boolean done = false;
             while (!done) {
                 try {
+                    signalShutDown();
                     m_eeProcess.waitFor();
                     done = true;
                 } catch (InterruptedException e) {
