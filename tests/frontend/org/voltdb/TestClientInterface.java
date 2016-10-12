@@ -853,8 +853,9 @@ public class TestClientInterface {
     private DeferredSerialization dsOf(final ByteBuffer buf) {
         return new DeferredSerialization() {
             @Override
-            public void serialize(final ByteBuffer outbuf) throws IOException {
+            public ByteBuffer serialize(final ByteBuffer outbuf) throws IOException {
                 outbuf.put(buf);
+                return null;
             }
             @Override
             public void cancel() {}

@@ -22,14 +22,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
+import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltdb.client.SSLMessageEncrypter;
+import org.voltcore.utils.SSLDeferredSerializationIterator;
+import org.voltcore.utils.Serializer;
+import org.voltcore.utils.SimpleDeferredSerialization;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 
 /**
 *
@@ -81,8 +83,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     private long m_lastPendingWriteTime = -1;
 
     private final boolean m_isSSLConfigured;
-    private final SSLMessageEncrypter m_sslEncrypter;
-
+    private final SSLEngine m_sslEngine;
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null, null);
@@ -93,14 +94,14 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
             QueueMonitor monitor,
-            SSLEngine engine)
+            SSLEngine sslEngine)
     {
         m_port = port;
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
-        m_isSSLConfigured = engine == null ? false : true;
-        m_sslEncrypter = engine == null ? null : new SSLMessageEncrypter(engine);
+        m_isSSLConfigured = sslEngine == null ? false : true;
+        m_sslEngine = sslEngine;
     }
 
     /*
@@ -193,56 +194,57 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void enqueue(final DeferredSerialization ds) {
+        throw new UnsupportedOperationException("Not supported by NIOWriteStream");
+    }
+
+    /**
+     * Queue the messages held by the iterator, deferring the serialization of the message until later.
+     * @param dsIter An iterator of deferred serialization tasks.
+     */
+    @Override
+    public void enqueue(final Iterator<DeferredSerialization> dsIter) {
         synchronized (this) {
             if (m_isShutdown) {
-                ds.cancel();
+                while (dsIter.hasNext()) {
+                    dsIter.next().cancel();
+                }
                 return;
             }
-            enqueueDS(ds);
+            updateLastPendingWriteTimeAndQueueBackpressure();
+            while (dsIter.hasNext()) {
+                m_queuedWrites.offer(dsIter.next());
+            }
+            m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
         return;
     }
 
-    private void enqueueDS(final DeferredSerialization ds) {
-        if (m_isSSLConfigured) {
-            try {
-                int serializedSize = ds.getSerializedSize();
-                if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) {
-                    return;
-                }
-                ByteBuffer message = ByteBuffer.allocate(serializedSize);
-                ds.serialize(message);
-                message.flip();
-
-                m_sslEncrypter.setMessage(message);
-                while (m_sslEncrypter.hasNext()) {
-                    ByteBuffer encrypted = m_sslEncrypter.next();
-                    if (encrypted != null) {
-                        offerBuffer(encrypted, encrypted.remaining());
-                    }
-                }
-            } catch (IOException e) {
-                // TODO: do something with this...
-            }
-        } else {
-            updateLastPendingWriteTimeAndQueueBackpressure();
-            m_queuedWrites.offer(ds);
-            m_port.setInterests(SelectionKey.OP_WRITE, 0);
-        }
-    }
-
-    /*
+    /**
      * For the server we run everything backpressure
      * related on the network thread, so the entire thing can just
      * go in the queue directly without acquiring any additional locks
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
+        throw new UnsupportedOperationException("Not supported by NIOWriteStream");
+    }
+
+    /**
+     * For the server we run everything backpressure
+     * related on the network thread, so the entire thing can just
+     * go in the queue directly without acquiring any additional locks
+     */
+    @Override
+    public void fastEnqueue(final Iterator<DeferredSerialization> dsIter) {
         m_port.queueTask(new Runnable() {
             @Override
             public void run() {
                 synchronized (NIOWriteStream.this) {
-                    enqueueDS(ds);
+                    updateLastPendingWriteTimeAndQueueBackpressure();
+                    while (dsIter.hasNext()) {
+                        m_queuedWrites.offer(dsIter.next());
+                    }
+                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
                 }
             }
         });
@@ -278,39 +280,23 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             updateLastPendingWriteTimeAndQueueBackpressure();
 
-            for (ByteBuffer buf : b) {
+            for (final ByteBuffer buf : b) {
                 if (m_isSSLConfigured) {
-                    m_sslEncrypter.setMessage(buf);
-                    while (m_sslEncrypter.hasNext()) {
-                        ByteBuffer encrypted = m_sslEncrypter.next();
-                        if (encrypted != null) {
-                            offerBuffer(encrypted, encrypted.remaining());
+                    Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, new Serializer() {
+                        @Override
+                        public ByteBuffer serialize() {
+                            return buf;
                         }
+                    });
+                    while (dsIter.hasNext()) {
+                        m_queuedWrites.offer(dsIter.next());
                     }
                 } else {
-                    offerBuffer(buf, buf.remaining());
+                    m_queuedWrites.offer(new SimpleDeferredSerialization(buf));
                 }
             }
+            m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
-    }
-
-    private void offerBuffer(final ByteBuffer buf, final int bufLen) {
-        m_queuedWrites.offer(new DeferredSerialization() {
-            @Override
-            public void serialize(ByteBuffer outbuf) {
-                outbuf.put(buf);
-            }
-
-            @Override
-            public void cancel() {}
-
-            @Override
-            public int getSerializedSize() {
-                return bufLen;
-            }
-        });
-
-        m_port.setInterests( SelectionKey.OP_WRITE, 0);
     }
 
     /**

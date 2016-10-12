@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -166,6 +167,16 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     @Override
     public void fastEnqueue(DeferredSerialization ds) {
         enqueue(ds);
+    }
+
+    @Override
+    public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void enqueue(Iterator<DeferredSerialization> dsIter) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

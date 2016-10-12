@@ -110,6 +110,10 @@
                   org/voltcore/utils/InstanceId.java
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
+                  org/voltcore/utils/Serializer.java
+                  org/voltcore/utils/SimpleDeferredSerialization.java
+                  org/voltcore/utils/SSLDeferredSerialization.java
+                  org/voltcore/utils/SSLDeferredSerializationIterator.java
                   org/voltcore/utils/Bits.java
                   org/voltcore/utils/LatencyWatchdog.java
                   org/voltcore/utils/CompressionStrategy.java

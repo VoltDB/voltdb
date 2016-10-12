@@ -66,8 +66,11 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerializationIterator;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.SSLDeferredSerializationIterator;
+import org.voltcore.utils.Serializer;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -106,8 +109,6 @@ import javax.net.ssl.SSLEngine;
  *
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
-
-    private static final int HANDSHAKE_BUFFER_SIZE = 16 * 1024;
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
@@ -251,7 +252,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
-        private final SSLContext m_sslContext;
+        private final SSLEngine m_sslEngine;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -259,7 +260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLContext sslContext)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLEngine sslEngine)
         {
             m_interface = intf;
             m_network = network;
@@ -280,7 +281,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new RuntimeException(e);
             }
             m_serverSocket = socket;
-            m_sslContext = sslContext;
+            m_sslEngine = sslEngine;
         }
 
         public void start() throws IOException {
@@ -338,7 +339,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -446,19 +447,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // do the handshaking here.
                     socket.configureBlocking(false);
 
-                    SSLEngine sslEngine = null;
-                    if (m_sslContext != null) {
-                        sslEngine = m_sslContext.createSSLEngine();
-                        sslEngine.setUseClientMode(false);
-                        sslEngine.setNeedClientAuth(false);
-
-                        SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
+                    if (m_sslEngine != null) {
+                        SSLHandshaker handshaker = new SSLHandshaker(socket, m_sslEngine);
                         if (!handshaker.handshake()) {
-                            throw new IOException("XXX SSL handshake failed");
+                            throw new IOException("SSL handshake failed");
                         }
                     }
 
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, m_sslEngine);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -501,7 +497,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -725,7 +721,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin, sslEngine);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -758,12 +754,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * can be invalidated on catalog updates
          */
         private final String m_username;
+        private final SSLEngine m_sslEngine;
 
         public ClientInputHandler(String username,
-                                  boolean isAdmin)
+                                  boolean isAdmin,
+                                  SSLEngine sslEngine)
         {
             m_username = username.intern();
             m_isAdmin = isAdmin;
+            m_sslEngine = sslEngine;
         }
 
         @Override
@@ -791,10 +790,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
-                    ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    error.flattenToBuffer(buf).flip();
-                    c.writeStream().enqueue(buf);
+                    Serializer serializer = new Serializer() {
+                        @Override
+                        public ByteBuffer serialize() {
+                            ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                            buf.putInt(buf.capacity() - 4);
+                            error.flattenToBuffer(buf).flip();
+                            return buf;
+                        }
+                    };
+                    Iterator<DeferredSerialization> dsIter;
+                    if (m_sslEngine != null) {
+                        dsIter = new SSLDeferredSerializationIterator(m_sslEngine, serializer);
+                    } else {
+                        dsIter = new DeferredSerializationIterator(serializer);
+                    }
+                    c.writeStream().enqueue(dsIter);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -911,10 +922,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void serialize(ByteBuffer buf) throws IOException
+        public ByteBuffer serialize(ByteBuffer buf) throws IOException
         {
             buf.putInt(buf.capacity() - 4);
             clientResponse.flattenToBuffer(buf);
+            return null;
         }
 
         @Override
@@ -1028,6 +1040,70 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    private Iterator<DeferredSerialization> createDSIterator(InitiateResponseMessage response,
+                                                             ClientInterfaceHandleManager cihm,
+                                                             Procedure catProc,
+                                                             SSLEngine sslEngine)
+    {
+        ClientResponseImpl clientResponse = response.getClientResponseData();
+
+        // HACK-O-RIFFIC
+        // For now, figure out if this is a transaction that was ignored
+        // by the ReplaySequencer and just remove the handle from the CIHM
+        // without removing any handles before it which we haven't seen yet.
+        ClientInterfaceHandleManager.Iv2InFlight clientData;
+        if (clientResponse != null &&
+                clientResponse.getStatusString() != null &&
+                clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+            clientData = cihm.removeHandle(response.getClientInterfaceHandle());
+        } else {
+            clientData = cihm.findHandle(response.getClientInterfaceHandle());
+        }
+        if (clientData == null) {
+            return DeferredSerializationIterator.EMPTY_DEFERRED_SERIALIZATION_ITERATOR;
+        }
+
+        final long now = System.nanoTime();
+        final long delta = now - clientData.m_creationTimeNanos;
+
+        /*
+         * Log initiator stats
+         */
+        cihm.m_acg.logTransactionCompleted(
+                cihm.connection.connectionId(clientData.m_clientHandle),
+                cihm.connection.getHostnameOrIP(clientData.m_clientHandle),
+                clientData.m_procName,
+                delta,
+                clientResponse.getStatus());
+
+        clientResponse.setClientHandle(clientData.m_clientHandle);
+        clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
+        clientResponse.setHash(null); // not part of wire protocol
+        if (sslEngine != null) {
+            return new SSLDeferredSerializationIterator(sslEngine, new ClientResponseSerializer(clientResponse));
+        } else {
+            return new DeferredSerializationIterator(new ClientResponseSerializer(clientResponse));
+        }
+    }
+
+    private static class ClientResponseSerializer implements Serializer {
+
+        private final ClientResponseImpl clientResponse;
+
+        public ClientResponseSerializer(ClientResponseImpl clientResponse) {
+            this.clientResponse = clientResponse;
+        }
+
+        @Override
+        public ByteBuffer serialize() {
+            int serializedSize = clientResponse.getSerializedSize();
+            ByteBuffer buf = ByteBuffer.allocate(serializedSize + 4);
+            buf.putInt(serializedSize);
+            clientResponse.flattenToBuffer(buf);
+            return buf;
+        }
+    }
+
     CatalogContext getCatalogContext() {
         return m_catalogContext.get();
     }
@@ -1126,10 +1202,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
+        SSLEngine tmpClientEngine = null;
+        SSLEngine tmpAdminEngine = null;
+        if (sslContext != null) {
+            tmpClientEngine = sslContext.createSSLEngine();
+            tmpClientEngine.setUseClientMode(false);
+            tmpClientEngine.setNeedClientAuth(false);
+            tmpAdminEngine = sslContext.createSSLEngine();
+            tmpAdminEngine.setUseClientMode(false);
+            tmpAdminEngine.setNeedClientAuth(false);
+        }
+        final SSLEngine clientEngine = tmpClientEngine;
+        final SSLEngine adminEngine = tmpAdminEngine;
+
         // pre-allocate single partition array
-        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, sslContext);
+        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, clientEngine);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
+        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, adminEngine);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1153,7 +1242,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
-                        cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
+                        cihm.connection.writeStream().fastEnqueue(createDSIterator(response, cihm, procedure, clientEngine));
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -1499,8 +1588,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
-                        public void serialize(ByteBuffer outbuf) throws IOException {
+                        public ByteBuffer serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
+                            return null;
                         }
                         @Override
                         public void cancel() {}
@@ -1751,6 +1841,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public void fastEnqueue(final Iterator<org.voltcore.utils.DeferredSerialization> dsIter) {
+            enqueue(dsIter);
+        }
+
+        @Override
         public void enqueue(final org.voltcore.utils.DeferredSerialization ds)
         {
 
@@ -1765,6 +1860,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return resp;
                 }
             });
+        }
+
+        @Override
+        public void enqueue(Iterator<DeferredSerialization> dsIter) {
+            while (dsIter.hasNext()) {
+                enqueue(dsIter.next());
+            }
         }
 
         @Override

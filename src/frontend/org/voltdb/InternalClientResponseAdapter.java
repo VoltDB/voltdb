@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -248,6 +249,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
@@ -264,6 +270,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, e);
         }
+    }
+
+    @Override
+    public void enqueue(Iterator<DeferredSerialization> dsIter) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

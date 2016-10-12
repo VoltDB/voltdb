@@ -104,11 +104,9 @@ public abstract class NIOWriteStreamBase {
         int bytesQueued = 0;
         while ((ds = oldlist.poll()) != null) {
             processedWrites++;
-            final int serializedSize = ds.getSerializedSize();
-            if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
             BBContainer outCont = m_queuedBuffers.peekLast();
-            ByteBuffer outbuf = null;
-            if (outCont == null || !outCont.b().hasRemaining()) {
+            ByteBuffer outbuf;
+            if (outCont == null || outCont.b().remaining() < 4) {
                 outCont = pool.acquire();
                 outCont.b().clear();
                 m_queuedBuffers.offer(outCont);
@@ -116,38 +114,28 @@ public abstract class NIOWriteStreamBase {
 
             outbuf = outCont.b();
 
-            //Fastpath, serialize to direct buffer creating no garbage
-            if (outbuf.remaining() >= serializedSize) {
-                final int oldLimit = outbuf.limit();
-                outbuf.limit(outbuf.position() + serializedSize);
-                final ByteBuffer slice = outbuf.slice();
-                ds.serialize(slice);
-                checkSloppySerialization(slice, ds);
-                slice.position(0);
-                bytesQueued += slice.remaining();
-                outbuf.position(outbuf.limit());
-                outbuf.limit(oldLimit);
+            int oldPosition = outbuf.position();
+            ByteBuffer allocated = ds.serialize(outbuf);
+            if (allocated == null) {
+                //Fastpath, serialized to direct buffer 'outbuf' creating no garbage
+                bytesQueued += outbuf.position() - oldPosition;
             } else {
-                //Slow path serialize to heap, and then put in buffers
-                ByteBuffer buf = ByteBuffer.allocate(serializedSize);
-                ds.serialize(buf);
-                checkSloppySerialization(buf, ds);
-                buf.position(0);
-                bytesQueued += buf.remaining();
-                while (buf.hasRemaining()) {
+                //Slow path, serialized to 'allocated' on the heap, then put in direct buffers.
+                bytesQueued += allocated.remaining();
+                while (allocated.hasRemaining()) {
                     if (!outbuf.hasRemaining()) {
                         outCont = pool.acquire();
                         outbuf = outCont.b();
                         outbuf.clear();
                         m_queuedBuffers.offer(outCont);
                     }
-                    if (outbuf.remaining() >= buf.remaining()) {
-                        outbuf.put(buf);
+                    if (outbuf.remaining() >= allocated.remaining()) {
+                        outbuf.put(allocated);
                     } else {
-                        final int oldLimit = buf.limit();
-                        buf.limit(buf.position() + outbuf.remaining());
-                        outbuf.put(buf);
-                        buf.limit(oldLimit);
+                        final int oldLimit = allocated.limit();
+                        allocated.limit(allocated.position() + outbuf.remaining());
+                        outbuf.put(allocated);
+                        allocated.limit(oldLimit);
                     }
                 }
             }

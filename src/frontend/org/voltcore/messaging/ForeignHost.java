@@ -222,7 +222,7 @@ public class ForeignHost {
             m_network.enqueue(
                     new DeferredSerialization() {
                         @Override
-                        public final void serialize(final ByteBuffer buf) throws IOException {
+                        public final ByteBuffer serialize(final ByteBuffer buf) throws IOException {
                             buf.putInt(buf.capacity() - 4);
                             buf.putLong(message.m_sourceHSId);
                             buf.putInt(destinations.length);
@@ -231,6 +231,7 @@ public class ForeignHost {
                             }
                             message.flattenToBuffer(buf);
                             buf.flip();
+                            return null;
                         }
 
                         @Override
