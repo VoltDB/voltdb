@@ -952,7 +952,7 @@ public final class InvocationDispatcher {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            dispatch(task, handler, ccxn, user);
+            return dispatch(task, handler, ccxn, user);
         }
         Object p0 = task.getParams().getParam(0);
         if (!(p0 instanceof Long)) {

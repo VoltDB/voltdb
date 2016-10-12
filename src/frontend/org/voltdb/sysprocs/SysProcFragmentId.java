@@ -205,4 +205,8 @@ public class SysProcFragmentId
     public static final long PF_updateSettingsBarrierAggregate = 301;
     public static final long PF_updateSettings = 302;
     public static final long PF_updateSettingsAggregate = 303;
+
+    // @PrepareShutdown
+    public static final long PF_prepareShutdown = 310;
+    public static final long PF_prepareShutdownAggregate = 311;
 }

@@ -37,8 +37,9 @@ import org.voltdb.VoltZK;
 
 @ProcInfo(singlePartition = false)
 
-public class Resume extends VoltSystemProcedure
-{
+public class Resume extends VoltSystemProcedure {
+
+    private final static OperationMode RUNNING = OperationMode.RUNNING;
     @Override
     public void init() {}
 
@@ -56,13 +57,12 @@ public class Resume extends VoltSystemProcedure
      * @param ctx       Internal parameter. Not user-accessible.
      * @return          Standard STATUS table.
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx)
-    {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         // Choose the lowest site ID on this host to actually flip the bit
         VoltDBInterface voltdb = VoltDB.instance();
         OperationMode opMode = voltdb.getMode();
 
-        if (ctx.isLowestSiteId() && opMode != OperationMode.RUNNING) {
+        if (ctx.isLowestSiteId()) {
             ZooKeeper zk = voltdb.getHostMessenger().getZK();
             try {
                 Stat stat;
@@ -70,22 +70,24 @@ public class Resume extends VoltSystemProcedure
                 Code code;
                 do {
                     stat = new Stat();
-                    code = Code.OK;
+                    code = Code.BADVERSION;
                     try {
                         byte [] data = zk.getData(VoltZK.operationMode, false, stat);
                         zkMode = data == null ? opMode : OperationMode.valueOf(data);
-                        if (zkMode == OperationMode.RUNNING) {
+                        if (zkMode == RUNNING) {
                             break;
                         }
-                        stat = zk.setData(VoltZK.operationMode,
-                                OperationMode.RUNNING.getBytes(), stat.getVersion());
+                        stat = zk.setData(VoltZK.operationMode, RUNNING.getBytes(), stat.getVersion());
+                        code = Code.OK;
+                        zkMode = RUNNING;
+                        break;
                     } catch (BadVersionException ex) {
                         code = ex.code();
                     }
-                } while (zkMode != OperationMode.RUNNING && code != Code.BADVERSION);
+                } while (zkMode != RUNNING && code == Code.BADVERSION);
 
-                voltdb.setMode(OperationMode.RUNNING);
                 voltdb.getHostMessenger().unpause();
+                voltdb.setMode(RUNNING);
 
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -94,6 +96,6 @@ public class Resume extends VoltSystemProcedure
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
-        return (new VoltTable[] {t});
+        return new VoltTable[] {t};
     }
 }

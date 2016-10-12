@@ -90,7 +90,7 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
-    // cluster settings
+    // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
     public CatalogContext(

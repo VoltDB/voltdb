@@ -62,6 +62,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -129,6 +130,7 @@ import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
@@ -565,6 +567,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
+            // Handle multiple invocations of server thread in the same JVM.
+            // by clearing static variables/properties which ModuleManager,
+            // and Settings depend on
+            ConfigFactory.clearProperty(Settings.CONFIG_DIR);
+            ModuleManager.resetCacheRoot();
+
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
             // check that this is a 64 bit VM

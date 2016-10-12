@@ -88,6 +88,7 @@ public class VoltDB {
     public static final String STAGED_MESH = "_MESH";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
+    public static final String MODULE_CACHE = ".bundles-cache";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
