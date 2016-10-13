@@ -207,20 +207,15 @@ public class TestStoredProcedureInvocation extends TestCase {
         // try original if no timeout
         if (timeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
             try {
-                ByteBuffer buf = ByteBuffer.allocate(10000); // rando buffer big enough
-                buf.put(ProcedureInvocationType.ORIGINAL.getValue()); //Version
+                StoredProcedureInvocation spi = new StoredProcedureInvocation();
+                spi.setProcName(procName);
+                spi.setClientHandle(handle);
+                spi.setParams(params);
 
-                SerializationHelper.writeString(procName, buf);
-                buf.putLong(handle);
-
-                ParameterSet paramSet = (params != null
-                        ? ParameterSet.fromArrayWithCopy(params)
-                        : ParameterSet.emptyParameterSet());
-                paramSet.flattenToBuffer(buf);
-
+                ByteBuffer buf = ByteBuffer.allocate(spi.getSerializedSizeForOriginalVersion());
+                spi.flattenToBufferForOriginalVersion(buf);
                 buf.flip();
 
-                // don't bother testing allPartition in older versions
                 roundTripBuffer(expectSuccess, buf, procName, handle, timeout, false);
             }
             catch (Exception e) {

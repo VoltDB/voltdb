@@ -967,30 +967,30 @@ public class TestPlansGroupBy extends PlannerTestCase {
         compile("SELECT P1.PKEY AS AAA FROM P1 GROUP BY AAA");
     }
 
-    public void testGroupbyAliasNegativeCases() {
+    public void testGroupByAliasNegativeCases() {
         // Group by aggregate expression
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
-            fail();
+            fail("Did not expect invalid GROUP BY query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
-            fail();
+            fail("Did not expect invalid GROUP BY alias query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
-            fail();
+            fail("Did not expect invalid GROUP BY expression alias query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
@@ -998,9 +998,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Group by alias and expression
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
-            fail();
+            fail("Did not expect invalid GROUP BY alias expression query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
@@ -1009,9 +1009,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Having
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT ABS(A1), count(*) as ct FROM P1 GROUP BY ABS(A1) having ct > 3");
-            fail();
+            fail("Did not expect invalid HAVING condition on alias query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
@@ -1020,9 +1020,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Group by column.alias
         try {
-            pns = compileToFragments(
+            pns = compileInvalidToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
-            fail();
+            fail("Did not expect invalid GROUP BY qualified alias query to succeed.");
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
