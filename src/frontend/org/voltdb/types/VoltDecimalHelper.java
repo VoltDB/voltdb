@@ -206,7 +206,7 @@ public class VoltDecimalHelper {
         if (!isRoundingEnabled()) {
             throw new RuntimeException(String.format("Decimal scale %d is greater than the maximum %d", bd.scale(), kDefaultScale));
         }
-        int desiredPrecision = bd.precision() - lostScaleDigits;
+        int desiredPrecision = Math.max(0, bd.precision() - lostScaleDigits);
         MathContext mc = new MathContext(desiredPrecision, mode);
         BigDecimal nbd = bd.round(mc);
         if (nbd.scale() != scale) {
@@ -239,7 +239,7 @@ public class VoltDecimalHelper {
             throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
                                   wholeNumberPrecision + " and the max is 26");
         }
-        final int scalingFactor = kDefaultScale - decimalScale;
+        final int scalingFactor = Math.max(0, kDefaultScale - decimalScale);
         BigInteger scalableBI = bd.unscaledValue();
         //* enable to debug */ System.out.println("DEBUG BigDecimal: " + bd);
         //* enable to debug */ System.out.println("DEBUG unscaled: " + scalableBI);

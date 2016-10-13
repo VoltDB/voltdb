@@ -229,9 +229,6 @@ def get_max_mismatches(comparison_database, suite_name):
         if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
               config_name == 'basic-compoundex-joins'):
             max_mismatches = 4620
-        # Known failures in the numeric-decimals "extended" test suite (see ENG-10546)
-        elif config_name == 'numeric-decimals':
-            max_mismatches = 300
         # Known failures in the joined-matview-* test suites ...
         # Failures in joined-matview-default-full due to ENG-11086
         elif config_name == 'joined-matview-default-full':
