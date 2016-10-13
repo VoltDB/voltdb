@@ -45,11 +45,6 @@ public class MockWriteStream implements WriteStream {
     }
 
     @Override
-    public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
@@ -58,11 +53,6 @@ public class MockWriteStream implements WriteStream {
         } catch (IOException e) {
             Throwables.propagate(e);
         }
-    }
-
-    @Override
-    public void enqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
     }
 
     @Override

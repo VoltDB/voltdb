@@ -3,6 +3,7 @@ package org.voltcore.utils;
 import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -17,6 +18,22 @@ public class SSLDeferredSerializationIterator implements Iterator<DeferredSerial
     public SSLDeferredSerializationIterator(SSLEngine sslEngine, Serializer serializer) {
         this.sslEngine = sslEngine;
         this.serializer = serializer;
+    }
+
+    public SSLDeferredSerializationIterator(SSLEngine sslEngine, final DeferredSerialization ds) {
+        this.sslEngine = sslEngine;
+        this.serializer = new Serializer() {
+            @Override
+            public ByteBuffer serialize() {
+                try {
+                    ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
+                    ds.serialize(buf);
+                    return buf;
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+        };
     }
 
     @Override

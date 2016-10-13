@@ -1,22 +1,29 @@
 package org.voltcore.utils;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
 public class DeferredSerializationIterator implements Iterator<DeferredSerialization> {
 
-    public static DeferredSerializationIterator EMPTY_DEFERRED_SERIALIZATION_ITERATOR = new DeferredSerializationIterator(Collections.emptyList());
+    public static DeferredSerializationIterator EMPTY_DEFERRED_SERIALIZATION_ITERATOR =
+            new DeferredSerializationIterator(new ArrayList<DeferredSerialization>());
     private Iterator<DeferredSerialization> dsIter;
     private final Serializer serializer;
+
+    public DeferredSerializationIterator(DeferredSerialization ds) {
+        this.serializer = null;
+        this.dsIter = Collections.singletonList(ds).iterator();
+    }
 
     public DeferredSerializationIterator(Serializer serializer) {
         this.serializer = serializer;
         this.dsIter = null;
     }
 
-    private DeferredSerializationIterator(List<DeferredSerialization> dsList) {
+    public DeferredSerializationIterator(List<DeferredSerialization> dsList) {
         this.serializer = null;
         this.dsIter = dsList.iterator();
     }
@@ -34,5 +41,10 @@ public class DeferredSerializationIterator implements Iterator<DeferredSerializa
     @Override
     public DeferredSerialization next() {
         return dsIter.next();
+    }
+
+    @Override
+    public void remove() {
+        throw new UnsupportedOperationException();
     }
 }

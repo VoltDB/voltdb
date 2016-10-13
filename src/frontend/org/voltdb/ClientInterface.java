@@ -790,22 +790,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 final ClientResponseImpl error = handleRead(message, this, c);
                 if (error != null) {
-                    Serializer serializer = new Serializer() {
-                        @Override
-                        public ByteBuffer serialize() {
-                            ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
-                            buf.putInt(buf.capacity() - 4);
-                            error.flattenToBuffer(buf).flip();
-                            return buf;
-                        }
-                    };
-                    Iterator<DeferredSerialization> dsIter;
-                    if (m_sslEngine != null) {
-                        dsIter = new SSLDeferredSerializationIterator(m_sslEngine, serializer);
-                    } else {
-                        dsIter = new DeferredSerializationIterator(serializer);
-                    }
-                    c.writeStream().enqueue(dsIter);
+                    ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    error.flattenToBuffer(buf).flip();
+                    c.writeStream().enqueue(buf);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -926,6 +914,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         {
             buf.putInt(buf.capacity() - 4);
             clientResponse.flattenToBuffer(buf);
+            buf.flip();
             return null;
         }
 
@@ -1100,6 +1089,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ByteBuffer buf = ByteBuffer.allocate(serializedSize + 4);
             buf.putInt(serializedSize);
             clientResponse.flattenToBuffer(buf);
+            buf.flip();
             return buf;
         }
     }
@@ -1242,7 +1232,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (cihm != null) {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
-                        cihm.connection.writeStream().fastEnqueue(createDSIterator(response, cihm, procedure, clientEngine));
+                        cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -1841,11 +1831,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void fastEnqueue(final Iterator<org.voltcore.utils.DeferredSerialization> dsIter) {
-            enqueue(dsIter);
-        }
-
-        @Override
         public void enqueue(final org.voltcore.utils.DeferredSerialization ds)
         {
 
@@ -1860,13 +1845,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return resp;
                 }
             });
-        }
-
-        @Override
-        public void enqueue(Iterator<DeferredSerialization> dsIter) {
-            while (dsIter.hasNext()) {
-                enqueue(dsIter.next());
-            }
         }
 
         @Override

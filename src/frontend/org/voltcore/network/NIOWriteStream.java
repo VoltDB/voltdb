@@ -26,6 +26,7 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.DeferredSerializationIterator;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.SSLDeferredSerializationIterator;
 import org.voltcore.utils.Serializer;
@@ -194,15 +195,12 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void enqueue(final DeferredSerialization ds) {
-        throw new UnsupportedOperationException("Not supported by NIOWriteStream");
-    }
-
-    /**
-     * Queue the messages held by the iterator, deferring the serialization of the message until later.
-     * @param dsIter An iterator of deferred serialization tasks.
-     */
-    @Override
-    public void enqueue(final Iterator<DeferredSerialization> dsIter) {
+        Iterator<DeferredSerialization> dsIter;
+        if (m_isSSLConfigured) {
+            dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
+        } else {
+            dsIter = new DeferredSerializationIterator(ds);
+        }
         synchronized (this) {
             if (m_isShutdown) {
                 while (dsIter.hasNext()) {
@@ -226,23 +224,20 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        throw new UnsupportedOperationException("Not supported by NIOWriteStream");
-    }
-
-    /**
-     * For the server we run everything backpressure
-     * related on the network thread, so the entire thing can just
-     * go in the queue directly without acquiring any additional locks
-     */
-    @Override
-    public void fastEnqueue(final Iterator<DeferredSerialization> dsIter) {
+        Iterator<DeferredSerialization> dsIter;
+        if (m_isSSLConfigured) {
+            dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
+        } else {
+            dsIter = new DeferredSerializationIterator(ds);
+        }
+        final Iterator<DeferredSerialization> finalDsIter = dsIter;
         m_port.queueTask(new Runnable() {
             @Override
             public void run() {
                 synchronized (NIOWriteStream.this) {
                     updateLastPendingWriteTimeAndQueueBackpressure();
-                    while (dsIter.hasNext()) {
-                        m_queuedWrites.offer(dsIter.next());
+                    while (finalDsIter.hasNext()) {
+                        m_queuedWrites.offer(finalDsIter.next());
                     }
                     m_port.setInterests( SelectionKey.OP_WRITE, 0);
                 }

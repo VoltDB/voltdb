@@ -249,11 +249,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
@@ -270,11 +265,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, e);
         }
-    }
-
-    @Override
-    public void enqueue(Iterator<DeferredSerialization> dsIter) {
-        throw new UnsupportedOperationException();
     }
 
     @Override

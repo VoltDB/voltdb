@@ -18,7 +18,6 @@
 package org.voltcore.network;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 
 import org.voltcore.utils.DeferredSerialization;
 
@@ -35,12 +34,6 @@ public interface WriteStream {
     public void fastEnqueue(final DeferredSerialization ds);
 
     /**
-     * Only implemented for the client network, queues the callback
-     * without acquiring additional locks or doing more work
-     */
-    public void fastEnqueue(final Iterator<DeferredSerialization> dsIter);
-
-    /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism
      * for serializing and queueing network writes. It allows the sender to define an efficient serialization
      * mechanism that performs a single allocation of the correct size without the overhead of FastSerializer
@@ -48,15 +41,6 @@ public interface WriteStream {
      * @param ds A deferred serialization task that will generate the message
      */
     public void enqueue(final DeferredSerialization ds);
-
-    /**
-     * Queue messages held by the iterator and defer the serialization of the message until later. This is the ideal mechanism
-     * for serializing and queueing network writes. It allows the sender to define an efficient serialization
-     * mechanism that performs a single allocation of the correct size without the overhead of FastSerializer
-     * which has to constantly check if it needs to grow.
-     * @param dsIter An iterator of deferred serialization tasks that will generate messages
-     */
-    public void enqueue(final Iterator<DeferredSerialization> dsIter);
 
     /**
      * Queue a ByteBuffer for writing to the network. If the ByteBuffer is not direct then it will

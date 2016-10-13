@@ -170,20 +170,6 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public void fastEnqueue(Iterator<DeferredSerialization> dsIter) {
-        while (dsIter.hasNext()) {
-            enqueue(dsIter.next());
-        }
-    }
-
-    @Override
-    public void enqueue(Iterator<DeferredSerialization> dsIter) {
-        while (dsIter.hasNext()) {
-            enqueue(dsIter.next());
-        }
-    }
-
-    @Override
     public void enqueue(DeferredSerialization ds) {
         try {
             // serialize() touches not-threadsafe state around Initiator
