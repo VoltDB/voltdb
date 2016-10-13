@@ -520,43 +520,19 @@ function downloadCSV(event,args,whichChart) {
         else if (graphView == "Days"){
             chartData =  JSON.parse(localStorage.cmdLogDay)
         }
-            var csvCmdLog = convertArrayOfObjectsToCSV({
-                data: chartData
-            });
-            var csvOverlay = convertArrayOfObjectsToCSV({
-                data: overLayData
-            });
-            var filename_cmdLog = args.filename + "-" + graphView + ".csv";
-            var filename_overlay = "Overlay-" + graphView + ".csv";
-
-            downloadAll([
-                [filename_cmdLog, csvCmdLog],
-                [filename_overlay, csvOverlay],
-            ]);
     }
 
-    if(whichChart != "commandLog"){
-        var csv = convertArrayOfObjectsToCSV({
-            data: chartData
-        });
-        if (csv == null) return;
+    var csv = convertArrayOfObjectsToCSV({
+        data: chartData
+    });
+    if (csv == null) return;
 
-        filename = args.filename + "-" + graphView + ".csv";
-        data = encodeURI(csv);
+    filename = args.filename + "-" + graphView + ".csv";
+    data = encodeURI(csv);
 
-        var blob = new Blob([csv], {type: "text/csv;"});
-        saveAs(blob, filename );
-    }
+    var blob = new Blob([csv], {type: "text/csv;"});
+    saveAs(blob, filename );
 }
-
-function downloadAll(files){
-    if(files.length == 0) return;
-    file = files.pop();
-    var blob = new Blob([file[1]], {type: "text/csv;"});
-    saveAs(blob, file[0]);
-    downloadAll(files);
-}
-
 
 function convertPartitionData(data){
     var chartData = [];
