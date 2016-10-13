@@ -319,7 +319,7 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
-                    tmLog.warn(VoltDB.GenerateThreadDump());
+                    tmLog.warn(VoltDB.GenerateCriticalThreadDump());
                 }
             }
         }
