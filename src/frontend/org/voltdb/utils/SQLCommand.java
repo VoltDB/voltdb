@@ -33,6 +33,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,8 +72,11 @@ import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.history.FileHistory;
 
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 public class SQLCommand
 {
@@ -1384,7 +1388,8 @@ public class SQLCommand
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, "myk5yst15r5".toCharArray());
             sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(kmf.getKeyManagers(), null, null);
+            sslContext.init(createKeyManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5", "myk5yst15r5"),
+                    createTrustManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5"), new SecureRandom());
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
             return;
@@ -1506,5 +1511,52 @@ public class SQLCommand
         } catch (Throwable e) {
             // ignore any error
         }
+    }
+
+    /**
+     * Creates the key managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
+     *
+     * @param filepath - the path to the JKS keystore.
+     * @param keystorePassword - the keystore's password.
+     * @param keyPassword - the key's passsword.
+     * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
+     * @throws Exception
+     */
+    protected static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("JKS");
+        InputStream keyStoreIS = new FileInputStream(filepath);
+        try {
+            keyStore.load(keyStoreIS, keystorePassword.toCharArray());
+        } finally {
+            if (keyStoreIS != null) {
+                keyStoreIS.close();
+            }
+        }
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, keyPassword.toCharArray());
+        return kmf.getKeyManagers();
+    }
+
+    /**
+     * Creates the trust managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
+     *
+     * @param filepath - the path to the JKS keystore.
+     * @param keystorePassword - the keystore's password.
+     * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
+     * @throws Exception
+     */
+    protected static TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
+        KeyStore trustStore = KeyStore.getInstance("JKS");
+        InputStream trustStoreIS = new FileInputStream(filepath);
+        try {
+            trustStore.load(trustStoreIS, keystorePassword.toCharArray());
+        } finally {
+            if (trustStoreIS != null) {
+                trustStoreIS.close();
+            }
+        }
+        TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustFactory.init(trustStore);
+        return trustFactory.getTrustManagers();
     }
 }
