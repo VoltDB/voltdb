@@ -98,7 +98,7 @@ public class CatalogDiffEngine {
         private String       m_errorMessage   = null;
     }
 
-    /*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
+    //*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
     /// A flag that controls output for debugging.
     private boolean m_triggeredVerbosity = false;
     /// A string that dynamically controls the verbose output flag, enabling it for the
@@ -453,7 +453,22 @@ public class CatalogDiffEngine {
             ) {
                 m_newTablesForExport.add(tbl.getTypeName());
             }
-            // Support add/drop of the top level object.
+            // If this is a materialized view, and it's not safe for non-empty
+            // tables, then we need to note that.  We do this by returning an
+            // empty string.
+            if (tbl.getMvhandlerinfo().size() > 0) {
+                MaterializedViewHandlerInfo mvhInfo = tbl.getMvhandlerinfo().get("mvhandlerinfo");
+                if ( mvhInfo != null ) {
+                    if ( ! mvhInfo.getIssafewithnonemptysources()) {
+                        // Return an empty string here.  We don't know if this
+                        // is actually allowed or not.  We need more processing
+                        // The see if it's ok with some empty tables.
+                        return "";
+                    }
+                    return null;
+                }
+            }
+            // Otherwise, support add/drop of the top level object.
             return null;
         }
 
@@ -655,45 +670,73 @@ public class CatalogDiffEngine {
             return retval;
         }
 
-        if ((suspect instanceof MaterializedViewInfo) && (parent instanceof Table)) {
-            /*
-             * This will be a single table matview.  So, if it's safe
-             * for non-empty sources, return null.  Otherwise, return the
-             * populated retval.
-             */
-            MaterializedViewInfo mv = (MaterializedViewInfo)suspect;
-            if (! mv.getIssafewithnonemptysources()) {
-                Table srcTable = (Table)parent;
-
-                String viewName = mv.getDest().getTypeName();
-                String sourceName = srcTable.getTypeName();
-                String errorMessage =
-                        String.format(
-                                "Unable to create view %s on non-empty table %s because it uses unsafe operations.",
-                                viewName,
-                                sourceName);
-                retval = new TablePopulationRequirements(viewName, sourceName, errorMessage);
-                return retval;
+        // Check to see if a table is a materialized view.  If
+        // so, we want to check if the table is safe for non-empty
+        // source tables, and leave the correct error message if so.
+        if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
+            if (tbl.getMvhandlerinfo().size() > 0) {
+                MaterializedViewHandlerInfo mvhInfo = tbl.getMvhandlerinfo().get("mvhandlerinfo");
+                if ( mvhInfo != null ) {
+                    retval = getMVHandlerInfoMessage(mvhInfo);
+                    if (retval != null) {
+                        return retval;
+                    }
+                }
             }
+        }
+        // If this is a MV, it means we are changing it in some
+        // way, which we don't actually allow.
+        if ((suspect instanceof MaterializedViewInfo) && (parent instanceof Table)) {
             return null;
         }
+        return null;
+    }
 
-        if ((suspect instanceof MaterializedViewHandlerInfo) && (parent instanceof Table)) {
-            MaterializedViewHandlerInfo mvh = (MaterializedViewHandlerInfo)suspect;
-            if ( ! mvh.getIssafewithnonemptysources()) {
-                String viewName = mvh.getDesttable().getTypeName();
-                String errorMessage =
-                        String.format(
-                                "Unable to create view %s on multiple non-empty tables because it uses unsafe operations.",
-                                viewName);
-                retval = new TablePopulationRequirements(viewName);
-                retval.setErrorMessage(errorMessage);
-                for (TableRef tref : mvh.getSourcetables()) {
-                    retval.addTableName(tref.getTable().getTypeName());
-                }
-                return retval;
+    /**
+     * Check a MaterializedViewHandlerInfo object for safety.  Return
+     * an object with table population requirements on the table for it to be
+     * allowed.  The return object, if it is non-null, will have a set of names
+     * of tables one of which must be empty if the view can be created.  It will
+     * also have an error message.
+     *
+     * @param mvh A MaterializedViewHandlerInfo object describing the view part
+     *            of a table.
+     * @return A TablePopulationRequirements object describing a set of tables
+     *         and an error message.
+     */
+    private TablePopulationRequirements getMVHandlerInfoMessage(MaterializedViewHandlerInfo mvh) {
+        TablePopulationRequirements retval;
+        if ( ! mvh.getIssafewithnonemptysources()) {
+            String viewName = mvh.getDesttable().getTypeName();
+            String errorMessage =
+                    String.format(
+                            "Unable to create view %s on multiple non-empty tables because it uses unsafe operations.",
+                            viewName);
+            retval = new TablePopulationRequirements(viewName);
+            retval.setErrorMessage(errorMessage);
+            for (TableRef tref : mvh.getSourcetables()) {
+                retval.addTableName(tref.getTable().getTypeName());
             }
+            return retval;
+        }
+        return null;
+    }
 
+    private TablePopulationRequirements getMVInfoMessage(CatalogType table, MaterializedViewInfo mv) {
+        TablePopulationRequirements retval;
+        if (! mv.getIssafewithnonemptysources()) {
+            Table srcTable = (Table)table;
+
+            String viewName = mv.getDest().getTypeName();
+            String sourceName = srcTable.getTypeName();
+            String errorMessage =
+                    String.format(
+                            "Unable to create view %s on non-empty table %s because it uses unsafe operations.",
+                            viewName,
+                            sourceName);
+            retval = new TablePopulationRequirements(viewName, sourceName, errorMessage);
+            return retval;
         }
         return null;
     }
@@ -1264,7 +1307,7 @@ public class CatalogDiffEngine {
         Object materializerValue = null;
         // Consider shifting into the strict more required within materialized view definitions.
         if (prevType instanceof Table) {
-            // Under normal circumstances, it's highly unpossible that another (nested?) table will
+            // Under normal circumstances, it's highly unlikely that another (nested?) table will
             // appear in the details of a materialized view table. So, when it does (!?), be sure to
             // complain -- and don't let it throw off the accounting of the strict diff mode.
             // That is, don't set the local "materializerValue".
