@@ -175,21 +175,21 @@ class OverviewModule extends Module {
         maxJavaHeapText                 { $("#adminTbl > tbody > tr:nth-child(21) > td.configLabel") }
         maxJavaHeapField                { $(id:"txtMaxJavaHeap") }
 
-        heartbeatTimeoutText            { $("#adminTbl1 > tbody > tr:nth-child(17) > td.configLabel") }
+        heartbeatTimeoutText            { $("#adminTbl1 > tbody > tr:nth-child(14) > td.configLabel") }
         heartbeatTimeoutField           { $(id:"txtHeartbeatTimeout") }
 
-        queryTimeoutText                { $("#adminTbl1 > tbody > tr:nth-child(18) > td.configLabel") }
+        queryTimeoutText                { $("#adminTbl1 > tbody > tr:nth-child(15) > td.configLabel") }
         queryTimeoutField               { $(id:"txtQueryTimeout") }
 
-        maxTempTableMemoryText          { $("#adminTbl1 > tbody > tr:nth-child(19) > td.configLabel") }
+        maxTempTableMemoryText          { $("#adminTbl1 > tbody > tr:nth-child(16) > td.configLabel") }
         maxTempTableMemoryField         { $(id:"txtMaxTempTableMemory") }
 
-        snapshotPriorityText            { $("#adminTbl1 > tbody > tr:nth-child(20) > td.configLabel") }
+        snapshotPriorityText            { $("#adminTbl1 > tbody > tr:nth-child(17) > td.configLabel") }
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
 
 
-        memoryLimitText                 { $("#adminTbl1 > tbody > tr:nth-child(21) > td.configLabel") }
+        memoryLimitText                 { $("#adminTbl1 > tbody > tr:nth-child(18) > td.configLabel") }
         memoryLimitField                { $("#txtMemoryLimit") }
         memoryLimitType                 { $(id:"selMemoryLimitUnit") }
         memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }
