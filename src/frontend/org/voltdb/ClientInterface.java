@@ -252,7 +252,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
-        private final SSLEngine m_sslEngine;
+        private final SSLContext m_sslContext;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -260,7 +260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLEngine sslEngine)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLContext sslContext)
         {
             m_interface = intf;
             m_network = network;
@@ -281,7 +281,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new RuntimeException(e);
             }
             m_serverSocket = socket;
-            m_sslEngine = sslEngine;
+            m_sslContext = sslContext;
         }
 
         public void start() throws IOException {
@@ -325,11 +325,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Thread for Running authentication of client.
         class AuthRunnable implements Runnable {
             final SocketChannel m_socket;
-            final SSLEngine m_sslEngine;
+            final SSLContext m_sslContext;
 
-            AuthRunnable(SocketChannel socket, SSLEngine sslEngine) {
+            AuthRunnable(SocketChannel socket, SSLContext sslContext) {
                 this.m_socket = socket;
-                this.m_sslEngine = sslEngine;
+                this.m_sslContext = sslContext;
             }
 
             @Override
@@ -339,7 +339,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
+                        SSLEngine sslEngine = null;
+                        if (m_sslContext != null) {
+                            sslEngine = m_sslContext.createSSLEngine();
+                            sslEngine.setUseClientMode(false);
+                            sslEngine.setNeedClientAuth(false);
+                        }
+
+                        if (sslEngine != null) {
+                            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
+                            if (!handshaker.handshake()) {
+                                throw new IOException("SSL handshake failed");
+                            }
+                        }
+
+                        final InputHandler handler = authenticate(m_socket, sslEngine, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -353,7 +367,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 handler,
                                                 0,
                                                 ReverseDNSPolicy.ASYNCHRONOUS,
-                                                m_sslEngine);
+                                                sslEngine);
                                 /*
                                  * If IV2 is enabled the logic initially enabling read is
                                  * in the started method of the InputHandler
@@ -364,7 +378,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         handler,
                                         SelectionKey.OP_READ,
                                         ReverseDNSPolicy.ASYNCHRONOUS,
-                                        m_sslEngine);
+                                        sslEngine);
                             }
                             success = true;
                         }
@@ -447,14 +461,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // do the handshaking here.
                     socket.configureBlocking(false);
 
-                    if (m_sslEngine != null) {
-                        SSLHandshaker handshaker = new SSLHandshaker(socket, m_sslEngine);
-                        if (!handshaker.handshake()) {
-                            throw new IOException("SSL handshake failed");
-                        }
-                    }
-
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, m_sslEngine);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, m_sslContext);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -1192,23 +1199,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
-        SSLEngine tmpClientEngine = null;
-        SSLEngine tmpAdminEngine = null;
-        if (sslContext != null) {
-            tmpClientEngine = sslContext.createSSLEngine();
-            tmpClientEngine.setUseClientMode(false);
-            tmpClientEngine.setNeedClientAuth(false);
-            tmpAdminEngine = sslContext.createSSLEngine();
-            tmpAdminEngine.setUseClientMode(false);
-            tmpAdminEngine.setNeedClientAuth(false);
-        }
-        final SSLEngine clientEngine = tmpClientEngine;
-        final SSLEngine adminEngine = tmpAdminEngine;
-
         // pre-allocate single partition array
-        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, clientEngine);
+        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, sslContext);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, adminEngine);
+        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
