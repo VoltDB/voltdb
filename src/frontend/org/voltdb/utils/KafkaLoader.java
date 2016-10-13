@@ -108,7 +108,7 @@ public class KafkaLoader {
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
         m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
         try {
-            m_es = getConsumerExecutor(m_consumer, m_loader);
+            m_es = getConsumerExecutor(m_config, m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
                 m_log.info("Kafka Consumer from topic: " + m_config.topic + " Started using procedure: " + m_config.procedure);
             } else {
@@ -156,6 +156,8 @@ public class KafkaLoader {
 
         @Option(shortOpt = "f", desc = "Periodic Flush Interval in seconds. (default: 10)")
         int flush = 10;
+        @Option(shortOpt = "k", desc = "Kafka Topic Partitions. (default: 10)")
+        int kpartitions = 10;
 
         /**
          * Batch size for processing batched operations.
@@ -323,13 +325,13 @@ public class KafkaLoader {
 
     }
 
-    private ExecutorService getConsumerExecutor(KafkaConsumerConnector consumer,
+    private ExecutorService getConsumerExecutor(KafkaConfig config, KafkaConsumerConnector consumer,
             CSVDataLoader loader) throws Exception {
 
         Map<String, Integer> topicCountMap = new HashMap<>();
         //Get this from config or arg. Use 3 threads default.
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-        topicCountMap.put(m_config.topic, 3);
+        ExecutorService executor = Executors.newFixedThreadPool(m_config.kpartitions);
+        topicCountMap.put(m_config.topic, m_config.kpartitions);
         Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.m_consumer.createMessageStreams(topicCountMap);
         List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(m_config.topic);
 
