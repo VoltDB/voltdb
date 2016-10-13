@@ -78,6 +78,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+    private final int m_gapFullWait = Integer.getInteger("KAFKA_IMPORT_GAP_WAIT", 2_000);
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
     private final FetchRequestBuilder m_fetchRequestBuilder;
@@ -512,7 +513,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     public boolean commitOffset() {
         final short version = 1;
-
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
             long now = System.currentTimeMillis();
@@ -570,7 +570,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long s = -1L;
         long offer = -1L;
         final long [] lag;
-        private final long gapTrackerCheckMaxTimeMs = 2_000;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -586,7 +585,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if ((offset - c) >= lag.length) {
                 offer = offset;
                 try {
-                    wait(gapTrackerCheckMaxTimeMs);
+                    wait(m_gapFullWait);
                 } catch (InterruptedException e) {
                     rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
                 }
