@@ -182,27 +182,29 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             .groupReplacementText("INSERT").useWholeMatch()
             .suffix(" ON CONFLICT ({columns:pk}) DO UPDATE SET ({columns:npk}) = ({values:npk})");
 
-    // Captures the use of an UPSERT INTO VALUES statement, for example:
-    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
-    // where the column list, here "(C1, C2, C3)", is optional; the values
-    // list, here "(1, 'abc', 12.34)", can include arbitrary values; and both
-    // can include any number of items. (Though, for a valid UPSERT, the number
-    // of values must match the number of columns, when included, or else the
-    // number of columns defined in table T1; and the types must also match.)
+    // Captures the use of an UPSERT INTO SELECT statement, for example:
+    //     UPSERT INTO T1 (C1, C2, C3) SELECT (C4, C5, C6) FROM T2
+    // where the initial column list, here "(C1, C2, C3)", is optional; the
+    // second column list, here "(C4, C5, C6)", can include arbitrary column
+    // expressions; and both can include any number of items. (Though, for a
+    // valid UPSERT, the number of column expressions must match the number
+    // of columns, when included, or else the number of columns defined in
+    // table T1; and the types must also match.) Also, the SELECT portion may
+    // contain additional clauses, such as WHERE and ORDER BY clauses.
     private static final Pattern upsertSelectQuery = Pattern.compile(
-            UPSERT_QUERY_START + "SELECT\\s+(?<values>[+\\-*\\/%|'\\s\\w]+(,\\s*[+\\-*\\/%|'\\s\\w]+)*)\\s+"
+            UPSERT_QUERY_START + "SELECT\\s+(?<values>[+\\-*\\/%|'\\s\\w]+(,\\s*[+\\-*\\/%|'\\s\\w]+)*)(?<!DISTINCT)\\s+"
                     + "FROM\\s+(?<selecttables>\\w+(\\s+AS\\s+\\w+)?((\\s*,\\s*|\\s+JOIN\\s+)\\w+(\\s+AS\\s+\\w+)?)*)\\s+"
                     + "(?<where>WHERE\\s+((?!"+SORT_KEYWORDS+").)+)?"
                     + "(?<sort>("+SORT_KEYWORDS+").+)?",
             Pattern.CASE_INSENSITIVE);
-    // Modifies an UPSERT INTO VALUES statement, as described above, such as:
-    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
+    // Modifies an UPSERT INTO SELECT statement, as described above, such as:
+    //     UPSERT INTO T1 (C1, C2, C3) SELECT (C4, C5, C6) FROM T2
     // which PostgreSQL does not support, and replaces it with an INSERT
     // statement using ON CONFLICT DO UPDATE, such as:
-    //     INSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34) ON CONFLICT (C1)
-    //         DO UPDATE SET (C2, C3) = ('abc', 12.34)
+    //     INSERT INTO T1 AS _TMP (C1, C2, C3) SELECT (C4, C5, C6) FROM T2 ON CONFLICT (C1)
+    //         DO UPDATE SET (C2, C3) = (SELECT C5, C6 FROM T2 WHERE C4=_TMP.C1)
     // which is an equivalent that PostgreSQL does support. (This example
-    // assumes that the C1 column is the primary key.)
+    // assumes that the C1 and C4 columns are the primary keys.)
     private static final QueryTransformer upsertSelectQueryTransformer
             = new QueryTransformer(upsertSelectQuery)
             .groups("upsert", "table", "columns", "values", "selecttables", "where", "sort")

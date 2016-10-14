@@ -291,7 +291,7 @@ class VoltDatabase:
             return 1
 
         # Gets deployment.xml for this database.
-        deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(self.database_id)
+        deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(self.database_id, sid)
         filename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH, 'deployment.xml'))
         config_path = os.path.realpath(self.get_volt_server_data_folder(sid))
         deployment_file = open(filename, 'w')
