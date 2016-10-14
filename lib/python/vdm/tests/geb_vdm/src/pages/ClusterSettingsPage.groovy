@@ -88,12 +88,15 @@ class ClusterSettingsPage extends Page {
         overview { module OverviewModule }
         directories { module DirectoriesModule }
         dr { module DatabaseReplicationModule }
+        selectServer                 {$("#serverOption")}
+        selectOption                    {"#divDbManager > div:nth-child(7) > div > div > div.rightSideServ > form > select > option:nth-child(2)"}
     }
 
     static at = {
 //        waitFor(30) { clusterSettingsTab.isDisplayed() }
         //      waitFor(30) { serverSettingsTab.isDisplayed() }
     }
+
 
     /*
      *  Return the id of Server with index as input
@@ -147,6 +150,10 @@ class ClusterSettingsPage extends Page {
     String saveMessage = "Changes have been saved."
     boolean foundStatus = false
     int count = 0
+
+    def boolean chooseSelectOption( String choice ) {
+        selectServer.value(choice)
+    }
 
     /*
      *  Create a new Database

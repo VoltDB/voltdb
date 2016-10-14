@@ -131,6 +131,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
+    public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids

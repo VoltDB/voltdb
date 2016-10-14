@@ -47,6 +47,7 @@ import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -54,7 +55,6 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -174,7 +174,7 @@ public class SnapshotSaveAPI
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds);
+                            remoteDataCenterLastIds, finalJsData);
                     createSetupIv2(
                             file_path,
                             pathType,

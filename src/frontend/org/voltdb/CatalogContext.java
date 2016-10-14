@@ -36,11 +36,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-
-import com.google_voltpatches.common.base.Supplier;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -90,14 +90,14 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
-    // cluster settings
-    private final Supplier<ClusterSettings> m_clusterSettings;
+    // database settings. contains both cluster and path settings
+    private final DbSettings m_dbSettings;
 
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
-            Supplier<ClusterSettings> settings,
+            DbSettings settings,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
@@ -146,7 +146,7 @@ public class CatalogContext {
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
 
-        this.m_clusterSettings = settings;
+        this.m_dbSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
@@ -174,7 +174,11 @@ public class CatalogContext {
     }
 
     public ClusterSettings getClusterSettings() {
-        return m_clusterSettings.get();
+        return m_dbSettings.getCluster();
+    }
+
+    public PathSettings getPaths() {
+        return m_dbSettings.getPath();
     }
 
     public CatalogContext update(
@@ -210,7 +214,7 @@ public class CatalogContext {
                     txnId,
                     uniqueId,
                     newCatalog,
-                    this.m_clusterSettings,
+                    this.m_dbSettings,
                     bytes,
                     catalogBytesHash,
                     depbytes,
@@ -309,7 +313,7 @@ public class CatalogContext {
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
-        int hostCount = m_clusterSettings.get().hostcount();
+        int hostCount = m_dbSettings.getCluster().hostcount();
         int sitesPerHost = deployment.getSitesperhost();
         int kFactor = deployment.getKfactor();
         logLines.put("deployment1",

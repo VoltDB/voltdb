@@ -96,6 +96,8 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
@@ -266,6 +268,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * access to internal state via m_systemProcedureContext.
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
+        @Override
+        public ClusterSettings getClusterSettings() {
+            return m_context.getClusterSettings();
+        }
+
+        @Override
+        public PathSettings getPaths() {
+            return m_context.getPaths();
+        }
+
         @Override
         public Database getDatabase() {
             return m_context.database;
