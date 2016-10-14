@@ -232,6 +232,7 @@ public class KafkaLoader {
 
         @Override
         public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
+            if (m_config.maxerrors <= 0) return false;
             if (response != null) {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
