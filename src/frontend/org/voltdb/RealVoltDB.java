@@ -3206,13 +3206,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
 
-        if (m_startMode != null) {
-            m_mode = m_startMode;
-        } else {
-            // Shouldn't be here, but to be safe
-            m_mode = OperationMode.RUNNING;
-        }
-
         if (m_clientInterface != null) {
             m_clientInterface.mayActivateSnapshotDaemon();
             try {
@@ -3417,14 +3410,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_leaderAppointer.onReplayCompletion();
         }
 
-        if (!m_rejoining && !m_joining) {
-            if (m_startMode != null) {
-                m_mode = m_startMode;
-            } else {
-                // Shouldn't be here, but to be safe
-                m_mode = OperationMode.RUNNING;
-            }
+        if (m_startMode != null) {
+            m_mode = m_startMode;
+        } else {
+            // Shouldn't be here, but to be safe
+            m_mode = OperationMode.RUNNING;
+        }
 
+        if (!m_rejoining && !m_joining) {
             if (m_clientInterface != null) {
                 try {
                     m_clientInterface.startAcceptingConnections();
