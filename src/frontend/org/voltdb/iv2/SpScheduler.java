@@ -1157,8 +1157,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_isLeader) {
             TxnEgo ego = advanceTxnEgo();
             long newSpHandle = ego.getTxnId();
-
-            msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle);
+            // this uniqueId is needed as the command log tracks it (uniqueId has to advance)
+            long uniqueId = m_uniqueIdGenerator.getNextUniqueId();
+            msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
 
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, msg);

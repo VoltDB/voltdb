@@ -37,8 +37,8 @@ public class DummyTransactionTaskMessage extends TransactionInfoBaseMessage
         m_isForReplay = false;
     }
 
-    public DummyTransactionTaskMessage (long initiatorHSId, long txnId) {
-        super(initiatorHSId, initiatorHSId, txnId, txnId, true, false);
+    public DummyTransactionTaskMessage (long initiatorHSId, long txnId, long uniqueId) {
+        super(initiatorHSId, initiatorHSId, txnId, uniqueId, true, false);
         m_isReadOnly = true;
         m_isForReplay = false;
         setSpHandle(txnId);
