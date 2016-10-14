@@ -1046,4 +1046,18 @@ public class MaterializedViewProcessor {
         // this is not the optimal index candidate for now
         return false;
     }
+
+    /**
+     * If the argument table is a single-table materialized view,
+     * then return the attendant MaterializedViewInfo object.  Otherwise
+     * return null.
+     */
+    public static MaterializedViewInfo getMaterializedViewInfo(Table tbl) {
+        MaterializedViewInfo mvInfo = null;
+        Table source = tbl.getMaterializer();
+        if (source != null) {
+            mvInfo = source.getViews().get(tbl.getTypeName());
+        }
+        return mvInfo;
+    }
 }

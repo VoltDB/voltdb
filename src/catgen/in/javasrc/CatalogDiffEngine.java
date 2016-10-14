@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
+import org.voltdb.compiler.MaterializedViewProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -80,7 +81,9 @@ public class CatalogDiffEngine {
             return m_errorMessage;
         }
         public final void setErrorMessage(String errorMessage) {
-            m_errorMessage = errorMessage;
+            // The final error message wants a space at the beginning.
+            // Don't ask why.
+            m_errorMessage = " " + errorMessage;
         }
         public final String getObjectName() {
             return m_objectName;
@@ -88,9 +91,11 @@ public class CatalogDiffEngine {
         @Override
         public String toString() {
             StringBuffer sb = new StringBuffer();
-            sb.append(m_objectName != null ? m_objectName : "<<NULL>>")
+            sb.append("{")
+              .append(m_objectName != null ? m_objectName : "<<NULL>>")
               .append(", Names: \"" + String.join(", ", m_tableNames + "\""))
-              .append(", Msg: \"" + m_errorMessage + "\"");
+              .append(", Msg: \"" + m_errorMessage + "\"")
+              .append("}");
             return sb.toString();
         }
         private String m_objectName           = null;
@@ -453,20 +458,32 @@ public class CatalogDiffEngine {
             ) {
                 m_newTablesForExport.add(tbl.getTypeName());
             }
+            String viewName = null;
+            String sourceTableName = null;
             // If this is a materialized view, and it's not safe for non-empty
-            // tables, then we need to note that.  We do this by returning an
-            // empty string.
+            // tables, then we need to note this.  In this conditional, we set
+            // viewName to nonNull if the view has unsafe operations.  Otherwise
+            // we leave it as null.
             if (tbl.getMvhandlerinfo().size() > 0) {
                 MaterializedViewHandlerInfo mvhInfo = tbl.getMvhandlerinfo().get("mvhandlerinfo");
                 if ( mvhInfo != null ) {
                     if ( ! mvhInfo.getIssafewithnonemptysources()) {
-                        // Return an empty string here.  We don't know if this
-                        // is actually allowed or not.  We need more processing
-                        // The see if it's ok with some empty tables.
-                        return "";
+                        // Set viewName, but don't set sourceTableName
+                        // because this is a multi-table view.
+                        viewName = tbl.getTypeName();
                     }
-                    return null;
                 }
+            } else if (tbl.getMaterializer() != null) {
+                MaterializedViewInfo mvInfo = MaterializedViewProcessor.getMaterializedViewInfo(tbl);
+                if (mvInfo != null && ( ! mvInfo.getIssafewithnonemptysources() ) ) {
+                    // Set both names, as this is a single table view.
+                    // We know getMaterializer() will return non-null.
+                    viewName = tbl.getTypeName();
+                    sourceTableName = tbl.getMaterializer().getTypeName();
+                }
+            }
+            if (viewName != null) {
+                return createViewDisallowedMessage(viewName, sourceTableName);
             }
             // Otherwise, support add/drop of the top level object.
             return null;
@@ -561,21 +578,7 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof MaterializedViewInfo && ! m_inStrictMatViewDiffMode) {
-            MaterializedViewInfo mvSuspect = (MaterializedViewInfo)suspect;
-            if (mvSuspect.getIssafewithnonemptysources()) {
-                return null;
-            }
-            return "Materialized views with unsafe operations may only be created on empty source tables.";
-        }
-
-        else if (suspect instanceof MaterializedViewHandlerInfo) {
-            if ( ! m_inStrictMatViewDiffMode) {
-                MaterializedViewHandlerInfo mvSuspect = (MaterializedViewHandlerInfo)suspect;
-                if (mvSuspect.getIssafewithnonemptysources()) {
-                    return null;
-                }
-                return "Materialized views with unsafe operations may only be created on empty source tables.";
-            }
+            return null;
         }
 
         else if (isTableLimitDeleteStmt(suspect)) {
@@ -683,6 +686,14 @@ public class CatalogDiffEngine {
                         return retval;
                     }
                 }
+            } else {
+                MaterializedViewInfo mvInfo = MaterializedViewProcessor.getMaterializedViewInfo(tbl);
+                if (mvInfo != null && ( ! mvInfo.getIssafewithnonemptysources())) {
+                    retval = getMVInfoMessage(tbl, mvInfo);
+                    if (retval != null) {
+                        return retval;
+                    }
+                }
             }
         }
         // If this is a MV, it means we are changing it in some
@@ -691,6 +702,29 @@ public class CatalogDiffEngine {
             return null;
         }
         return null;
+    }
+
+    /**
+     * Return an error message asserting that we cannot create a view
+     * with a given name.
+     *
+     * @param viewName The name of the view we are refusing to create.
+     * @param singleTableName The name of the source table if there is
+     *                        one source table.  If there are multiple
+     *                        tables this should be null.  This only
+     *                        affects the wording of the error message.
+     * @return
+     */
+    private String createViewDisallowedMessage(String viewName, String singleTableName) {
+        return String.format(
+                "Unable to create %sview %s %sbecause it uses unsafe operations.",
+                ((singleTableName != null)
+                        ? "single table "
+                        : "multi-table "),
+                viewName,
+                ((singleTableName == null)
+                        ? ""
+                        : String.format("on table %s ", singleTableName)));
     }
 
     /**
@@ -709,10 +743,7 @@ public class CatalogDiffEngine {
         TablePopulationRequirements retval;
         if ( ! mvh.getIssafewithnonemptysources()) {
             String viewName = mvh.getDesttable().getTypeName();
-            String errorMessage =
-                    String.format(
-                            "Unable to create view %s on multiple non-empty tables because it uses unsafe operations.",
-                            viewName);
+            String errorMessage = createViewDisallowedMessage(viewName, null);
             retval = new TablePopulationRequirements(viewName);
             retval.setErrorMessage(errorMessage);
             for (TableRef tref : mvh.getSourcetables()) {
@@ -723,18 +754,14 @@ public class CatalogDiffEngine {
         return null;
     }
 
-    private TablePopulationRequirements getMVInfoMessage(CatalogType table, MaterializedViewInfo mv) {
+    private TablePopulationRequirements getMVInfoMessage(Table table, MaterializedViewInfo mv) {
         TablePopulationRequirements retval;
         if (! mv.getIssafewithnonemptysources()) {
-            Table srcTable = (Table)table;
+            Table srcTable = table;
 
-            String viewName = mv.getDest().getTypeName();
-            String sourceName = srcTable.getTypeName();
-            String errorMessage =
-                    String.format(
-                            "Unable to create view %s on non-empty table %s because it uses unsafe operations.",
-                            viewName,
-                            sourceName);
+            String viewName = mv.getTypeName();
+            String sourceName = mv.getParent().getTypeName();
+            String errorMessage = createViewDisallowedMessage(viewName, sourceName);
             retval = new TablePopulationRequirements(viewName, sourceName, errorMessage);
             return retval;
         }
@@ -1205,22 +1232,12 @@ public class CatalogDiffEngine {
                 assert (nonEmptyErrorMessage != null);
 
                 TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
-                String existingErrorMessagesForNonEmptyTable = null;
                 if (popreq == null) {
                     popreq = response;
-                    existingErrorMessagesForNonEmptyTable = popreq.getErrorMessage();
-                    assert(existingErrorMessagesForNonEmptyTable != null);
                     m_tablesThatMustBeEmpty.put(objectName, popreq);
-                }
-                if (nonEmptyErrorMessage.length() == 0) {
-                    // the empty string presumes there is already an error for this table
-                    assert (existingErrorMessagesForNonEmptyTable != null);
                 } else {
-                    if (existingErrorMessagesForNonEmptyTable != null) {
-                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
-                    }
-                    // add indentation here so the formatting comes out right for the user #gianthack
-                    popreq.setErrorMessage(" " + nonEmptyErrorMessage);
+                    String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
+                    popreq.setErrorMessage(newErrorMessage);
                 }
             }
         }

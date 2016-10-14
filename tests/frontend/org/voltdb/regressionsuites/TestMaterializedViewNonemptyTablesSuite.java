@@ -41,9 +41,13 @@
  * the License.
  */package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
@@ -51,29 +55,226 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testNothing() throws Exception {
-        assertTrue(true);
+    private void testOperation(Client client, String op, boolean wantSuccess) throws Exception {
+        String sql = String.format("create view mv as select a, count(*), %s from safeTestFull group by a", op);
+        client.callProcedure("@AdHoc", "drop view mv if exists");
+        boolean success = false;
+        try {
+            client.callProcedure("@AdHoc", sql);
+            success = true;
+        } catch (Exception ex) {
+            success = false;
+        }
+        client.callProcedure("@AdHoc", "drop view mv if exists");
+        assertEquals("Unexpected result", wantSuccess, success);
     }
 
-    public void testUnsafeOperators() throws Exception {
+    void testBoolOperation(Client client, String op, boolean wantSuccess) throws Exception {
+    }
+
+    private void testSafeOperation(Client client, String op) throws Exception {
+        testOperation(client, op, true);
+    }
+
+    private void testUnsafeOperation(Client client, String op) throws Exception {
+        testOperation(client, op, false);
+    }
+
+    private void testUnsafeBoolOperation(Client client, String op) throws Exception {
+        testBoolOperation(client, op, false);
+    }
+
+    private void testSafeBoolOperation(Client client, String op) throws Exception {
+        testBoolOperation(client, op, true);
+    }
+
+
+
+    private void populateSafeTables(Client client) throws Exception {
+        client.callProcedure("SAFETESTFULL.insert", 300, "mumble", 301, "marble");
+    }
+    public void testSafeOperations() throws Exception {
+        Client client = getClient();
+        populateSafeTables(client);
+        //
+        // ExpressionType operations.
+        //
+        // Unsafe Operations
+        testUnsafeOperation(client, "MIN(b + b)");
+        testUnsafeOperation(client, "MIN(b - b)");
+        testUnsafeOperation(client, "MIN(b * b)");
+        testUnsafeOperation(client, "MIN(b / b)");
+        testUnsafeOperation(client, "MIN(MOD(b, b))");
+        testUnsafeOperation(client, "MIN(cast(b as integer))");
+        testUnsafeOperation(client, "MIN(APPROX_COUNT_DISTINCT(b))");
+
+        // Unsafe Boolean Operations
+        testUnsafeBoolOperation(client, "bs like 'abc'");
+
+        // Safe Boolean Operations
+        testSafeBoolOperation(client, "b = b");
+        testSafeBoolOperation(client, "b <> b");
+        testSafeBoolOperation(client, "b < b");
+        testSafeBoolOperation(client, "b > b");
+        testSafeBoolOperation(client, "b <= b");
+        testSafeBoolOperation(client, "b >= b");
+        testSafeBoolOperation(client, "b not distinct b");
+        testSafeBoolOperation(client, "(a = b) and (b = a)");
+        testSafeBoolOperation(client, "(a = b) or (b = a)");
+
+        // Safe Operations
+        //
+        testSafeOperation(client, "MIN(100)");
+        testSafeOperation(client, "MAX(b)");
+        testSafeOperation(client, "MIN(b)");
+        /*
+        //
+        // Scalar Functions.
+        //
+        testSafeOperation("MIN()");
+        // */
+    }
+
+    // Note: This is here only to test the actual behavior with
+    //       empty and non-empty tables.
+    public void testTablePopulationBehavior() throws Exception {
         Client client = getClient();
 
+        // In all these tests we test the create view DML operation
+        // on a set of all empty tables, then on a set of some empty
+        // some populated tables, then a set of all empty tables again.
+        // The tables alpha and beta are sometimes populates, and the
+        // table empty is never populated.
+
+        testCreateView(client,
+                       "create view vv1 as select a, count(*), max(b + b) from alpha group by a",
+                       "because it uses unsafe operations");
+        // This should fail if alpha and beta are both populated, as
+        // they are in the second test case.
+        testCreateView(client,
+                       "create view vv2 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
+                       "because it uses unsafe operations");
+        // This should succeed always, since the table empty is always
+        // empty.
+        testCreateView(client,
+                       "create view vv3 as select alpha.a, count(*), max(empty.b + empty.b) from alpha, empty group by alpha.a",
+                       null);
+        testCreateView(client,
+                       "create view vv4 as select a, count(*), max(b) from alpha group by a",
+                       null);
+    }
+
+    static String[] tableNames = new String[] {
+        "alpha",
+        "beta",
+        "empty"
+    };
+    /**
+     * Test to see if we can create a view.  The view name is
+     * necessary because we drop the view after creation.
+     *
+     * @param client The Client object.
+     * @param sql The sql string.  This should start "create view name ",
+     *            where "name" is the view name.
+     * @param expectedDiagnostic The expected diagnostic string.  This
+     *                           should be null if the creation is
+     *                           expected to succeed.
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    private void testCreateView(Client client,
+                                String sql,
+                                String expectedDiagnostic)
+            throws IOException, NoConnectionsException, ProcCallException {
         ClientResponse cr;
-        cr = client.callProcedure("@AdHoc", "create view vv as select a, count(*), max(a+a) from alpha group by a");
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, cr.getStatus());
-        cr = client.callProcedure("ALPHA.insert", 0, 1);
+        assertTrue("sql string should start with \"create view \"",
+                   sql.startsWith("create view "));
+        String tail = sql.substring(12);
+        int pos = tail.indexOf(" ");
+        String viewName = tail.substring(0, pos);
+        // Try to drop the view.  Even if it doesn't
+        // exist, this should succeed.
+        dropView(client, viewName);
+        // Truncate all the tables.
+        truncateTables(client, tableNames);
+        // Now try to create the view with empty tables.
+        // This should always succeed.
+        cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("BETA.insert", 0, 1);
+
+        // Drop the view and populate the tables.
+        dropView(client, viewName);
+        populateTables(client);
+
+        // Try the view creation again.  This may or may
+        // not succeed.
+        boolean success = true;
+        boolean expectedSuccess = (expectedDiagnostic == null);
+        try {
+            cr = client.callProcedure("@AdHoc", sql);
+        } catch (ProcCallException ex) {
+            cr = ex.getClientResponse();
+            success = false;
+        }
+        if (success) {
+            if ( ! expectedSuccess) {
+                fail("Unexpected SQL compilation success");
+            }
+        } else {
+            if ( expectedSuccess ) {
+                fail(String.format("Unexpected SQL compilation failure:\n%s",
+                                   cr.getStatusString()));
+            }
+            assertTrue(String.format("Did not find \"%s\" in diagnostic message \"%s\"",
+                                     expectedDiagnostic,
+                                     cr.getStatusString()),
+                       cr.getStatusString().contains(expectedDiagnostic));
+        }
+        // Drop the view..
+        dropView(client, viewName);
+        truncateTables(client, tableNames);
+        // Try creating the view again.  Sometimes after a
+        // population and then truncation things go awry.
+        // Again, this should always succeed.
+        cr = client.callProcedure("@AdHoc", sql);
+        assertEquals("View creation on empty tables should always succeed.",
+                     ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void populateTables(Client client) throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("ALPHA.insert", 100, 101);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        String msg = cr.getAppStatusString();
-        System.out.printf("Status: %s\n", msg);
+        cr = client.callProcedure("BETA.insert",  200, 201);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // Leave the table EMPTY empty for now.
+    }
+
+    /**
+     * Drop a view, and test that the result is success.
+     * @param client The client.
+     * @param viewName The name of the view.
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    private void dropView(Client client, String viewName)
+            throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("drop view %s if exists;",
+                                                viewName));
+        assertEquals("Should be able to drop a view.",
+                     ClientResponse.SUCCESS,
+                     cr.getStatus());
     }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMaterializedViewNonemptyTablesSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
-
+        project.setUseDDLSchema(true);
         project.addSchema(TestMaterializedViewNonemptyTablesSuite.class.getResource("testmvnonemptytables-ddl.sql"));
 
 
@@ -84,13 +285,14 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER
-        config = new LocalCluster("testMateralizedViewNonemptyTables-cluster.jar", 2, 3, 1,
+        // CLUSTER (Is this necessary?)
+        /*
+        config = new LocalCluster("testMateralizedViewNonemptyTables-cluster.jar", 1, 3, 0,
                BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
-
+        // */
         return builder;
     }
 }
