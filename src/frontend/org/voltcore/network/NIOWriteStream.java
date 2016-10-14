@@ -26,7 +26,6 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.DeferredSerializationIterator;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.SSLDeferredSerializationIterator;
 import org.voltcore.utils.Serializer;
@@ -195,26 +194,25 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void enqueue(final DeferredSerialization ds) {
-        Iterator<DeferredSerialization> dsIter;
-        if (m_isSSLConfigured) {
-            dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
-        } else {
-            dsIter = new DeferredSerializationIterator(ds);
-        }
         synchronized (this) {
             if (m_isShutdown) {
-                while (dsIter.hasNext()) {
-                    dsIter.next().cancel();
-                }
+                ds.cancel();
                 return;
             }
+            Iterator<DeferredSerialization> dsIter = null;
+            if (m_isSSLConfigured) {
+                dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
+            }
             updateLastPendingWriteTimeAndQueueBackpressure();
-            while (dsIter.hasNext()) {
-                m_queuedWrites.offer(dsIter.next());
+            if (m_isSSLConfigured) {
+                while (dsIter.hasNext()) {
+                    m_queuedWrites.offer(dsIter.next());
+                }
+            } else {
+                m_queuedWrites.offer(ds);
             }
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
-        return;
     }
 
     /**
@@ -224,25 +222,32 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        Iterator<DeferredSerialization> dsIter;
         if (m_isSSLConfigured) {
-            dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
-        } else {
-            dsIter = new DeferredSerializationIterator(ds);
-        }
-        final Iterator<DeferredSerialization> finalDsIter = dsIter;
-        m_port.queueTask(new Runnable() {
-            @Override
-            public void run() {
-                synchronized (NIOWriteStream.this) {
-                    updateLastPendingWriteTimeAndQueueBackpressure();
-                    while (finalDsIter.hasNext()) {
-                        m_queuedWrites.offer(finalDsIter.next());
+            m_port.queueTask(new Runnable() {
+                @Override
+                public void run() {
+                    Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
+                    synchronized (NIOWriteStream.this) {
+                        updateLastPendingWriteTimeAndQueueBackpressure();
+                        while (dsIter.hasNext()) {
+                            m_queuedWrites.offer(dsIter.next());
+                        }
+                        m_port.setInterests( SelectionKey.OP_WRITE, 0);
                     }
-                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
                 }
-            }
-        });
+            });
+        } else {
+            m_port.queueTask(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (NIOWriteStream.this) {
+                        updateLastPendingWriteTimeAndQueueBackpressure();
+                        m_queuedWrites.offer(ds);
+                        m_port.setInterests( SelectionKey.OP_WRITE, 0);
+                    }
+                }
+            });
+        }
     }
 
     @Override

@@ -66,11 +66,8 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.DeferredSerializationIterator;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.SSLDeferredSerializationIterator;
-import org.voltcore.utils.Serializer;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -1033,71 +1030,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             return false;
-        }
-    }
-
-    private Iterator<DeferredSerialization> createDSIterator(InitiateResponseMessage response,
-                                                             ClientInterfaceHandleManager cihm,
-                                                             Procedure catProc,
-                                                             SSLEngine sslEngine)
-    {
-        ClientResponseImpl clientResponse = response.getClientResponseData();
-
-        // HACK-O-RIFFIC
-        // For now, figure out if this is a transaction that was ignored
-        // by the ReplaySequencer and just remove the handle from the CIHM
-        // without removing any handles before it which we haven't seen yet.
-        ClientInterfaceHandleManager.Iv2InFlight clientData;
-        if (clientResponse != null &&
-                clientResponse.getStatusString() != null &&
-                clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
-            clientData = cihm.removeHandle(response.getClientInterfaceHandle());
-        } else {
-            clientData = cihm.findHandle(response.getClientInterfaceHandle());
-        }
-        if (clientData == null) {
-            return DeferredSerializationIterator.EMPTY_DEFERRED_SERIALIZATION_ITERATOR;
-        }
-
-        final long now = System.nanoTime();
-        final long delta = now - clientData.m_creationTimeNanos;
-
-        /*
-         * Log initiator stats
-         */
-        cihm.m_acg.logTransactionCompleted(
-                cihm.connection.connectionId(clientData.m_clientHandle),
-                cihm.connection.getHostnameOrIP(clientData.m_clientHandle),
-                clientData.m_procName,
-                delta,
-                clientResponse.getStatus());
-
-        clientResponse.setClientHandle(clientData.m_clientHandle);
-        clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
-        clientResponse.setHash(null); // not part of wire protocol
-        if (sslEngine != null) {
-            return new SSLDeferredSerializationIterator(sslEngine, new ClientResponseSerializer(clientResponse));
-        } else {
-            return new DeferredSerializationIterator(new ClientResponseSerializer(clientResponse));
-        }
-    }
-
-    private static class ClientResponseSerializer implements Serializer {
-
-        private final ClientResponseImpl clientResponse;
-
-        public ClientResponseSerializer(ClientResponseImpl clientResponse) {
-            this.clientResponse = clientResponse;
-        }
-
-        @Override
-        public ByteBuffer serialize() {
-            int serializedSize = clientResponse.getSerializedSize();
-            ByteBuffer buf = ByteBuffer.allocate(serializedSize + 4);
-            buf.putInt(serializedSize);
-            clientResponse.flattenToBuffer(buf);
-            buf.flip();
-            return buf;
         }
     }
 
