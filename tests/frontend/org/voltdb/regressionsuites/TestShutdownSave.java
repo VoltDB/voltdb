@@ -23,12 +23,16 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileReader;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.TestCSVFormatterSuiteBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -37,29 +41,27 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
-public class TestPrepareShutdown extends RegressionSuite
+public class TestShutdownSave extends RegressionSuite
 {
-    public TestPrepareShutdown(String name) {
+    public TestShutdownSave(String name) {
         super(name);
     }
 
-    public void testPrepareShutdown() throws Exception {
-        final Client client2 = this.getClient();
-        for (int i = 0; i < 50; i++) {
-            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);
-        }
+    public void testShutdownSave() throws Exception {
+        if (!MiscUtils.isPro()) return;
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
-        //push import data async
-        String[] myData = new String[5000];
-        for (int i =0; i < 5000; i++) {
-            myData[i] = i + ",1,2,3,4,5,6,7,8,9,10";
+        final Client client2 = this.getClient();
+        for (int i = 0; i < 256; ++i) {
+            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 200);
         }
-        TestCSVFormatterSuiteBase.pushDataAsync(7001, myData);
 
         final Client client = getAdminClient();
         ClientResponse resp = client.callProcedure("@PrepareShutdown");
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
+        long sigil = resp.getResults()[0].asScalarLong();
 
         //test sys proc that is not allowed.
         try {
@@ -97,35 +99,64 @@ public class TestPrepareShutdown extends RegressionSuite
         }
         assertTrue (sum == 0);
 
-        //check import OUTSTANDING_REQUESTS
-       sum = Long.MAX_VALUE;
-        while (sum > 0) {
-            resp = client2.callProcedure("@Statistics", "IMPORTER", 0);
-            assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
-            VoltTable t = resp.getResults()[0];
-            if (t.advanceRow()) {
-                sum = t.getLong(8);
-            }
-            System.out.printf("Outstanding importer transactions: %d\n", sum);
-            Thread.sleep(500);
-        }
-        assertTrue (sum == 0);
         try{
-            client.callProcedure("@Shutdown");
+            client.callProcedure("@Shutdown", sigil);
             fail("@Shutdown fails via admin mode");
         } catch (ProcCallException e) {
+            if (!e.getMessage().contains("Connection to database host")) {
+                throw e;
+            }
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@Shutdown: cluster has been shutdown via admin mode ");
         }
+
+        LocalCluster cluster = (LocalCluster)m_config;
+        cluster.waitForNodesToShutdown();
+
+        for (int i = 0; i < HOST_COUNT; ++i) {
+            File snapDH = getSnapshotPathForHost(cluster, i);
+
+            File terminusFH = new File(snapDH.getParentFile(), VoltDB.TERMINUS_MARKER);
+            assertTrue("("+ i +") terminus file " + terminusFH + " is not accessible",
+                    terminusFH.exists() && terminusFH.isFile() && terminusFH.canRead());
+            String nonce;
+            try (BufferedReader br = new BufferedReader(new FileReader(terminusFH))) {
+                nonce = br.readLine();
+            }
+            assertTrue("(" + i + ") no nonce written to terminus file " + terminusFH,
+                    nonce != null && !nonce.trim().isEmpty());
+
+            File [] finished = snapDH.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File f) {
+                    return    f.isFile()
+                           && f.getName().startsWith(nonce)
+                           && f.getName().endsWith(".finished");
+                }
+            });
+            assertTrue("(" + i + ") snapshot did not finish " + Arrays.asList(finished),
+                    finished.length == 1 && finished[0].exists() && finished[0].isFile());
+
+        }
     }
+
+    static File getSnapshotPathForHost(LocalCluster cluster, int hostId) {
+        if (cluster.isNewCli()) {
+            return new File(cluster.getServerSpecificRoot(Integer.toString(hostId)), "snapshots");
+        } else {
+            List<File> subRoots = cluster.getSubRoots();
+            return new File (subRoots.get(hostId), "/tmp/" + System.getProperty("user.name") + "/snapshots");
+        }
+    }
+    static int HOST_COUNT = 3;
 
     static public junit.framework.Test suite() throws Exception {
 
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestPrepareShutdown.class);
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestShutdownSave.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
 
-        String bundleLocation = System.getProperty("user.dir") + "/bundles";
-        additionalEnv.put("voltdbbundlelocation", bundleLocation);
+        // String bundleLocation = System.getProperty("user.dir") + "/bundles";
+        // additionalEnv.put("voltdbbundlelocation", bundleLocation);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
@@ -133,23 +164,7 @@ public class TestPrepareShutdown extends RegressionSuite
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
 
-        // configure socket importer 1
-        Properties props = buildProperties(
-                "port", "7001",
-                "decode", "true",
-                "procedure", "indexme.insert");
-
-        Properties formatConfig = buildProperties(
-                "nullstring", "test",
-                "separator", ",",
-                "blank", "empty",
-                "escape", "\\",
-                "quotechar", "\"",
-                "nowhitespace", "true");
-
-        project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
-
-        LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
+        LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);

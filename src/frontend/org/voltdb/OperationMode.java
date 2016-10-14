@@ -17,7 +17,7 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.base.Charsets;
+import java.nio.charset.StandardCharsets;
 
 /**
  * All the operational modes VoltDB can be in
@@ -28,7 +28,7 @@ public enum OperationMode {
     private final byte [] bytes;
 
     OperationMode() {
-        bytes = name().getBytes(Charsets.UTF_8);
+        bytes = name().getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -50,6 +50,6 @@ public enum OperationMode {
     }
 
     public static OperationMode valueOf(byte [] bytes) {
-        return valueOf(new String(bytes, Charsets.UTF_8));
+        return valueOf(new String(bytes, StandardCharsets.UTF_8));
     }
 }

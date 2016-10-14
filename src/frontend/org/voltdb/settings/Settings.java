@@ -28,7 +28,7 @@ import java.util.UUID;
 
 import org.aeonbits.owner.Accessible;
 import org.aeonbits.owner.ConfigFactory;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.Digester;
 import org.voltdb.utils.VoltFile;
 
@@ -40,7 +40,7 @@ public interface Settings extends Accessible {
 
     public static void initialize(File voltdbroot) {
         if (ConfigFactory.getProperty(Settings.CONFIG_DIR) == null) try {
-            File confDH = new VoltFile(voltdbroot, VoltDB.CONFIG_DIR).getCanonicalFile();
+            File confDH = new VoltFile(voltdbroot, Constants.CONFIG_DIR).getCanonicalFile();
             ConfigFactory.setProperty(Settings.CONFIG_DIR, confDH.getPath());
         } catch (IOException e) {
             throw new SettingsException("failed to resolve the cluster settings directory", e);
