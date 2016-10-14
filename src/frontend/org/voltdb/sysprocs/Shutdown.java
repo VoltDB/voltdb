@@ -121,6 +121,9 @@ public class Shutdown extends VoltSystemProcedure {
      * @return Never returned, no he never returned...
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx) {
+
+        //block all traffic now
+        VoltDB.instance().setShuttingdown(true);
         SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_shutdownSync;
