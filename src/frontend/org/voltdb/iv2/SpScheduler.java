@@ -185,6 +185,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
+
+        // After SP leader promotion, a DummyTransactionTaskMessage is generated from the new leader.
+        // This READ ONLY message will serve as a synchronization point on all replicas of this
+        // partition, like normal SP write transaction that has to finish executing on all replicas.
+        // In this way, the leader can make sure all replicas have finished replaying
+        // all their repair logs entries.
+        // From now on, the new leader is safe to accept new transactions. See ENG-11110.
+        // Deliver here is to make sure it's the first message on the new leader.
+        deliver(new DummyTransactionTaskMessage());
     }
 
     @Override
