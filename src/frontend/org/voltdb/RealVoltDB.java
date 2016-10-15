@@ -2683,7 +2683,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         synchronized(m_startAndStopLock) {
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
-                //block all traffic other than some Sysprocs which are allowed during shutting down.
+                //block all transactions other than some sysprocs, the same ones allowed in prepare shutting down process
                 setShuttingdown(true);
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
