@@ -129,8 +129,14 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();;
-
+    private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();
+    
+    // Track all new tables.  We use this to know which
+    // tables do not need to be checked for emptiness.
+    // This may be redundant with m_newTablesForExport,
+    // at least in use.  That is to say, we might be able
+    // to keep only one of them.
+    private final SortedSet<String> m_newTables = new TreeSet<>();
     //Track new tables to help determine which export table is new or
     //modified
     private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
@@ -210,25 +216,32 @@ public class CatalogDiffEngine {
     }
 
     public String[] tablesThatMustBeEmpty() {
-        String answer[] = new String[m_tablesThatMustBeEmpty.size()];
-        int idx = 0;
+        ArrayList<String> tableSetNames = new ArrayList<>();
         for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
-            List<String> tableNames = entry.getValue().getTableNames();
-            String tableString = String.join("+", tableNames);
-            answer[idx] = tableString;
-            idx += 1;
+        	// If there are no table names,
+        	// don't add anything.
+        	List<String> tableNames = entry.getValue().getTableNames();
+            if (tableNames.size() > 0) {
+            	String tableString = String.join("+", tableNames);
+            	tableSetNames.add(tableString);
+            }
         }
-        return answer;
+        String answer[] = new String[tableSetNames.size()];
+        return tableSetNames.toArray(answer);
     }
 
     public String[] reasonsWhyTablesMustBeEmpty() {
-        String answer[] = new String[m_tablesThatMustBeEmpty.size()];
-        int idx = 0;
+        ArrayList<String> errorMessages = new ArrayList<>();
         for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
-            answer[idx] = entry.getValue().getErrorMessage();
-            idx += 1;
+        	// If there are no table names,
+        	// don't add anything.
+        	List<String> tableNames = entry.getValue().getTableNames();
+        	if (tableNames.size() > 0) {
+        		errorMessages.add(entry.getValue().getErrorMessage());
+        	}
         }
-        return answer;
+        String answer[] = new String[errorMessages.size()];
+        return errorMessages.toArray(answer);
     }
 
     public boolean worksWithElastic() {
@@ -453,10 +466,14 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             Table tbl = (Table)suspect;
-            if (   ChangeType.ADDITION == changeType
-                && CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)
-            ) {
-                m_newTablesForExport.add(tbl.getTypeName());
+            String tableName = tbl.getTypeName();
+            if (   ChangeType.ADDITION == changeType ) {
+            	// Remember the name of the new table.
+            	m_newTables.add(tableName);
+            	if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+            		// Remember that it's a new export table.
+            		m_newTablesForExport.add(tbl.getTypeName());
+            	}
             }
             String viewName = null;
             String sourceTableName = null;
@@ -747,7 +764,10 @@ public class CatalogDiffEngine {
             retval = new TablePopulationRequirements(viewName);
             retval.setErrorMessage(errorMessage);
             for (TableRef tref : mvh.getSourcetables()) {
-                retval.addTableName(tref.getTable().getTypeName());
+            	String tableName = tref.getTable().getTypeName();
+            	if ( ! m_newTables.contains(tableName)) {
+            		retval.addTableName(tableName);
+            	}
             }
             return retval;
         }
@@ -757,12 +777,14 @@ public class CatalogDiffEngine {
     private TablePopulationRequirements getMVInfoMessage(Table table, MaterializedViewInfo mv) {
         TablePopulationRequirements retval;
         if (! mv.getIssafewithnonemptysources()) {
-            Table srcTable = table;
-
             String viewName = mv.getTypeName();
             String sourceName = mv.getParent().getTypeName();
             String errorMessage = createViewDisallowedMessage(viewName, sourceName);
-            retval = new TablePopulationRequirements(viewName, sourceName, errorMessage);
+            retval = new TablePopulationRequirements(viewName);
+            retval.setErrorMessage(errorMessage);
+            if ( ! m_newTables.contains(sourceName)) {
+            	retval.addTableName(sourceName);
+            }
             return retval;
         }
         return null;
@@ -1025,6 +1047,12 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * Check if a modification operation can be done on a
+     * table if the table is empty.  Return an error message
+     * if it's possible on empty tables, and null if it's
+     * completely impossible.  There is another method for
+     * additions and deletions.  This is just for modifications.
+     * 
      * @return null if the change is not possible under any circumstances.
      * Return a {@link java.util.List} of string arrays if it is possible if the table is empty.
      * The list may be empty, otherwise each string array contains exactly two strings.
@@ -1227,7 +1255,6 @@ public class CatalogDiffEngine {
             for (TablePopulationRequirements response : responseList) {
                 String objectName = response.getObjectName();
                 List<String> tableNames = response.getTableNames();
-                assert (tableNames != null && tableNames.size() > 0);
                 String nonEmptyErrorMessage = response.getErrorMessage();
                 assert (nonEmptyErrorMessage != null);
 
