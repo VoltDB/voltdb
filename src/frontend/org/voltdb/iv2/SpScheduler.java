@@ -163,6 +163,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
     // the truncation handle last sent to the replicas
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
+    // the max schedule transaction sphandle, multi-fragments mp txn counts one
+    long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -474,9 +476,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
             } else {
                 /*
@@ -489,8 +493,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
                         0,
                         m_uniqueIdGenerator.partitionId);
-                //Don't think it wise to make a new one for a short circuit read
-                newSpHandle = getMaxTaskedSpHandle();
+
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             // Need to set the SP handle on the received message
@@ -809,8 +813,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+
+                if (m_outstandingTxns.get(msg.getTxnId()) == null) {
+                    updateMaxScheduledTransactionSpHandle(newSpHandle);
+                }
+
             } else {
-                newSpHandle = getMaxTaskedSpHandle();
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             msg.setSpHandle(newSpHandle);
@@ -1166,6 +1175,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_isLeader) {
             TxnEgo ego = advanceTxnEgo();
             long newSpHandle = ego.getTxnId();
+            updateMaxScheduledTransactionSpHandle(newSpHandle);
             // this uniqueId is needed as the command log tracks it (uniqueId has to advance)
             long uniqueId = m_uniqueIdGenerator.getNextUniqueId();
             msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
@@ -1336,6 +1346,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
             m_bufferedReadLog = new BufferedReadLog();
         }
+    }
+
+    private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
+        m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
     }
 
     private long getRepairLogTruncationHandleForReplicas()
