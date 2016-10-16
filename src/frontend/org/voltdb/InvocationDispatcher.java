@@ -507,6 +507,12 @@ public final class InvocationDispatcher {
 
     private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
         final VoltDBInterface voltdb = VoltDB.instance();
+
+        //block transactions while shutting down
+        if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
+            return false;
+        }
+
         //@Statistics and  @Shutdown are allowed in pause/shutdown mode
         if (voltdb.isShuttingdown()) {
             return procedure.getAllowedinshutdown();
