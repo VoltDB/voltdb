@@ -25,7 +25,6 @@ import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -36,10 +35,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
@@ -49,6 +50,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -487,25 +489,21 @@ public class Inits {
             int httpPort = httpPortStart;
             SslType sslType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
                     m_deployment.getHttpd().getSsl() : null;
-
-            if (sslType != null) {
+            SslContextFactory sslContextFactory = null;
+            if (sslType != null && sslType.isEnabled()) {
                 try {
-                    KeyStore ks = KeyStore.getInstance("JKS");
-                    ks.load(new FileInputStream(sslType.getKeystore().getPath()), sslType.getKeystore().getPassword().toCharArray());
-                    KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-                    kmf.init(ks, sslType.getKeystore().getPassword().toCharArray());
-                    m_config.m_sslContext = SSLContext.getInstance("TLS");
-                    m_config.m_sslContext.init(createKeyManagers(sslType.getKeystore().getPath(), sslType.getKeystore().getPassword(), sslType.getKeystore().getPassword()),
-                            createTrustManagers(sslType.getTruststore().getPath(), sslType.getTruststore().getPassword()), new SecureRandom());
+                    sslContextFactory = getSSLContextFactory(sslType);
+                    sslContextFactory.start();
+                    m_config.m_sslContext = sslContextFactory.getSslContext();
                 } catch (Exception e) {
-                    hostLog.fatal("SSL configuration failed for keystore " + sslType.getKeystore().getPath() + " and truststore " + sslType.getTruststore().getPath() + ". Exiting.", e);
-                    System.exit(-1);                }
+                    hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
+                }
             }
 
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, sslType, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, sslContextFactory, mustListen
                             );
                     success = true;
                     break;
@@ -534,6 +532,49 @@ public class Inits {
                 return;
             }
             m_config.m_httpPort = httpPort;
+        }
+
+        private SslContextFactory getSSLContextFactory(SslType sslType) {
+            SslContextFactory sslContextFactory = new SslContextFactory();
+            String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path", true);
+            sslContextFactory.setKeyStorePath(value);
+            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true);
+            sslContextFactory.setKeyStorePassword(keyStorePassword);
+            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
+            if (value!=null) {
+                sslContextFactory.setTrustStorePath(value);
+            }
+            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
+            if (value!=null) {
+                sslContextFactory.setTrustStorePassword(value);
+            }
+            // exclude weak ciphers
+            sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                    "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+            sslContextFactory.setKeyManagerPassword(keyStorePassword);
+            return sslContextFactory;
+        }
+
+        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
+            String sysProp = System.getProperty(sysPropName);
+            if (StringUtils.isNotBlank(sysProp)) {
+                return sysProp.trim();
+            } else {
+                String value = null;
+                if (store!=null) {
+                    value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+                }
+                if (StringUtils.isBlank(value) && throwForNull) {
+                    throw new IllegalArgumentException(
+                            "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+                } else {
+                    return value;
+                }
+            }
         }
 
         @Override

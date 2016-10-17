@@ -927,7 +927,7 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, SslType sslType, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, int port, SslContextFactory sslContextFactory, boolean mustListen) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
@@ -961,7 +961,7 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (sslType ==null || !sslType.isEnabled()) { // basic HTTP
+            if (sslContextFactory == null) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
                 connector = new ServerConnector(m_server);
@@ -975,7 +975,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
-                m_server.addConnector(getSSLServerConnector(sslType, intf, port));
+                m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
@@ -1031,49 +1031,8 @@ public class HTTPAdminListener {
         }
     }
 
-    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
-        String sysProp = System.getProperty(sysPropName);
-        if (StringUtils.isNotBlank(sysProp)) {
-            return sysProp.trim();
-        } else {
-            String value = null;
-            if (store!=null) {
-                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-            }
-            if (StringUtils.isBlank(value) && throwForNull) {
-                    throw new IllegalArgumentException(
-                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
-            } else {
-                return value;
-            }
-        }
-    }
-
-    private ServerConnector getSSLServerConnector(SslType sslType, String intf, int port)
+    private ServerConnector getSSLServerConnector(SslContextFactory sslContextFactory, String intf, int port)
         throws IOException {
-        SslContextFactory sslContextFactory = new SslContextFactory();
-        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path", true);
-        sslContextFactory.setKeyStorePath(value);
-        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true));
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
-        if (value!=null) {
-            sslContextFactory.setTrustStorePath(value);
-        }
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
-        if (value!=null) {
-            sslContextFactory.setTrustStorePassword(value);
-        }
-        // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
-                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
-        /* More configurable things that we are not using for now.
-        sslContextFactory.setKeyManagerPassword("password");
-                */
-
         // SSL HTTP Configuration
         HttpConfiguration httpsConfig = new HttpConfiguration();
         httpsConfig.setSecureScheme("ssl");
