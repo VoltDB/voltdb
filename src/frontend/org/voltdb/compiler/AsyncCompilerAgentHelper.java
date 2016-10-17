@@ -240,8 +240,11 @@ public class AsyncCompilerAgentHelper
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
             retval.diffCommandsLength = commands.length();
-            retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();
-            retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
+            String emptyTablesAndReasons[][] = diff.tablesThatMustBeEmpty();
+            assert(emptyTablesAndReasons.length == 2);
+            assert(emptyTablesAndReasons[0].length == emptyTablesAndReasons[1].length);
+            retval.tablesThatMustBeEmpty = emptyTablesAndReasons[0];
+            retval.reasonsForEmptyTables = emptyTablesAndReasons[1];
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
         }

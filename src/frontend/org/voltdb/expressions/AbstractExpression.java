@@ -1369,4 +1369,54 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
+    /**
+     * Little objects of this class keep track of operators
+     * which can make an expression unsafe for use in creating
+     * materialized views on non-empty tables.
+     */
+    public static class UnsafeMVOperators {
+        public final void add(String opName) {
+            m_oplist.append(m_sep)
+                    .append(opName);
+            m_sep = ", ";
+            m_isUnsafe = true;
+        }
+        @Override
+        public String toString() {
+            return m_oplist.toString();
+        }
+        public final boolean isUnsafe() {
+            return m_isUnsafe;
+        }
+        private       String       m_sep      = "";
+        private final StringBuffer m_oplist   = new StringBuffer();
+        private boolean            m_isUnsafe = false;
+    };
+    /**
+     * Returns true iff this expression is allowable when creating
+     * materialized views on nonempty tables.  We have marked all
+     * the ExpressionType enumerals and all the function id integers
+     * which are safe.  These are marked statically.  So we just
+     * recurse through the tree, looking at operation types and
+     * function types until we find something we don't like.  If
+     * we get all the way through the search we are happy, and
+     * return true.
+     */
+    public void isNonemptyMVSafe(UnsafeMVOperators ops) {
+        if ( ! m_type.isMVSafe()) {
+            ops.add(m_type.symbol());
+        }
+        if (m_left != null) {
+            m_left.isNonemptyMVSafe(ops);
+        }
+        if (m_right != null) {
+            m_right.isNonemptyMVSafe(ops);
+        }
+        if (m_args != null) {
+            for (AbstractExpression arg : m_args) {
+                arg.isNonemptyMVSafe(ops);
+            }
+        }
+    }
 }

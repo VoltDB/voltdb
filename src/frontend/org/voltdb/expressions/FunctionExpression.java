@@ -52,7 +52,7 @@ public class FunctionExpression extends AbstractExpression {
 
     /// An optional implied keyword argument, always upper case,
     /// normally null -- except for functions that had an initial keyword
-    /// argumment which got optimized out of its argument list prior to export
+    /// argument which got optimized out of its argument list prior to export
     /// from the HSQL front-end.
     /// For example:
     /// SQL invocation  |  m_impliedArgument
@@ -377,4 +377,8 @@ public class FunctionExpression extends AbstractExpression {
         return true;
     }
 
+    @Override
+    public void isNonemptyMVSafe(UnsafeMVOperators ops) {
+        ops.add(explain("TABLE"));
+    }
 }
