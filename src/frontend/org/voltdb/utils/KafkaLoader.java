@@ -17,6 +17,9 @@
 package org.voltdb.utils;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -106,7 +109,7 @@ public class KafkaLoader {
             m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_config.table, m_config.batch, m_config.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_config.flush, m_config.flush);
-        m_consumer = new KafkaConsumerConnector(m_config.zookeeper, m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
+        m_consumer = new KafkaConsumerConnector(m_config);
         try {
             m_es = getConsumerExecutor(m_config, m_consumer, m_loader);
             if (m_config.useSuppliedProcedure) {
@@ -158,6 +161,8 @@ public class KafkaLoader {
         int flush = 10;
         @Option(shortOpt = "k", desc = "Kafka Topic Partitions. (default: 10)")
         int kpartitions = 10;
+        @Option(shortOpt = "c", desc = "Kafka Consumer Configuration File")
+        String config = "";
 
         /**
          * Batch size for processing batched operations.
@@ -263,20 +268,26 @@ public class KafkaLoader {
 
         final ConsumerConfig m_consumerConfig;
         final ConsumerConnector m_consumer;
+        final KafkaConfig m_config;
 
-        public KafkaConsumerConnector(String zk, String groupName) {
+        public KafkaConsumerConnector(KafkaConfig config) throws IOException {
+            m_config = config;
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
-            String groupId = "voltdb-" + groupName;
+            String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
             //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
-            props.put("zookeeper.connect", zk);
+            if (m_config.config.length() > 0) {
+                props.load(new FileInputStream(new File(m_config.config)));
+            } else {
+                props.put("zookeeper.session.timeout.ms", "400");
+                props.put("zookeeper.sync.time.ms", "200");
+                props.put("auto.commit.interval.ms", "1000");
+                props.put("auto.commit.enable", "true");
+                props.put("auto.offset.reset", "smallest");
+                props.put("rebalance.backoff.ms", "10000");
+            }
             props.put("group.id", groupId);
-            props.put("zookeeper.session.timeout.ms", "400");
-            props.put("zookeeper.sync.time.ms", "200");
-            props.put("auto.commit.interval.ms", "1000");
-            props.put("auto.commit.enable", "true");
-            props.put("auto.offset.reset", "smallest");
-            props.put("rebalance.backoff.ms", "10000");
+            props.put("zookeeper.connect", m_config.zookeeper);
 
             m_consumerConfig = new ConsumerConfig(props);
 
