@@ -42,7 +42,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
     int numberOfTrials = 5
     // No setup() needed: SqlQueriesTestBase.setup gets called before each test (automatically)
 
-
     // SQL queries test for admin-client port
     def checkSqlqueryClientToAdminPortSwitchingForCancelPopup() {
         when: 'click the SQL Query link (if needed)'
@@ -56,7 +55,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.setQueryText(checkQuery)
         then: 'run the query'
         page.runQuery()
-
+        report "runCreateQuery"
         try {
             waitFor(10) {
                 page.cancelpopupquery.isDisplayed()
@@ -76,7 +75,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.openAdminPage()
         then: 'should be on Admin page'
         at AdminPage
-
+        report "atAdminPage"
         try {
             waitFor(10) {
                 page.networkInterfaces.clusterClientPortValue.isDisplayed()
@@ -86,7 +85,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
             waitFor(10) { cluster.pauseok.isDisplayed() }
             cluster.pauseok.click()
             println("Pause button displayed and clicked!!")
-
         } catch (geb.error.RequiredPageContentNotPresent e) {
             println("Already in pause state!! in admin page.")
         } catch (geb.waiting.WaitTimeoutException e) {
@@ -120,12 +118,12 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         } catch (geb.waiting.WaitTimeoutException e) {
             println("waiting time exceed here")
         }
-
+        report "runcreate"
         when: 'set select query in the box'
         page.setQueryText("SELECT * FROM " + tablename)
         then: 'run the query'
         page.runQuery()
-        report 'checking'
+        report 'runselect'
         waitFor(5) {
             page.cancelpopupquery.isDisplayed()
             page.okpopupquery.isDisplayed()
@@ -245,7 +243,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.openAdminPage()
         then: 'should be on Admin page'
         at AdminPage
-        report "admin"
+
         // Checking if the resume button is displayed
         // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
         try {
