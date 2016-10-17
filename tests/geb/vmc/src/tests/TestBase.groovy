@@ -89,10 +89,17 @@ class TestBase extends GebReportingSpec {
         }
 
         // Confirm that the 'DB Monitor' page opens initially, the first time
-        // (this is used by NavigatePagesTest)
+        // (this is used by NavigatePagesBasicTest)
         if (doesDBMonitorPageOpenFirst == null) {
             doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
             debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
+            if (!doesDBMonitorPageOpenFirst) {
+                debugPrint 'Page: ' + page.toString()
+                debugPrint '  is DbMonitor : ' + page.isDbMonitorPageOpen()
+                debugPrint '  is isAdmin   : ' + page.isAdminPageOpen()
+                debugPrint '  is isSchema  : ' + page.isSchemaPageOpen()
+                debugPrint '  is isSqlQuery: ' + page.isSqlQueryPageOpen()
+            }
         }
     }
 
