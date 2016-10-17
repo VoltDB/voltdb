@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -40,6 +38,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestCatalogDiffs extends TestCase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
@@ -109,7 +109,7 @@ public class TestCatalogDiffs extends TestCase {
         System.out.println(commands);
         catOriginal.execute(commands);
         assertTrue(diff.supported());
-        assertEquals(0, diff.tablesThatMustBeEmpty().length);
+        assertEquals(0, diff.tablesThatMustBeEmpty()[0].length);
         if (expectSnapshotIsolation != null) {
             assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
         }
@@ -153,7 +153,7 @@ public class TestCatalogDiffs extends TestCase {
         catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());
-        assertTrue(diff.tablesThatMustBeEmpty().length > 0);
+        assertTrue(diff.tablesThatMustBeEmpty()[0].length > 0);
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
     }
 

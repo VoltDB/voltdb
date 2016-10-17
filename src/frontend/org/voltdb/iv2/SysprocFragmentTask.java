@@ -168,7 +168,7 @@ public class SysprocFragmentTask extends TransactionTask
 
 
     // Extracted the sysproc portion of ExecutionSite processFragmentTask(), then
-    // modifed to work in the new world
+    // modified to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
         final FragmentResponseMessage currentFragResponse =
