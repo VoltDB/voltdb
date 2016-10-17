@@ -11,9 +11,13 @@
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
         <string>org.voltcore.network</string>
         <string>org.voltdb.importer</string>
+        <string>org.voltdb.client</string>
+        <string>org.voltdb.importer.formatter</string>
         <string>org.apache.log4j</string>
         <string>org.slf4j</string>
+        <string>jsr166y</string>
         <string>org.voltcore.utils</string>
+        <string>org.voltcore.logging</string>
         <string>com.google_voltpatches.common.base</string>
         <string>com.google_voltpatches.common.collect</string>
         <string>com.google_voltpatches.common.net</string>
@@ -76,7 +80,7 @@
                 <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.voltdb.client,org.slf4j" />
+                <attribute name="Import-Package" value="${default.imports}"/>
             </manifest>
         </jar>
     </target>
