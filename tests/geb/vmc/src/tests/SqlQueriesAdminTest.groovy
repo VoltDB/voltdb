@@ -160,29 +160,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         // }
         println("all popup for query verified for deleting data from table!!")
 
-        report "cancel"
-
-        // Go to admin page and resume
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
-        report "admin"
-        // Checking if the resume button is displayed
-        // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
-        try {
-            waitFor(waitTime) {
-                page.networkInterfaces.clusterClientPortValue.isDisplayed()
-                cluster.resumebutton.click()
-                cluster.resumeok.click()
-            }
-            println("Resume okay")
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Already in resume state!!")
-        } catch (geb.waiting.WaitTimeoutException e) {
-            println("rechecking due to geb waiting exception")
-        }
-
         report "ended"
     }
 
@@ -258,27 +235,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-
-        // Go to admin page and resume
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
-        report "admin"
-        // Checking if the resume button is displayed
-        // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
-        try {
-            waitFor(waitTime) {
-                page.networkInterfaces.clusterClientPortValue.isDisplayed()
-                cluster.resumebutton.click()
-                cluster.resumeok.click()
-            }
-            println("Resume okay")
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Already in resume state!!")
-        } catch (geb.waiting.WaitTimeoutException e) {
-            println("rechecking due to geb waiting exception")
-        }
 
         report "ended"
     }
