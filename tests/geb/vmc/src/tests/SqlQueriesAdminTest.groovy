@@ -119,44 +119,44 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
             println("waiting time exceed here")
         }
         report "runcreate"
-        when: 'set select query in the box'
-        page.setQueryText("SELECT * FROM " + tablename)
-        then: 'run the query'
-        page.runQuery()
-        report 'runselect'
-        waitFor(waitTime) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            //page.switchadminport.isDisplayed()
-            //page.queryexecutionerror.isDisplayed()
-            //page.queryerrortxt.isDisplayed()
-        }
-        page.cancelpopupquery.click()
-        println("all popup query verified for selecting data from table!!")
-
-        when: 'set delete query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-        waitFor(waitTime) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            //page.switchadminport.isDisplayed()
-            //page.queryexecutionerror.isDisplayed()
-            //page.queryerrortxt.isDisplayed()
-        }
-        //for(count=0; count<numberOfTrials; count++) {
-        try {
-            page.cancelpopupquery.click()
-            waitFor(waitTime) { !page.cancelpopupquery.isDisplayed() }
-            println("Cancelled")
-            report "inside"
-            //break
-        } catch (geb.waiting.WaitTimeoutException exception) {
-            println("Waiting for popup to close")
-        }
-        // }
-        println("all popup for query verified for deleting data from table!!")
+//        when: 'set select query in the box'
+//        page.setQueryText("SELECT * FROM " + tablename)
+//        then: 'run the query'
+//        page.runQuery()
+//        report 'runselect'
+//        waitFor(waitTime) {
+//            page.cancelpopupquery.isDisplayed()
+//            page.okpopupquery.isDisplayed()
+//            //page.switchadminport.isDisplayed()
+//            //page.queryexecutionerror.isDisplayed()
+//            //page.queryerrortxt.isDisplayed()
+//        }
+//        page.cancelpopupquery.click()
+//        println("all popup query verified for selecting data from table!!")
+//
+//        when: 'set delete query in the box'
+//        page.setQueryText(deleteQuery)
+//        then: 'run the query'
+//        page.runQuery()
+//        waitFor(waitTime) {
+//            page.cancelpopupquery.isDisplayed()
+//            page.okpopupquery.isDisplayed()
+//            //page.switchadminport.isDisplayed()
+//            //page.queryexecutionerror.isDisplayed()
+//            //page.queryerrortxt.isDisplayed()
+//        }
+//        //for(count=0; count<numberOfTrials; count++) {
+//        try {
+//            page.cancelpopupquery.click()
+//            waitFor(waitTime) { !page.cancelpopupquery.isDisplayed() }
+//            println("Cancelled")
+//            report "inside"
+//            //break
+//        } catch (geb.waiting.WaitTimeoutException exception) {
+//            println("Waiting for popup to close")
+//        }
+//        // }
+//        println("all popup for query verified for deleting data from table!!")
 
         report "ended"
     }
