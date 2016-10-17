@@ -61,6 +61,8 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
 
+import javax.net.ssl.SSLContext;
+
 /**
  * VoltDB provides main() for the VoltDB server
  */
@@ -170,6 +172,9 @@ public class VoltDB {
         /** override for the admin port number in the deployment file */
         public int m_adminPort = DISABLED_PORT;
         public String m_adminInterface = "";
+
+        /** ssl context for client and admin ports */
+        public SSLContext m_sslContext = null;
 
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;

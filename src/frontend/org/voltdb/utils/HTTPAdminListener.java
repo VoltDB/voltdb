@@ -81,7 +81,7 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
-import org.voltdb.compiler.deploymentfile.HttpsType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -927,7 +927,7 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, int port, SslType sslType, boolean mustListen) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
@@ -961,7 +961,7 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+            if (sslType ==null || !sslType.isEnabled()) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
                 connector = new ServerConnector(m_server);
@@ -975,7 +975,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
-                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
+                m_server.addConnector(getSSLServerConnector(sslType, intf, port));
             }
 
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
@@ -1049,17 +1049,17 @@ public class HTTPAdminListener {
         }
     }
 
-    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
+    private ServerConnector getSSLServerConnector(SslType sslType, String intf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
-        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
+        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path", true);
         sslContextFactory.setKeyStorePath(value);
-        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeystore(), "password", true));
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTruststore(), "path", false);
+        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true));
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
         if (value!=null) {
             sslContextFactory.setTrustStorePath(value);
         }
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTruststore(), "password", false);
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
         if (value!=null) {
             sslContextFactory.setTrustStorePassword(value);
         }
@@ -1076,9 +1076,9 @@ public class HTTPAdminListener {
 
         // SSL HTTP Configuration
         HttpConfiguration httpsConfig = new HttpConfiguration();
-        httpsConfig.setSecureScheme("https");
+        httpsConfig.setSecureScheme("ssl");
         httpsConfig.setSecurePort(port);
-        //Add this customizer to indicate we are in https land
+        //Add this customizer to indicate we are in ssl land
         httpsConfig.addCustomizer(new SecureRequestCustomizer());
         HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
 

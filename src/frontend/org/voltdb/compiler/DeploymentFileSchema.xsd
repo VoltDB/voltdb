@@ -315,14 +315,14 @@
           <xs:attribute name="enabled" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
-      <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
+      <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
     </xs:sequence>
     <xs:attribute name="port" type="xs:int"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- configuration for HTTPS -->
-  <xs:complexType name="httpsType">
+  <xs:complexType name="sslType">
     <xs:sequence>
       <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
       <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>

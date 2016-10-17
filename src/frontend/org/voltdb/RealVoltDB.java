@@ -36,8 +36,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -163,13 +161,6 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1062,19 +1053,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
-            SSLContext sslContext;
-            try {
-                KeyStore ks = KeyStore.getInstance("JKS");
-                ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
-                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-                kmf.init(ks, "myk5yst15r5".toCharArray());
-                sslContext = SSLContext.getInstance("TLS");            sslContext.init(createKeyManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5", "myk5yst15r5"),
-                        createTrustManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5"), new SecureRandom());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
-                return;
-            }
-
             // Create the client interface
             try {
                 InetAddress clientIntf = null;
@@ -1099,7 +1077,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         adminIntf,
                         config.m_adminPort,
                         m_config.m_timestampTestingSalt,
-                        sslContext);
+                        m_config.m_sslContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -3909,52 +3887,5 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
-    }
-
-    /**
-     * Creates the key managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-     *
-     * @param filepath - the path to the JKS keystore.
-     * @param keystorePassword - the keystore's password.
-     * @param keyPassword - the key's passsword.
-     * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
-     * @throws Exception
-     */
-    protected KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
-        KeyStore keyStore = KeyStore.getInstance("JKS");
-        InputStream keyStoreIS = new FileInputStream(filepath);
-        try {
-            keyStore.load(keyStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (keyStoreIS != null) {
-                keyStoreIS.close();
-            }
-        }
-        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(keyStore, keyPassword.toCharArray());
-        return kmf.getKeyManagers();
-    }
-
-    /**
-     * Creates the trust managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-     *
-     * @param filepath - the path to the JKS keystore.
-     * @param keystorePassword - the keystore's password.
-     * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
-     * @throws Exception
-     */
-    protected TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
-        KeyStore trustStore = KeyStore.getInstance("JKS");
-        InputStream trustStoreIS = new FileInputStream(filepath);
-        try {
-            trustStore.load(trustStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (trustStoreIS != null) {
-                trustStoreIS.close();
-            }
-        }
-        TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        trustFactory.init(trustStore);
-        return trustFactory.getTrustManagers();
     }
 }

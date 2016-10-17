@@ -58,7 +58,7 @@ import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
-import org.voltdb.compiler.deploymentfile.HttpsType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
@@ -1135,21 +1135,21 @@ public class VoltProjectBuilder {
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
         if (m_httpsEnabled) {
-            HttpsType httpsType = factory.createHttpsType();
-            httpsType.setEnabled(m_httpsEnabled);
+            SslType sslType = factory.createSslType();
+            sslType.setEnabled(m_httpsEnabled);
             if (m_keystore!=null) {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_keystore);
                 store.setPassword(m_keystorePassword);
-                httpsType.setKeystore(store);
+                sslType.setKeystore(store);
             }
             if (m_certstore!=null) {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_certstore);
                 store.setPassword(m_certstorePassword);
-                httpsType.setTruststore(store);
+                sslType.setTruststore(store);
             }
-            httpd.setHttps(httpsType);
+            httpd.setSsl(sslType);
         }
 
         // <export>

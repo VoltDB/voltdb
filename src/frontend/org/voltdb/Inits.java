@@ -24,6 +24,8 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,7 +49,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.HttpsType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -59,6 +61,12 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -477,18 +485,33 @@ public class Inits {
 
             boolean success = false;
             int httpPort = httpPortStart;
-            HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
-                    m_deployment.getHttpd().getHttps() : null;
+            SslType sslType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
+                    m_deployment.getHttpd().getSsl() : null;
+
+            if (sslType != null) {
+                try {
+                    KeyStore ks = KeyStore.getInstance("JKS");
+                    ks.load(new FileInputStream(sslType.getKeystore().getPath()), sslType.getKeystore().getPassword().toCharArray());
+                    KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+                    kmf.init(ks, sslType.getKeystore().getPassword().toCharArray());
+                    m_config.m_sslContext = SSLContext.getInstance("TLS");
+                    m_config.m_sslContext.init(createKeyManagers(sslType.getKeystore().getPath(), sslType.getKeystore().getPassword(), sslType.getKeystore().getPassword()),
+                            createTrustManagers(sslType.getTruststore().getPath(), sslType.getTruststore().getPassword()), new SecureRandom());
+                } catch (Exception e) {
+                    hostLog.fatal("SSL configuration failed for keystore " + sslType.getKeystore().getPath() + " and truststore " + sslType.getTruststore().getPath() + ". Exiting.", e);
+                    System.exit(-1);                }
+            }
+
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, sslType, mustListen
                             );
                     success = true;
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        if (httpsType != null && httpsType.isEnabled()) {
+                        if (sslType != null && sslType.isEnabled()) {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
                         } else {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
@@ -521,7 +544,7 @@ public class Inits {
             m_rvdb.m_jsonEnabled = false;
             boolean httpsEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                if (m_deployment.getHttpd().getHttps()!=null && m_deployment.getHttpd().getHttps().isEnabled()) {
+                if (m_deployment.getHttpd().getSsl()!=null && m_deployment.getHttpd().getSsl().isEnabled()) {
                     httpsEnabled = true;
                 }
                 httpPort = (m_deployment.getHttpd().getPort()==null) ?
@@ -545,6 +568,54 @@ public class Inits {
                 }
                 setupHttpServer("", httpPort, false, true);
             }
+        }
+
+
+        /**
+         * Creates the key managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
+         *
+         * @param filepath - the path to the JKS keystore.
+         * @param keystorePassword - the keystore's password.
+         * @param keyPassword - the key's passsword.
+         * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
+         * @throws Exception
+         */
+        private KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            InputStream keyStoreIS = new FileInputStream(filepath);
+            try {
+                keyStore.load(keyStoreIS, keystorePassword.toCharArray());
+            } finally {
+                if (keyStoreIS != null) {
+                    keyStoreIS.close();
+                }
+            }
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(keyStore, keyPassword.toCharArray());
+            return kmf.getKeyManagers();
+        }
+
+        /**
+         * Creates the trust managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
+         *
+         * @param filepath - the path to the JKS keystore.
+         * @param keystorePassword - the keystore's password.
+         * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
+         * @throws Exception
+         */
+        private TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            InputStream trustStoreIS = new FileInputStream(filepath);
+            try {
+                trustStore.load(trustStoreIS, keystorePassword.toCharArray());
+            } finally {
+                if (trustStoreIS != null) {
+                    trustStoreIS.close();
+                }
+            }
+            TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustFactory.init(trustStore);
+            return trustFactory.getTrustManagers();
         }
     }
 

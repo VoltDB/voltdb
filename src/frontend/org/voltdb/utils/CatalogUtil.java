@@ -1944,7 +1944,7 @@ public abstract class CatalogUtil {
 
         // set the catalog info
         int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
-        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+        if (httpd.getSsl()!=null && httpd.getSsl().isEnabled()) {
             defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
         }
         cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
