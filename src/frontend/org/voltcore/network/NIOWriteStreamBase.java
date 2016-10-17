@@ -105,8 +105,8 @@ public abstract class NIOWriteStreamBase {
         while ((ds = oldlist.poll()) != null) {
             processedWrites++;
             BBContainer outCont = m_queuedBuffers.peekLast();
-            ByteBuffer outbuf;
-            if (outCont == null || outCont.b().remaining() < 4) {
+            ByteBuffer outbuf = null;
+            if (outCont == null || !outCont.b().hasRemaining()) {
                 outCont = pool.acquire();
                 outCont.b().clear();
                 m_queuedBuffers.offer(outCont);

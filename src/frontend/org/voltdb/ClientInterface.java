@@ -341,9 +341,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             sslEngine = m_sslContext.createSSLEngine();
                             sslEngine.setUseClientMode(false);
                             sslEngine.setNeedClientAuth(false);
-                        }
-
-                        if (sslEngine != null) {
+                            // blocking needs to be false for handshaking.
+                            m_socket.configureBlocking(false);
                             SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
                             if (!handshaker.handshake()) {
                                 throw new IOException("SSL handshake failed");
@@ -454,9 +453,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      * successful authentication of connections that would put us over the limit.
                      */
                     m_numConnections.incrementAndGet();
-
-                    // do the handshaking here.
-                    socket.configureBlocking(false);
 
                     final AuthRunnable authRunnable = new AuthRunnable(socket, m_sslContext);
                     while (true) {
