@@ -22,7 +22,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -175,9 +174,10 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             // serialize() touches not-threadsafe state around Initiator
             // stats.  In the normal code path, this is protected by a lock
             // in NIOWriteStream.enqueue().
-            ByteBuffer buf;
+            ByteBuffer buf = null;
             synchronized(this) {
-                buf = ds.serialize(ByteBuffer.allocate(0));
+                buf = ByteBuffer.allocate(ds.getSerializedSize());
+                ds.serialize(buf);
             }
             if (buf == null) {
                 throw new UnsupportedOperationException();

@@ -300,7 +300,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
-
             m_running = true;
             String threadName = m_isAdmin ? "AdminPort connection acceptor" : "ClientPort connection acceptor";
             m_thread = new Thread( null, this, threadName, 262144);
