@@ -61,7 +61,7 @@ class TestBase extends GebReportingSpec {
     static int waitTime         = 30
     boolean testStatus          = false
 
-    static Boolean doesDBMonitorPageOpenFirst = null
+    static Boolean doesExpectedPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
 
     private static final ExecutorService executor = Executors.newFixedThreadPool(5);
@@ -88,18 +88,21 @@ class TestBase extends GebReportingSpec {
             at VoltDBManagementCenterPage
         }
 
-        // Confirm that the 'DB Monitor' page opens initially, the first time
+        // Confirm that one of the VMC pages opens initially, the first time:
+        // it used to always be the 'DB Monitor' page, but we no longer care
+        // which one, since it remembers via a cookie
         // (this is used by NavigatePagesBasicTest)
-        if (doesDBMonitorPageOpenFirst == null) {
-            doesDBMonitorPageOpenFirst = page.isDbMonitorPageOpen()
-            debugPrint 'DB Monitor page was opened initially: ' + doesDBMonitorPageOpenFirst + ' [in TestBase.setup()]'
-            if (!doesDBMonitorPageOpenFirst) {
-                debugPrint 'Page: ' + page.toString()
-                debugPrint '  is DbMonitor : ' + page.isDbMonitorPageOpen()
-                debugPrint '  is isAdmin   : ' + page.isAdminPageOpen()
-                debugPrint '  is isSchema  : ' + page.isSchemaPageOpen()
-                debugPrint '  is isSqlQuery: ' + page.isSqlQueryPageOpen()
-            }
+        if (doesExpectedPageOpenFirst == null) {
+            boolean dbMonitorPage = page.isDbMonitorPageOpen()
+            boolean adminPage     = page.isAdminPageOpen()
+            boolean schemaPage    = page.isSchemaPageOpen()
+            boolean sqlQueryPage  = page.isSqlQueryPageOpen()
+            doesExpectedPageOpenFirst = dbMonitorPage || adminPage || schemaPage || sqlQueryPage
+            debugPrint 'Initially open Page [in TestBase.setup()]: ' + page.toString()
+            debugPrint '  is DbMonitor : ' + dbMonitorPage
+            debugPrint '  is isAdmin   : ' + adminPage
+            debugPrint '  is isSchema  : ' + schemaPage
+            debugPrint '  is isSqlQuery: ' + sqlQueryPage
         }
     }
 
