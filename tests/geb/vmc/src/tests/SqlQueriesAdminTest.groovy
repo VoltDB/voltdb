@@ -106,7 +106,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         then: 'run the query'
         page.runQuery()
         try {
-            waitFor(15) {
+            waitFor(waitTime) {
                 page.cancelpopupquery.isDisplayed()
                 page.okpopupquery.isDisplayed()
                 page.switchadminport.isDisplayed()
@@ -124,7 +124,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         then: 'run the query'
         page.runQuery()
         report 'runselect'
-        waitFor(5) {
+        waitFor(waitTime) {
             page.cancelpopupquery.isDisplayed()
             page.okpopupquery.isDisplayed()
             //page.switchadminport.isDisplayed()
@@ -138,7 +138,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-        waitFor(5) {
+        waitFor(waitTime) {
             page.cancelpopupquery.isDisplayed()
             page.okpopupquery.isDisplayed()
             //page.switchadminport.isDisplayed()
