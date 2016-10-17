@@ -29,7 +29,6 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.SSLDeferredSerializationIterator;
 import org.voltcore.utils.Serializer;
-import org.voltcore.utils.SimpleDeferredSerialization;
 
 import javax.net.ssl.SSLEngine;
 
@@ -292,7 +291,28 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                         m_queuedWrites.offer(dsIter.next());
                     }
                 } else {
-                    m_queuedWrites.offer(new SimpleDeferredSerialization(buf));
+                    m_queuedWrites.offer(new DeferredSerialization() {
+                        @Override
+                        public ByteBuffer serialize(ByteBuffer outbuf) {
+                            for (ByteBuffer buf : b) {
+                                outbuf.put(buf);
+                            }
+                            return null;
+                        }
+
+                        @Override
+                        public void cancel() {}
+
+                        @Override
+                        public int getSerializedSize() {
+                            int sum = 0;
+                            for (ByteBuffer buf : b) {
+                                buf.position(0);
+                                sum += buf.remaining();
+                            }
+                            return sum;
+                        }
+                    });
                 }
             }
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
