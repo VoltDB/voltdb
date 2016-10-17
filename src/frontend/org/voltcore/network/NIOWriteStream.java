@@ -198,12 +198,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 ds.cancel();
                 return;
             }
-            Iterator<DeferredSerialization> dsIter = null;
-            if (m_isSSLConfigured) {
-                dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
-            }
             updateLastPendingWriteTimeAndQueueBackpressure();
             if (m_isSSLConfigured) {
+                Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
                 while (dsIter.hasNext()) {
                     m_queuedWrites.offer(dsIter.next());
                 }
