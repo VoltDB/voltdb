@@ -398,9 +398,7 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[]) {
-            super();
-        }
+        public NodeConnection(long ids[]) {}
 
         /*
          * NodeConnection uses ignoreBackpressure to get rate limiter to not
