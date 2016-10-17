@@ -125,7 +125,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.setQueryText("SELECT * FROM " + tablename)
         then: 'run the query'
         page.runQuery()
-
+        report 'checking'
         waitFor(5) {
             page.cancelpopupquery.isDisplayed()
             page.okpopupquery.isDisplayed()
