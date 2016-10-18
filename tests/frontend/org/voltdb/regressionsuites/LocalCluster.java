@@ -1376,15 +1376,8 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public synchronized void shutDownExternal(boolean forceKillEEProcs)
-    {
+    public void waitForNodesToShutdown() {
         if (m_cluster != null) {
-            // kill all procs
-            for (Process proc : m_cluster) {
-                if (proc == null)
-                    continue;
-                proc.destroy();
-            }
 
             // join on all procs
             for (Process proc : m_cluster) {
@@ -1426,6 +1419,20 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         m_eeProcs.clear();
+
+    }
+
+    public synchronized void shutDownExternal(boolean forceKillEEProcs)
+    {
+        if (m_cluster != null) {
+            // kill all procs
+            for (Process proc : m_cluster) {
+                if (proc == null)
+                    continue;
+                proc.destroy();
+            }
+        }
+        waitForNodesToShutdown();
     }
 
     @Override

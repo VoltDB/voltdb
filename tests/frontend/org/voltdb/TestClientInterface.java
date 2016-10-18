@@ -92,12 +92,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.base.Supplier;
 
 public class TestClientInterface {
     // mocked objects that CI requires
@@ -234,8 +232,8 @@ public class TestClientInterface {
 
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
-        Supplier<ClusterSettings> settings = CatalogUtil.asClusterSettings(deploymentPath).asSupplier();
-        m_context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0);
+        DbSettings dbSettings = CatalogUtil.asDbSettings(deploymentPath);
+        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 

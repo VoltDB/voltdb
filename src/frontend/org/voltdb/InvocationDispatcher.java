@@ -30,15 +30,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+import org.json_voltpatches.JSONWriter;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.ForeignHost;
@@ -49,6 +57,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.Consistency.ReadLevel;
@@ -76,6 +85,8 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.settings.PathSettings;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -91,6 +102,7 @@ public final class InvocationDispatcher {
     private static final VoltLogger log = new VoltLogger(InvocationDispatcher.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /**
      * This reference is shared with the one in {@link ClientInterface}
@@ -357,7 +369,7 @@ public final class InvocationDispatcher {
             else if ("@AdHocSpForTest".equals(procName)) {
                 return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
             }
-            else if (procName.equals("@LoadSinglepartitionTable")) {
+            else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
             }
@@ -408,18 +420,26 @@ public final class InvocationDispatcher {
                 if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user);
                 }
+            } else if ("@Shutdown".equals(procName)) {
+                if (task.getParams().size() == 1) {
+                    return takeShutdownSaveSnapshot(task, handler, ccxn, user);
+                }
+            }
+            // Verify that admin mode sysprocs are called from a client on the
+            // admin port, otherwise return a failure
+            if ((   "@Pause".equals(procName)
+                 || "@Resume".equals(procName)
+                 || "@PrepareShutdown".equals(procName))
+               && !handler.isAdmin())
+            {
+                return unexpectedFailureResponse(
+                        procName + " is not available to this client",
+                        task.clientHandle);
             }
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
 
-        // Verify that admin mode sysprocs are called from a client on the
-        // admin port, otherwise return a failure
-        if (("@Pause".equals(procName) || "@Resume".equals(procName) || "@PrepareShutdown".equals(procName)) && !handler.isAdmin()) {
-            return unexpectedFailureResponse(
-                    procName + " is not available to this client",
-                    task.clientHandle);
-        }
 
         int partition = -1;
         try {
@@ -486,12 +506,19 @@ public final class InvocationDispatcher {
     }
 
     private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
+        final VoltDBInterface voltdb = VoltDB.instance();
+
+        //block transactions while shutting down
+        if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
+            return false;
+        }
+
         //@Statistics and  @Shutdown are allowed in pause/shutdown mode
-        if (VoltDB.instance().isShuttingdown()) {
+        if (voltdb.isShuttingdown()) {
             return procedure.getAllowedinshutdown();
         }
 
-        if (VoltDB.instance().getMode() != OperationMode.PAUSED || handler.isAdmin()) {
+        if (voltdb.getMode() != OperationMode.PAUSED || handler.isAdmin()) {
             return true;
         }
 
@@ -920,6 +947,187 @@ public final class InvocationDispatcher {
         buf.putInt(buf.capacity() - 4);
         response.flattenToBuffer(buf).flip();
         ccxn.writeStream().enqueue(buf);
+    }
+
+    private final ClientResponseImpl takeShutdownSaveSnapshot(
+            final StoredProcedureInvocation task,
+            final InvocationClientHandler handler, final Connection ccxn,
+            final AuthUser user
+            )
+    {
+        // shutdown save snapshot is available for Pro edition only
+        if (!MiscUtils.isPro()) {
+            task.setParams();
+            return dispatch(task, handler, ccxn, user);
+        }
+        Object p0 = task.getParams().getParam(0);
+        if (!(p0 instanceof Long)) {
+            return gracefulFailureResponse(
+                    "Incorrect argument type",
+                    task.clientHandle);
+        }
+        final long zkTxnId = ((Long)p0).longValue();
+        VoltDBInterface voltdb = VoltDB.instance();
+
+        if (!voltdb.isShuttingdown()) {
+            log.warn("Ignoring shutdown save snapshot request as VoltDB is not shutting down");
+            return unexpectedFailureResponse(
+                    "Ignoring shutdown save snapshot request as VoltDB is not shutting down",
+                    task.clientHandle);
+        }
+        final ZooKeeper zk = voltdb.getHostMessenger().getZK();
+        // network threads are blocked from making zookeeper calls
+        Future<Long> fut = voltdb.getSES(true).submit(new Callable<Long>() {
+            @Override
+            public  Long call() {
+                try {
+                    Stat stat = zk.exists(VoltZK.operationMode, false);
+                    if (stat == null) {
+                        VoltDB.crashLocalVoltDB("cluster operation mode zookeeper node does not exist");
+                        return Long.MIN_VALUE;
+                    }
+                    return stat.getMzxid();
+                } catch (KeeperException | InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Failed to stat the cluster operation zookeeper node", true, e);
+                    return Long.MIN_VALUE;
+                }
+            }
+        });
+        try {
+            if (fut.get().longValue() != zkTxnId) {
+                return unexpectedFailureResponse(
+                        "Internal error: cannot write a shutdown snapshot because the " +
+                        "current system state is not consistent with an orderly shutdown. " +
+                        "Please try \"voltadmin shutdown --save\" again.",
+                        task.clientHandle);
+            }
+        } catch (InterruptedException | ExecutionException e1) {
+            VoltDB.crashLocalVoltDB("Failed to stat the cluster operation zookeeper node", true, e1);
+            return null;
+        }
+
+        PathSettings paths = m_catalogContext.get().getPaths();
+        String snapshotJson = null;
+        try {
+            JSONWriter jss = new JSONStringer()
+                    .object()
+                    .key(SnapshotUtil.JSON_URIPATH).value("file://" + paths.resolve(paths.getSnapshoth()).getPath())
+                    .key(SnapshotUtil.JSON_NONCE).value(SnapshotUtil.getShutdownSaveNonce(zkTxnId))
+                    .key(SnapshotUtil.JSON_TERMINUS).value(zkTxnId)
+                    .key(SnapshotUtil.JSON_BLOCK).value(true)
+                    .key(SnapshotUtil.JSON_PATH_TYPE).value(SnapshotPathType.SNAP_AUTO.toString())
+                    .key(SnapshotUtil.JSON_FORMAT).value(SnapshotFormat.NATIVE.toString())
+                    .endObject();
+            snapshotJson = jss.toString();
+        } catch (JSONException e) {
+            VoltDB.crashLocalVoltDB("Failed to create shutdown snapshot save command", true, e);
+            return null;
+        }
+        log.info("Invoking shutdown snapshot save: " + snapshotJson);
+        consoleLog.info("Taking snapshot to save database contents");
+
+        final StoredProcedureInvocation saveSnapshotTask = new StoredProcedureInvocation();
+
+        saveSnapshotTask.setProcName("@SnapshotSave");
+        saveSnapshotTask.setParams(snapshotJson);
+
+        final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
+                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Shutdown Snapshot Save"
+                );
+        final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
+            @Override
+            public boolean isAdmin() {
+                return handler.isAdmin();
+            }
+            @Override
+            public long connectionId() {
+                return ClientInterface.SHUTDONW_SAVE_CID;
+            }
+        };
+
+        final long sourceHandle = task.clientHandle;
+        SimpleClientResponseAdapter.SyncCallback shutdownCallback =
+                new SimpleClientResponseAdapter.SyncCallback()
+                ;
+        final ListenableFuture<ClientResponse> onShutdownComplete =
+                shutdownCallback.getResponseFuture()
+                ;
+        onShutdownComplete.addListener(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    onShutdownComplete.get();
+                } catch (ExecutionException|InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                    return;
+                }
+                // no need to transmit response as we are shutting down
+            }
+        },
+        CoreUtils.SAMETHREADEXECUTOR);
+        task.setClientHandle(alternateAdapter.registerCallback(shutdownCallback));
+
+        SimpleClientResponseAdapter.SyncCallback saveCallback =
+                new SimpleClientResponseAdapter.SyncCallback()
+                ;
+        final ListenableFuture<ClientResponse> onSaveComplete =
+                saveCallback.getResponseFuture()
+                ;
+        onSaveComplete.addListener(new Runnable() {
+            @Override
+            public void run() {
+                ClientResponse r;
+                try {
+                    r = onSaveComplete.get();
+                } catch (ExecutionException|InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                    return;
+                }
+                if (r.getStatus() != ClientResponse.SUCCESS) {
+                    transmitResponseMessage(r, ccxn, sourceHandle);
+                    log.error("Received error response for saving shutdown shapshot " + r.getStatusString());
+                    return;
+                }
+                // remove parameter so it does not recurse infinitely
+                consoleLog.info("Snapshot taken successfully");
+                task.setParams();
+                dispatch(task, alternateHandler, alternateAdapter, user);
+            }
+        },
+        CoreUtils.SAMETHREADEXECUTOR);
+        saveSnapshotTask.setClientHandle(alternateAdapter.registerCallback(saveCallback));
+
+        // network threads are blocked from making zookeeper calls
+        final byte [] guardContent = snapshotJson.getBytes(StandardCharsets.UTF_8);
+        Future<Boolean> guardFuture = voltdb.getSES(true).submit(new Callable<Boolean>() {
+            @Override
+            public Boolean call() throws Exception {
+                try {
+                    ZKUtil.asyncMkdirs(zk, VoltZK.shutdown_save_guard, guardContent).get();
+                } catch (NodeExistsException itIsOk) {
+                    return false;
+                } catch (InterruptedException | KeeperException e) {
+                    VoltDB.crashLocalVoltDB("Failed to create shutdown save guard zookeeper node", true, e);
+                    return false;
+                }
+                return true;
+            }
+        });
+        boolean created;
+        try {
+            created = guardFuture.get().booleanValue();
+        } catch (InterruptedException | ExecutionException e) {
+            VoltDB.crashLocalVoltDB("Failed to create shutdown save guard zookeeper node", true, e);
+            return null;
+        }
+        if (!created) {
+            return unexpectedFailureResponse(
+                    "Internal error: detected concurrent invocations of \"voltadmin shutdown --save\"",
+                    task.clientHandle);
+        }
+
+        voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
+        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user);
     }
 
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(

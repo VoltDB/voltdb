@@ -53,6 +53,8 @@ import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -161,6 +163,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
     // the truncation handle last sent to the replicas
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
+    // the max schedule transaction sphandle, multi-fragments mp txn counts one
+    long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -183,6 +187,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
+
+        // After SP leader promotion, a DummyTransactionTaskMessage is generated from the new leader.
+        // This READ ONLY message will serve as a synchronization point on all replicas of this
+        // partition, like normal SP write transaction that has to finish executing on all replicas.
+        // In this way, the leader can make sure all replicas have finished replaying
+        // all their repair logs entries.
+        // From now on, the new leader is safe to accept new transactions. See ENG-11110.
+        // Deliver here is to make sure it's the first message on the new leader.
+        deliver(new DummyTransactionTaskMessage());
     }
 
     @Override
@@ -400,6 +413,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
         }
+        else if (message instanceof DummyTransactionTaskMessage) {
+            handleDummyTransactionTaskMessage((DummyTransactionTaskMessage) message);
+        }
+        else if (message instanceof DummyTransactionResponseMessage) {
+            handleDummyTransactionResponseMessage((DummyTransactionResponseMessage)message);
+        }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
@@ -457,9 +476,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
             } else {
                 /*
@@ -472,8 +493,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
                         0,
                         m_uniqueIdGenerator.partitionId);
-                //Don't think it wise to make a new one for a short circuit read
-                newSpHandle = getMaxTaskedSpHandle();
+
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             // Need to set the SP handle on the received message
@@ -792,8 +813,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+
+                if (m_outstandingTxns.get(msg.getTxnId()) == null) {
+                    updateMaxScheduledTransactionSpHandle(newSpHandle);
+                }
+
             } else {
-                newSpHandle = getMaxTaskedSpHandle();
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             msg.setSpHandle(newSpHandle);
@@ -1143,6 +1169,69 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private void handleDummyTransactionTaskMessage(DummyTransactionTaskMessage message)
+    {
+        DummyTransactionTaskMessage msg = message;
+        if (m_isLeader) {
+            TxnEgo ego = advanceTxnEgo();
+            long newSpHandle = ego.getTxnId();
+            updateMaxScheduledTransactionSpHandle(newSpHandle);
+            // this uniqueId is needed as the command log tracks it (uniqueId has to advance)
+            long uniqueId = m_uniqueIdGenerator.getNextUniqueId();
+            msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
+
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, msg);
+
+                DuplicateCounter counter = new DuplicateCounter(
+                        HostMessenger.VALHALLA,
+                        msg.getTxnId(),
+                        m_replicaHSIds,
+                        msg);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+            }
+        } else {
+            setMaxSeenTxnId(msg.getSpHandle());
+        }
+        Iv2Trace.logDummyTransactionTaskMessage(msg, m_mailbox.getHSId());
+
+        DummyTransactionTask task = new DummyTransactionTask(m_mailbox,
+                new SpTransactionState(msg), m_pendingTasks);
+        // This read only DummyTransactionTask is to help flushing the task queue,
+        // including tasks in command log queue as well.
+        ListenableFuture<Object> durabilityBackpressureFuture =
+                m_cl.log(null, msg.getSpHandle(), null,  m_durabilityListener, task);
+        // Durability future is always null for sync command logging
+        // the transaction will be delivered again by the CL for execution once durable
+        // Async command logging has to offer the task immediately with a Future for backpressure
+        if (m_cl.canOfferTask()) {
+            assert durabilityBackpressureFuture != null;
+            m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
+        }
+    }
+
+    private void handleDummyTransactionResponseMessage(DummyTransactionResponseMessage message) {
+        final long spHandle = message.getSpHandle();
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
+        if (counter == null) {
+            // this will be on SPI without k-safety or replica only with k-safety
+            setRepairLogTruncationHandle(spHandle);
+            if (!m_isLeader) {
+                m_mailbox.send(message.getSPIHSId(), message);
+            }
+            return;
+        }
+
+        int result = counter.offer(message);
+        if (result == DuplicateCounter.DONE) {
+            // DummyTransactionResponseMessage ends on SPI
+            m_duplicateCounters.remove(dcKey);
+            setRepairLogTruncationHandle(spHandle);
+        }
+    }
+
+
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
@@ -1257,6 +1346,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
             m_bufferedReadLog = new BufferedReadLog();
         }
+    }
+
+    private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
+        m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
     }
 
     private long getRepairLogTruncationHandleForReplicas()

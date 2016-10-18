@@ -55,6 +55,8 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -110,6 +112,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
      * else will yell at you.
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
+        @Override
+        public ClusterSettings getClusterSettings() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public PathSettings getPaths() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
         @Override
         public Database getDatabase() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");

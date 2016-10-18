@@ -25,6 +25,9 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -141,6 +144,26 @@ public class Iv2Trace
                             txnIdToString(fresp.getSpHandle()),
                             fragStatusToString(fresp.getStatusCode())));
             }
+            else if (msg instanceof CompleteTransactionResponseMessage) {
+                CompleteTransactionResponseMessage cresp = (CompleteTransactionResponseMessage)msg;
+                String logmsg = "rxCompRsp %s from %s txnId %s spHandle %s SPI %s restart %s recovering %s";
+                iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                            CoreUtils.hsIdToString(cresp.m_sourceHSId),
+                            txnIdToString(cresp.getTxnId()),
+                            txnIdToString(cresp.getSpHandle()),
+                            txnIdToString(cresp.getSPIHSId()),
+                            cresp.isRestart(),
+                            cresp.isRecovering()));
+            }
+            else if (msg instanceof DummyTransactionResponseMessage) {
+                DummyTransactionResponseMessage dresp = (DummyTransactionResponseMessage)msg;
+                String logmsg = "rxDummyRsp %s from %s to %s for txnId %s";
+                iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                            CoreUtils.hsIdToString(dresp.m_sourceHSId),
+                            txnIdToString(dresp.getSPIHSId()),
+                            txnIdToString(dresp.getTxnId())
+                            ));
+            }
         }
     }
 
@@ -208,6 +231,17 @@ public class Iv2Trace
                         txnIdToString(ctask.getTxnId()),
                         ctask.isRollback() ? "ROLLBACK" : "COMMIT",
                         ctask.isRestart() ? "RESTART" : ""));
+        }
+    }
+
+    public static void logDummyTransactionTaskMessage(DummyTransactionTaskMessage dtask, long localHSId)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "rxDummyTxnMsg %s from %s txnId %s spHandle %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(dtask.m_sourceHSId),
+                        txnIdToString(dtask.getTxnId()),
+                        txnIdToString(dtask.getSpHandle())));
         }
     }
 

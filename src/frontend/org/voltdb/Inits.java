@@ -53,6 +53,8 @@ import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.modular.ModuleManager;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -394,7 +396,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        m_rvdb.m_clusterSettings,
+                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_paths),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
@@ -634,9 +636,21 @@ public class Inits {
         }
     }
 
+    class InitModuleManager extends InitWork {
+        InitModuleManager() {
+        }
+
+        @Override
+        public void run() {
+            ModuleManager.initializeCacheRoot(new File(m_config.m_voltdbRoot, VoltDB.MODULE_CACHE));
+            // TODO: start foundation bundles
+        }
+    }
+
     class InitExport extends InitWork {
         InitExport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override
@@ -660,6 +674,7 @@ public class Inits {
     class InitImport extends InitWork {
         InitImport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override

@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 public class ExtensibleSnapshotDigestData {
     /**
@@ -52,13 +53,21 @@ public class ExtensibleSnapshotDigestData {
      */
     private final Map<Integer, JSONObject> m_drMixedClusterSizeConsumerState;
 
+    /**
+     * Value that denotes that this snapshot is one created with shutdown --save. 0
+     * being no, and other values yes
+     */
+    private long m_terminus;
+
     public ExtensibleSnapshotDigestData(
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, JSONObject> drMixedClusterSizeConsumerState) {
+            Map<Integer, JSONObject> drMixedClusterSizeConsumerState,
+            final JSONObject jsData) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
+        m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
     }
 
     private void writeExportSequenceNumbersToSnapshot(JSONStringer stringer) throws IOException {
@@ -142,6 +151,12 @@ public class ExtensibleSnapshotDigestData {
                 }
             }
         }
+    }
+
+    private void mergeTerminusToZK(JSONObject jsonObj) throws JSONException {
+        long jsTerminus = jsonObj.optLong(SnapshotUtil.JSON_TERMINUS, 0L);
+        m_terminus = Math.max(jsTerminus, m_terminus);
+        jsonObj.put(SnapshotUtil.JSON_TERMINUS, m_terminus);
     }
 
     private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws IOException {
@@ -295,5 +310,10 @@ public class ExtensibleSnapshotDigestData {
         mergeExportSequenceNumbersToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj);
         mergeConsumerDrIdTrackerToZK(jsonObj);
+        mergeTerminusToZK(jsonObj);
+    }
+
+    public long getTerminus() {
+        return m_terminus;
     }
 }

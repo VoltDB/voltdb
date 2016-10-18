@@ -26,11 +26,17 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
+
+    public ClusterSettings getClusterSettings();
+
+    public PathSettings getPaths();
 
     public long getSpHandleForSnapshotDigest();
 
