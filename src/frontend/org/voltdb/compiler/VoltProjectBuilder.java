@@ -261,7 +261,7 @@ public class VoltProjectBuilder {
     // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
-    boolean m_httpsEnabled = false;
+    boolean m_sslEnabled = false;
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -589,8 +589,8 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setHttpsEnabled(final boolean enabled) {
-        m_httpsEnabled = enabled;
+    public void setSslEnabled(final boolean enabled) {
+        m_sslEnabled = enabled;
     }
 
     public void setKeyStoreInfo(final String path, final String password) {
@@ -1134,9 +1134,9 @@ public class VoltProjectBuilder {
         Jsonapi json = factory.createHttpdTypeJsonapi();
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
-        if (m_httpsEnabled) {
+        if (m_sslEnabled) {
             SslType sslType = factory.createSslType();
-            sslType.setEnabled(m_httpsEnabled);
+            sslType.setEnabled(m_sslEnabled);
             if (m_keystore!=null) {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_keystore);

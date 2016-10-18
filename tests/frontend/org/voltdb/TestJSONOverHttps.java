@@ -168,7 +168,7 @@ public class TestJSONOverHttps extends TestCase {
             builder.addStmtProcedure("fooinsert", "insert into foo values (?, ?);");
             builder.addStmtProcedure("foocount", "select count(*) from foo;");
             builder.setHTTPDPort(port);
-            builder.setHttpsEnabled(true);
+            builder.setSslEnabled(true);
             if (keyStorePath != null) {
                 String keystore = getResourcePath(keyStorePath);
                 builder.setKeyStoreInfo(keystore, keyStorePasswd);
