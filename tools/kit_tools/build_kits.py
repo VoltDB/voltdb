@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, shutil, datetime
+import argparse, os, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
@@ -12,11 +12,12 @@ version = "UNKNOWN"
 nativelibdir = "/nativelibs/obj"  #  ~test/libs/... usually
 defaultlicensedays = 45 #default trial license length
 
+
 ################################################
 # CHECKOUT CODE INTO A TEMP DIR
 ################################################
 
-def checkoutCode(voltdbGit, proGit, rbmqExportGit):
+def checkoutCode(voltdbGit, proGit, rbmqExportGit, gitloc):
     global buildir
     # clean out the existing dir
     run("rm -rf " + builddir)
@@ -27,17 +28,18 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         # do the checkouts, collect checkout errors on both community &
         # pro repos so user gets status on both checkouts
         message = ""
-        run("git clone git@github.com:VoltDB/voltdb.git")
+        run("git clone -q %s/voltdb.git" % gitloc)
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
             message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone git@github.com:VoltDB/pro.git")
+        run("git clone -q %s/pro.git" % gitloc)
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
             message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone git@github.com:VoltDB/export-rabbitmq.git")
+        #rabbitmq isn't mirrored internally, so don't use gitloc
+        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         # Probably ok to use master for export-rabbitmq.
         if result.failed:
@@ -78,7 +80,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=true %s clean default dist" % build_args)
+        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % ("true" if build_mac else "false",  build_args))
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -89,7 +91,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=true %s clean dist.pro" % (defaultlicensedays, build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=%s %s clean dist.pro" % (defaultlicensedays, "true" if build_mac else "false", build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -238,36 +240,32 @@ def rmNativeLibs():
 # GET THE GIT TAGS OR SHAS TO BUILD FROM
 ################################################
 
-if (len(sys.argv) > 3 or (len(sys.argv) == 2 and sys.argv[1] == "-h")):
-    print "usage:"
-    print "   build-kit.py"
-    print "   build-kit.py git-tag"
-    print "   build-kit.py voltdb-git-SHA pro-git-SHA"
+parser = argparse.ArgumentParser(description = "Create a full kit. With no args, will do build of master")
+parser.add_argument('voltdb_sha', nargs="?", default="master", help="voltdb repository commit, tag or branch" )
+parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository commit, tag or branch" )
+parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
+parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
+parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
+parser.add_argument('--nopackages', action='store_true', help="Don't build .rpm and .deb packages")
+parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
+args = parser.parse_args()
 
-proTreeish = "master"
-voltdbTreeish = "master"
-rbmqExportTreeish = "master"
+proTreeish = args.voltdb_sha
+voltdbTreeish = args.pro_sha
+rbmqExportTreeish = args.rabbitmq_sha
 
-# pass -o if you want the build put in the one-offs directory
-# passing different voltdb and pro trees also forces one-off
-if '-o' in sys.argv:
+print args
+
+build_community = not args.nocommunity
+build_mac = not args.nomac
+build_packages = not args.nopackages
+
+#If anything is missing we're going to dump this in oneoffs dir.
+build_all = build_community and build_mac and build_packages
+if voltdbTreeish != proTreeish or not build_all:
     oneOff = True
-    sys.argv.remove('-o')
 else:
-    oneOff = False
-
-if len(sys.argv) == 2:
-    createCandidate = False
-    proTreeish = sys.argv[1]
-    voltdbTreeish = sys.argv[1]
-    rbmqExportTreeish = sys.argv[1]
-if len(sys.argv) == 3:
-    createCandidate = False
-    voltdbTreeish = sys.argv[1]
-    proTreeish = sys.argv[2]
-    rbmqExportTreeish = sys.argv[2]
-    if voltdbTreeish != proTreeish:
-        oneOff = True     #force oneoff when not same tag/branch
+    oneOff  = False
 
 rmNativeLibs()
 
@@ -290,19 +288,21 @@ MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on the mini
-try:
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        buildCommunity()
-except Exception as e:
-    print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
+if build_mac and build_community:
+    try:
+        with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+            versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
+            buildCommunity()
+    except Exception as e:
+        print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
+        build_errors=True
 
-# build kits on 5f
+# build kits on 15f
 try:
     with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-        versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
+        versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
+        if build_mac:
+            assert versionCentos == versionMac
         if oneOff:
             releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
                 (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
@@ -310,8 +310,9 @@ try:
             releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
         makeReleaseDir(releaseDir)
         print "VERSION: " + versionCentos
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        if build_community:
+            buildCommunity()
+            copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
         buildPro()
         buildRabbitMQExport(versionCentos)
         copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
@@ -327,52 +328,56 @@ except Exception as e:
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
-# build debian kit
-try:
-    with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
-        debbuilddir = "%s/deb_build/" % builddir
-        run("rm -rf " + debbuilddir)
-        run("mkdir -p " + debbuilddir)
+if build_packages:
+    # build debian kit
+    try:
+        with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
+            debbuilddir = "%s/deb_build/" % builddir
+            run("rm -rf " + debbuilddir)
+            run("mkdir -p " + debbuilddir)
 
-        with cd(debbuilddir):
-            put ("tools/voltdb-install.py",".")
+            with cd(debbuilddir):
+                put ("tools/voltdb-install.py",".")
 
-            commbld = "voltdb-%s.tar.gz" % (versionCentos)
-            put("%s/%s" % (releaseDir, commbld),".")
-            run ("sudo python voltdb-install.py -D " + commbld)
-            get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-            entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-            put("%s/%s" % (releaseDir, entbld),".")
-            run ("sudo python voltdb-install.py -D " + entbld)
-            get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
-except Exception as e:
-    print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
+                if build_community:
+                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
+                    put("%s/%s" % (releaseDir, commbld),".")
+                    run ("sudo python voltdb-install.py -D " + commbld)
+                    get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
 
-try:
-    # build rpm kit
-    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-        rpmbuilddir = "%s/rpm_build/" % builddir
-        run("rm -rf " + rpmbuilddir)
-        run("mkdir -p " + rpmbuilddir)
+                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
+                put("%s/%s" % (releaseDir, entbld),".")
+                run ("sudo python voltdb-install.py -D " + entbld)
+                get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
+    except Exception as e:
+        print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
+        build_errors=True
 
-        with cd(rpmbuilddir):
-            put ("tools/voltdb-install.py",".")
+    try:
+        # build rpm kit
+        with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
+            rpmbuilddir = "%s/rpm_build/" % builddir
+            run("rm -rf " + rpmbuilddir)
+            run("mkdir -p " + rpmbuilddir)
 
-            commbld = "voltdb-%s.tar.gz" % (versionCentos)
-            put("%s/%s" % (releaseDir, commbld),".")
-            run ("python2.6 voltdb-install.py -R " + commbld)
-            get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+            with cd(rpmbuilddir):
+                put ("tools/voltdb-install.py",".")
 
-            entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-            put("%s/%s" % (releaseDir, entbld),".")
-            run ("python2.6 voltdb-install.py -R " + entbld)
-            get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+                if build_community:
+                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
+                    put("%s/%s" % (releaseDir, commbld),".")
+                    run ("python2.6 voltdb-install.py -R " + commbld)
+                    get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
-except Exception as e:
-    print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
+                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
+                put("%s/%s" % (releaseDir, entbld),".")
+                run ("python2.6 voltdb-install.py -R " + entbld)
+                get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
+
+    except Exception as e:
+        print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
+        build_errors=True
 
 computeChecksums(releaseDir)
 
