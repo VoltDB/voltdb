@@ -19,6 +19,11 @@ package org.voltdb;
 
 import org.voltdb.compiler.deploymentfile.ReadlevelType;
 
+/**
+ * Note: A shortcut read (FAST) is a read operation sent to any replica and completed with no
+ * confirmation or communication with other replicas. In a partition scenario, it's
+ * possible to read an unconfirmed transaction's writes that will be lost.
+ */
 public abstract class Consistency {
 
     public enum ReadLevel {

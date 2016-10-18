@@ -62,6 +62,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -97,6 +98,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
+import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
@@ -128,6 +130,7 @@ import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.modular.ModuleManager;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
@@ -135,6 +138,7 @@ import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.ClusterSettingsRef;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.PathSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
@@ -193,13 +197,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     // Managed voltdb directories settings
-    volatile private PathSettings m_paths;
+    volatile PathSettings m_paths;
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "6.6";
+    static final String m_defaultVersionString = "6.7";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.7\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -262,6 +266,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Are we adding the node to the cluster instead of rejoining?
     volatile boolean m_joining = false;
+    private boolean m_shuttingdown = false;
 
     long m_clusterCreateTime;
     AtomicBoolean m_replicationActive = new AtomicBoolean(false);
@@ -313,6 +318,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
      };
+
+    @Override
+    public boolean isShuttingdown() {
+        return m_shuttingdown;
+    }
+    @Override
+    public void setShuttingdown(boolean shuttingdown) {
+        m_shuttingdown = shuttingdown;
+    }
 
     @Override
     public boolean rejoining() {
@@ -383,7 +397,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigDirectory(File voltdbroot) {
-        return new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
+        return new VoltFile(voltdbroot, Constants.CONFIG_DIR);
     }
 
     private File getConfigLogDeployment() {
@@ -553,6 +567,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
+            // Handle multiple invocations of server thread in the same JVM.
+            // by clearing static variables/properties which ModuleManager,
+            // and Settings depend on
+            ConfigFactory.clearProperty(Settings.CONFIG_DIR);
+            ModuleManager.resetCacheRoot();
+
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
             // check that this is a 64 bit VM
@@ -793,7 +813,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
-                setMode(OperationMode.PAUSED);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
@@ -2036,7 +2055,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
                             catalog,
-                            m_clusterSettings,
+                            new DbSettings(m_clusterSettings, m_paths),
                             new byte[] {},
                             null,
                             deploymentBytes,
@@ -3196,6 +3215,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
+
         if (m_clientInterface != null) {
             m_clientInterface.mayActivateSnapshotDaemon();
             try {
@@ -3264,12 +3284,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
-        if (!m_joining) {
-            m_statusTracker.setNodeState(NodeState.UP);
-            Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-        }
+        m_statusTracker.setNodeState(NodeState.UP);
+        Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
     }
 
     @Override
@@ -3364,6 +3382,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
+        /*
+         * Remove the terminus file if it is there, which is written on shutdown --save
+         */
+        new File(m_paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER).delete();
 
         /*
          * Command log is already initialized if this is a rejoin or a join
@@ -3400,6 +3422,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_leaderAppointer.onReplayCompletion();
         }
 
+        if (m_startMode != null) {
+            m_mode = m_startMode;
+        } else {
+            // Shouldn't be here, but to be safe
+            m_mode = OperationMode.RUNNING;
+        }
+
         if (!m_rejoining && !m_joining) {
             if (m_clientInterface != null) {
                 try {
@@ -3431,13 +3460,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
-        }
-
-        if (m_startMode != null) {
-            m_mode = m_startMode;
-        } else {
-            // Shouldn't be here, but to be safe
-            m_mode = OperationMode.RUNNING;
         }
         if (!m_rejoining && !m_joining) {
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
@@ -3556,14 +3578,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
-                        int.class,
                         String.class,
                         ClientInterface.class,
+                        Cartographer.class,
+                        HostMessenger.class,
                         byte.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
-                        m_messenger.getHostId(),
                         drProducerHost,
                         m_clientInterface,
+                        m_cartographer,
+                        m_messenger,
                         drConsumerClusterId);
                 m_globalServiceElector.registerService(m_consumerDRGateway);
             } catch (Exception e) {
@@ -3676,7 +3700,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @throws IOException
      */
    static String setupDefaultDeployment(VoltLogger logger, File voltdbroot) throws IOException {
-        File configInfoDir = new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
+        File configInfoDir = new VoltFile(voltdbroot, Constants.CONFIG_DIR);
         configInfoDir.mkdirs();
 
         File depFH = new VoltFile(configInfoDir, "deployment.xml");

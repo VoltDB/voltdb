@@ -1,3 +1,18 @@
+file -inlinebatch END_OF_DROP_BATCH
+
+DROP PROCEDURE Initialize                      IF EXISTS;
+DROP PROCEDURE Results                         IF EXISTS;
+DROP PROCEDURE Vote                            IF EXISTS;
+DROP PROCEDURE ContestantWinningStates         IF EXISTS;
+DROP PROCEDURE GetStateHeatmap                 IF EXISTS;
+DROP VIEW  v_votes_by_phone_number             IF EXISTS;
+DROP VIEW  v_votes_by_contestant_number        IF EXISTS;
+DROP VIEW  v_votes_by_contestant_number_state  IF EXISTS;
+DROP TABLE contestants                         IF EXISTS;
+DROP TABLE votes                               IF EXISTS;
+DROP TABLE area_code_state                     IF EXISTS;
+
+END_OF_DROP_BATCH
 
 -- Tell sqlcmd to batch the following commands together,
 -- so that the schema loads quickly.

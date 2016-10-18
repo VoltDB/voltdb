@@ -11,9 +11,13 @@
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
         <string>org.voltcore.network</string>
         <string>org.voltdb.importer</string>
+        <string>org.voltdb.client</string>
+        <string>org.voltdb.importer.formatter</string>
         <string>org.apache.log4j</string>
         <string>org.slf4j</string>
+        <string>jsr166y</string>
         <string>org.voltcore.utils</string>
+        <string>org.voltcore.logging</string>
         <string>com.google_voltpatches.common.base</string>
         <string>com.google_voltpatches.common.collect</string>
         <string>com.google_voltpatches.common.net</string>
@@ -66,6 +70,9 @@
             <zipgroupfileset dir="${base.dir}/lib/" includes="metrics-core-2.2.0.jar" />
         <zipgroupfileset dir="${base.dir}/lib/" includes="scala-library-2.10.4.jar" />
         <zipgroupfileset dir="${base.dir}/lib" includes="kafka_2.10-0.8.2.1.jar" />
+        <zipgroupfileset dir="${base.dir}/lib/" includes="kafka-clients-0.8.2.1.jar" />
+        <zipgroupfileset dir="${base.dir}/lib/" includes="snappy-java-1.1.1.7.jar" />
+        <zipgroupfileset dir="${base.dir}/lib/" includes="lz4-1.2.0.jar" />
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
@@ -73,7 +80,7 @@
                 <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
-                <attribute name="Import-Package" value="org.osgi.framework;version=&quot;[1.6,2)&quot;,org.voltdb.importer,org.voltdb.client,org.slf4j" />
+                <attribute name="Import-Package" value="${default.imports}"/>
             </manifest>
         </jar>
     </target>

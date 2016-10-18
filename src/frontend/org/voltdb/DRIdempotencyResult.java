@@ -14,30 +14,32 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef TUPLESERIALIZER_H_
-#define TUPLESERIALIZER_H_
 
-#include "common/TupleSchema.h"
-#include "common/tabletuple.h"
-#include "common/serializeio.h"
+package org.voltdb;
 
-/**
- * Base class for tuple serializers
- */
-namespace voltdb {
-class TupleSerializer {
-public:
-    /**
-     * Serialize the provided tuple to the provide serialize output
-     */
-    virtual void serializeTo(TableTuple tuple, ReferenceSerializeOutput *out) = 0;
+public enum DRIdempotencyResult {
+    SUCCESS((byte) 0),    // Is the expect next DR ID
+    DUPLICATE((byte) -1), // Is a duplicate DR ID seen before
+    GAP((byte) 1);        // Is way in the future
 
-    /**
-     * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
-     */
-    virtual size_t getMaxSerializedTupleSize(const TupleSchema *schema) = 0;
+    private final byte m_id;
+    DRIdempotencyResult(byte id) {
+        m_id = id;
+    }
 
-    virtual ~TupleSerializer() {}
-};
+    public byte id() {
+        return m_id;
+    }
+
+    public static DRIdempotencyResult fromID(byte id) {
+        if (SUCCESS.id() == id) {
+            return SUCCESS;
+        } else if (DUPLICATE.id() == id) {
+            return DUPLICATE;
+        } else if (GAP.id() == id) {
+            return GAP;
+        } else {
+            throw new IllegalArgumentException("Invalid DRIdempotencyResult ID " + id);
+        }
+    }
 }
-#endif /* TUPLESERIALIZER_H_ */

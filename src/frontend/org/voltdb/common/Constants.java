@@ -78,4 +78,5 @@ public class Constants
     public static final int HTTP_PORT_AUTO = 0;
 
     public static final String DBROOT = "voltdbroot";
+    public static final String CONFIG_DIR = "config";
 }

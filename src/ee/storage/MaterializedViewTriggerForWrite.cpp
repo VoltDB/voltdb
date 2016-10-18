@@ -361,7 +361,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     params[colindex] = oldValue;
     // executing the stored plan.
     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
-    Table *tbl = context->executeExecutors(executorList, 0);
+    UniqueTempTableResult tbl = context->executeExecutors(executorList, 0);
     assert(tbl);
     // get the fallback value from the returned table.
     TableIterator iterator = tbl->iterator();
@@ -379,7 +379,6 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
         params[colindex] = backups[colindex];
     }
-    context->cleanupExecutorsForSubquery(executorList);
     return newVal;
 }
 

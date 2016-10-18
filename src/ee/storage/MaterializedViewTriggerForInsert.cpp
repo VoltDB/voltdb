@@ -54,13 +54,7 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
     // include all target table indexes except the actual primary key index on the group by columns.
-    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
-    BOOST_FOREACH(TableIndex *index, targetIndexes) {
-        if (index != m_index) {
-            m_updatableIndexList.push_back(index);
-        }
-    }
-
+    initUpdatableIndexList();
     allocateBackedTuples();
 
     VOLT_TRACE("Finished MaterializedViewTriggerForInsert initialization...");
@@ -74,6 +68,24 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
         delete m_aggExprs[ii];
     }
     m_target->decrementRefcount();
+}
+
+void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
+    // Note that if the way we initialize this m_updatableIndexList changes in the future,
+    //   we will also need to change the condition to detect when the m_updatableIndexList
+    //   should be refreshed in the updateDefinition() function.
+    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    m_updatableIndexList.clear();
+    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+        if (index != m_index) {
+            m_updatableIndexList.push_back(index);
+        }
+    }
+}
+
+void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo) {
+    setTargetTable(destTable);
+    initUpdatableIndexList();
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,

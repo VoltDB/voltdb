@@ -189,13 +189,17 @@ public class VoltDecimalHelper {
     }
 
     /**
-     * Round a BigDecimal number to a scale given the rounding mode.
-     * Note that rounding may return the precision.  For example,
-     * rounding 9.99999 and 9.1999 to a scale of 2 gives 10.00 and 9.20.
-     * The latter has precision 3, and the former has precision 4.
-     * @param bd
-     * @param scale
-     * @return
+     * Round a BigDecimal number to a scale, given the rounding mode.
+     * Note that the precision of the result can depend not only on its original
+     * precision and scale and the desired scale, but also on its value.
+     * For example, when rounding up with scale 2:<br>
+     *     9.1999 with input scale 4 and precision 5 returns 9.20 with precision 3 (down 2).<br>
+     *     9.9999 with input scale 4 and precision 5 returns 10.00 with precision 4 (down 1).<br>
+     *     91.9999 with input scale 4 and precision 6 returns 92.00 with precision 4 (down 2).
+     * @param bd the input value of arbitrary scale and precision
+     * @param scale the desired scale of the return value
+     * @param mode the rounding algorithm to use
+     * @return the rounded value approximately equal to bd, but having the desired scale
      */
     static private final BigDecimal roundToScale(BigDecimal bd, int scale, RoundingMode mode) throws RuntimeException
     {
@@ -206,7 +210,7 @@ public class VoltDecimalHelper {
         if (!isRoundingEnabled()) {
             throw new RuntimeException(String.format("Decimal scale %d is greater than the maximum %d", bd.scale(), kDefaultScale));
         }
-        int desiredPrecision = bd.precision() - lostScaleDigits;
+        int desiredPrecision = Math.max(1, bd.precision() - lostScaleDigits);
         MathContext mc = new MathContext(desiredPrecision, mode);
         BigDecimal nbd = bd.round(mc);
         if (nbd.scale() != scale) {
@@ -239,7 +243,7 @@ public class VoltDecimalHelper {
             throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
                                   wholeNumberPrecision + " and the max is 26");
         }
-        final int scalingFactor = kDefaultScale - decimalScale;
+        final int scalingFactor = Math.max(0, kDefaultScale - decimalScale);
         BigInteger scalableBI = bd.unscaledValue();
         //* enable to debug */ System.out.println("DEBUG BigDecimal: " + bd);
         //* enable to debug */ System.out.println("DEBUG unscaled: " + scalableBI);

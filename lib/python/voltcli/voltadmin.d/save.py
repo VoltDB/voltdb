@@ -34,22 +34,51 @@ import urllib
                               'tables to skip in the snapshot',
                               default = None)
     ),
-    arguments = (
-        VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
-        VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
+    arguments=(
+            VOLT.PathArgument('directory', 'the snapshot server directory', absolute=True, optional=True),
+            VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)', optional=True)
     )
 )
 def save(runner):
-    uri = 'file://%s' % urllib.quote(runner.opts.directory)
-    nonce = runner.opts.nonce.replace('"', '\\"')
+    uri = None
+    dir_specified = False
+    if runner.opts.directory is not None:
+        uri = 'file://%s' % urllib.quote(runner.opts.directory)
+        dir_specified = True
+
+    nonce = None
+    if runner.opts.nonce is not None:
+        nonce = runner.opts.nonce.replace('"', '\\"')
+    elif dir_specified:
+        runner.abort('When a DIRECTORY is given a NONCE must be specified as well.')
+    else:
+        runner.opts.format = 'native'
+        runner.opts.tables = None
+        runner.opts.skip_tables = None
+
     if runner.opts.blocking:
         blocking = 'true'
     else:
         blocking = 'false'
-    raw_json_opts = ['uripath:"%s"' % (uri),
-                     'nonce:"%s"' % (nonce),
-                     'block:%s' % (blocking),
-                     'format:"%s"' % (runner.opts.format)]
+    if uri is not None:
+        if nonce is not None:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'nonce:"%s"' % (nonce),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+        else:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+    else:
+        if nonce is not None:
+            raw_json_opts = ['uripath:"%s"' % (uri),
+                             'nonce:"%s"' % (nonce),
+                             'block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
+        else:
+            raw_json_opts = ['block:%s' % (blocking),
+                             'format:"%s"' % (runner.opts.format)]
     if runner.opts.tables:
         raw_json_opts.append('tables:%s' % (runner.opts.tables))
     if runner.opts.skip_tables:

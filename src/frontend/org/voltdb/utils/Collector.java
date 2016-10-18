@@ -17,21 +17,23 @@
 
 package org.voltdb.utils;
 
-import static org.voltdb.VoltDB.CONFIG_DIR;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -50,6 +52,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.processtools.SFTPSession;
@@ -60,7 +64,6 @@ import org.voltdb.types.TimestampType;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
-import org.voltdb.VoltDB;
 
 public class Collector {
     private static String m_configInfoPath = null;
@@ -225,7 +228,7 @@ public class Collector {
     }
 
     private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator;
+        String configLogDirPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator;
 
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
@@ -277,6 +280,44 @@ public class Collector {
         }
     }
 
+    private static String getLinuxOSInfo() {
+        // Supported Linux OS for voltdb are CentOS, Redhat and Ubuntu
+        String versionInfo = "";
+
+        BufferedReader br = null;
+        // files containing the distribution info
+        // Ubuntu - "/etc/lsb-release"
+        // Redhat, CentOS - "/etc/redhat-release"
+        final List<String> distInfoFilePaths = Arrays.asList("/etc/lsb-release",
+                                                            "/etc/redhat-release");
+        for (String filePath : distInfoFilePaths) {
+            if (Files.exists(Paths.get(filePath))) {
+                try {
+                    br = new BufferedReader(new FileReader(filePath));
+                }
+                catch (FileNotFoundException excp) {
+                    System.err.println(excp.getMessage());
+                }
+                break;
+            }
+        }
+
+        if (br != null) {
+            StringBuffer buffer = new StringBuffer();
+            try {
+                while ((versionInfo = br.readLine()) != null) {
+                    buffer.append(versionInfo);
+                }
+                versionInfo = buffer.toString();
+            }
+            catch (IOException io) {
+                System.err.println(io.getMessage());
+                versionInfo = "";
+            }
+        }
+        return versionInfo;
+    }
+
     private static Set<String> setCollection(boolean skipHeapDump) {
         Set<String> collectionFilesList = new HashSet<String>();
 
@@ -326,19 +367,23 @@ public class Collector {
             }
 
             String systemLogBase;
+            final String systemLogBaseDirPath = "/var/log/";
             if (System.getProperty("os.name").startsWith("Mac")) {
                 systemLogBase = "system.log";
             } else {
-                String[] unameCmd = {"bash", "-c", "lsb_release -id"};
-                Process p = Runtime.getRuntime().exec(unameCmd);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                String line = reader.readLine();
-                if (line.contains("Ubuntu"))
+                String versionInfo = getLinuxOSInfo();
+                if (versionInfo.contains("Ubuntu")) {
                     systemLogBase = "syslog";
-                else
+                }
+                else {
                     systemLogBase = "messages";
+                    if (versionInfo.isEmpty()) {
+                        System.err.println("Couldn't find distribution info for supported systems. Perform"
+                                + " lookup for system logs in files named: " + systemLogBase);
+                    }
+                }
             }
-            for (File file: new File("/var/log/").listFiles()) {
+            for (File file: new File(systemLogBaseDirPath).listFiles()) {
                 if (file.getName().startsWith(systemLogBase)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }

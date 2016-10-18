@@ -26,11 +26,17 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
+
+    public ClusterSettings getClusterSettings();
+
+    public PathSettings getPaths();
 
     public long getSpHandleForSnapshotDigest();
 
@@ -86,8 +92,8 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                         long lastReceivedDRId);
+    public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                        long lastReceivedDRId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);

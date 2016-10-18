@@ -68,6 +68,7 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
+        assert(ddlurl != null);
         String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();

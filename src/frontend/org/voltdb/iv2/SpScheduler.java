@@ -53,6 +53,8 @@ import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionResponseMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -161,6 +163,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
     // the truncation handle last sent to the replicas
     long m_lastSentTruncationHandle = Long.MIN_VALUE;
+    // the max schedule transaction sphandle, multi-fragments mp txn counts one
+    long m_maxScheduledTxnSpHandle = Long.MIN_VALUE;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -183,6 +187,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
+
+        // After SP leader promotion, a DummyTransactionTaskMessage is generated from the new leader.
+        // This READ ONLY message will serve as a synchronization point on all replicas of this
+        // partition, like normal SP write transaction that has to finish executing on all replicas.
+        // In this way, the leader can make sure all replicas have finished replaying
+        // all their repair logs entries.
+        // From now on, the new leader is safe to accept new transactions. See ENG-11110.
+        // Deliver here is to make sure it's the first message on the new leader.
+        deliver(new DummyTransactionTaskMessage());
     }
 
     @Override
@@ -248,7 +261,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final TransactionState txn = m_outstandingTxns.get(key.m_txnId);
             if (txn == null || txn.isDone()) {
                 m_outstandingTxns.remove(key.m_txnId);
-                setRepairLogTruncationHandle(key.m_spHandle);
+                // for MP write txns, we should use it's first SpHandle in the TransactionState
+                // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
+                long m_safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
+                setRepairLogTruncationHandle(m_safeSpHandle);
             }
 
             VoltMessage resp = counter.getLastResponse();
@@ -315,26 +331,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDRv1()));
-
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || dr;
+        boolean replay = commandLog || sentinel;
         boolean sequenceForReplay = m_isLeader && replay;
 
-        assert(!(commandLog && dr));
-
-        if (commandLog || sentinel) {
+        if (replay) {
             sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
         }
-        //--------------------------------------------
-        // DRv1 path, mark for future removal
-        else if (dr) {
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
-            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-        //--------------------------------------------
 
         if (sequenceForReplay) {
             InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithUniqueId,
@@ -409,6 +413,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
         }
+        else if (message instanceof DummyTransactionTaskMessage) {
+            handleDummyTransactionTaskMessage((DummyTransactionTaskMessage) message);
+        }
+        else if (message instanceof DummyTransactionResponseMessage) {
+            handleDummyTransactionResponseMessage((DummyTransactionResponseMessage)message);
+        }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
@@ -457,13 +467,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     hostLog.fatal("Invocation: " + message);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-            } else if (message.isForDRv1()) {
-                assert false : "DRv1 is not supported";
-                uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
-                // @LoadSinglepartitionTable does not have a valid uid
-                if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
-                }
             }
 
             /*
@@ -473,9 +476,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+                updateMaxScheduledTransactionSpHandle(newSpHandle);
                 uniqueId = m_uniqueIdGenerator.getNextUniqueId();
             } else {
                 /*
@@ -488,8 +493,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
                         0,
                         m_uniqueIdGenerator.partitionId);
-                //Don't think it wise to make a new one for a short circuit read
-                newSpHandle = getMaxTaskedSpHandle();
+
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             // Need to set the SP handle on the received message
@@ -808,8 +813,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
+
+                if (m_outstandingTxns.get(msg.getTxnId()) == null) {
+                    updateMaxScheduledTransactionSpHandle(newSpHandle);
+                }
+
             } else {
-                newSpHandle = getMaxTaskedSpHandle();
+                newSpHandle = m_maxScheduledTxnSpHandle;
             }
 
             msg.setSpHandle(newSpHandle);
@@ -877,7 +887,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(msg.getSpHandle(), msg);
+            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly());
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
@@ -994,30 +1004,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
-            // doing duplicate suppresion: all done.
+            // doing duplicate suppression: all done.
             return;
-        } else {
-            // No k-safety means no replica: read/write queries on master.
-            // K-safety: read-only queries (on master) or write queries (on replica).
-            if (txn == null) {
-                // this is one-shot read that should be released only when previous writes are all acked
-                if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                    m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
-                    return;
-                }
-            } else {
-                if (txn.isReadOnly()) {
-                    // non early flush read MP
-                    if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
-                        m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
-                        return;
-                    }
-                } else if (txn.isDone()) {
-                    // when write transaction is done
-                    setRepairLogTruncationHandle(txn.m_spHandle);
-                }
+        }
 
-            }
+        // No k-safety means no replica: read/write queries on master.
+        // K-safety: read-only queries (on master) or write queries (on replica).
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
+                && (txn == null || txn.isReadOnly()) ) {
+            // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
+            // we will have to buffer these reads until previous writes acked in the cluster.
+            long readTxnId = txn == null ? message.getSpHandle() : txn.m_spHandle;
+            m_bufferedReadLog.offer(m_mailbox, message, readTxnId, m_repairLogTruncationHandle);
+            return;
+        }
+
+        // for complete writes txn, we will advance the transaction point
+        if (txn != null && !txn.isReadOnly() && txn.isDone()) {
+            setRepairLogTruncationHandle(txn.m_spHandle);
         }
 
         m_mailbox.send(message.getDestinationSiteId(), message);
@@ -1030,9 +1034,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
-            if (!msg.isForReplay()) {
-                advanceTxnEgo();
-            }
+            advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
 
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
@@ -1155,8 +1157,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn("" + who + ": most recent SP handle: " + getCurrentTxnId() + " " +
-                TxnEgo.txnIdToString(getCurrentTxnId()));
+        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
         hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
         hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
@@ -1167,6 +1168,69 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
     }
+
+    private void handleDummyTransactionTaskMessage(DummyTransactionTaskMessage message)
+    {
+        DummyTransactionTaskMessage msg = message;
+        if (m_isLeader) {
+            TxnEgo ego = advanceTxnEgo();
+            long newSpHandle = ego.getTxnId();
+            updateMaxScheduledTransactionSpHandle(newSpHandle);
+            // this uniqueId is needed as the command log tracks it (uniqueId has to advance)
+            long uniqueId = m_uniqueIdGenerator.getNextUniqueId();
+            msg = new DummyTransactionTaskMessage(m_mailbox.getHSId(), newSpHandle, uniqueId);
+
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, msg);
+
+                DuplicateCounter counter = new DuplicateCounter(
+                        HostMessenger.VALHALLA,
+                        msg.getTxnId(),
+                        m_replicaHSIds,
+                        msg);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+            }
+        } else {
+            setMaxSeenTxnId(msg.getSpHandle());
+        }
+        Iv2Trace.logDummyTransactionTaskMessage(msg, m_mailbox.getHSId());
+
+        DummyTransactionTask task = new DummyTransactionTask(m_mailbox,
+                new SpTransactionState(msg), m_pendingTasks);
+        // This read only DummyTransactionTask is to help flushing the task queue,
+        // including tasks in command log queue as well.
+        ListenableFuture<Object> durabilityBackpressureFuture =
+                m_cl.log(null, msg.getSpHandle(), null,  m_durabilityListener, task);
+        // Durability future is always null for sync command logging
+        // the transaction will be delivered again by the CL for execution once durable
+        // Async command logging has to offer the task immediately with a Future for backpressure
+        if (m_cl.canOfferTask()) {
+            assert durabilityBackpressureFuture != null;
+            m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
+        }
+    }
+
+    private void handleDummyTransactionResponseMessage(DummyTransactionResponseMessage message) {
+        final long spHandle = message.getSpHandle();
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
+        if (counter == null) {
+            // this will be on SPI without k-safety or replica only with k-safety
+            setRepairLogTruncationHandle(spHandle);
+            if (!m_isLeader) {
+                m_mailbox.send(message.getSPIHSId(), message);
+            }
+            return;
+        }
+
+        int result = counter.offer(message);
+        if (result == DuplicateCounter.DONE) {
+            // DummyTransactionResponseMessage ends on SPI
+            m_duplicateCounters.remove(dcKey);
+            setRepairLogTruncationHandle(spHandle);
+        }
+    }
+
 
     @Override
     public void setCommandLog(CommandLog cl) {
@@ -1270,6 +1334,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
+
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
+            tmLog.info("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
+                + (m_defaultConsistencyReadLevel == Consistency.ReadLevel.SAFE ? m_bufferedReadLog.toString() : ""));
+        }
     }
 
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
@@ -1277,6 +1346,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
             m_bufferedReadLog = new BufferedReadLog();
         }
+    }
+
+    private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
+        m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
     }
 
     private long getRepairLogTruncationHandleForReplicas()
@@ -1287,10 +1360,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void setRepairLogTruncationHandle(long newHandle)
     {
-        assert newHandle >= m_repairLogTruncationHandle : "new handle: " + newHandle + ", repairLog:" + m_repairLogTruncationHandle;
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
 
+            // We have to advance the local truncation point on the replica. It's important for
+            // node promotion when there are no missing repair log transactions on the replica.
+            // Because we still want to release the reads if no following writes will come to this replica.
             if (! m_isLeader) {
                 return;
             }
@@ -1298,6 +1373,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
             }
             scheduleRepairLogTruncateMsg();
+        } else {
+            // As far as I know, they are cases that will move truncation handle backwards.
+            // These include node failures (promotion phase) and node rejoin (early rejoin phase).
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                        "to" + TxnEgo.txnIdToString(newHandle));
+            }
         }
     }
 

@@ -42,6 +42,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 public class TestCatalogDiffs extends TestCase {
+    static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
 
     Class<?>[] BASEPROCS =     { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
@@ -1393,7 +1394,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -1415,7 +1416,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -1450,7 +1451,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -1472,7 +1473,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">exportdata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "            <property name=\"iamnew\">see_me_roar</property>"
                 + "        </configuration>"
                 + "    </export>"
@@ -1495,7 +1496,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "            <property name=\"type\">TSV</property>"
                 + "            <property name=\"with-schema\">true</property>"
                 + "            <property name=\"nonce\">pre-fix-other</property>"
-                + "            <property name=\"outdir\">exportdatadata</property>"
+                + "            <property name=\"outdir\">"+m_dir+"</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";

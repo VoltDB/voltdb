@@ -42,6 +42,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -95,15 +96,17 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -266,6 +269,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
         @Override
+        public ClusterSettings getClusterSettings() {
+            return m_context.getClusterSettings();
+        }
+
+        @Override
+        public PathSettings getPaths() {
+            return m_context.getPaths();
+        }
+
+        @Override
         public Database getDatabase() {
             return m_context.database;
         }
@@ -421,18 +434,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         /**
          * Check to see if binary log is expected (start DR id adjacent to last received DR id)
-         *
-         * @return 0 expected, -1 duplicated binary log, 1 future binary log
          */
         @Override
-        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                             long lastReceivedDRId)
+        public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                            long lastReceivedDRId)
         {
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
                 // Don't have a tracker for this cluster
                 if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
-                    return (byte)0;
+                    return DRIdempotencyResult.SUCCESS;
                 } else {
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
@@ -447,7 +458,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (targetTracker == null) {
                     // Don't have a tracker for this partition
                     if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
-                        return (byte)0;
+                        return DRIdempotencyResult.SUCCESS;
                     } else {
                         if (drLog.isTraceEnabled()) {
                             drLog.trace(String.format("P%d binary log site idempotency check failed. " +
@@ -463,11 +474,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     final long lastDrId = targetTracker.getLastDrId();
                     if (lastDrId == lastReceivedDRId) {
                         // This is what we expected
-                        return (byte)0;
+                        return DRIdempotencyResult.SUCCESS;
                     }
                     if (lastDrId > lastReceivedDRId) {
                         // This is a duplicate
-                        return (byte)-1;
+                        return DRIdempotencyResult.DUPLICATE;
                     }
 
                     if (drLog.isTraceEnabled()) {
@@ -479,7 +490,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                 }
             }
-            return (byte)1;
+            return DRIdempotencyResult.GAP;
         }
 
         @Override
@@ -1481,6 +1492,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 }
                 foundSinglepartTxnId = true;
                 m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
+                setSpHandleForSnapshotDigest(txnId);
             }
             if (!skipMultiPart && TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
                 if (foundMultipartTxnId) {

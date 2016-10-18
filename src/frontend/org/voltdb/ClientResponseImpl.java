@@ -88,7 +88,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, handle);
     }
 
-    ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
+    public ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
         this.appStatus = appStatus;
         this.appStatusString = appStatusString;
         setResults(status, results, statusString);

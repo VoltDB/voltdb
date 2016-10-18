@@ -55,6 +55,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -63,7 +64,6 @@ import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -1222,7 +1222,7 @@ SnapshotCompletionInterest, Promotable
         Config restore = SystemProcedureCatalog.listing.get(procedureName);
         Procedure restoreProc = restore.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.procName = procedureName;
+        spi.setProcName(procedureName);
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {

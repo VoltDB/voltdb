@@ -14,22 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "common/FullTupleSerializer.h"
-#include "common/serializeio.h"
-#include "common/TupleSchema.h"
 
-namespace voltdb {
-/**
- * Serialize the provided tuple to the provide serialize output
- */
-void FullTupleSerializer::serializeTo(TableTuple tuple, ReferenceSerializeOutput *out) {
-    tuple.serializeTo(*out, true);
-}
+package org.voltdb;
 
-/**
- * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
- */
-size_t FullTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema) {
-    return schema->getMaxSerializedTupleSize(true);
-}
+import org.voltdb.client.ClientResponse;
+import org.voltdb.messaging.Dr2MultipartResponseMessage;
+import org.voltdb.messaging.Dr2MultipartTaskMessage;
+
+public interface DRConsumerMpCoordinator {
+
+    void deliver(Dr2MultipartTaskMessage message);
+
+    void deliver(Dr2MultipartResponseMessage message);
+
+    void processClientResponse(int handle, ClientResponse response);
+
+    void becomeLeader();
+
+    void shutdown();
 }

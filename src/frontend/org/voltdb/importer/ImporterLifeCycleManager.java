@@ -225,7 +225,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             public void run() {
                 try {
                     importer.accept();
-                } catch(Exception e) {
+                } catch(Throwable e) {
                     s_logger.error(
                         String.format("Error calling accept for importer %s", m_factory.getTypeName()),
                         e);

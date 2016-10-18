@@ -144,6 +144,12 @@ public class PlannerTestCase extends TestCase {
         return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
     }
 
+    protected List<AbstractPlanNode> compileInvalidToFragments(String sql) {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, m_defaultParamCount,
+                planForSinglePartitionFalse, m_noJoinOrder);
+    }
+
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
@@ -166,15 +172,22 @@ public class PlannerTestCase extends TestCase {
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder) {
-        // Yes, we ARE assuming that test queries don't contain quoted question marks.
-        int paramCount = StringUtils.countMatches(sql, "?");
-        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
+        try {
+            // Yes, we ARE assuming that test queries don't contain quoted question marks.
+            int paramCount = StringUtils.countMatches(sql, "?");
+            return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
+        }
+        catch (PlanningErrorException pe) {
+            fail("Query: '" + sql + "' threw " + pe);
+            return null; // dead code.
+        }
     }
 
     /** A helper here where the junit test can assert success */
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
                                                                    boolean planForSinglePartition,
                                                                    String joinOrder) {
+        //* enable to debug */ System.out.println("DEBUG: compileWithJoinOrderToFragments(\"" + sql + "\", " + planForSinglePartition + ", \"" + joinOrder + "\")");
         List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
@@ -454,7 +467,6 @@ public class PlannerTestCase extends TestCase {
     private static void ensureTable(int data[][]) {
         // Ensure there is at least one row, and that
         // all rows have the same length.
-        assertTrue(data.length > 0);
         for (int idx = 1; idx < data.length; idx += 1) {
             assertTrue(data[idx].length == data[0].length);
         }
@@ -486,6 +498,9 @@ public class PlannerTestCase extends TestCase {
         }
         public int getColCount() {
             // TODO Auto-generated method stub
+            if (m_data.length == 0) {
+                return 0;
+            }
             return m_data[0].length;
         }
         public Object getColumnNamesName() {
@@ -736,7 +751,10 @@ public class PlannerTestCase extends TestCase {
             return m_expectedOutput.length;
         }
         public int    getColCount() {
-            return m_expectedOutput[0].length;
+            if (m_expectedOutput.length > 0) {
+                return m_expectedOutput[0].length;
+            }
+            return 0;
         }
         public String getColCountName() {
             return String.format("NUM_OUTPUT_COLS_%s", m_testName.toUpperCase());

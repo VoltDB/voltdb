@@ -414,7 +414,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
+    void serializeTo(voltdb::SerializeOutput& output, bool includeHiddenColumns = false) const;
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -951,7 +951,7 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
     }
 }
 
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) {
+inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) const {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {

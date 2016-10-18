@@ -179,19 +179,8 @@
                             <div id="GraphBlock" class="">
                                 <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
                             </div>
-
                         </div>
                         <div class="rightShowhide">
-                            <div class="sliderGraph">
-                                <div class="labelSlider">
-                                    <label for="timeInterval">Retained Time Interval:</label>
-                                <input type="text" id="timeInterval" readonly ><span>mins</span>
-
-
-                                </div>
-                                <div id="slider-range-min" class="sliderMain"></div>
-                            </div>
-
                             <ul class="rightShowhideList" id="showHideRightlist">
                                 <li class="viewSelect">
                                     <label>View</label>
@@ -672,10 +661,10 @@
                                 </tr>
                                 <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
                                     <td class="configLabel">File Prefix </td>
-                                    <td align="right" class="tdSnapshotPrefix">
+                                    <td class="tdSnapshotPrefix" align="right">
                                         <form id="frmSnapshotFilePrefix" method="get" action="">
                                             <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
-                                            <span id="prefixSpan"></span>
+                                            <span id="prefixSpan" class="wordBreak"></span>
                                             <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
                                             <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
                                         </form>

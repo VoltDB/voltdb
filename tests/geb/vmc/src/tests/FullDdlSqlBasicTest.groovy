@@ -34,10 +34,10 @@ import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase
 /**
  * This class tests the 'fullDDL.sql' file in the VMC, by running its queries
  * on the 'SQL Query' tab of the VoltDB Management Center (VMC) page, and
- * validates the results by running the test methods in the TestDDLFeatures
- * class.
+ * validates the results by running the JUnit test methods in the TestDDLFeatures
+ * class, via reflection.
  */
-class FullDdlSqlTest extends SqlQueriesTestBase {
+class FullDdlSqlBasicTest extends SqlQueriesTestBase {
     static final String FULL_DDL_FILE = '../../frontend/org/voltdb/fullddlfeatures/fullDDL.sql';
 
     @Shared def fullDdlFile = new File(FULL_DDL_FILE)
