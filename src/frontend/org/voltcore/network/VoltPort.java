@@ -27,7 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.SSLMessageDecrypter;
+import org.voltcore.utils.ssl.SSLMessageDecrypter;
 
 import javax.net.ssl.SSLEngine;
 

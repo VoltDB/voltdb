@@ -15,8 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.utils;
+package org.voltcore.utils.ssl;
 
+import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;

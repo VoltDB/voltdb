@@ -27,8 +27,8 @@ import java.util.Iterator;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.SSLDeferredSerializationIterator;
-import org.voltcore.utils.Serializer;
+import org.voltcore.utils.ssl.SSLDeferredSerializationIterator;
+import org.voltcore.utils.ssl.Serializer;
 
 import javax.net.ssl.SSLEngine;
 

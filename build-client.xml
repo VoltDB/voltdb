@@ -110,14 +110,14 @@
                   org/voltcore/utils/InstanceId.java
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
-                  org/voltcore/utils/Serializer.java
-                  org/voltcore/utils/SSLDeferredSerialization.java
-                  org/voltcore/utils/SSLDeferredSerializationIterator.java
-                  org/voltcore/utils/SSLMessageDecrypter.java
                   org/voltcore/utils/Bits.java
                   org/voltcore/utils/LatencyWatchdog.java
                   org/voltcore/utils/CompressionStrategy.java
                   org/voltcore/utils/VoltTypeUtil.java
+                  org/voltcore/utils/ssl/Serializer.java
+                  org/voltcore/utils/ssl/SSLDeferredSerialization.java
+                  org/voltcore/utils/ssl/SSLDeferredSerializationIterator.java
+                  org/voltcore/utils/ssl/SSLMessageDecrypter.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java

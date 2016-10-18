@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.utils;
+package org.voltcore.utils.ssl;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
