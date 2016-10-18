@@ -1216,7 +1216,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("mismatched shutdown snapshots nonces"));
+            assertTrue(VoltDB.crashMessage.contains("have different shutdown snapshots nonces"));
         }
     }
 
