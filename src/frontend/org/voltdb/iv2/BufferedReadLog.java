@@ -120,11 +120,15 @@ public class BufferedReadLog
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("BufferedReadLog contents:");
-        Iterator<Item> itr = m_bufferedReads.iterator();
-        for(int i = 0; itr.hasNext(); i++)  {
-            sb.append("           ").append(i).append(":").append(itr.next().toString()).append("\n");
+        sb.append("BufferedReadLog size:").append(m_bufferedReads.size());
+        if (m_bufferedReads.size() > 0) {
+            sb.append(", contents:\n");
+            Iterator<Item> itr = m_bufferedReads.iterator();
+            for(int i = 0; itr.hasNext(); i++)  {
+                sb.append("BufferedReadLog entry[").append(i).append("]:").append(itr.next().toString()).append("\n");
+            }
         }
+
         return sb.toString();
     }
 }
