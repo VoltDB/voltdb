@@ -99,10 +99,10 @@ class TestBase extends GebReportingSpec {
             boolean sqlQueryPage  = page.isSqlQueryPageOpen()
             doesExpectedPageOpenFirst = dbMonitorPage || adminPage || schemaPage || sqlQueryPage
             debugPrint 'Initially open Page [in TestBase.setup()]: ' + page.toString()
-            debugPrint '  is DbMonitor : ' + dbMonitorPage
-            debugPrint '  is isAdmin   : ' + adminPage
-            debugPrint '  is isSchema  : ' + schemaPage
-            debugPrint '  is isSqlQuery: ' + sqlQueryPage
+            debugPrint '  isDbMonitorPage: ' + dbMonitorPage
+            debugPrint '  isAdminPage    : ' + adminPage
+            debugPrint '  isSchemaPage   : ' + schemaPage
+            debugPrint '  isSqlQueryPage : ' + sqlQueryPage
         }
     }
 
