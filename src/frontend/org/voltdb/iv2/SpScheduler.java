@@ -180,6 +180,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_bufferedReadLog = new BufferedReadLog();
         }
         m_repairLogTruncationHandle = getCurrentTxnId();
+        // initialized as current txn id in order to release the initial reads into the system
+        m_maxScheduledTxnSpHandle = getCurrentTxnId();
     }
 
     @Override
@@ -485,7 +487,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         0,
                         m_uniqueIdGenerator.partitionId);
 
-                newSpHandle = m_maxScheduledTxnSpHandle;
+                newSpHandle = getMaxScheduledTxnSpHandle();
             }
 
             // Need to set the SP handle on the received message
@@ -748,7 +750,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // borrows do not advance the sp handle. The handle would
         // move backwards anyway once the next message is received
         // from the SP leader.
-        long newSpHandle = getMaxTaskedSpHandle();
+        long newSpHandle = getMaxScheduledTxnSpHandle();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -808,9 +810,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (m_outstandingTxns.get(msg.getTxnId()) == null) {
                     updateMaxScheduledTransactionSpHandle(newSpHandle);
                 }
-
             } else {
-                newSpHandle = m_maxScheduledTxnSpHandle;
+                newSpHandle = getMaxScheduledTxnSpHandle();
             }
 
             msg.setSpHandle(newSpHandle);
@@ -1341,6 +1342,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
         m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
+    }
+
+    private long getMaxScheduledTxnSpHandle() {
+        return m_maxScheduledTxnSpHandle;
     }
 
     private long getRepairLogTruncationHandleForReplicas()
