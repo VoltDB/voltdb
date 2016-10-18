@@ -23,25 +23,17 @@ package org.voltdb.importclient.kafka;
 public enum KafkaImporterCommitPolicy {
 
         COMMIT_POLICY_TIME,
-        COMMIT_POLICY_BYTES,
-        COMMIT_POLICY_TRANSACTION,
         COMMIT_POLICY_NONE;
 
         public static final KafkaImporterCommitPolicy fromString(String policy) {
             if (policy == null) return COMMIT_POLICY_NONE;
             if (policy.endsWith("ms")) return COMMIT_POLICY_TIME;
-            if (policy.endsWith("t")) return COMMIT_POLICY_TRANSACTION;
-            if (policy.endsWith("b")) return COMMIT_POLICY_BYTES;
             return COMMIT_POLICY_NONE;
         };
         public static final long fromStringTriggerValue(String policy, KafkaImporterCommitPolicy prop) {
             switch (prop) {
                 case COMMIT_POLICY_TIME:
                     return Long.parseLong(policy.replaceAll("ms", ""));
-                case COMMIT_POLICY_BYTES:
-                    return Long.parseLong(policy.replaceAll("b", ""));
-                case COMMIT_POLICY_TRANSACTION:
-                    return Long.parseLong(policy.replaceAll("t", ""));
             }
             return 0;
         };

@@ -81,8 +81,18 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
-        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+        KafkaImporterCommitPolicy cp;
+        long triggerValue;
+        try {
+            cp = KafkaImporterCommitPolicy.fromString(commitPolicy);
+            triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, cp);
+        } catch (Exception ex) {
+            m_logger.warn("Failed to configure commit policy: " + commitPolicy);
+            cp = KafkaImporterCommitPolicy.COMMIT_POLICY_NONE;
+            triggerValue = 0;
+        }
+        m_commitPolicy = cp;
+        m_triggerValue = triggerValue;
 
         m_formatterBuilder = formatterBuilder;
     }

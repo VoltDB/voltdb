@@ -75,7 +75,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     //Start with invalid so consumer will fetch it.
     private final AtomicLong m_currentOffset = new AtomicLong(-1);
     private long m_lastCommittedOffset = -1;
-    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<BlockingChannel>();
+    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<>();
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
@@ -84,6 +84,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private HostAndPort m_coordinator;
     private final FetchRequestBuilder m_fetchRequestBuilder;
     boolean noTransaction = false;
+    //Counters for commit policies.
+    private long m_lastCommitTime = 0;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
@@ -362,11 +364,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 );
     }
 
-    //Counters for commit policies.
-    private long m_lastCommitTime = 0;
-    private long m_bytesFetched = 0;
-    private long m_messagesFetched = 0;
-
     @Override
     protected void accept() {
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
@@ -446,7 +443,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 sleepCounter = 1;
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
-                    m_messagesFetched++;
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
                     long currentOffset = messageAndOffset.offset();
@@ -463,7 +459,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    m_bytesFetched += line.length();
                     try {
                         m_gapTracker.submit(messageAndOffset.nextOffset());
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
@@ -497,15 +492,15 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         } catch (InterruptedException ie) {
                         }
                 }
-                if (commitOffset(m_bytesFetched, m_messagesFetched, false)) {
-                    resetCounters();
+                if (shouldCommit()) {
+                    commitOffset();
                 }
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
             //Dont care about return as it wil force a commit.
-            commitOffset(m_bytesFetched, m_messagesFetched, true);
+            commitOffset();
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
             BlockingChannel channel = m_offsetManager.getAndSet(null);
@@ -521,34 +516,23 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     }
 
-    public boolean shouldCommit(long bytesFetched, long messagesFetched, boolean force) {
-        if (force) return true;
+    //Based on commit policy
+    public boolean shouldCommit() {
         switch(m_config.getCommitPolicy()) {
             case COMMIT_POLICY_TIME:
                 return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
-            case COMMIT_POLICY_BYTES:
-                return (bytesFetched > m_config.getTriggerValue());
-            case COMMIT_POLICY_TRANSACTION:
-                return (messagesFetched > m_config.getTriggerValue());
         }
         return true;
     }
 
-    public boolean resetCounters() {
-        boolean commit = false;
+    public void resetCounters() {
         switch(m_config.getCommitPolicy()) {
             case COMMIT_POLICY_TIME:
                 m_lastCommitTime = EstTime.currentTimeMillis();
-            case COMMIT_POLICY_BYTES:
-                m_bytesFetched = 0;
-            case COMMIT_POLICY_TRANSACTION:
-                m_messagesFetched = 0;
         }
-        return commit;
     }
 
-    public boolean commitOffset(long bytesFetched, long messagesFetched, boolean force) {
-        if (!shouldCommit(bytesFetched, messagesFetched, force)) return false;
+    public boolean commitOffset() {
         final short version = 1;
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
@@ -597,6 +581,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 return false;
             }
             m_lastCommittedOffset = safe;
+            resetCounters();
             return true;
         }
 
