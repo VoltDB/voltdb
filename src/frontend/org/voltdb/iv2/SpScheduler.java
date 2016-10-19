@@ -765,12 +765,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             txn = new BorrowTransactionState(newSpHandle, message);
         }
 
-
+        // BorrowTask is a read only task embedded in a MP transaction
+        // and its response (FragmentResponseMessage) should not be buffered
         if (message.getFragmentTaskMessage().isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, message.getFragmentTaskMessage(),
                                         message.getInputDepMap());
+            task.setResponseNotBufferable();
             m_pendingTasks.offer(task);
         }
         else {
@@ -778,6 +780,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                         m_pendingTasks, message.getFragmentTaskMessage(),
                         message.getInputDepMap());
+            task.setResponseNotBufferable();
             m_pendingTasks.offer(task);
         }
     }
@@ -1003,6 +1006,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
+                && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
             // we will have to buffer these reads until previous writes acked in the cluster.

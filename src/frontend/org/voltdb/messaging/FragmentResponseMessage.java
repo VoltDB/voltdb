@@ -50,6 +50,7 @@ public class FragmentResponseMessage extends VoltMessage {
     // Not currently used; leaving it in for now
     boolean m_dirty = true;
     boolean m_recovering = false;
+    boolean m_respBufferable = true;
     // WHA?  Why do we have a separate dependency count when
     // the array lists will tell you their lengths?  Doesn't look like
     // we do anything else with this value other than track the length
@@ -85,6 +86,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_status = resp.m_status;
         m_dirty = resp.m_dirty;
         m_recovering = resp.m_recovering;
+        m_respBufferable = resp.m_respBufferable;
         m_exception = resp.m_exception;
         m_subject = Subject.DEFAULT.getId();
     }
@@ -136,6 +138,14 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_spHandle;
     }
 
+    public boolean getRespBufferable() {
+        return m_respBufferable;
+    }
+
+    public void setRespBufferable(boolean respBufferable) {
+        m_respBufferable = respBufferable;
+    }
+
     public byte getStatusCode() {
         return m_status;
     }
@@ -168,6 +178,7 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // status byte
             + 1 // dirty flag
             + 1 // node recovering flag
+            + 1 // response bufferable flag
             + 2; // dependency count
 
         // one int per dependency ID
@@ -206,6 +217,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put(m_status);
         buf.put((byte) (m_dirty ? 1 : 0));
         buf.put((byte) (m_recovering ? 1 : 0));
+        buf.put((byte) (m_respBufferable ? 1 : 0));
         buf.putShort(m_dependencyCount);
         for (int i = 0; i < m_dependencyCount; i++)
             buf.putInt(m_dependencyIds.get(i));
@@ -240,6 +252,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_status = buf.get();
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
+        m_respBufferable = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
@@ -279,6 +292,11 @@ public class FragmentResponseMessage extends VoltMessage {
             sb.append("\n  DIRTY");
         else
             sb.append("\n  PRISTINE");
+
+        if (m_respBufferable)
+            sb.append("\n  BUFFERABLE");
+        else
+            sb.append("\n  NOT BUFFERABLE");
 
         for (int i = 0; i < m_dependencyCount; i++) {
             sb.append("\n  DEP ").append(m_dependencyIds.get(i));
