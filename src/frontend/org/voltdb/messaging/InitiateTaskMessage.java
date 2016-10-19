@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.TxnEgo;
 
 
 /**
@@ -218,7 +219,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(TxnEgo.txnIdToString(m_txnId));
 
         sb.append("\n");
         if (m_isReadOnly)

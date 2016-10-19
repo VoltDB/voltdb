@@ -494,11 +494,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             assert(destEmptyTable);
             auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
             bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
-            new MaterializedViewHandler(destEmptyTable,
-                                        mvHandlerInfo,
-                                        engine,
-                                        populateInitialTuple,
-                                        fallible);
+            MaterializedViewHandler *newHandler = new MaterializedViewHandler(destEmptyTable,
+                                                                              mvHandlerInfo,
+                                                                              engine);
+            if (populateInitialTuple) {
+                newHandler->catchUpWithExistingData(engine, fallible);
+            }
         }
     }
 
@@ -1928,8 +1929,7 @@ void PersistentTable::addIndex(TableIndex *index) {
     m_noAvailableUniqueIndex = false;
     m_smallestUniqueIndex = NULL;
     m_smallestUniqueIndexCrc = 0;
-    // Need to reconstruct the materialized views when a new index is created on the source table.
-    // Because the query plans to refresh the view may be changed.
+    // Mark view handlers that need to be reconstructed as dirty.
     polluteViews();
 }
 
@@ -1957,8 +1957,7 @@ void PersistentTable::removeIndex(TableIndex *index) {
     delete index;
     m_smallestUniqueIndex = NULL;
     m_smallestUniqueIndexCrc = 0;
-    // Need to reconstruct the materialized views when an index is removed from the source table.
-    // Because the query plans to refresh the view may be changed.
+    // Mark view handlers that need to be reconstructed as dirty.
     polluteViews();
 }
 
@@ -2009,8 +2008,18 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler *viewHandler) {
 }
 
 void PersistentTable::polluteViews() {
+    //   This method will be called every time when an index is added or dropped
+    // from the table to update the joined table view handler properly.
+    //   If the current table is a view source table, adding / dropping an index
+    // may change the plan to refresh the view, therefore all the handlers that
+    // use the current table as one of their sources need to be updated.
+    //   If the current table is a view target table, we need to refresh the list
+    // of tracked indices so that the data in the table and its indices can be in sync.
     BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
         mvHanlder->pollute();
+    }
+    if (m_mvHandler) {
+        m_mvHandler->pollute();
     }
 }
 

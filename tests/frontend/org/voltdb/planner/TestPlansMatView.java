@@ -169,7 +169,7 @@ public class TestPlansMatView extends PlannerTestCase {
         List<AbstractPlanNode> pns;
 
         try {
-            pns = compileToFragments("SELECT * FROM P X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
+            pns = compileInvalidToFragments("SELECT * FROM P X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -181,7 +181,7 @@ public class TestPlansMatView extends PlannerTestCase {
         }
 
         try {
-            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM R Y WHERE Y.VAL1 = X.SUM_V1)");
+            pns = compileInvalidToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM R Y WHERE Y.VAL1 = X.SUM_V1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -193,7 +193,7 @@ public class TestPlansMatView extends PlannerTestCase {
         }
 
         try {
-            pns = compileToFragments("SELECT * FROM R X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
+            pns = compileInvalidToFragments("SELECT * FROM R X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -205,7 +205,7 @@ public class TestPlansMatView extends PlannerTestCase {
         }
 
         try {
-            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM P Y WHERE Y.VAL1 = X.SUM_V1)");
+            pns = compileInvalidToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM P Y WHERE Y.VAL1 = X.SUM_V1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -217,7 +217,7 @@ public class TestPlansMatView extends PlannerTestCase {
         }
 
         try {
-            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.SUM_V1)");
+            pns = compileInvalidToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.SUM_V1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -229,7 +229,7 @@ public class TestPlansMatView extends PlannerTestCase {
         }
 
         try {
-            pns = compileToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VP Y WHERE Y.SUM_V1 = X.SUM_V1)");
+            pns = compileInvalidToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VP Y WHERE Y.SUM_V1 = X.SUM_V1)");
             //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");
@@ -246,7 +246,7 @@ public class TestPlansMatView extends PlannerTestCase {
         //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
 
         try {
-            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
+            pns = compileInvalidToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
             /* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
             /* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
             fail("unexpected success for partitioned view query with subquery.");

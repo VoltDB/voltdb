@@ -47,6 +47,10 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte SNAPSHOT_CHECK_REQUEST_ID = VOLTCORE_MESSAGE_ID_MAX + 21;
     final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
     final public static byte IV2_REPAIR_LOG_TRUNCATION = VOLTCORE_MESSAGE_ID_MAX + 23;
+    final public static byte DR2_MULTIPART_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 24;
+    final public static byte DR2_MULTIPART_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 25;
+    final public static byte DUMMY_TRANSACTION_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 26;
+    final public static byte DUMMY_TRANSACTION_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 27;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -128,6 +132,18 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case IV2_REPAIR_LOG_TRUNCATION:
             message = new RepairLogTruncationMessage();
+            break;
+        case DR2_MULTIPART_TASK_ID:
+            message = new Dr2MultipartTaskMessage();
+            break;
+        case DR2_MULTIPART_RESPONSE_ID:
+            message = new Dr2MultipartResponseMessage();
+            break;
+        case DUMMY_TRANSACTION_TASK_ID:
+            message = new DummyTransactionTaskMessage();
+            break;
+        case DUMMY_TRANSACTION_RESPONSE_ID:
+            message = new DummyTransactionResponseMessage();
             break;
         default:
             message = null;

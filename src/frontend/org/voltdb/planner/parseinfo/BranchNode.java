@@ -274,6 +274,7 @@ public class BranchNode extends JoinNode {
     protected void collectEquivalenceFilters(
             HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
             ArrayDeque<JoinNode> joinNodes) {
+        //* enable to debug */ System.out.println("DEBUG: Branch cEF in  " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
         if ( ! m_whereInnerList.isEmpty()) {
             ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
                                                       equivalenceSet);
@@ -290,11 +291,10 @@ public class BranchNode extends JoinNode {
             ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList,
                                                       equivalenceSet);
         }
+        // One-sided join criteria can not be used to infer single partitioining for a
+        // non-inner query. In general, they do not prevent results from being generated
+        // on the partitions that don't have partition-key-qualified rows.
         if (m_joinType == JoinType.INNER) {
-            // HSQL sometimes tags single-table filters in inner joins as join clauses
-            // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-            // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-            // conditions that determine partitioning, so process them as where clauses.
             if ( ! m_joinInnerList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
                                                           equivalenceSet);
@@ -304,12 +304,14 @@ public class BranchNode extends JoinNode {
                                                           equivalenceSet);
             }
         }
+
         if (m_leftNode != null) {
             joinNodes.add(m_leftNode);
         }
         if (m_rightNode != null) {
             joinNodes.add(m_rightNode);
         }
+        //* enable to debug */ System.out.println("DEBUG: Branch cEF out " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
     }
 
     /**

@@ -57,6 +57,8 @@ import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.modular.ModuleManager;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -404,7 +406,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        m_rvdb.m_clusterSettings,
+                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_paths),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
@@ -483,7 +485,8 @@ public class Inits {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, String publicInterface,
+                int httpPortStart, boolean findAny, boolean mustListen) {
 
             boolean success = false;
             int httpPort = httpPortStart;
@@ -503,7 +506,7 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, sslContextFactory, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, sslContextFactory, mustListen
                             );
                     success = true;
                     break;
@@ -597,17 +600,17 @@ public class Inits {
             }
             // if set by cli use that.
             if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
-                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, m_config.m_httpPort, false, true);
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
                 httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
-                setupHttpServer("", httpPort, true, false);
+                setupHttpServer("", "", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
-                setupHttpServer("", httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, httpPort, false, true);
             }
         }
 
@@ -745,9 +748,21 @@ public class Inits {
         }
     }
 
+    class InitModuleManager extends InitWork {
+        InitModuleManager() {
+        }
+
+        @Override
+        public void run() {
+            ModuleManager.initializeCacheRoot(new File(m_config.m_voltdbRoot, VoltDB.MODULE_CACHE));
+            // TODO: start foundation bundles
+        }
+    }
+
     class InitExport extends InitWork {
         InitExport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override
@@ -771,6 +786,7 @@ public class Inits {
     class InitImport extends InitWork {
         InitImport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override

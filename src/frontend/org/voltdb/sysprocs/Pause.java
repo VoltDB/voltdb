@@ -20,20 +20,30 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
+import org.apache.zookeeper_voltpatches.KeeperException.Code;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 
 @ProcInfo(singlePartition = false)
 
-public class Pause extends VoltSystemProcedure
-{
+public class Pause extends VoltSystemProcedure {
+    private final static VoltLogger LOG = new VoltLogger("HOST");
+
+    protected volatile Stat m_stat = null;
+    private final static OperationMode PAUSED = OperationMode.PAUSED;
+
     @Override
     public void init() {}
 
@@ -46,22 +56,60 @@ public class Pause extends VoltSystemProcedure
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
+    protected static  String ll(long l) {
+        return Long.toString(l, Character.MAX_RADIX);
+    }
+
     /**
      * Enter admin mode
      * @param ctx       Internal parameter. Not user-accessible.
      * @return          Standard STATUS table.
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx)
-    {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx) {
         // Choose the lowest site ID on this host to actually flip the bit
-        if (ctx.isLowestSiteId())
-        {
-            VoltDB.instance().setMode(OperationMode.PAUSED);
+
+        if (ctx.isLowestSiteId()) {
+            VoltDBInterface voltdb = VoltDB.instance();
+            OperationMode opMode = voltdb.getMode();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("voltdb opmode is " + opMode);
+            }
+            ZooKeeper zk = voltdb.getHostMessenger().getZK();
             try {
-                VoltDB.instance().getHostMessenger().getZK().setData(
-                        VoltZK.operationMode,
-                        OperationMode.PAUSED.getBytes(), -1);
-                VoltDB.instance().getHostMessenger().pause();
+                Stat stat;
+                OperationMode zkMode = null;
+                Code code;
+                do {
+                    stat = new Stat();
+                    code = Code.BADVERSION;
+                    try {
+                        byte [] data = zk.getData(VoltZK.operationMode, false, stat);
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("zkMode is " + (zkMode == null ? "(null)" : OperationMode.valueOf(data)));
+                        }
+                        zkMode = data == null ? opMode : OperationMode.valueOf(data);
+                        if (zkMode == PAUSED) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("read node at version " + stat.getVersion() + ", txn " + ll(stat.getMzxid()));
+                            }
+                            break;
+                        }
+                        stat = zk.setData(VoltZK.operationMode, PAUSED.getBytes(), stat.getVersion());
+                        code = Code.OK;
+                        zkMode = PAUSED;
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("!WROTE! node at version " + stat.getVersion() + ", txn " + ll(stat.getMzxid()));
+                        }
+                        break;
+                    } catch (BadVersionException ex) {
+                        code = ex.code();
+                    }
+                } while (zkMode != PAUSED && code == Code.BADVERSION);
+
+                m_stat = stat;
+                voltdb.getHostMessenger().pause();
+                voltdb.setMode(PAUSED);
+
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

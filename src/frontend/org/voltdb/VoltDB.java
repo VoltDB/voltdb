@@ -85,11 +85,12 @@ public class VoltDB {
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
+    public static final String TERMINUS_MARKER = ".shutdown_snapshot";
     public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
-    public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
+    public static final String MODULE_CACHE = ".bundles-cache";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -619,10 +620,6 @@ public class VoltDB {
                 }
             }
 
-            if (!m_publicInterface.isEmpty()) {
-                m_httpPortInterface = m_publicInterface;
-            }
-
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -709,8 +706,9 @@ public class VoltDB {
             return ImmutableList.<File>builder()
                     .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
                     .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR))
+                    .add(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR))
                     .add(new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.TERMINUS_MARKER))
                     .build();
         }
 
@@ -720,7 +718,7 @@ public class VoltDB {
         private void checkInitializationMarker() {
 
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
+            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
             File configCFH = null;
             File optCFH = null;
 

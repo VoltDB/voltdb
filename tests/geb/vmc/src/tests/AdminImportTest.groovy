@@ -391,7 +391,8 @@ class AdminImportTest extends TestBase {
         }
         and: 'Expand import'
         waitFor(waitTime) { page.overview.importConfig.isDisplayed() }
-        page.overview.importConfig.click()
+        report 'OpenAddConfig'
+        waitFor(waitTime){page.overview.importConfig.click()}
         waitFor(waitTime) { page.overview.importExpanded.isDisplayed() }
 
         then: 'Display the created KAFKA'

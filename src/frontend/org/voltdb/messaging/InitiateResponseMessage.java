@@ -28,6 +28,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.TxnEgo;
 
 /**
  * Message from an execution site to initiator with the final response for
@@ -258,9 +259,8 @@ public class InitiateResponseMessage extends VoltMessage {
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("INITITATE_RESPONSE FOR TXN ");
-        sb.append(m_txnId);
-        sb.append("\n SP HANDLE: ").append(m_spHandle);
+        sb.append("INITITATE_RESPONSE FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
+        sb.append("\n SP HANDLE: ").append(TxnEgo.txnIdToString(m_spHandle));
         sb.append("\n INITIATOR HSID: ").append(CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: ").append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append("\n CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);

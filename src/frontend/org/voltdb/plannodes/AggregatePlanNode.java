@@ -498,7 +498,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (ExpressionType e : m_aggregateTypes) {
             sb.append(sep).append(e.symbol());
             sep = ", ";
-            if (e == ExpressionType.AGGREGATE_WINDOWED_RANK) {
+            if (e == ExpressionType.AGGREGATE_WINDOWED_RANK || e == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK) {
                 sb.append("()");
             }
             else if (e != ExpressionType.AGGREGATE_COUNT_STAR) {

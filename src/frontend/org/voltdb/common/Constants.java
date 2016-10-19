@@ -79,4 +79,5 @@ public class Constants
 
     public static final String DBROOT = "voltdbroot";
     public static final int SSL_CHUNK_SIZE = 8 * 1024;
+    public static final String CONFIG_DIR = "config";
 }

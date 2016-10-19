@@ -525,7 +525,7 @@ public class AsyncBenchmark {
         } catch (Exception e) {
             return;
         }
-        config.setSSLContext(sslContext);
+        //config.setSSLContext(sslContext);
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         benchmark.runBenchmark();

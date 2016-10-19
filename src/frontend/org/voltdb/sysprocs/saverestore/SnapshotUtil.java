@@ -25,6 +25,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -81,6 +82,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -104,7 +106,10 @@ public class SnapshotUtil {
     public static final String JSON_DATA = "data";
     public static final String JSON_URIPATH = "uripath";
     public static final String JSON_SERVICE = "service";
-
+    /**
+     * milestone used to mark a shutdown save snapshot
+     */
+    public static final String JSON_TERMINUS = "terminus";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -448,6 +453,23 @@ public class SnapshotUtil {
             public void run() {
                 try {
                     f.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
+    }
+
+    /**
+     * Write the shutdown save snapshot terminus marker
+     */
+    public static Runnable writeTerminusMarker(final String nonce, final PathSettings paths, final VoltLogger logger) {
+        final File f = new File(paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
+        return new Runnable() {
+            @Override
+            public void run() {
+                try(PrintWriter pw = new PrintWriter(new FileWriter(f), true)) {
+                    pw.println(nonce);
                 } catch (IOException e) {
                     throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
                 }
@@ -1620,5 +1642,13 @@ public class SnapshotUtil {
             return VoltDB.instance().getSnapshotPath();
         }
         return path;
+    }
+
+    public static String getShutdownSaveNonce(final long zkTxnId) {
+        SimpleDateFormat dfmt = new SimpleDateFormat("'SHUTDOWN_'yyyyMMdd'T'HHmmss'_'");
+        dfmt.setTimeZone(VoltDB.REAL_DEFAULT_TIMEZONE);
+        StringBuilder sb = new StringBuilder(64).append(dfmt.format(new Date()))
+                .append(Long.toString(zkTxnId, Character.MAX_RADIX));
+        return sb.toString();
     }
 }

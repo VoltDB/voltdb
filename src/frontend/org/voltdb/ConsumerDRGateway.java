@@ -22,14 +22,16 @@ package org.voltdb;
 // largely self-contained
 public interface ConsumerDRGateway extends Promotable {
 
-    public abstract void updateCatalog(CatalogContext catalog);
+    void updateCatalog(CatalogContext catalog);
 
-    public abstract boolean isActive();
+    boolean isActive();
 
-    public abstract void initialize(boolean resumeReplication);
+    void initialize(boolean resumeReplication);
 
-    public abstract void shutdown(boolean blocking) throws InterruptedException;
+    void shutdown(boolean blocking) throws InterruptedException;
 
-    public void restart() throws InterruptedException;
+    void restart() throws InterruptedException;
+
+    DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 
 }

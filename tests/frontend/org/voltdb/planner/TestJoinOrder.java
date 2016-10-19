@@ -68,7 +68,7 @@ public class TestJoinOrder extends PlannerTestCase {
         }
 
         pn = compileSPWithJoinOrder("select * from T1, T2 where A=B", "  T1  ,  T2  ");
-        /* DEBUG */ System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         n = pn.getChild(0).getChild(0);
         assertEquals("T1", ((SeqScanPlanNode)n.getChild(0)).getTargetTableName());
         assertEquals("T2", ((SeqScanPlanNode)n.getChild(1)).getTargetTableName());
@@ -258,7 +258,7 @@ public class TestJoinOrder extends PlannerTestCase {
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
 
         pns = compileWithJoinOrderToFragments("select * from I1, T2 where A=B", "I1, T2");
-        /*/ to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
         n = pns.get(0).getChild(0).getChild(0);
         assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("I1"));
         assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
@@ -323,7 +323,7 @@ public class TestJoinOrder extends PlannerTestCase {
         AbstractPlanNode pn, n;
         pn = compile(sql);
         n = pn.getChild(0).getChild(0);
-        System.out.println(pn.toExplainPlanString());
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
         // starts from T7
 
         HashSet<Integer> mySets = new HashSet<>();

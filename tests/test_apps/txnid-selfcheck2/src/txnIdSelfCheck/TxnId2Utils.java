@@ -23,13 +23,13 @@
 
 package txnIdSelfCheck;
 
-import java.io.IOException;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+
+import java.io.IOException;
 
 public enum TxnId2Utils {;
 
@@ -74,7 +74,9 @@ public enum TxnId2Utils {;
                     )) {}
                 else if (ss.matches("(?s).*No response received in the allotted time.*") ||
                          ss.matches(".*Server is currently unavailable; try again later.*") ||
-                         ss.matches(".*Server is paused and is currently unavailable.*")) {
+                         ss.matches(".*Server is paused.*") ||
+                         ss.matches("(?s).*Server shutdown in progress.*")
+                        ) {
                     sleep = true;
                 }
                 else {

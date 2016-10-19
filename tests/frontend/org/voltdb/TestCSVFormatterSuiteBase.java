@@ -99,7 +99,7 @@ import org.voltdb.utils.VoltFile;
         }
     }
 
-    private static class SocketDataPusher extends Thread {
+    public static class SocketDataPusher extends Thread {
         private static final String m_server = "localhost";
         private OutputStream m_sout;
         private final CountDownLatch m_latch;

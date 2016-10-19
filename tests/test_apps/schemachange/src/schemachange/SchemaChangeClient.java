@@ -23,28 +23,17 @@
 
 package schemachange;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.*;
+import org.voltdb.client.*;
+import org.voltdb.compiler.VoltCompilerUtils;
+import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
+
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.CLIConfig;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.TableHelper;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltCompilerUtils;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 
 public class SchemaChangeClient {
 
@@ -222,7 +211,7 @@ public class SchemaChangeClient {
             long max = this.maxId();
 
             TableLoader loader = new TableLoader(client, this.oldSchema.table,
-                                                 config.noProgressTimeout, helper);
+                    config.noProgressTimeout, helper);
 
             log.info(_F("Loading table %s", tableName));
             loader.load(max + 1, realRowCount);
@@ -305,47 +294,52 @@ public class SchemaChangeClient {
 
             BatchResult execute() throws IOException {
                 String ddlString = this.ddl.toString();
-                BatchResult result = BatchResult.BATCH_SUCCEEDED;
-                try {
-                    if (ddlString.length() > 0) {
-                        log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
-                        String error = execLiveDDL(client, ddlString, false);
-                        if (error == null) {
-                            // hoooey!
-                            this.lastSuccessfulDDL = ddlString;
-                            // the caller may be disappointed by success
-                            if (this.expectedError != null) {
-                                die("Expected an error containing '%s', but the batch succeeded.",
-                                    this.expectedError);
+                BatchResult result = null;
+                boolean retry = true;
+                while (retry) {
+                    retry = false;
+                    result = BatchResult.BATCH_SUCCEEDED;
+                    try {
+                        if (ddlString.length() > 0) {
+                            log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
+                            String error = execLiveDDL(client, ddlString, false);
+                            if (error == null) {
+                                // hoooey!
+                                this.lastSuccessfulDDL = ddlString;
+                                // the caller may be disappointed by success
+                                if (this.expectedError != null) {
+                                    die("Expected an error containing '%s', but the batch succeeded.",
+                                            this.expectedError);
+                                }
+                            } else {
+                                if (error.contains("Server is paused")) {
+                                    try { Thread.sleep(3 * 1000); }
+                                    catch (Exception e) { }
+                                    retry = true;
+                                }
+                                // blowed up good!
+                                if (this.expectedError != null) {
+                                    // expected an error, check that it's the right one
+                                    if (this.expectedError.length() == 0) {
+                                        result = BatchResult.BATCH_FAILED_AS_EXPECTED;
+                                        log.info("Ignored expected error.");
+                                    } else if (error.contains(this.expectedError)) {
+                                        result = BatchResult.BATCH_FAILED_AS_EXPECTED;
+                                        log.info(_F("Ignored expected error containing '%s'.", this.expectedError));
+                                    } else {
+                                        result = BatchResult.BATCH_FAILED;  // not really used, but correct
+                                        die("Expected an error containing '%s'.", this.expectedError);
+                                    }
+                                } else {
+                                    result = BatchResult.BATCH_FAILED;
+                                    this.lastFailureDDL = ddlString;
+                                    this.lastFailureError = error;
+                                }
                             }
                         }
-                        else {
-                            // blowed up good!
-                            if (this.expectedError != null) {
-                                // expected an error, check that it's the right one
-                                if (this.expectedError.length() == 0) {
-                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
-                                    log.info("Ignored expected error.");
-                                }
-                                else if (error.contains(this.expectedError)) {
-                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
-                                    log.info(_F("Ignored expected error containing '%s'.", this.expectedError));
-                                }
-                                else {
-                                    result = BatchResult.BATCH_FAILED;  // not really used, but correct
-                                    die("Expected an error containing '%s'.", this.expectedError);
-                                }
-                            }
-                            else {
-                                result = BatchResult.BATCH_FAILED;
-                                this.lastFailureDDL = ddlString;
-                                this.lastFailureError = error;
-                            }
-                        }
+                    } finally {
+                        this.ddl = null;
                     }
-                }
-                finally {
-                    this.ddl = null;
                 }
                 return result;
             }
@@ -505,44 +499,44 @@ public class SchemaChangeClient {
                  * Don't create the index more than once because it isn't dropped.
                  */
                 switch (changeType) {
-                  case CREATE:
-                    batch.add(TableHelper.ddlForTable(this.newSchema.table));
-                    this.count = 0;
-                    break;
+                    case CREATE:
+                        batch.add(TableHelper.ddlForTable(this.newSchema.table));
+                        this.count = 0;
+                        break;
 
-                  case MUTATE_EMPTY:
-                    if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
-                        batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
-                                  this.newSchema.uniqueIndexName,
-                                  this.newSchema.tableName,
-                                  this.newSchema.uniqueColumnName);
-                    }
-                    batch.add(TableHelper.getAlterTableDDLToMigrate(
-                                    this.oldSchema.table, this.newSchema.table));
-                    this.count = tupleCount(this.oldSchema.table);
-                    break;
-
-                  case MUTATE_NONEMPTY:
-                    // unique index creation fails when not empty
-                    if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
-                        batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
-                                  this.newSchema.uniqueIndexName,
-                                  this.newSchema.tableName,
-                                  this.newSchema.uniqueColumnName);
-                        if (changeType == ChangeType.MUTATE_NONEMPTY) {
-                            batch.setExpectedError("is not empty.");
+                    case MUTATE_EMPTY:
+                        if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
+                            batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
+                                    this.newSchema.uniqueIndexName,
+                                    this.newSchema.tableName,
+                                    this.newSchema.uniqueColumnName);
                         }
-                    }
-                    batch.add(TableHelper.getAlterTableDDLToMigrate(
-                                    this.oldSchema.table, this.newSchema.table));
-                    this.count = tupleCount(this.oldSchema.table);
-                    break;
+                        batch.add(TableHelper.getAlterTableDDLToMigrate(
+                                this.oldSchema.table, this.newSchema.table));
+                        this.count = tupleCount(this.oldSchema.table);
+                        break;
+
+                    case MUTATE_NONEMPTY:
+                        // unique index creation fails when not empty
+                        if (!isRetry && this.mutationCount == 1 && this.newSchema.uniqueIndexName != null) {
+                            batch.add("CREATE UNIQUE INDEX %s ON %s (%s)",
+                                    this.newSchema.uniqueIndexName,
+                                    this.newSchema.tableName,
+                                    this.newSchema.uniqueColumnName);
+                            if (changeType == ChangeType.MUTATE_NONEMPTY) {
+                                batch.setExpectedError("is not empty.");
+                            }
+                        }
+                        batch.add(TableHelper.getAlterTableDDLToMigrate(
+                                this.oldSchema.table, this.newSchema.table));
+                        this.count = tupleCount(this.oldSchema.table);
+                        break;
                 }
 
                 // partition table
                 if (this.newSchema.partitioned) {
                     batch.add("PARTITION TABLE %s ON COLUMN %s",
-                              this.newSchema.tableName, this.newSchema.pkeyName);
+                            this.newSchema.tableName, this.newSchema.pkeyName);
                 }
 
                 // create verify procedure
@@ -576,7 +570,7 @@ public class SchemaChangeClient {
             // UAC worked
             if (obsCatVersion == schemaVersionNo) {
                 this.die("Catalog update was reported to be successful but did not pass "
-                        + "verification: expected V%d, observed V%d",
+                                + "verification: expected V%d, observed V%d",
                         schemaVersionNo+1, obsCatVersion);
             }
 
@@ -595,7 +589,7 @@ public class SchemaChangeClient {
             }
             else if (this.count > 0) {
                 log.info(_F("Completed table mutation with %d tuples in %.4f seconds (%d tuples/sec)",
-                            this.count, seconds, (long) (this.count / seconds)));
+                        this.count, seconds, (long) (this.count / seconds)));
             } else {
                 log.info(_F("Completed empty table mutation in %.4f seconds", seconds));
             }
@@ -670,7 +664,7 @@ public class SchemaChangeClient {
             // deterministically sample the same rows
             assert(sampleResults.sampleOffset >= 0);
             ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + this.getTableName(),
-                                                         sampleResults.sampleOffset, guessT);
+                    sampleResults.sampleOffset, guessT);
             assert(cr.getStatus() == ClientResponse.SUCCESS);
             VoltTable result = cr.getResults()[0];
             if (result.fetchRow(0).getLong(0) != 1) {
@@ -861,7 +855,7 @@ public class SchemaChangeClient {
         String msg;
         if (fatalLevel.get() > 0) {
             log.error(_F("In connectToOneServerWithRetry, don't bother to try reconnecting to this host: %s",
-                            server));
+                    server));
             flag = false;
         }
         while (flag) {
@@ -895,27 +889,27 @@ public class SchemaChangeClient {
     private class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-                log.warn(_F("Lost connection to %s:%d.", hostname, port));
-                totalConnections.decrementAndGet();
+            log.warn(_F("Lost connection to %s:%d.", hostname, port));
+            totalConnections.decrementAndGet();
 
-                // reset the connection id so the client will connect to a recovered cluster
-                // this is a bit of a hack
-                if (connectionsLeft == 0) {
-                    ((ClientImpl) client).resetInstanceId();
+            // reset the connection id so the client will connect to a recovered cluster
+            // this is a bit of a hack
+            if (connectionsLeft == 0) {
+                ((ClientImpl) client).resetInstanceId();
+            }
+
+            // setup for retry
+            final String server = MiscUtils.getHostnameColonPortString(hostname, port);
+            class ReconnectThread extends Thread {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(server);
                 }
+            };
 
-                // setup for retry
-                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                class ReconnectThread extends Thread {
-                    @Override
-                    public void run() {
-                        connectToOneServerWithRetry(server);
-                    }
-                };
-
-                ReconnectThread th = new ReconnectThread();
-                th.setDaemon(true);
-                th.start();
+            ReconnectThread th = new ReconnectThread();
+            th.setDaemon(true);
+            th.start();
         }
     }
 
@@ -993,10 +987,10 @@ public class SchemaChangeClient {
              *  loading optionally occurs at the end, after creation/mutation.
              */
             ChangeType changeType = (rand.nextInt(100) < percentNewTable
-                                        ? ChangeType.CREATE
-                                        : (tableHasData
-                                            ? ChangeType.MUTATE_NONEMPTY
-                                            : ChangeType.MUTATE_EMPTY));
+                    ? ChangeType.CREATE
+                    : (tableHasData
+                    ? ChangeType.MUTATE_NONEMPTY
+                    : ChangeType.MUTATE_EMPTY));
 
             boolean addDataToTable = rand.nextInt(100) < percentLoadTable;
 
@@ -1064,24 +1058,24 @@ public class SchemaChangeClient {
 
         if (success && cr != null) {
             switch (cr.getStatus()) {
-            case ClientResponse.SUCCESS:
-                // hooray!
-                log.info("Catalog update was reported to be successful");
-                break;
-            case ClientResponse.CONNECTION_LOST:
-            case ClientResponse.CONNECTION_TIMEOUT:
-            case ClientResponse.RESPONSE_UNKNOWN:
-            case ClientResponse.SERVER_UNAVAILABLE:
-                // can try again after a break
-                success = false;
-                break;
-            case ClientResponse.UNEXPECTED_FAILURE:
-            case ClientResponse.GRACEFUL_FAILURE:
-            case ClientResponse.USER_ABORT:
-                // should never happen
-                SchemaChangeUtility.die(false,
-                        "USER_ABORT in procedure call for Catalog update: %s",
-                        ((ClientResponseImpl)cr).toJSONString());
+                case ClientResponse.SUCCESS:
+                    // hooray!
+                    log.info("Catalog update was reported to be successful");
+                    break;
+                case ClientResponse.CONNECTION_LOST:
+                case ClientResponse.CONNECTION_TIMEOUT:
+                case ClientResponse.RESPONSE_UNKNOWN:
+                case ClientResponse.SERVER_UNAVAILABLE:
+                    // can try again after a break
+                    success = false;
+                    break;
+                case ClientResponse.UNEXPECTED_FAILURE:
+                case ClientResponse.GRACEFUL_FAILURE:
+                case ClientResponse.USER_ABORT:
+                    // should never happen
+                    SchemaChangeUtility.die(false,
+                            "USER_ABORT in procedure call for Catalog update: %s",
+                            ((ClientResponseImpl)cr).toJSONString());
             }
         }
 
@@ -1114,24 +1108,24 @@ public class SchemaChangeClient {
 
         if (error == null && cr != null) {
             switch (cr.getStatus()) {
-            case ClientResponse.SUCCESS:
-                // hooray!
-                log.info("Live DDL execution was reported to be successful");
-                break;
-            case ClientResponse.CONNECTION_LOST:
-            case ClientResponse.CONNECTION_TIMEOUT:
-            case ClientResponse.RESPONSE_UNKNOWN:
-            case ClientResponse.SERVER_UNAVAILABLE:
-                // can try again after a break
-                error = String.format("Communication error: %s", cr.getStatusString());
-                break;
-            case ClientResponse.UNEXPECTED_FAILURE:
-            case ClientResponse.GRACEFUL_FAILURE:
-            case ClientResponse.USER_ABORT:
-                // should never happen
-                SchemaChangeUtility.die(false,
-                        "USER_ABORT in procedure call for live DDL: %s",
-                        ((ClientResponseImpl)cr).toJSONString());
+                case ClientResponse.SUCCESS:
+                    // hooray!
+                    log.info("Live DDL execution was reported to be successful");
+                    break;
+                case ClientResponse.CONNECTION_LOST:
+                case ClientResponse.CONNECTION_TIMEOUT:
+                case ClientResponse.RESPONSE_UNKNOWN:
+                case ClientResponse.SERVER_UNAVAILABLE:
+                    // can try again after a break
+                    error = String.format("Communication error: %s", cr.getStatusString());
+                    break;
+                case ClientResponse.UNEXPECTED_FAILURE:
+                case ClientResponse.GRACEFUL_FAILURE:
+                case ClientResponse.USER_ABORT:
+                    // should never happen
+                    SchemaChangeUtility.die(false,
+                            "USER_ABORT in procedure call for live DDL: %s",
+                            ((ClientResponseImpl)cr).toJSONString());
             }
         }
 
