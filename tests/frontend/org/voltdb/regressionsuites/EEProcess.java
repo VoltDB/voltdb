@@ -321,13 +321,17 @@ public class EEProcess {
         Socket ipcSocket;
         PrintWriter ipcWriter;
         try {
+            // Need to send as many EOFs as m_siteCount.
             for (int i=0; i<m_siteCount; i++) {
+                // The connection will be closed once an EOF is sent.
+                // So we need to re-open the connection if we want to send another EOF.
                 ipcSocket = new Socket("localhost", m_port);
                 if (! ipcSocket.isConnected()) {
                     ipcSocket.close();
                     return;
                 }
                 ipcWriter = new PrintWriter(ipcSocket.getOutputStream());
+                // 0x04 is the code for EOF.
                 ipcWriter.write("\004");
                 ipcWriter.flush();
                 ipcWriter.close();
