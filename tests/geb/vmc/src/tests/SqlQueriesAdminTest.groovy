@@ -42,7 +42,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
     int numberOfTrials = 5
     // No setup() needed: SqlQueriesTestBase.setup gets called before each test (automatically)
 
-
     // SQL queries test for admin-client port
     def checkSqlqueryClientToAdminPortSwitchingForCancelPopup() {
         when: 'click the SQL Query link (if needed)'
@@ -56,7 +55,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.setQueryText(checkQuery)
         then: 'run the query'
         page.runQuery()
-
+        report "runCreateQuery"
         try {
             waitFor(10) {
                 page.cancelpopupquery.isDisplayed()
@@ -76,7 +75,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.openAdminPage()
         then: 'should be on Admin page'
         at AdminPage
-
+        report "atAdminPage"
         try {
             waitFor(10) {
                 page.networkInterfaces.clusterClientPortValue.isDisplayed()
@@ -86,7 +85,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
             waitFor(10) { cluster.pauseok.isDisplayed() }
             cluster.pauseok.click()
             println("Pause button displayed and clicked!!")
-
         } catch (geb.error.RequiredPageContentNotPresent e) {
             println("Already in pause state!! in admin page.")
         } catch (geb.waiting.WaitTimeoutException e) {
@@ -108,7 +106,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         then: 'run the query'
         page.runQuery()
         try {
-            waitFor(15) {
+            waitFor(waitTime) {
                 page.cancelpopupquery.isDisplayed()
                 page.okpopupquery.isDisplayed()
                 page.switchadminport.isDisplayed()
@@ -120,68 +118,45 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         } catch (geb.waiting.WaitTimeoutException e) {
             println("waiting time exceed here")
         }
-
-        when: 'set select query in the box'
-        page.setQueryText("SELECT * FROM " + tablename)
-        then: 'run the query'
-        page.runQuery()
-
-        waitFor(5) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            //page.switchadminport.isDisplayed()
-            //page.queryexecutionerror.isDisplayed()
-            //page.queryerrortxt.isDisplayed()
-        }
-        page.cancelpopupquery.click()
-        println("all popup query verified for selecting data from table!!")
-
-        when: 'set delete query in the box'
-        page.setQueryText(deleteQuery)
-        then: 'run the query'
-        page.runQuery()
-        waitFor(5) {
-            page.cancelpopupquery.isDisplayed()
-            page.okpopupquery.isDisplayed()
-            //page.switchadminport.isDisplayed()
-            //page.queryexecutionerror.isDisplayed()
-            //page.queryerrortxt.isDisplayed()
-        }
-        //for(count=0; count<numberOfTrials; count++) {
-        try {
-            page.cancelpopupquery.click()
-            waitFor(waitTime) { !page.cancelpopupquery.isDisplayed() }
-            println("Cancelled")
-            report "inside"
-            //break
-        } catch (geb.waiting.WaitTimeoutException exception) {
-            println("Waiting for popup to close")
-        }
-        // }
-        println("all popup for query verified for deleting data from table!!")
-
-        report "cancel"
-
-        // Go to admin page and resume
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
-        report "admin"
-        // Checking if the resume button is displayed
-        // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
-        try {
-            waitFor(waitTime) {
-                page.networkInterfaces.clusterClientPortValue.isDisplayed()
-                cluster.resumebutton.click()
-                cluster.resumeok.click()
-            }
-            println("Resume okay")
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Already in resume state!!")
-        } catch (geb.waiting.WaitTimeoutException e) {
-            println("rechecking due to geb waiting exception")
-        }
+        report "runcreate"
+//        when: 'set select query in the box'
+//        page.setQueryText("SELECT * FROM " + tablename)
+//        then: 'run the query'
+//        page.runQuery()
+//        report 'runselect'
+//        waitFor(waitTime) {
+//            page.cancelpopupquery.isDisplayed()
+//            page.okpopupquery.isDisplayed()
+//            //page.switchadminport.isDisplayed()
+//            //page.queryexecutionerror.isDisplayed()
+//            //page.queryerrortxt.isDisplayed()
+//        }
+//        page.cancelpopupquery.click()
+//        println("all popup query verified for selecting data from table!!")
+//
+//        when: 'set delete query in the box'
+//        page.setQueryText(deleteQuery)
+//        then: 'run the query'
+//        page.runQuery()
+//        waitFor(waitTime) {
+//            page.cancelpopupquery.isDisplayed()
+//            page.okpopupquery.isDisplayed()
+//            //page.switchadminport.isDisplayed()
+//            //page.queryexecutionerror.isDisplayed()
+//            //page.queryerrortxt.isDisplayed()
+//        }
+//        //for(count=0; count<numberOfTrials; count++) {
+//        try {
+//            page.cancelpopupquery.click()
+//            waitFor(waitTime) { !page.cancelpopupquery.isDisplayed() }
+//            println("Cancelled")
+//            report "inside"
+//            //break
+//        } catch (geb.waiting.WaitTimeoutException exception) {
+//            println("Waiting for popup to close")
+//        }
+//        // }
+//        println("all popup for query verified for deleting data from table!!")
 
         report "ended"
     }
@@ -259,27 +234,6 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         then: 'run the query'
         page.runQuery()
 
-        // Go to admin page and resume
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
-        report "admin"
-        // Checking if the resume button is displayed
-        // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
-        try {
-            waitFor(waitTime) {
-                page.networkInterfaces.clusterClientPortValue.isDisplayed()
-                cluster.resumebutton.click()
-                cluster.resumeok.click()
-            }
-            println("Resume okay")
-        } catch (geb.error.RequiredPageContentNotPresent e) {
-            println("Already in resume state!!")
-        } catch (geb.waiting.WaitTimeoutException e) {
-            println("rechecking due to geb waiting exception")
-        }
-
         report "ended"
     }
 
@@ -289,7 +243,7 @@ class SqlQueriesAdminTest extends SqlQueriesTestBase {
         page.openAdminPage()
         then: 'should be on Admin page'
         at AdminPage
-        report "admin"
+
         // Checking if the resume button is displayed
         // If resumebutton gives RequiredPageContentNotPresent error, it means it is already in resumed state
         try {
