@@ -52,9 +52,12 @@ class NavigatePagesBasicTest extends TestBase {
         browser.registerPageChangeListener(listener)
     }
 
-    def 'confirm DB Monitor page opens initially'() {
-        expect: 'DB Monitor page was open initially'
-        doesDBMonitorPageOpenFirst
+    // Test that one of the VMC pages opens initially, the first time: it used
+    // to always be the 'DB Monitor' page, but we no longer care which one,
+    // since it remembers via a cookie (this value is set in TestBase)
+    def 'confirm a VMC page opens initially'() {
+        expect: 'VMC page was open initially'
+        doesExpectedPageOpenFirst
     }
 
     def navigatePages() {
