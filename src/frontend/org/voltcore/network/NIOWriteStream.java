@@ -238,7 +238,36 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 public void run() {
                     synchronized (NIOWriteStream.this) {
                         updateLastPendingWriteTimeAndQueueBackpressure();
-                        m_queuedWrites.offer(ds);
+                        try {
+                            final int serializedSize = ds.getSerializedSize();
+                            if (!(serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH)) {
+                                m_queuedWrites.offer(new DeferredSerialization() {
+                                    @Override
+                                    public ByteBuffer serialize(ByteBuffer outbuf) throws IOException {
+                                        if (outbuf.remaining() >= serializedSize) {
+                                            ds.serialize(outbuf);
+                                            return null;
+                                        } else {
+                                            ByteBuffer allocated = ByteBuffer.allocate(serializedSize);
+                                            ds.serialize(allocated);
+                                            allocated.flip();
+                                            return allocated;
+                                        }
+                                    }
+
+                                    @Override
+                                    public void cancel() {
+                                    }
+
+                                    @Override
+                                    public int getSerializedSize() throws IOException {
+                                        throw new UnsupportedOperationException("getSerializedSize not supported");
+                                    }
+                                });
+                            }
+                        } catch(IOException e){
+                            throw new RuntimeException("Failed to get serialized size for ds " + e.getMessage());
+                        }
                         m_port.setInterests( SelectionKey.OP_WRITE, 0);
                     }
                 }
@@ -291,10 +320,15 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     m_queuedWrites.offer(new DeferredSerialization() {
                         @Override
                         public ByteBuffer serialize(ByteBuffer outbuf) {
-                            for (ByteBuffer buf : b) {
+                            if (outbuf.remaining() >= buf.remaining()) {
                                 outbuf.put(buf);
+                                return null;
+                            } else {
+                                ByteBuffer allocated = ByteBuffer.allocate(buf.remaining());
+                                allocated.put(buf);
+                                allocated.flip();
+                                return allocated;
                             }
-                            return null;
                         }
 
                         @Override
@@ -302,12 +336,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
                         @Override
                         public int getSerializedSize() {
-                            int sum = 0;
-                            for (ByteBuffer buf : b) {
-                                buf.position(0);
-                                sum += buf.remaining();
-                            }
-                            return sum;
+                             return buf.remaining();
                         }
                     });
                 }

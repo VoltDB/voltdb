@@ -911,9 +911,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public ByteBuffer serialize(ByteBuffer buf) throws IOException
         {
-            buf.putInt(buf.capacity() - 4);
+            buf.putInt(clientResponse.getSerializedSize());
             clientResponse.flattenToBuffer(buf);
-            buf.flip();
             return null;
         }
 
