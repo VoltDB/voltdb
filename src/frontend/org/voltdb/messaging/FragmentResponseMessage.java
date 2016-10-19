@@ -50,6 +50,10 @@ public class FragmentResponseMessage extends VoltMessage {
     // Not currently used; leaving it in for now
     boolean m_dirty = true;
     boolean m_recovering = false;
+    // a flag to decide whether to buffer this response or not
+    // it does not need to send over network, because it's only set to be false
+    // for BorrowTask which executes locally.
+    // Writes are always false and the flag is not used.
     boolean m_respBufferable = true;
     // WHA?  Why do we have a separate dependency count when
     // the array lists will tell you their lengths?  Doesn't look like
@@ -178,7 +182,6 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // status byte
             + 1 // dirty flag
             + 1 // node recovering flag
-            + 1 // response bufferable flag
             + 2; // dependency count
 
         // one int per dependency ID
@@ -217,7 +220,6 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put(m_status);
         buf.put((byte) (m_dirty ? 1 : 0));
         buf.put((byte) (m_recovering ? 1 : 0));
-        buf.put((byte) (m_respBufferable ? 1 : 0));
         buf.putShort(m_dependencyCount);
         for (int i = 0; i < m_dependencyCount; i++)
             buf.putInt(m_dependencyIds.get(i));
@@ -252,7 +254,6 @@ public class FragmentResponseMessage extends VoltMessage {
         m_status = buf.get();
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
-        m_respBufferable = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
