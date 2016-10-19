@@ -314,6 +314,9 @@ public class EEProcess {
         }
     }
 
+    // In some tests there is no client initiated and the IPC server will hang
+    // waiting for the incoming messages.
+    // Push EOFs to IPC processes in this case can help end the hanging situation.
     private void signalShutDown() {
         Socket ipcSocket;
         PrintWriter ipcWriter;
@@ -330,9 +333,7 @@ public class EEProcess {
                 ipcWriter.close();
                 ipcSocket.close();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        } catch (IOException e) {}
     }
 
     public void waitForShutdown() throws InterruptedException {

@@ -49,6 +49,7 @@ import java.util.zip.ZipFile;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
@@ -104,6 +105,12 @@ public class TestCollector {
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        client.close();
+        cluster.shutDown();
     }
 
     private ZipFile collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
