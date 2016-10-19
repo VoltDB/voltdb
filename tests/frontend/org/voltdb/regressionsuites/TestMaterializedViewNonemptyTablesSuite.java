@@ -51,6 +51,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
+    private static final String UNSAFE_OPS_STRING
+        = "because the view definition uses operations that cannot always be applied";
+
     public TestMaterializedViewNonemptyTablesSuite(String name) {
         super(name);
     }
@@ -68,7 +71,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
             // got failure, then verify that the exception
             // is one we expect.
             if ( ! wantSuccess ) {
-                assertTrue(ex.getMessage().contains("because it uses unsafe operations"));
+                assertTrue(ex.getMessage().contains(UNSAFE_OPS_STRING));
             }
         }
         client.callProcedure("@AdHoc", "drop view mv if exists");
@@ -156,12 +159,12 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
 
         testCreateView(client,
                        "create view vv1 as select a, count(*), max(b + b) from alpha group by a",
-                       "because it uses unsafe operations");
+                       UNSAFE_OPS_STRING);
         // This should fail if alpha and beta are both populated, as
         // they are in the second test case.
         testCreateView(client,
                        "create view vv2 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
-                       "because it uses unsafe operations");
+                       UNSAFE_OPS_STRING);
         // This should succeed always, since the table empty is always
         // empty.
         testCreateView(client,
