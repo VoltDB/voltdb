@@ -1420,6 +1420,8 @@ public class LocalCluster implements VoltServerConfig {
 
         m_eeProcs.clear();
 
+        m_running = false;
+
     }
 
     public synchronized void shutDownExternal(boolean forceKillEEProcs)

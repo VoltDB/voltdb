@@ -53,9 +53,9 @@ public class TestShutdownSave extends RegressionSuite
         if (!MiscUtils.isPro()) return;
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
-        final Client client2 = this.getClient();
+        Client client2 = this.getClient();
         for (int i = 0; i < 256; ++i) {
-            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 200);
+            client2.callProcedure(new Callback(), "KV.INSERT", i);
         }
 
         final Client client = getAdminClient();
@@ -136,7 +136,26 @@ public class TestShutdownSave extends RegressionSuite
             });
             assertTrue("(" + i + ") snapshot did not finish " + Arrays.asList(finished),
                     finished.length == 1 && finished[0].exists() && finished[0].isFile());
+        }
 
+        m_config.startUp(false);
+        client2 = this.getClient();
+
+        ClientResponse cr = client2.callProcedure("@Statistics", "PROCEDUREPROFILE", 0);
+        assertEquals("statistics invocation failed: " + cr.getStatusString() , ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable t = cr.getResults()[0];
+        while (t.advanceRow()) {
+            assertNotSame("detected replayed transactions", "KV.insert", t.getString(1));
+        }
+
+        m_config.shutDown();
+
+        for (int i = 0; i < HOST_COUNT; ++i) {
+            File snapDH = getSnapshotPathForHost(cluster, i);
+
+            File terminusFH = new File(snapDH.getParentFile(), VoltDB.TERMINUS_MARKER);
+            assertFalse("("+ i +") terminus file " + terminusFH + " is accessible",
+                    terminusFH.exists() && terminusFH.isFile() && terminusFH.canRead());
         }
     }
 
@@ -163,6 +182,7 @@ public class TestShutdownSave extends RegressionSuite
         project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
+        project.configureLogging(true, true, 2, 2, 64);
 
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
