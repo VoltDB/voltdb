@@ -405,10 +405,12 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    delete m_engine;
-    delete [] m_reusedResultBuffer;
-    delete [] m_tupleBuffer;
-    delete [] m_exceptionBuffer;
+    if (m_engine != NULL) {
+        delete m_engine;
+        delete [] m_reusedResultBuffer;
+        delete [] m_tupleBuffer;
+        delete [] m_exceptionBuffer;
+    }
 }
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {

@@ -40,6 +40,7 @@ public class TestHttpPort extends TestCase {
     PortListener ncprocess;
     PipeToFile pf;
     int rport;
+    LocalCluster config;
 
     public TestHttpPort(String name) {
         super(name);
@@ -61,7 +62,7 @@ public class TestHttpPort extends TestCase {
             String catalogJar = "dummy.jar";
             builder.setHTTPDPort(rport);
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             config.portGenerator.enablePortProvider();
             config.portGenerator.pprovider.setHttp(rport);
@@ -90,6 +91,7 @@ public class TestHttpPort extends TestCase {
         if (ncprocess != null) {
             ncprocess.close();
         }
+        config.shutDown();
     }
 
     /*
