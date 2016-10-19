@@ -146,7 +146,9 @@ public class TestMixedSitesPerHostCluster {
             cluster.start();
             fail();
         }
-        catch (RuntimeException e) {}
+        catch (RuntimeException e) {
+            assertTrue(e.getMessage().endsWith("external processes failed to start"));
+        }
         finally {
             cluster.shutdown();
         }

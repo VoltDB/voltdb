@@ -546,7 +546,8 @@ public class ClusterConfig
             ArrayList<Integer> hosts = new ArrayList<Integer>();
             partToHosts.put(i, hosts);
         }
-        for (int i = 0; i < getTotalSitesCount(); i++) {
+        int totalSitesCount = getTotalSitesCount();
+        for (int i = 0; i < totalSitesCount; i++) {
             // serially assign partitions to execution sites.
             int partition = (++partitionCounter) % partitionCount;
             int hostId = sitesToHostId.get(sitesToHostId.floorKey(i));
@@ -599,14 +600,14 @@ public class ClusterConfig
     }
 
     /**
-     * Each partition should has K different replica
+     * Each partition should has K+1 replicas
      */
     public static boolean checkKSafetyConstraint(
             HashMap<Integer, ArrayList<Integer>> partToHosts,
-            int kfactor)
+            int replicasCount)
     {
         return partToHosts.entrySet().stream().allMatch(
-                v -> kfactor == Sets.newHashSet(v.getValue()).size());
+                v -> replicasCount == Sets.newHashSet(v.getValue()).size());
     }
 
     /**
