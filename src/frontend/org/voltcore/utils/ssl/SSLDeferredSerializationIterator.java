@@ -46,6 +46,7 @@ public class SSLDeferredSerializationIterator implements Iterator<DeferredSerial
                 try {
                     ByteBuffer buf = ByteBuffer.allocate(ds.getSerializedSize());
                     ds.serialize(buf);
+                    buf.flip();
                     return buf;
                 } catch (IOException e) {
                     return null;

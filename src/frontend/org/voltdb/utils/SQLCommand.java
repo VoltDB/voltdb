@@ -50,6 +50,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -99,7 +100,6 @@ public class SQLCommand
     private static List<String> RecallableSessionLines = new ArrayList<String>();
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
-
 
     private static String patchErrorMessageWithFile(String batchFileName, String message) {
 
@@ -1263,6 +1263,11 @@ public class SQLCommand
         String kerberos = "";
         List<String> queries = null;
         String ddlFile = "";
+        boolean ssl = false;
+        String sslKeystorePath = null;
+        String sslKeystorePassword = null;
+        String sslTruststorePath = null;
+        String sslTruststorePassword = null;
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1340,6 +1345,24 @@ public class SQLCommand
             else if (arg.equals("--output-skip-metadata")) {
                 m_outputShowMetadata = false;
             }
+
+            // args to enable ssl
+            else if (arg.equals("--ssl")) {
+                ssl = true;
+            }
+            else if (arg.startsWith("--ssl-keystore-path=")) {
+                sslKeystorePath = extractArgInput(arg);
+            }
+            else if (arg.startsWith("--ssl-keystore-password=")) {
+                sslKeystorePassword = extractArgInput(arg);
+            }
+            else if (arg.startsWith("--ssl-truststore-path")) {
+                sslTruststorePath = extractArgInput(arg);
+            }
+            else if (arg.startsWith("--ssl-truststore-password")) {
+                sslTruststorePassword = extractArgInput(arg);
+            }
+
             else if (arg.equals("--debug")) {
                 m_debug = true;
             }
@@ -1380,22 +1403,31 @@ public class SQLCommand
         // Create connection
         ClientConfig config = new ClientConfig(user, password);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-
-        SSLContext sslContext = null;
-        try {
-            KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, "myk5yst15r5".toCharArray());
-            sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(createKeyManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5", "myk5yst15r5"),
-                    createTrustManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5"), new SecureRandom());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
-            return;
+        if (ssl) {
+            if (sslKeystorePath == null || sslKeystorePassword == null || sslKeystorePath.isEmpty() || sslKeystorePassword.isEmpty()) {
+                printUsage("Specifying --ssl requires that --ssl-keystore-path and --ssl-keystore-password also be specified");
+            }
+            SSLContext sslContext = null;
+            if (sslTruststorePath == null || sslTruststorePath.isEmpty()) {
+                sslTruststorePath = sslKeystorePath;
+            }
+            if (sslTruststorePassword == null || sslTruststorePassword.isEmpty()) {
+                sslTruststorePassword = sslKeystorePassword;
+            }
+            try {
+                KeyStore ks = KeyStore.getInstance("JKS");
+                ks.load(new FileInputStream(sslKeystorePath), sslKeystorePassword.toCharArray());
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+                kmf.init(ks, sslKeystorePassword.toCharArray());
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(createKeyManagers(sslKeystorePath, sslKeystorePassword, sslKeystorePassword),
+                        createTrustManagers(sslTruststorePath, sslTruststorePassword), new SecureRandom());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                return;
+            }
+            config.setSSLContext(sslContext);
         }
-        config.setSSLContext(sslContext);
-
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {
