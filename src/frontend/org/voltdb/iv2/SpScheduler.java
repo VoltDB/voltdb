@@ -180,6 +180,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_bufferedReadLog = new BufferedReadLog();
         }
         m_repairLogTruncationHandle = getCurrentTxnId();
+        // initialized as current txn id in order to release the initial reads into the system
+        m_maxScheduledTxnSpHandle = getCurrentTxnId();
     }
 
     @Override
@@ -187,15 +189,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
-
-        // After SP leader promotion, a DummyTransactionTaskMessage is generated from the new leader.
-        // This READ ONLY message will serve as a synchronization point on all replicas of this
-        // partition, like normal SP write transaction that has to finish executing on all replicas.
-        // In this way, the leader can make sure all replicas have finished replaying
-        // all their repair logs entries.
-        // From now on, the new leader is safe to accept new transactions. See ENG-11110.
-        // Deliver here is to make sure it's the first message on the new leader.
-        deliver(new DummyTransactionTaskMessage());
     }
 
     @Override
@@ -494,7 +487,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         0,
                         m_uniqueIdGenerator.partitionId);
 
-                newSpHandle = m_maxScheduledTxnSpHandle;
+                newSpHandle = getMaxScheduledTxnSpHandle();
             }
 
             // Need to set the SP handle on the received message
@@ -757,7 +750,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // borrows do not advance the sp handle. The handle would
         // move backwards anyway once the next message is received
         // from the SP leader.
-        long newSpHandle = getMaxTaskedSpHandle();
+        long newSpHandle = getMaxScheduledTxnSpHandle();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -772,12 +765,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             txn = new BorrowTransactionState(newSpHandle, message);
         }
 
-
+        // BorrowTask is a read only task embedded in a MP transaction
+        // and its response (FragmentResponseMessage) should not be buffered
         if (message.getFragmentTaskMessage().isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, message.getFragmentTaskMessage(),
                                         message.getInputDepMap());
+            task.setResponseNotBufferable();
             m_pendingTasks.offer(task);
         }
         else {
@@ -785,6 +780,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
                         m_pendingTasks, message.getFragmentTaskMessage(),
                         message.getInputDepMap());
+            task.setResponseNotBufferable();
             m_pendingTasks.offer(task);
         }
     }
@@ -817,9 +813,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (m_outstandingTxns.get(msg.getTxnId()) == null) {
                     updateMaxScheduledTransactionSpHandle(newSpHandle);
                 }
-
             } else {
-                newSpHandle = m_maxScheduledTxnSpHandle;
+                newSpHandle = getMaxScheduledTxnSpHandle();
             }
 
             msg.setSpHandle(newSpHandle);
@@ -1011,6 +1006,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // No k-safety means no replica: read/write queries on master.
         // K-safety: read-only queries (on master) or write queries (on replica).
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE && m_isLeader && m_sendToHSIds.length > 0
+                && message.getRespBufferable()
                 && (txn == null || txn.isReadOnly()) ) {
             // on k-safety leader with safe reads configuration: one shot reads + normal multi-fragments MP reads
             // we will have to buffer these reads until previous writes acked in the cluster.
@@ -1350,6 +1346,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void updateMaxScheduledTransactionSpHandle(long newSpHandle) {
         m_maxScheduledTxnSpHandle = Math.max(m_maxScheduledTxnSpHandle, newSpHandle);
+    }
+
+    private long getMaxScheduledTxnSpHandle() {
+        return m_maxScheduledTxnSpHandle;
     }
 
     private long getRepairLogTruncationHandleForReplicas()

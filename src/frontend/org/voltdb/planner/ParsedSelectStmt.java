@@ -154,6 +154,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // this list is the join order either from the user or parser if it has large number of table joins.
     private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
     private boolean m_hasPartitionColumnsInWindowedAggregates = false;
+    // If this statement is the query for a materialized view, and
+    // some expression has operations which are unsafe to create
+    // with non-empty source tables, then this string will have
+    // the error message.  If this is null, the view can be created
+    // with populated tables with no problem.
+    private String m_mvUnSafeErrorMessage = null;
 
     /**
      * Class constructor
@@ -1630,6 +1636,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
+    }
+
+    public void setUnsafeMVMessage(String msg) {
+        m_mvUnSafeErrorMessage = msg;
+    }
+
+    public String getUnsafeMVMessage() {
+        return m_mvUnSafeErrorMessage;
     }
 
     /**

@@ -1678,6 +1678,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         // -- 4 -- Test defining view after the data is loaded.
+        //         The test is crafted to include only safe operations.
         if (! isHSQL()) {
             System.out.println("Now testing view data catching-up.");
             try {
@@ -1688,15 +1689,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             }
             try {
                 client.callProcedure("@AdHoc",
-                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, SUMAMT, MINUNIT, MAXUNIT, ITEMCOUNT) AS " +
+                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, MINUNIT, MAXUNIT) AS " +
                     "SELECT " +
                         "CUSTOMERS.NAME, " +
                         "ORDERS.ORDER_ID, " +
                         "COUNT(*), " +
-                        "SUM(PRODUCTS.PRICE * ORDERITEMS.QTY), " +
                         "MIN(PRODUCTS.PRICE), " +
-                        "MAX(PRODUCTS.PRICE), " +
-                        "COUNT(ORDERITEMS.PID) " +
+                        "MAX(PRODUCTS.PRICE) " +
                     "FROM CUSTOMERS JOIN ORDERS ON CUSTOMERS.CUSTOMER_ID = ORDERS.CUSTOMER_ID " +
                                    "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
                                    "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
