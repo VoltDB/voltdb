@@ -39,7 +39,6 @@ import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -55,7 +54,7 @@ public class TestShutdownSave extends RegressionSuite
 
         Client client2 = this.getClient();
         for (int i = 0; i < 256; ++i) {
-            client2.callProcedure(new Callback(), "KV.INSERT", i);
+            client2.callProcedure("KV.INSERT", i);
         }
 
         final Client client = getAdminClient();
@@ -70,7 +69,8 @@ public class TestShutdownSave extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@SystemInformation:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertEquals("incorrect status from @SystemInformation",
+                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
         }
 
         //test query that is not allowed
@@ -80,7 +80,8 @@ public class TestShutdownSave extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("ArbitraryDurationProc:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertEquals("incorrect status from ArbitraryDurationProc",
+                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
         }
         long sum = Long.MAX_VALUE;
         while (sum > 0) {
@@ -137,7 +138,9 @@ public class TestShutdownSave extends RegressionSuite
             assertTrue("(" + i + ") snapshot did not finish " + Arrays.asList(finished),
                     finished.length == 1 && finished[0].exists() && finished[0].isFile());
         }
-
+        if (!cluster.isNewCli()) {
+            cluster.overrideStartCommandVerb("recover");
+        }
         m_config.startUp(false);
         client2 = this.getClient();
 
@@ -191,12 +194,5 @@ public class TestShutdownSave extends RegressionSuite
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;
-    }
-
-    class Callback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            assertTrue(clientResponse.getStatus() == ClientResponse.SUCCESS);
-        }
     }
 }
