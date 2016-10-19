@@ -16,24 +16,31 @@
  */
 package org.voltdb.importclient.kafka;
 
+import org.apache.log4j.Logger;
+
 /**
  * KafkaImporterCommitPolicy determines how offsets are committed to kafka.
  * @author akhanzode
  */
 public enum KafkaImporterCommitPolicy {
 
-        COMMIT_POLICY_TIME,
-        COMMIT_POLICY_NONE;
+        TIME,
+        NONE;
 
+        private static final Logger m_logger = Logger.getLogger("IMPORT");
         public static final KafkaImporterCommitPolicy fromString(String policy) {
-            if (policy == null) return COMMIT_POLICY_NONE;
-            if (policy.endsWith("ms")) return COMMIT_POLICY_TIME;
-            return COMMIT_POLICY_NONE;
+            if (policy == null) return NONE;
+            if (policy.endsWith("ms")) return TIME;
+            return NONE;
         };
         public static final long fromStringTriggerValue(String policy, KafkaImporterCommitPolicy prop) {
-            switch (prop) {
-                case COMMIT_POLICY_TIME:
-                    return Long.parseLong(policy.replaceAll("ms", ""));
+            try {
+                switch (prop) {
+                    case TIME:
+                        return policy == null ? 0 : Long.parseLong(policy.replaceAll("ms", ""));
+                }
+            } catch (NumberFormatException nfex) {
+                m_logger.warn("Failed to parse commit policy: " + policy, nfex);
             }
             return 0;
         };

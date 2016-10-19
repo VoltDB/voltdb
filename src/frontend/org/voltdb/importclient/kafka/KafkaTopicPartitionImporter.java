@@ -519,7 +519,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     //Based on commit policy
     public boolean shouldCommit() {
         switch(m_config.getCommitPolicy()) {
-            case COMMIT_POLICY_TIME:
+            case TIME:
                 return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
         }
         return true;
@@ -527,7 +527,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     public void resetCounters() {
         switch(m_config.getCommitPolicy()) {
-            case COMMIT_POLICY_TIME:
+            case TIME:
                 m_lastCommitTime = EstTime.currentTimeMillis();
         }
     }
