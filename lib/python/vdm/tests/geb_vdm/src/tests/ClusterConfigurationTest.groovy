@@ -936,7 +936,7 @@ class ClusterConfigurationTest extends TestBase {
         overview.filePrefixField.value("At_Least")
         overview.filePrefixText.click()
         and: 'Check Save Message'
-        checkSaveMessage()
+        waitFor(60) { saveStatus.text().equals(saveMessage) }
         then: 'Check if Value in File Prefix Field in Auto Snapshot has changed'
         if(overview.filePrefixField.value() == "At_Least") {
             println("Test Pass: The change is displayed")
