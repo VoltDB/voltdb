@@ -1648,6 +1648,11 @@ div.popup {
 .overlay-btns {
     text-align: right;
     padding: 5px 20px 20px 20px;
+
+}
+.overlayShutdownBtn {
+    text-align: center;
+    padding: 5px 0 24px 0;
 }
 
 
@@ -3887,6 +3892,19 @@ fieldset { border:1px solid #ccc; padding:20px;}
     background-color: #3A89FF;
     color: #fff;
 }
+
+/**********************Shutdown ******************************/
+ul#shutdownMsg{ margin:0; padding:0;}
+ul#shutdownMsg li{ font-size:13px; line-height:20px; }
+.shutdownNormal{ position:relative; padding-right:23px; top:2px;}
+.shutdownSuccess{ position:relative; padding-right:5px; top:2px;}
+.shutdownLoader{ position:relative; padding-right:5px; top:4px;}
+.shutdownFailure{ position:relative; padding-right:5px; top:4px;}
+.shutdownErrorMsg {  padding:0 20px 15px 20px;color:#c70000; line-height:15px; width:400px;}
+.shutdownErrorMsg h2 { font-weight:bold; font-size:13px;}
+.shutdownRetryMsg { padding: 0 0 11px 0; text-align: center;}
+
+
 
 /*********************************************media Qu********************/
 

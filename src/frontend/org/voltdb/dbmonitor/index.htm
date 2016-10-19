@@ -2120,7 +2120,9 @@
         <div class="overlay-content confirmationHeight">
             <p id="memErrorMsg" class="txt-bold">Maximum storage limit reached. Cannot save the current tab. <br/>Please remove the existing tabs or decrease the length of query.</p>
         </div>
+
         <div class="overlay-btns"><a id="btnMemoryErrorOk" class="btn">Ok</a></div>
+
     </div>
     <!-- Memory exceeded message -->
 
@@ -2135,6 +2137,57 @@
         <div class="overlay-btns"><a id="btnIsSupportedOk" class="btn">Ok</a></div>
     </div>
     <!-- HTML5 support popup -->
+
+    <!-- Prepare Shutdown popup -->
+    <a id="btnPrepareShutdown" href="#shutdownStatusPopup" style="display: none;"></a>
+    <div id="shutdownStatusPopup" style="display: none;">
+        <div class="overlay-title ">
+                <img id="" src="css/resources/images/Information.png" class="imgError" /> <span>Shutting Down</span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight" style="width:300px">
+            <ul id="shutdownMsg">
+                <li id="liPrepareShutdownNormal"><span class='shutdownNormal'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Preparing for shutdown.</li>
+
+                <li id="liQueueExpDataNormal"><span class='shutdownNormal'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Writing out all queued export data.</li>
+
+                <li id="liCompleteOutstandingExpDrNormal"><span class='shutdownNormal'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
+
+                <li id="liCompleteClientTransNormal"><span class='shutdownNormal'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
+
+                <li id="liCompleteOutstandingImpNormal"><span class='shutdownNormal'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
+
+                <li id="liShutdownReadyNormal"><span class='shutdownNormal'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
+            </ul>
+        </div>
+        <div class="shutdownErrorMsg" id="divShutdownErrMsg" style="display:none">
+            <h2>Error Occured</h2>
+            <p><span id="shutdownErrMsg"></span></p>
+        </div>
+        <div class="shutdownRetryMsg" id="divShutdownRetryMsg"><p> Do you want to retry?</p></div>
+        <div class="overlayShutdownBtn" id="divRetryBtn" style="display:none">
+
+            <a id="btnPrepareShutdownOk" class="btn">Ok</a>
+            <a id="btnPrepareShutdownCancel" class="btn btn-gray confirmNoSave">Cancel</a>
+        </div>
+
+    </div>
+    <!-- Prepare Shutdown popup -->
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

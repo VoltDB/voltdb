@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
- package vmcTest.pages
+package vmcTest.pages
 
 import geb.Module
 import java.util.List;
@@ -85,7 +85,5 @@ class Cluster extends Module {
         saveyes                     {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.closeBtn")}
         failedsaveok                { $("#btnSaveSnapshotStatus", text:"Ok")}
         downloadconfigurationbutton { $("#downloadAdminConfigurations") }
-
     }
-
 }
