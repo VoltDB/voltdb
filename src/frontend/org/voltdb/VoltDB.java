@@ -236,9 +236,9 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<>();
         public String m_commandLogBinding = null;
 
         /**
@@ -974,7 +974,7 @@ public class VoltDB {
      */
     public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
         if (currentStacktrace == null) {
-            currentStacktrace = new ArrayList<String>();
+            currentStacktrace = new ArrayList<>();
         }
 
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
@@ -1065,7 +1065,7 @@ public class VoltDB {
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
-                List<String> currentStacktrace = new ArrayList<String>();
+                List<String> currentStacktrace = new ArrayList<>();
                 currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
                 // Create a special dump file to hold the stack trace

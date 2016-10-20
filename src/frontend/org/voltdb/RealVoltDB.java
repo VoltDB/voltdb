@@ -103,6 +103,7 @@ import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -161,6 +162,8 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -800,17 +803,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            Map<Integer, String> hostGroups = null;
-
-            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
+            readDeploymentAndCreateStarterCatalogContext(config);
+            final int numberOfNodes = m_messenger.getLiveHostIds().size();
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
             }
 
-            if (!isRejoin && !m_joining) {
-                hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
-            }
+            final Map<Integer, ExtensibleGroupTag> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
@@ -910,27 +910,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
+            m_configuredReplicationFactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
+                                              m_catalogContext.cluster.getNetworkpartition());
             JSONObject topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
-                m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
-                m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
-                        m_catalogContext.cluster.getNetworkpartition());
-                List<Integer> partitions = null;
+                List<Integer> partitions;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          clusterConfig.getSitesPerHost());
+                    partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
                                 m_configuredReplicationFactor + ".\n" +
                                 "No more nodes can join.", false, null);
                     }
-                }
-                else {
+                } else {
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                 }
@@ -1574,33 +1572,40 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(StartAction startAction, Map<Integer, String> hostGroups,
+    private JSONObject getTopology(StartAction startAction, Map<Integer, ExtensibleGroupTag> hostGroups,
                                    JoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
+        int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
+        int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
         if (startAction == StartAction.JOIN) {
             assert(joinCoordinator != null);
             topo = joinCoordinator.getTopology();
         }
-        else if (!startAction.doesRejoin()) {
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
-            int hostcount = m_clusterSettings.get().hostcount();
-            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+        else {
+            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
+            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
+            int hostcount = liveHostIds.size();
             ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
-            if (!clusterConfig.validate()) {
+            if (!startAction.doesRejoin() && !clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
-            topo = registerClusterConfig(clusterConfig, hostGroups);
-        }
-        else {
-            Stat stat = new Stat();
+
             try {
-                topo =
-                    new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), "UTF-8"));
+                final Multimap<Integer, Long> replicas = m_cartographer.getReplicasForPartitions(m_cartographer.getPartitions());
+                final Map<Integer, Long> masters = m_cartographer.getHSIdsForSinglePartitionMasters();
+                replicas.removeAll(MpInitiator.MP_INIT_PID);
+                masters.remove(MpInitiator.MP_INIT_PID);
+                topo = clusterConfig.getTopology(hostGroups, replicas, masters, Lists.newArrayList());
+                m_messenger.registerGroupTags(hostGroups);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to calculate topology", false, e);
             }
-            catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to get topology from ZK", true, e);
+
+            if (!startAction.doesRejoin()) {
+                topo = registerClusterConfig(topo);
             }
+
         }
         return topo;
     }
@@ -1620,16 +1625,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return initiators;
     }
 
-    private JSONObject registerClusterConfig(ClusterConfig config, Map<Integer, String> hostGroups)
+    private JSONObject registerClusterConfig(JSONObject topo)
     {
         // First, race to write the topology to ZK using Highlander rules
         // (In the end, there can be only one)
-        JSONObject topo = null;
         try
         {
-            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
-            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
-            topo = config.getTopology(hostGroups);
             byte[] payload = topo.toString(4).getBytes("UTF-8");
             m_messenger.getZK().create(VoltZK.topology, payload,
                     Ids.OPEN_ACL_UNSAFE,
@@ -1837,7 +1838,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
+    void readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2060,8 +2061,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             null,
                             deploymentBytes,
                             0);
-
-            return m_clusterSettings.get().hostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -2373,8 +2372,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         if (m_config.m_placementGroup != null) {
-            hmconfig.group = m_config.m_placementGroup;
+            hmconfig.rackAwarenessgroup = m_config.m_placementGroup;
         }
+        // default buddy group, clusterConfig will calculate the right group
+        // once all hosts is in cluster
+        hmconfig.buddyGroup = "0";
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;

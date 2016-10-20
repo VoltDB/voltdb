@@ -30,6 +30,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,7 +52,9 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 
+import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -60,7 +64,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     private final int NUM_AGREEMENT_SITES = 1;
     private ClusterConfig m_config = null;
     private Set<Integer> m_hostIds;
-    private Map<Integer, String> m_hostGroups;
+    private Map<Integer, ExtensibleGroupTag> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
@@ -114,7 +118,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
-            m_hostGroups.put(i, "0");
+            m_hostGroups.put(i, new ExtensibleGroupTag("0", "0"));
         }
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);
@@ -128,8 +132,8 @@ public class TestLeaderAppointer extends ZKTestBase {
     {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(),
-                null, m_config.getTopology(m_hostGroups), m_mpi, stats, false);
+                                    m_config.getReplicationFactor(),
+                                    null, m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -278,7 +282,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     false);
@@ -525,7 +529,7 @@ public class TestLeaderAppointer extends ZKTestBase {
                                     m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(),
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_config.getTopology(m_hostGroups, HashMultimap.create(), new HashMap<>(), new ArrayList<>()),
                                     m_mpi,
                                     new KSafetyStats(),
                                     true);

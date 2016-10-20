@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
@@ -66,6 +67,7 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -90,7 +92,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger m_hostLog = new VoltLogger("HOST");
     private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
-    public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
+    public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<>();
 
     /**
      * Callback for watching for host failures.
@@ -122,13 +124,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private static final String INTERNAL_INTERFACE = "internalinterface";
         private static final String ZK_INTERFACE = "zkinterface";
         private static final String COORDINATOR_IP = "coordinatorip";
-        private static final String GROUP = "group";
+        private static final String RACK_AWARENESS_GROUP = "rackawarenessgroup";
+        private static final String BUDDY_GROUP = "buddygroup";
 
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:7181";
         public String internalInterface = "";
         public int internalPort = 3021;
-        public String group = "0";
+        public String rackAwarenessgroup = "0";
+        public String buddyGroup = "0";
         public int deadHostTimeout = Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
@@ -212,7 +216,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
-                js.key(GROUP).value(group);
+                js.key(RACK_AWARENESS_GROUP).value(rackAwarenessgroup);
+                js.key(BUDDY_GROUP).value(buddyGroup);
                 js.key(COORDINATOR_IP).value(coordinatorIp.toString());
                 js.key(ZK_INTERFACE).value(zkInterface);
                 js.key(INTERNAL_INTERFACE).value(internalInterface);
@@ -237,14 +242,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static class HostInfo {
 
         private final static String HOST_IP = "hostIp";
-        private final static String GROUP = "group";
+        private final static String RACK_AWARENESS_GROUP = "rackAwarenessGroup";
+        private final static String BUDDY_GROUP = "buddyGroup";
 
         final String m_hostIp;
-        final String m_group;
+        final String m_rackAwarenessGroup;
+        String m_buddyGroup;
 
-        public HostInfo(String hostIp, String group) {
+        public HostInfo(String hostIp, String rackAwarenessGroup, String buddyGroup) {
             m_hostIp = hostIp;
-            m_group = group;
+            m_rackAwarenessGroup = rackAwarenessGroup;
+            m_buddyGroup = buddyGroup;
         }
 
         public byte[] toBytes() throws JSONException
@@ -252,7 +260,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             final JSONStringer js = new JSONStringer();
             js.object();
             js.key(HOST_IP).value(m_hostIp);
-            js.key(GROUP).value(m_group);
+            js.key(RACK_AWARENESS_GROUP).value(m_rackAwarenessGroup);
+            js.key(BUDDY_GROUP).value(m_buddyGroup);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -260,7 +269,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
             final JSONObject obj = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
-            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP));
+            return new HostInfo(obj.getString(HOST_IP),
+                                obj.getString(RACK_AWARENESS_GROUP),
+                                obj.getString(BUDDY_GROUP));
         }
     }
 
@@ -589,7 +600,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             /*
              * A set containing just the leader (this node)
              */
-            HashSet<Long> agreementSites = new HashSet<Long>();
+            HashSet<Long> agreementSites = new HashSet<>();
             agreementSites.add(agreementHSId);
 
             /*
@@ -650,7 +661,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group);
+            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(),
+                    m_config.rackAwarenessgroup, m_config.buddyGroup);
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
@@ -937,7 +949,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         /*
          * Construct the set of agreement sites based on all the hosts that are connected
          */
-        HashSet<Long> agreementSites = new HashSet<Long>();
+        HashSet<Long> agreementSites = new HashSet<>();
         agreementSites.add(agreementHSId);
 
         m_network.start();//network must be running for register to work
@@ -1004,10 +1016,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
             hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
-                                    m_config.group);
+                                    m_config.rackAwarenessgroup, m_config.buddyGroup);
         } else {
             hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
-                                    m_config.group);
+                                    m_config.rackAwarenessgroup, m_config.buddyGroup);
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -1016,8 +1028,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Wait until all the nodes have built a mesh.
      */
-    public Map<Integer, String> waitForGroupJoin(int expectedHosts) {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
+    public Map<Integer, ExtensibleGroupTag> waitForGroupJoin(int expectedHosts) {
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
 
         try {
             while (true) {
@@ -1028,7 +1040,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (String child : children) {
                     final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
                     // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
-                    hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), info.m_group);
+                    ExtensibleGroupTag groupTag = new ExtensibleGroupTag(info.m_rackAwarenessGroup, info.m_buddyGroup);
+                    hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), groupTag);
                 }
 
                 /*
@@ -1059,6 +1072,37 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         assert hostGroups.size() == expectedHosts;
         return hostGroups;
+    }
+
+    public Map<Integer, ExtensibleGroupTag> getGroupTags()
+            throws KeeperException, InterruptedException, JSONException
+    {
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        final List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+
+        for (String child : children) {
+            final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
+            // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
+            ExtensibleGroupTag groupTag = new ExtensibleGroupTag(info.m_rackAwarenessGroup, info.m_buddyGroup);
+            hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), groupTag);
+        }
+        return hostGroups;
+    }
+
+    /**
+     * Rewrite the calculated buddy group tag into cluster
+     */
+    public void registerGroupTags(Map<Integer, ExtensibleGroupTag> hostGroups)
+            throws KeeperException, InterruptedException, JSONException
+    {
+        final List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        for (String child : children) {
+            final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
+            // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
+            int hostId = Integer.parseInt(child.substring(child.indexOf("host") + 4));
+            info.m_buddyGroup = hostGroups.get(hostId).m_buddyGroup;
+            m_zk.setData(ZKUtil.joinZKPath(CoreZK.hosts, child), info.toBytes(), -1);
+        }
     }
 
     public boolean isPaused() {
@@ -1288,13 +1332,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         assert(message != null);
         assert(destinationHSIds != null);
         final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =
-            new HashMap<ForeignHost, ArrayList<Long>>(32);
+            new HashMap<>(32);
         for (long hsId : destinationHSIds) {
             ForeignHost host = presend(hsId, message);
             if (host == null) continue;
             ArrayList<Long> bundle = foreignHosts.get(host);
             if (bundle == null) {
-                bundle = new ArrayList<Long>();
+                bundle = new ArrayList<>();
                 foreignHosts.put(host, bundle);
             }
             bundle.add(hsId);
@@ -1447,7 +1491,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public Map<Long, Pair<String, long[]>>
         getIOStats(final boolean interval) throws InterruptedException, ExecutionException {
         final ImmutableMap<Integer, ForeignHost> fhosts = m_foreignHosts;
-        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>(fhosts.size());
+        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<>(fhosts.size());
 
         for (ForeignHost fh : fhosts.values()) {
             picoNetworks.add(fh.m_network);
