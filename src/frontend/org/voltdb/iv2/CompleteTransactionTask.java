@@ -19,31 +19,26 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
-import org.voltcore.messaging.Mailbox;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 
 public class CompleteTransactionTask extends TransactionTask
 {
-    final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
     final private PartitionDRGateway m_drGateway;
 
-    public CompleteTransactionTask(Mailbox initiator,
-                                   TransactionState txnState,
+    public CompleteTransactionTask(TransactionState txnState,
                                    TransactionTaskQueue queue,
                                    CompleteTransactionMessage msg,
                                    PartitionDRGateway drGateway)
     {
         super(txnState, queue);
-        m_initiator = initiator;
         m_completeMsg = msg;
         m_drGateway = drGateway;
     }
@@ -78,10 +73,6 @@ public class CompleteTransactionTask extends TransactionTask
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
             hostLog.debug("RESTART: " + this);
         }
-
-        final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
-        resp.m_sourceHSId = m_initiator.getHSId();
-        m_initiator.deliver(resp);
     }
 
     @Override
@@ -116,11 +107,6 @@ public class CompleteTransactionTask extends TransactionTask
             // stream faithfully
             taskLog.logTask(m_completeMsg);
         }
-
-        final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
-        resp.setIsRecovering(true);
-        resp.m_sourceHSId = m_initiator.getHSId();
-        m_initiator.deliver(resp);
     }
 
     @Override

@@ -41,7 +41,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -190,9 +189,6 @@ public class MpScheduler extends Scheduler
         }
         else if (message instanceof Iv2EndOfLogMessage) {
             handleEOLMessage();
-        }
-        else if (message instanceof DummyTransactionTaskMessage) {
-            // leave empty to ignore it on purpose
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
