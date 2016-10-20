@@ -1097,13 +1097,11 @@ public abstract class CatalogUtil {
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
-        int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
         Cluster catCluster = catalog.getClusters().get("cluster");
         // copy the deployment info that is currently not recorded anywhere else
         Deployment catDeploy = catCluster.getDeployment().get("deployment");
-        catDeploy.setSitesperhost(sitesPerHost);
         catDeploy.setKfactor(kFactor);
         // copy partition detection configuration from xml to catalog
         String defaultPPDPrefix = "partition_detection";

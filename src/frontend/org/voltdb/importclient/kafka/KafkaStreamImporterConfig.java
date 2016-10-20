@@ -65,9 +65,11 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final int m_partition;
     private HostAndPort m_partitionLeader;
     private final FormatterBuilder m_formatterBuilder;
+    private final KafkaImporterCommitPolicy m_commitPolicy;
+    private final long m_triggerValue;
 
     private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
-            String groupId, int fetchSize, int soTimeout, String procedure,
+            String groupId, int fetchSize, int soTimeout, String procedure, String commitPolicy,
             FormatterBuilder formatterBuilder)
     {
         m_uri = uri;
@@ -79,6 +81,10 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
+        KafkaImporterCommitPolicy cp;
+        m_commitPolicy = KafkaImporterCommitPolicy.fromString(commitPolicy);
+        m_triggerValue = KafkaImporterCommitPolicy.fromStringTriggerValue(commitPolicy, m_commitPolicy);
+
         m_formatterBuilder = formatterBuilder;
     }
 
@@ -141,6 +147,14 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return m_uri;
     }
 
+    public KafkaImporterCommitPolicy getCommitPolicy() {
+        return m_commitPolicy;
+    }
+
+    public long getTriggerValue() {
+        return m_triggerValue;
+    }
+
     public static Map<URI, ImporterConfig> createConfigEntries(Properties props,  FormatterBuilder formatterBuilder)
     {
         String brokers = props.getProperty("brokers", "").trim();
@@ -181,7 +195,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         if (ttopicList == null || ttopicList.isEmpty()) {
             throw new IllegalArgumentException("Missing topic(s).");
         }
-
+        String commitPolicy = props.getProperty("commit.policy", "none");
         Map<URI, ImporterConfig> configs = new HashMap<>();
         for (String topic : ttopicList) {
             if (topic.length() > topicMaxNameLength) {
@@ -192,7 +206,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
-                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatterBuilder));
+                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, commitPolicy, formatterBuilder));
             } catch(Exception e) {
                 m_logger.warn(String.format("Error trying to get partition information for topic [%s] on host [%s]", topic, hapList.get(0).getHost()), e);
             }
@@ -216,7 +230,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, FormatterBuilder formatterBuilder)
+            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, String commitPolicy, FormatterBuilder formatterBuilder)
     {
         SimpleConsumer consumer = null;
         Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
@@ -258,7 +272,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                         }
                         KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
                                 part.partitionId(), new HostAndPort(leader.host(), leader.port()),
-                                groupId, fetchSize, soTimeout, procedure, formatterBuilder);
+                                groupId, fetchSize, soTimeout, procedure, commitPolicy, formatterBuilder);
                         configs.put(uri, config);
                     }
                 }

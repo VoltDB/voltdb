@@ -48,6 +48,7 @@ public class FragmentTask extends TransactionTask
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
+    boolean m_respBufferable = true;
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
                  FragmentTaskMessage message,
@@ -71,6 +72,20 @@ public class FragmentTask extends TransactionTask
         m_initiator = mailbox;
         m_fragmentMsg = message;
         m_inputDeps = inputDeps;
+
+        if (txnState != null && !txnState.isReadOnly()) {
+            m_respBufferable = false;
+        }
+    }
+
+    public void setResponseNotBufferable() {
+        m_respBufferable = false;
+    }
+
+    private void deliverResponse(FragmentResponseMessage response) {
+        response.m_sourceHSId = m_initiator.getHSId();
+        response.setRespBufferable(m_respBufferable);
+        m_initiator.deliver(response);
     }
 
     @Override
@@ -106,9 +121,7 @@ public class FragmentTask extends TransactionTask
 
             // execute the procedure
             final FragmentResponseMessage response = processFragmentTask(siteConnection);
-            // completion?
-            response.m_sourceHSId = m_initiator.getHSId();
-            m_initiator.deliver(response);
+            deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
                 siteConnection.setBatchTimeout(originalTimeout);
@@ -141,7 +154,6 @@ public class FragmentTask extends TransactionTask
 
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
-        response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
@@ -154,7 +166,7 @@ public class FragmentTask extends TransactionTask
             response.addDependency(outputDepId, depTable);
         }
 
-        m_initiator.deliver(response);
+        deliverResponse(response);
         completeFragment();
     }
 

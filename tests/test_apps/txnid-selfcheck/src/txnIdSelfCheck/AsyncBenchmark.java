@@ -493,12 +493,12 @@ public class AsyncBenchmark {
         timer.cancel();
 
         shutdown.set(true);
-
+        /* don't wait for a proper cleanup just go away the system may not be healthy -pr
         // block until all outstanding txns return
         for (Client client : clients) {
             client.drain();
             client.close();
-        }
+        }*/
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");

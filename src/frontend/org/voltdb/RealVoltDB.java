@@ -808,6 +808,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     managedPathsEmptyCheck(config);
             }
 
+            // Write local sitesPerHost to ZK
+            if (config.m_sitesperhost == VoltDB.UNDEFINED) {
+                config.m_sitesperhost = readDepl.deployment.getCluster().getSitesperhost();
+            } else {
+                hostLog.info("CLI overrides the local sites count to " + config.m_sitesperhost);
+                consoleLog.info("CLI overrides the local sites count to " + config.m_sitesperhost);
+            }
+            m_messenger.registerSitesPerHostToZK(config.m_sitesperhost);
+
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
@@ -922,7 +931,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          clusterConfig.getSitesPerHost());
+                                                                          m_messenger.getLocalSitesCount());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -1090,12 +1099,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 m_clientInterface = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
                         m_cartographer,
-                        m_configuredNumberOfPartitions,
                         clientIntf,
                         config.m_port,
                         adminIntf,
-                        config.m_adminPort,
-                        m_config.m_timestampTestingSalt);
+                        config.m_adminPort);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -1583,10 +1590,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             topo = joinCoordinator.getTopology();
         }
         else if (!startAction.doesRejoin()) {
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
             int hostcount = m_clusterSettings.get().hostcount();
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            m_messenger.waitForAllSitesPerHostToBeRegistered(hostcount);
+            ClusterConfig clusterConfig = new ClusterConfig(hostcount,
+                                                            m_messenger.getSitesPerHostFromZK(),
+                                                            kfactor);
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
@@ -1913,6 +1922,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
                         + m_config.m_pathToDeployment, false, null);
             }
+
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
              * Trick here is to print out all applicable problems and then stop, rather than stopping
@@ -2422,15 +2432,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clusterSettings.get().store();
         } else if (m_myHostId == 0) {
             m_clusterSettings.store(m_messenger.getZK());
-        }
-        ClusterConfig config = new ClusterConfig(
-                m_clusterSettings.get().hostcount(),
-                clusterType.getSitesperhost(),
-                clusterType.getKfactor()
-                );
-
-        if (!config.validate()) {
-            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
