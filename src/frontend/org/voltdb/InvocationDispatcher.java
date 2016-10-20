@@ -86,7 +86,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -1059,7 +1059,7 @@ public final class InvocationDispatcher {
             return null;
         }
 
-        PathSettings paths = m_catalogContext.get().getPaths();
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
         String snapshotJson = null;
         try {
             JSONWriter jss = new JSONStringer()
