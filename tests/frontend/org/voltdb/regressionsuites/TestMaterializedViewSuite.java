@@ -330,8 +330,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("AggAges", 1).getResults();
         assertEquals(1, results.length);
         assertEquals(2, results[0].getRowCount());
-
-}
+    }
 
     private void subtestDeleteSinglePartition() throws IOException, ProcCallException
     {
@@ -1471,6 +1470,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
+    private void insertRowAdHoc(Client client, String stmt) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
     private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -1748,7 +1755,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void truncateSourceTables(Client client, int rollback,
             int truncateTable1, int truncateTable2, int truncateTable3,
-            int truncateTable4) {
+            int truncateTable4)
+    {
         try {
             try {
                 VoltTable vt = client.callProcedure("TruncateTables", rollback,
@@ -2202,6 +2210,30 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
             assertContentOfTable(new Object[][] {}, vt);
         }
+    }
+
+    public void testEng11314() throws Exception {
+        Client client = getClient();
+        String[] insertT1 = {
+            "INSERT INTO T1_ENG_11314 (G1, C2, C3) VALUES (1, 1024, 64);",
+            "INSERT INTO T1_ENG_11314 (G1, C2, C3) VALUES (2, 2048, 32);"
+        };
+        String insertT2 = "INSERT INTO T2_ENG_11314 (G0) VALUES (0);";
+        String bugTrigger = "UPDATE T1_ENG_11314 SET C2=64, C3=1024 WHERE G1=2;";
+        Object[][] viewContent = { {0, 2, 0, 0, 1024, 64, 0, 0, 0, 0, 0, 0, "abc", "def"} };
+        // -1- Insert data
+        insertRowAdHoc(client, insertT1[0]);
+        insertRowAdHoc(client, insertT1[1]);
+        insertRowAdHoc(client, insertT2);
+        // -2- Test if the UPDATE statement will trigger an error on single table view V1:
+        client.callProcedure("@AdHoc", bugTrigger);
+        // -3- Verify view contents
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V1_ENG_11314").getResults()[0];
+            assertContentOfTable(viewContent, vt);
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V2_ENG_11314").getResults()[0];
+            assertContentOfTable(viewContent, vt);
     }
 
     /**
