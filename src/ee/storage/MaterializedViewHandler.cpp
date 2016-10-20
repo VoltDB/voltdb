@@ -151,12 +151,13 @@ namespace voltdb {
 
     void MaterializedViewHandler::setUpMinMaxQueries(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                  VoltDBEngine *engine) {
-        m_minMaxExecutorVectors.clear();
+        m_minMaxExecutorVectors.resize(mvHandlerInfo->fallbackQueryStmts().size());
         BOOST_FOREACH (LabeledStatement labeledStatement, mvHandlerInfo->fallbackQueryStmts()) {
+            int key = std::stoi(labeledStatement.first);
             catalog::Statement *stmt = labeledStatement.second;
             boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromCatalogStatement(engine, stmt);
             execVec->getRidOfSendExecutor();
-            m_minMaxExecutorVectors.push_back(execVec);
+            m_minMaxExecutorVectors[key] = execVec;
         }
     }
 
