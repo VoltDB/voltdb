@@ -17,12 +17,12 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -87,7 +87,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * return the pre-provided error message that corresponds to the non-empty
      * tables.
      *
-     * @param tablesThatMustBeEmpty List of table names that must be empty.
+     * Each of the tablesThatMustBeEmpty strings represents a set of tables.
+     * This is is a sequence of names separated by plus signs (+).  For example,
+     * "A+B+C" is the set {A, B, C}, and "A" is the singleton set {A}.  In
+     * these sets, only one needs to be empty.
+     *
+     * @param tablesThatMustBeEmpty List of sets of table names that must include
+     *                              an empty table.
      * @param reasonsForEmptyTables Error messages to return if that table isn't
      * empty.
      * @param context
@@ -107,9 +113,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // fetch the id of the tables that must be empty from the
         //  current catalog (not the new one).
         CatalogMap<Table> tables = context.getDatabase().getTables();
-        int[] tableIds = new int[tablesThatMustBeEmpty.length];
+        List<List<String>> allTableSets = decodeTables(tablesThatMustBeEmpty);
+        Map<String, Boolean> allTables = collapseSets(allTableSets);
+        int[] tableIds = new int[allTables.size()];
         int i = 0;
-        for (String tableName : tablesThatMustBeEmpty) {
+        for (String tableName : allTables.keySet()) {
             Table table = tables.get(tableName);
             if (table == null) {
                 String msg = String.format("@UpdateApplicationCatalog was checking to see if table %s was empty, " +
@@ -134,28 +142,80 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-        SortedSet<String> nonEmptyTables = new TreeSet<>();
 
-        // find all empty tables
+        // find all empty tables and mark that they are empty.
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
+            boolean isEmpty = true;
             if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
-                nonEmptyTables.add(tableName);
+                isEmpty = false;
             }
+            allTables.put(tableName.toUpperCase(), isEmpty);
         }
 
-        // return an error containing the names of all non-empty tables
-        // via the propagated reasons why each needs to be empty
-        if (!nonEmptyTables.isEmpty()) {
-            String msg = "Unable to make requested schema change:\n";
-            for (i = 0; i < tablesThatMustBeEmpty.length; ++i) {
-                if (nonEmptyTables.contains(tablesThatMustBeEmpty[i])) {
-                    msg += reasonsForEmptyTables[i] + "\n";
+        // Reexamine the sets of sets and see if any of them has
+        // one empty element.  If not, then add the respective
+        // error message to the output message
+        String msg = "Unable to make requested schema change:\n";
+        boolean allOk = true;
+        for (int idx = 0; idx < allTableSets.size(); idx += 1) {
+            List<String> tableNames = allTableSets.get(idx);
+            boolean allNonEmpty = true;
+            for (String tableName : tableNames) {
+                Boolean oneEmpty = allTables.get(tableName);
+                if (oneEmpty != null && oneEmpty) {
+                    allNonEmpty = false;
+                    break;
                 }
             }
+            if (allNonEmpty) {
+                String errMsg = reasonsForEmptyTables[idx];
+                msg += errMsg + "\n";
+                allOk = false;
+            }
+        }
+        if ( ! allOk) {
             throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, msg);
         }
+    }
+
+    /**
+     * Take a list of list of table names and collapse into a map
+     * which maps all table names to false.  We will set the correct
+     * values later on.  We just want to get the structure right now.
+     * Note that tables may be named multiple time in the lists of
+     * lists of tables.  Everything gets mapped to false, so we don't
+     * care.
+     *
+     * @param allTableSets
+     * @return
+     */
+    private Map<String, Boolean> collapseSets(List<List<String>> allTableSets) {
+        Map<String, Boolean> answer = new TreeMap<>();
+        for (List<String> tables : allTableSets) {
+            for (String table : tables) {
+                answer.put(table, false);
+            }
+        }
+        return answer;
+    }
+
+    /**
+     * Decode sets of names encoded as by concatenation with plus signs
+     * into lists of lists of strings.  Preserve the order, since we need
+     * it to match to error messages later on.
+     *
+     * @param tablesThatMustBeEmpty
+     * @return The decoded lists.
+     */
+    private List<List<String>> decodeTables(String[] tablesThatMustBeEmpty) {
+        List<List<String>> answer = new ArrayList<>();
+        for (String tableSet : tablesThatMustBeEmpty) {
+            String tableNames[] = tableSet.split("\\+");
+            answer.add(Arrays.asList(tableNames));
+        }
+        return answer;
     }
 
     public static class JavaClassForTest {

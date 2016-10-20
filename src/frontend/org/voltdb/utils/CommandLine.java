@@ -759,6 +759,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("paused");
         }
 
+        if (m_sitesperhost != VoltDB.UNDEFINED) {
+            cmdline.add("sitesperhost");
+            cmdline.add(Integer.toString(m_sitesperhost));
+        }
+
         //Add mesh and hostcount for probe only.
         if (m_startAction == StartAction.PROBE) {
             cmdline.add("mesh"); cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));

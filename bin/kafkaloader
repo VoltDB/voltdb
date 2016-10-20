@@ -123,8 +123,9 @@ fi
 for f in $VOLTDB_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
-
-CLASSPATH=${CLASSPATH}:${ZKLIB}/zkclient-0.3.jar:${ZKLIB}/zookeeper-3.3.4.jar
+for f in $ZKLIB/z*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
 
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
