@@ -65,6 +65,8 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.collect.Maps;
+
 import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
@@ -728,11 +730,14 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadClusterConfig() throws IOException {
         // check no hosts
-        ClusterConfig cluster_config = new ClusterConfig(0, 1, 0);
+        Map<Integer, Integer> emptySphMap = Maps.newHashMap();
+        ClusterConfig cluster_config = new ClusterConfig(0, emptySphMap, 0);
         assertFalse(cluster_config.validate());
 
         // check no sites-per-hosts
-        cluster_config = new ClusterConfig(1, 0, 0);
+        Map<Integer, Integer> zeroSphMap = Maps.newHashMap();
+        zeroSphMap.put(0, 0);
+        cluster_config = new ClusterConfig(1, zeroSphMap, 0);
         assertFalse(cluster_config.validate());
     }
 

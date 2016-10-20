@@ -163,6 +163,7 @@ public class LeaderAppointer implements Promotable
                         int pid = aPartition.getInt("partition_id");
                         if (pid == m_partitionId) {
                             replicaCount = aPartition.getJSONArray("replicas").length();
+                            break;
                         }
                     }
                 } catch (JSONException e) {
@@ -470,6 +471,7 @@ public class LeaderAppointer implements Promotable
                     int pid = aPartition.getInt("partition_id");
                     if (pid == partitionId) {
                         masterHostId = aPartition.getInt("master");
+                        break;
                     }
                 }
             }
