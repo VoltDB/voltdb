@@ -153,7 +153,7 @@ namespace voltdb {
                                                  VoltDBEngine *engine) {
         m_minMaxExecutorVectors.resize(mvHandlerInfo->fallbackQueryStmts().size());
         BOOST_FOREACH (LabeledStatement labeledStatement, mvHandlerInfo->fallbackQueryStmts()) {
-            int key = stoi(labeledStatement.first);
+            int key = std::stoi(labeledStatement.first);
             catalog::Statement *stmt = labeledStatement.second;
             boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromCatalogStatement(engine, stmt);
             execVec->getRidOfSendExecutor();

@@ -107,7 +107,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
     VoltDBEngine* engine = ExecutorContext::getEngine();
     int idx = 0;
     BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
-        int key = stoi(labeledStatement.first);
+        int key = std::stoi(labeledStatement.first);
         catalog::Statement *stmt = labeledStatement.second;
         const string& b64plan = stmt->fragments().begin()->second->plannodetree();
         const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
