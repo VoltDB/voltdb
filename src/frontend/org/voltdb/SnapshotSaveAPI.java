@@ -115,10 +115,6 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
-        final int numLocalSites = VoltDB.instance().getHostMessenger().getLocalSitesCount();
-        if (numLocalSites == VoltDB.UNDEFINED) {
-            throw new RuntimeException("Failed to get number of local sites for host" + VoltDB.instance().getHostMessenger().getHostId());
-        }
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
             try {
@@ -197,6 +193,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
+            final int numLocalSites = context.getLocalSitesCount();
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
