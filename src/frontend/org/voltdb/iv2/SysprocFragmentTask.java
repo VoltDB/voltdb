@@ -52,8 +52,6 @@ public class SysprocFragmentTask extends TransactionTask
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
 
-    boolean m_respBufferable = true;
-
     // This constructor is used during live rejoin log replay.
     SysprocFragmentTask(Mailbox mailbox,
                         FragmentTaskMessage message,
@@ -76,10 +74,6 @@ public class SysprocFragmentTask extends TransactionTask
             m_inputDeps = new HashMap<Integer, List<VoltTable>>();
         }
         assert(m_fragmentMsg.isSysProcTask());
-
-        if (txnState != null && !txnState.isReadOnly()) {
-            m_respBufferable = false;
-        }
     }
 
     /**
@@ -101,12 +95,8 @@ public class SysprocFragmentTask extends TransactionTask
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
             response.addDependency(outputDepId, depTable);
         }
-        response.setRespBufferable(m_respBufferable);
-        m_initiator.deliver(response);
-    }
 
-    public void setResponseNotBufferable() {
-        m_respBufferable = false;
+        m_initiator.deliver(response);
     }
 
     @Override
@@ -136,7 +126,6 @@ public class SysprocFragmentTask extends TransactionTask
 
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
-        response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
     }
 
