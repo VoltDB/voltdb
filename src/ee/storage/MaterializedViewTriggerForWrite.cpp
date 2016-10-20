@@ -102,7 +102,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
     }
     allocateMinMaxSearchKeyTuple();
 
-    m_fallbackExecutorVectors.resize(fallbackQueryStmts.size(), NULL);
+    m_fallbackExecutorVectors.resize(fallbackQueryStmts.size());
     m_usePlanForAgg.resize(fallbackQueryStmts.size(), false);
     VoltDBEngine* engine = ExecutorContext::getEngine();
     int idx = 0;
