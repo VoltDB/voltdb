@@ -232,7 +232,7 @@ public class HostCriteria {
             && o.m_terminusNonce != null
             && !m_terminusNonce.equals(o.m_terminusNonce))
         {
-            ilb.add("Servers have different shutdown snapshots nonces: "
+            ilb.add("Servers have different startup snapshots nonces: "
                     + m_terminusNonce + " vs. " + o.m_terminusNonce);
         }
         return ilb.build();

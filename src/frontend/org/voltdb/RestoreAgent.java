@@ -148,7 +148,7 @@ SnapshotCompletionInterest, Promotable
     private boolean m_hasRestored = false;
 
     /**
-     * Shutdown snapshot nonce
+     * Startup snapshot nonce (taken on shutdown save)
      */
     private final String m_terminusNonce;
 

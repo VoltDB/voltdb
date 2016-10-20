@@ -573,7 +573,7 @@ public class MeshProber implements JoinAcceptor {
         }
 
         if (terminusNonces.size() > 1) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Detected multiple shutdown snapshots, cannot "
+            org.voltdb.VoltDB.crashLocalVoltDB("Detected multiple startup snapshots, cannot "
                     + "proceed with cluster startup. Snapshot IDs " + terminusNonces);
         }
 

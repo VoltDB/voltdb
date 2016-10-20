@@ -320,7 +320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private boolean m_isBare = false;
 
     /**
-     * Shutdown snapshot nonce
+     * Startup snapshot nonce taken on shutdown --save
      */
     String m_terminusNonce = null;
 
@@ -3954,8 +3954,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     });
 
     /**
-     * Reads the file containing the shutdown snapshot nonce
-     * @return null if the file is not accessible, or the shutdown snapshot nonce
+     * Reads the file containing the startup snapshot nonce
+     * @return null if the file is not accessible, or the startup snapshot nonce
      */
     private String getTerminusNonce() {
         return terminusNonceSupplier.get();
