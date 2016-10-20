@@ -151,6 +151,10 @@ public class TestShutdownSave extends RegressionSuite
             assertNotSame("detected replayed transactions", "KV.insert", t.getString(1));
         }
 
+        cr = client2.callProcedure("@AdHoc", "SELECT COUNT(*) FROM KV;");
+        assertEquals("count(*) invocation failed: " + cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        assertEquals("content did not restore", 256L, cr.getResults()[0].asScalarLong());
+
         m_config.shutDown();
 
         for (int i = 0; i < HOST_COUNT; ++i) {

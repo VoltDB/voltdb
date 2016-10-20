@@ -223,7 +223,7 @@ public class MeshProber implements JoinAcceptor {
                 "host count %s is less then the number of coordinators %s",
                 hostCountSupplier.get(), coordinators.size());
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
-                "terminus is blank");
+                "terminus should not be blank");
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;

@@ -117,7 +117,7 @@ public class HostCriteria {
         checkArgument(startAction != null, "start action is null");
         checkArgument(hostCount > 0, "host count %s is less then one", hostCount);
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
-                "terminus is blank");
+                "terminus should not be blank");
 
         m_paused = paused;
         m_configHash = configHash;
