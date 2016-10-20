@@ -366,6 +366,14 @@ public abstract class NonVoltDBBackend {
         return false;
     }
 
+    /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e.,
+     *  a GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column, or equivalents
+     *  in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isGeoColumn(String columnName, String... tableNames) {
+        List<String> geoColumnTypes = Arrays.asList("GEOGRAPHY", "GEOGRAPHY_POINT");
+        return isColumnType(geoColumnTypes, columnName, tableNames);
+    }
+
     /** Returns true if the <i>columnName</i> is an integer column (including
      *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
      *  comparison, non-VoltDB database); false otherwise. */
@@ -374,11 +382,16 @@ public abstract class NonVoltDBBackend {
         return isColumnType(intColumnTypes, columnName, tableNames);
     }
 
-    /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e. a
-     *  GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column; false otherwise. */
-    private boolean isGeoColumn(String columnName, String... tableNames) {
-        List<String> geoColumnTypes = Arrays.asList("GEOGRAPHY", "GEOGRAPHY_POINT");
-        return isColumnType(geoColumnTypes, columnName, tableNames);
+    /** Returns true if the <i>columnName</i> is either an integer constant or
+     *  an integer column (including types TINYINT, SMALLINT, INTEGER, BIGINT,
+     *  or equivalents in a comparison, non-VoltDB database); false otherwise. */
+    private boolean isInteger(String columnName, String... tableNames) {
+        try {
+            Integer.parseInt(columnName.trim());
+            return true;
+        } catch (NumberFormatException e) {
+            return isIntegerColumn(columnName, tableNames);
+        }
     }
 
     /** Returns the number of occurrences of the specified character in the specified String. */
@@ -517,11 +530,30 @@ public abstract class NonVoltDBBackend {
                 System.out.println("    lastGroup : " + lastGroup);
             }
             if (qt.m_useWholeMatch) {
-                if (qt.m_columnType != null && (
-                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(lastGroup))
-                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(lastGroup)) )) {
+                // When columnType is specified, it means only modify queries
+                // that use that type; so if the relevant column(s) are not of
+                // the specified type, no changes are needed
+                boolean noChangesNeeded = false;
+                if (qt.m_columnType != null) {
+                    // When columnType is GEO, check whether the last, and
+                    // presumably only, column is not of that type
+                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup)) {
+                        noChangesNeeded = true;
+                    // When columnType is INTEGER, check whether any of the
+                    // columns (or constants) are non-integer
+                    } else if (qt.m_columnType == ColumnType.INTEGER) {
+                        for (int i=0; i < groups.size(); i++) {
+                            String group = groups.get(i);
+                            if (group != null && !isInteger(group)) {
+                                noChangesNeeded = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (noChangesNeeded) {
                     // Make no changes to query (when columnType is specified,
-                    // but does not match the column type found in this query)
+                    // but does not match the column type(s) found in this query)
                     replaceText.append(wholeMatch);
                 } else {
                     // Check for the case where the group (or the whole text) is to be replaced with replacementText

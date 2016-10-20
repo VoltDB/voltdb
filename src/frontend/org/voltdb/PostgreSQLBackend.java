@@ -66,7 +66,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("geography", "GEOGRAPHY");
         // NOTE: what VoltDB calls "GEOGRAPHY_POINT" would also be called
         // "geography" by PostgreSQL, so this mapping is imperfect; however,
-        // so far this has not been a problem
+        // so far this has not caused test failures
     }
 
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
@@ -114,18 +114,26 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(dayOfYearQuery)
             .initialText("EXTRACT ( ").prefix("DOY FROM").suffix(")").groups("column");
 
-    // Regex pattern for a typical column or column expression (including
-    // functions, operators, etc.) - currently only used for AVG, though this
-    // could be expanded in the future; note that AS or FROM can occur
-    // (rarely) if certain functions occur within the AVG function, e.g.,
-    // AVG(CAST(VCHAR AS INTEGER)) or AVG(EXTRACT(DAY FROM PAST))
-    private static final String COLUMN_PATTERN = "(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*"
-            + "\\s*((\\+|\\-|\\*|\\/)(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*)*\\s*";
+    // Regex patterns for a typical column, constant, or column expression
+    // (including functions, operators, etc.); used, e.g., for modifying an AVG
+    // query or a division (col1 / col2) query.
+    // Note: an AS or FROM can occur here (rarely) if certain functions occur
+    // within another function, such as AVG, e.g., AVG(CAST(VCHAR AS INTEGER))
+    // or AVG(EXTRACT(DAY FROM PAST))
+    private static final String COLUMN_NAME   = "(\\w+\\.)?(?<column1>\\w+)";
+    private static final String FUNCTION_NAME = "(\\w*\\s*\\(\\s*)*";
+    private static final String FUNCTION_END  = "(\\s+(AS|FROM)\\s+\\w+\\s*\\))?(\\s*\\))*";
+    private static final String ARITHMETIC_OP = "\\s*(\\+|\\-|\\*|\\/)\\s*";
+    private static final String COLUMN_EXPRESSION_PATTERN =
+            FUNCTION_NAME + COLUMN_NAME + FUNCTION_END
+            + "(" + ARITHMETIC_OP + FUNCTION_NAME
+                  + COLUMN_NAME.replace("column1", "column2") + FUNCTION_END
+            + ")*";
 
     // Captures the use of AVG(columnExpression), which PostgreSQL handles
     // differently, when the columnExpression is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
-            "AVG\\s*\\("+COLUMN_PATTERN+"\\)",
+            "AVG\\s*\\(\\s*"+COLUMN_EXPRESSION_PATTERN+"\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an AVG(columnExpression) function, where
     // <i>columnName</i> is of an integer type, for which PostgreSQL returns
@@ -133,7 +141,23 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // so change it to: TRUNC ( AVG(columnExpression) )
     private static final QueryTransformer avgQueryTransformer
             = new QueryTransformer(avgQuery)
-            .prefix("TRUNC ( ").suffix(" )").groups("column")
+            .prefix("TRUNC ( ").suffix(" )").groups("column1", "column2")
+            .useWholeMatch().columnType(ColumnType.INTEGER);
+
+    // Captures the use of expression1 / expression2, which PostgreSQL handles
+    // differently, when the expressions are of one of the integer types
+    private static final Pattern divisionQuery = Pattern.compile(
+            COLUMN_EXPRESSION_PATTERN + "\\s*/\\s*" + COLUMN_EXPRESSION_PATTERN
+            .replace("column1", "column3").replace("column2", "column4"),
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing expression1 / expression2, where the
+    // expressions are of an integer type, for which PostgreSQL returns a
+    // numeric (non-integer) value, unlike VoltDB, which returns an integer;
+    // so change it to: TRUNC ( expression1 / expression2 )
+    private static final QueryTransformer divisionQueryTransformer
+            = new QueryTransformer(divisionQuery)
+            .prefix("TRUNC ( ").suffix(" )")
+            .groups("column1", "column2", "column3", "column4")
             .useWholeMatch().columnType(ColumnType.INTEGER);
 
     // Captures the use of CEILING(columnName) or FLOOR(columnName)
@@ -376,7 +400,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  similar terms, so that the results will match. */
     public String transformDML(String dml) {
         return transformQuery(dml, orderByQueryTransformer,
-                avgQueryTransformer, ceilingOrFloorQueryTransformer,
+                avgQueryTransformer, divisionQueryTransformer,
+                ceilingOrFloorQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
                 stringConcatQueryTransformer, varbinaryConstantTransformer,
                 upsertValuesQueryTransformer, upsertSelectQueryTransformer);
