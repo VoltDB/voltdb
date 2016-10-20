@@ -44,8 +44,8 @@ public abstract class StmtTableScan {
     protected String m_tableAlias = null;
 
     // Store a unique list of scan columns.
-    protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
-    protected Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
+    private final List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    private final Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
 
     // Partitioning column info
     protected List<SchemaColumn> m_partitioningColumns = null;
@@ -77,7 +77,7 @@ public abstract class StmtTableScan {
         return m_stmtId;
     }
 
-    abstract public String getColumnName(int m_columnIndex);
+    abstract public String getColumnName(int columnIndex);
 
     abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
@@ -86,18 +86,20 @@ public abstract class StmtTableScan {
 
         List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(resolvedExpr);
         for (TupleValueExpression subqTve : tves) {
-            // The original column name may be changed by the processTVE in case of
-            // this TVE was originated in a subquery that was optimized out
-            String columnName = subqTve.getColumnName();
-            tve.setOrigStmtId(m_stmtId);
-            Pair<String, Integer> setItem = Pair.of(columnName, tve.getDifferentiator());
-            if ( ! m_scanColumnNameSet.contains(setItem)) {
-                SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
-                        columnName, columnName, tve.clone());
-                m_scanColumnNameSet.add(setItem);
-                m_scanColumnsList.add(scol);
-            }
+            resolveLeafTve(subqTve);
         }
         return resolvedExpr;
+    }
+
+    private void resolveLeafTve(TupleValueExpression subqTve) {
+        String columnName = subqTve.getColumnName();
+        subqTve.setOrigStmtId(m_stmtId);
+        Pair<String, Integer> setItem =
+                Pair.of(columnName, subqTve.getDifferentiator());
+        if (m_scanColumnNameSet.add(setItem)) {
+            SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
+                    columnName, columnName, subqTve);
+            m_scanColumnsList.add(scol);
+        }
     }
 }

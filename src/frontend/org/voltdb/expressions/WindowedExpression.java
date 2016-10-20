@@ -195,7 +195,7 @@ public class WindowedExpression extends AbstractExpression {
      * @return
      */
     public int getSortIndexOfOrderByExpression(AbstractExpression partitionByExpression) {
-        for (int idx = 0; idx < m_orderByExpressions.size(); idx += 1) {
+        for (int idx = 0; idx < m_orderByExpressions.size(); ++idx) {
             if (m_orderByExpressions.get(idx).equals(partitionByExpression)) {
                 return idx;
             }

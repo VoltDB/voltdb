@@ -117,6 +117,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testComplexAggsSuite() throws IOException, ProcCallException {
+        System.out.println("Test complex aggs...");
         complexAggs();
         complexAggsOrderbySuite();
         complexAggsDistinctLimit();
@@ -125,43 +126,54 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     private void complexAggs() throws IOException, ProcCallException {
         loadData(false);
 
-        Client client = this.getClient();
+        Client client = getClient();
+        String query;
         ClientResponse cr;
         VoltTable vt;
         long[][] expected;
 
         for (String tb: tbs) {
             // Test normal group by with expressions, addition, division for avg.
-            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
-                    "sum(wage)/count(wage) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
+            query = "SELECT dept, sum(wage), count(wage)+5, " +
+                    "sum(wage)/count(wage) " +
+                    "FROM " + tb + " GROUP BY dept ORDER BY dept DESC;";
+            cr = client.callProcedure("@AdHoc", query);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
             validateTableOfLongs(vt, expected);
 
             // Test different group by column order, non-grouped TVE, sum for column, division
-            cr = client.callProcedure("@AdHoc", "SELECT sum(wage)/count(wage) + 1, dept, " +
-                    "SUM(wage+1), SUM(wage)/2 from " + tb + " GROUP BY dept ORDER BY dept");
+            query = "SELECT sum(wage)/count(wage) + 1, dept, " +
+                    "SUM(wage+1), SUM(wage)/2 " +
+                    "FROM " + tb + " GROUP BY dept ORDER BY dept";
+            cr = client.callProcedure("@AdHoc", query);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
             validateTableOfLongs(vt, expected);
 
             // Test Complex Agg with functions
-            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(ABS(wage) - 1) as tag, " +
-                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
+            query = "SELECT dept, SUM(ABS(wage) - 1) as tag, " +
+                    "(count(*)+sum(dept*2))/2 " +
+                    "FROM " + tb + " GROUP BY dept ORDER BY ABS(dept)";
+            cr = client.callProcedure("@AdHoc", query);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
-            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
+            expected = new long[][] {{1, 57, 4}, {2, 88, 5}};
             validateTableOfLongs(vt, expected);
 
             // Test sum()/count(), Addition
-            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), " +
+            query = "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), " +
                     "MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  " +
-                    "MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
+                    "MAX(wage)+MIN(wage)+1 " +
+                    "FROM " + tb + " GROUP BY dept ORDER BY dept";
+            cr = client.callProcedure("@AdHoc", query);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
-            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
+            expected = new long[][] {
+                {1, 60, 3, 20, 30, 10, 20, 41},
+                {2, 90, 2, 45, 50, 40, 45, 91}};
             validateTableOfLongs(vt, expected);
         }
     }
@@ -275,6 +287,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testComplexGroupbySuite() throws IOException, ProcCallException, ParseException{
+        System.out.println("Test complex group by...");
         complexGroupby();
         complexGroupbyDistinctLimit();
         complexGroupbyOrderbySuite();
@@ -651,6 +664,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testOtherCases() throws IOException, ProcCallException {
+        System.out.println("Test other cases...");
         strangeCasesAndOrderby();
 
         ENG4285();
@@ -909,6 +923,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testAggregateOnJoin() throws IOException, ProcCallException {
+        System.out.println("Test aggs on joins...");
         loadData(false);
 
         Client client = this.getClient();
@@ -1123,7 +1138,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             sql = "SELECT count(wage), sum(id)  from " + tb +
                     " GROUP BY abs(dept) ORDER BY abs(dept) ";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.err.println(vt);
             validateTableOfLongs(vt, new long[][] { {3, 6}, {4, 22} });
 
             sql = "SELECT count(wage), sum(id), avg(wage)  from " + tb +
@@ -1139,7 +1153,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             sql = "SELECT COUNT(*) as tag, sum(wage) from " + tb +
                     " GROUP BY dept ORDER BY abs(dept) DESC";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.err.println(vt);
             validateTableOfLongs(vt, new long[][] { {4, 140}, {3, 60}});
         }
     }

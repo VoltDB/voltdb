@@ -365,15 +365,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     @Override
-    public List<StmtSubqueryScan> findAllFromSubqueries() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            subqueries.addAll(childStmt.findAllFromSubqueries());
-        }
-        return subqueries;
-    }
-
-    @Override
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         for (AbstractParsedStmt childStmt : m_children) {
@@ -443,7 +434,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
             newExpr.setExpressionType(expr.getExpressionType());
             if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
-                newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
+                newExpr.setLeft(expr.getLeft().clone());
                 newExpr.setRight(childSubqueryExpr);
                 assert(newExpr instanceof ComparisonExpression);
                 ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());

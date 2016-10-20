@@ -50,14 +50,6 @@ public class HashRangeExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() {
-        HashRangeExpression clone = (HashRangeExpression)super.clone();
-        clone.m_ranges = m_ranges;
-        clone.m_hashColumn = m_hashColumn;
-        return clone;
-    }
-
-    @Override
     public void validate() throws Exception {
         super.validate();
 

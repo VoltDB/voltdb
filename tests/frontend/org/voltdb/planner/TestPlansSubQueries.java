@@ -32,6 +32,7 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -93,7 +94,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         }
     }
 
-    private void checkOutputSchema(AbstractPlanNode planNode, String tableAlias, String[] columns) {
+    private void checkOutputSchema(AbstractPlanNode planNode,
+            String tableAlias, String[] columns) {
         NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
@@ -123,7 +125,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         if (col.getColumnName() == null || col.getColumnName().equals("")) {
             assertNotNull(col.getColumnAlias());
             assertEquals(column, col.getColumnAlias());
-        } else {
+        }
+        else {
             assertEquals(column, col.getColumnName());
         }
     }
@@ -135,9 +138,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
             assertEquals(tableAlias, snode.getTargetTableAlias());
         }
 
-        if (columns.length > 0) {
-            checkOutputSchema(snode, columns);
-        }
+        checkOutputSchema(snode, columns);
     }
 
     private void checkPredicateComparisonExpression(AbstractPlanNode pn, String tableAlias) {
@@ -146,6 +147,21 @@ public class TestPlansSubQueries extends PlannerTestCase {
         expr = expr.getLeft();
         assertTrue(expr instanceof TupleValueExpression);
         assertEquals(tableAlias, ((TupleValueExpression) expr).getTableAlias());
+    }
+
+    private void checkPredicateConjunction(AbstractPlanNode pn, int nTerms) {
+        AbstractExpression expr = ((SeqScanPlanNode) pn).getPredicate();
+        assertTrue(expr instanceof ConjunctionExpression);
+        assertEquals(nTerms, countTerms(expr));
+    }
+
+    private static int countTerms(AbstractExpression expr) {
+        int result = 0;
+        AbstractExpression left = expr.getLeft();
+        result += (left instanceof ConjunctionExpression) ? countTerms(left) : 1;
+        AbstractExpression right = expr.getRight();
+        result += (right instanceof ConjunctionExpression) ? countTerms(right) : 1;
+        return result;
     }
 
     private void checkIndexScan(AbstractPlanNode indexNode, String tableName, String indexName, String... columns) {
@@ -159,9 +175,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
             assertTrue(actualIndexName.contains(indexName));
         }
 
-        if (columns.length > 0) {
-            checkOutputSchema(idxNode, columns);
-        }
+        checkOutputSchema(idxNode, columns);
     }
 
     private void checkPrimaryKeyIndexScan(AbstractPlanNode indexNode, String tableName, String... columns) {
@@ -226,12 +240,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSubquerySimplification(sql, equivalentSql);
 
         // LIMIT in sub selects
+        // Complex columns in sub selects
         checkSimple("select COL1 FROM (SELECT A+3, C COL1 FROM R1  LIMIT 10) T1 WHERE T1.COL1 < 0",
                 tbName, new String[]{"COL1"}, "R1", new String[]{"C1", "C"}, true);
-
-        // Complex columns in sub selects
-        checkSimple("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) T1 WHERE T1.A1 < 0",
-                tbName, new String[]{"C1"}, "R1", new String[]{"A1", "C"}, true);
 
         // select *
         sql = "select A, C FROM (SELECT * FROM R1) T1 WHERE T1.A < 0";
@@ -275,20 +286,14 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "R1",  "A");
         checkPredicateComparisonExpression(pn, "R1");
 
-        pn = compile("select A2 FROM " +
+        pn = compile("SELECT A2 FROM " +
                 "(SELECT A1 AS A2 FROM " +
-                "(SELECT A + 1 AS A1 FROM R1 WHERE A < 3) T1" +
+                "(SELECT A + 1 AS A1 FROM R1 WHERE A < 3) T1 " +
                 "WHERE T1.A1 > 0) T2 " +
                 "WHERE T2.A2 = 3");
         pn = pn.getChild(0);
-        checkSeqScan(pn, "T2",  "A2");
-        checkPredicateComparisonExpression(pn, "T2");
-        pn = pn.getChild(0);
-        checkSeqScan(pn, "T1",  "A1");
-        checkPredicateComparisonExpression(pn, "T1");
-        pn = pn.getChild(0);
-        checkSeqScan(pn, "R1",  "A1");
-        checkPredicateComparisonExpression(pn, "R1");
+        checkSeqScan(pn, "T2", "A2");
+        checkPredicateConjunction(pn, 3);
 
         //
         // Crazy fancy sub-query:
@@ -469,6 +474,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     public void testReplicatedGroupbyLIMIT() {
         AbstractPlanNode pn;
+        AbstractPlanNode aggNode;
 
         pn = compile("select A, C FROM (SELECT * FROM R1 WHERE A > 3 Limit 3) T1 ");
         pn = pn.getChild(0);
@@ -484,7 +490,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 Limit 3 ) T1 Group by A");
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
 
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A", "D" );
@@ -493,10 +500,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.LIMIT));
 
-        // add order by node, wihtout inline limit and projection node.
+        // add order by node, without inline limit and projection node.
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A");
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         checkSeqScan(pn, "T1" );
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -510,12 +518,13 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
 
-        AbstractPlanNode aggNode;
-
         pn = compile("select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING SUM(D) < 3");
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        if (pn instanceof ProjectionPlanNode) {
+            pn = pn.getChild(0);
+        }
         aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
         checkSeqScan(pn, "T1" );
         pn = pn.getChild(0);
@@ -535,8 +544,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
 
         checkSeqScan(pn, "T1");
@@ -558,8 +567,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode); // complex aggregation
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
         aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         assertNotNull(((HashAggregatePlanNode)aggNode).getPostPredicate());
 
         checkSeqScan(pn, "T1");
@@ -589,7 +598,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof OrderByPlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "R1");
 
@@ -599,7 +609,8 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "Group by SC");
 
         pn = pn.getChild(0);
-        assertTrue(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        aggNode = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggNode);
         assertTrue(pn instanceof SeqScanPlanNode);
         checkSeqScan(pn, "T1");
         pn = pn.getChild(0);
@@ -2299,11 +2310,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         AbstractPlanNode pn = compile(sql);
         PlanNodeTree pnt = new PlanNodeTree(pn);
         String jsonSql = pnt.toJSONString();
-        System.out.println(jsonSql);
+        //* enable to debug */ System.out.println(jsonSql);
         AbstractPlanNode equivalentPne = compile(equivalentSql);
         PlanNodeTree equivalentPnt = new PlanNodeTree(equivalentPne);
         String equivalentJsonSql = equivalentPnt.toJSONString();
-        System.out.println(equivalentJsonSql);
+        //* enable to debug */ System.out.println(equivalentJsonSql);
         if (ignoreList != null) {
             for (String[] ignorePair : ignoreList) {
                 jsonSql = jsonSql.replaceAll(ignorePair[0], ignorePair[1]);

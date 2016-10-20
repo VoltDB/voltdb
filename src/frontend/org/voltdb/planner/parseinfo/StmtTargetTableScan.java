@@ -50,8 +50,8 @@ public class StmtTargetTableScan extends StmtTableScan {
         findPartitioningColumns();
     }
 
-    public StmtTargetTableScan(Table table, String tableAlias) {
-        this(table, tableAlias, 0);
+    public StmtTargetTableScan(Table table) {
+        this(table, table.getTypeName(), 0);
     }
 
     @Override
@@ -89,13 +89,13 @@ public class StmtTargetTableScan extends StmtTableScan {
         }
 
         String tbName = m_table.getTypeName();
-        String colName = partitionCol.getTypeName();
 
         TupleValueExpression tve = new TupleValueExpression(
-                tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
-        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
+                tbName, m_tableAlias, partitionCol, partitionCol.getIndex());
 
-        SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
+        String colName = partitionCol.getTypeName();
+        SchemaColumn scol =
+                new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
         m_partitioningColumns = new ArrayList<SchemaColumn>();
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;
