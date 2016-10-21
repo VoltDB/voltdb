@@ -17,11 +17,14 @@
 
 package org.voltdb;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -142,6 +145,9 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.PathSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
@@ -158,6 +164,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -311,6 +318,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
+
+    /**
+     * Startup snapshot nonce taken on shutdown --save
+     */
+    String m_terminusNonce = null;
 
     private int m_maxThreadsCount;
 
@@ -776,6 +788,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
+
+            m_terminusNonce = determination.terminusNonce;
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -2373,6 +2387,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
                 .addAllowed(m_config.m_enableAdd)
                 .safeMode(m_config.m_safeMode)
+                .terminusNonce(getTerminusNonce())
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();
@@ -3911,5 +3926,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
+    }
+
+    private final Supplier<String> terminusNonceSupplier = Suppliers.memoize(new Supplier<String>() {
+        @Override
+        public String get() {
+            File markerFH = new File(m_paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
+            // file needs to be both writable and readable as it will be deleted onRestoreComplete
+            if (!markerFH.exists() || !markerFH.isFile() || !markerFH.canRead() || !markerFH.canWrite()) {
+                return null;
+            }
+            String nonce = null;
+            try (BufferedReader rdr = new BufferedReader(new FileReader(markerFH))){
+                nonce = rdr.readLine();
+            } catch (IOException e) {
+                Throwables.propagate(e); // highly unlikely
+            }
+            // make sure that there is a snapshot associated with the terminus nonce
+            HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
+            FileFilter filter = new SnapshotUtil.SnapshotFilter();
+
+            SnapshotUtil.retrieveSnapshotFiles(
+                    m_paths.resolve(m_paths.getSnapshoth()),
+                    snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
+
+            return snapshots.containsKey(nonce) ? nonce : null;
+        }
+    });
+
+    /**
+     * Reads the file containing the startup snapshot nonce
+     * @return null if the file is not accessible, or the startup snapshot nonce
+     */
+    private String getTerminusNonce() {
+        return terminusNonceSupplier.get();
     }
 }

@@ -65,7 +65,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
-import com.google.common.collect.Maps;
+import com.google_voltpatches.common.collect.Maps;
 
 import junit.framework.TestCase;
 

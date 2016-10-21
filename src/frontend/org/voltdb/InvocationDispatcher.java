@@ -1049,7 +1049,7 @@ public final class InvocationDispatcher {
         try {
             if (fut.get().longValue() != zkTxnId) {
                 return unexpectedFailureResponse(
-                        "Internal error: cannot write a shutdown snapshot because the " +
+                        "Internal error: cannot write a startup snapshot because the " +
                         "current system state is not consistent with an orderly shutdown. " +
                         "Please try \"voltadmin shutdown --save\" again.",
                         task.clientHandle);
@@ -1073,10 +1073,10 @@ public final class InvocationDispatcher {
                     .endObject();
             snapshotJson = jss.toString();
         } catch (JSONException e) {
-            VoltDB.crashLocalVoltDB("Failed to create shutdown snapshot save command", true, e);
+            VoltDB.crashLocalVoltDB("Failed to create startup snapshot save command", true, e);
             return null;
         }
-        log.info("Invoking shutdown snapshot save: " + snapshotJson);
+        log.info("Invoking startup snapshot save: " + snapshotJson);
         consoleLog.info("Taking snapshot to save database contents");
 
         final StoredProcedureInvocation saveSnapshotTask = new StoredProcedureInvocation();
@@ -1085,7 +1085,7 @@ public final class InvocationDispatcher {
         saveSnapshotTask.setParams(snapshotJson);
 
         final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Shutdown Snapshot Save"
+                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Startup Snapshot Save"
                 );
         final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
             @Override
