@@ -23,6 +23,11 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -32,6 +37,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
     // Add a test for partitioning a table
 
+    @Test
     public void testBasicCreateIndex() throws Exception
     {
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -135,6 +141,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCreatePartialIndex() throws Exception
     {
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -198,6 +205,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCreateDropIndexonView() throws Exception
     {
         VoltDB.Configuration config = new VoltDB.Configuration();

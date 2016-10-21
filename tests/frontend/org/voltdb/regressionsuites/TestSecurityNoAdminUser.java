@@ -23,26 +23,30 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import junit.framework.TestCase;
+public class TestSecurityNoAdminUser extends JUnit4LocalClusterTest {
 
-public class TestSecurityNoAdminUser extends TestCase {
-
-    LocalCluster config;
+    LocalCluster config = null;
     PipeToFile pf;
 
-    public TestSecurityNoAdminUser(String name) {
-        super(name);
+    public TestSecurityNoAdminUser() {
     }
 
-    @Override
+    @Before
     public void setUp() throws Exception {
         try {
             //Build the catalog
@@ -69,14 +73,17 @@ public class TestSecurityNoAdminUser extends TestCase {
         }
     }
 
-    @Override
+    @After
     public void tearDown() throws Exception {
-        config.shutDown();
+        if (config != null) {
+            config.shutDown();
+        }
     }
 
     /*
      *
      */
+    @Test
     public void testSecurityNoUsers() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;

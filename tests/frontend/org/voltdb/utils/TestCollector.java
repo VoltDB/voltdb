@@ -57,13 +57,14 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class TestCollector {
+public class TestCollector extends JUnit4LocalClusterTest {
     private static final int STARTUP_DELAY = 3000;
     VoltProjectBuilder builder;
     LocalCluster cluster;

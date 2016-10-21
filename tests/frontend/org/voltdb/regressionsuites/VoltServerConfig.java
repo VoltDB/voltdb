@@ -25,8 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
+import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -38,7 +41,11 @@ import org.voltdb.compiler.VoltProjectBuilder;
  * run generically on top of a VoltServerConfig.
  *
  */
-public interface VoltServerConfig {
+public abstract class VoltServerConfig {
+
+    protected BackendTarget m_target = BackendTarget.NONE;
+
+    private static Set<VoltServerConfig> s_instanceSet= null;
 
     /**
      * Build a catalog jar with the required topology according to the
@@ -46,37 +53,37 @@ public interface VoltServerConfig {
      *
      * @param builder The VoltProjectBuilder instance describing the project to build.
      */
-    public boolean compile(VoltProjectBuilder builder);
+    public abstract boolean compile(VoltProjectBuilder builder);
 
     /**
      * Start the instance of VoltDB.
      */
-    public void startUp();
+    public abstract void startUp();
 
     /**
      * Start the instance of VoltDB and optionally clear the
      * data directories first
      */
-    public void startUp(boolean clearDataDirectories);
+    public abstract void startUp(boolean clearDataDirectories);
 
     /**
      * Shutdown the instance of VoltDB.
      */
-    public void shutDown() throws InterruptedException;
+    public abstract void shutDown() throws InterruptedException;
 
     /**
      * Get the hostname/ips matching the hostId
      * @param hostId
      * @return The single hostname/ips as string
      */
-    public String getListenerAddress(int hostId);
+    public abstract String getListenerAddress(int hostId);
 
     /**
      * Get the  host:port for admin connection for the matching hostId.
      * @param hostId
      * @return The host:port for admin connection for the matching hostId.
      */
-    public String getAdminAddress(int hostId);
+    public abstract String getAdminAddress(int hostId);
 
     /**
      * Get the list of hostnames/ips that are listening
@@ -84,14 +91,14 @@ public interface VoltServerConfig {
      *
      * @return A list of hostnames/ips as strings.
      */
-    public List<String> getListenerAddresses();
+    public abstract List<String> getListenerAddresses();
 
     /**
      * Returns the number of listeners for this configuration of VoltDB.
      *
      * @return the number of listeners for this VoltDB configuration.
      */
-    public int getListenerCount();
+    public abstract int getListenerCount();
 
     /**
      * Get the name of this particular configuration. This may be
@@ -100,35 +107,35 @@ public interface VoltServerConfig {
      *
      * @return The name of this config.
      */
-    public String getName();
+    public abstract String getName();
 
-    public void setCallingMethodName(String name);
+    public abstract void setCallingMethodName(String name);
 
     /**
      * Get the number of nodes running in this test suite
      */
-    public int getNodeCount();
+    public abstract int getNodeCount();
 
     /**
      * @return Is the underlying instance of VoltDB running HSQL?
      */
-    public boolean isHSQL();
+    public abstract boolean isHSQL();
 
     /**
      * @return Is the underlying instance of VoltDB running IPC with Valgrind?
      */
-    public boolean isValgrind();
+    public abstract boolean isValgrind();
 
     /**
      * @return Is the underlying instance of VoltDB running DEBUG mode
      */
-    public boolean isDebug();
+    public abstract boolean isDebug();
 
-    boolean compileWithPartitionDetection(VoltProjectBuilder builder,
+    abstract boolean compileWithPartitionDetection(VoltProjectBuilder builder,
             String snapshotPath,
             String ppdPrefix);
 
-    boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
+    abstract boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
                                  boolean adminOnStartup);
 
     /**
@@ -139,7 +146,7 @@ public interface VoltServerConfig {
      * @param path
      * @throws IOException
      */
-    public void createDirectory(File path) throws IOException;
+    public abstract void createDirectory(File path) throws IOException;
 
     /**
      * Delete the directory as seen by all instances represented by this config.
@@ -147,21 +154,58 @@ public interface VoltServerConfig {
      * @param path
      * @throws IOException
      */
-    public void deleteDirectory(File path) throws IOException;
+    public abstract void deleteDirectory(File path) throws IOException;
 
     /**
      * List the files contained in the specified path as seen by all instances represented
      * by this config. It will go into the specified path in the subroot for each instance,
      * aggregate the list of files, and then return them.
      */
-    public List<File> listFiles(File path) throws IOException;
+    public abstract List<File> listFiles(File path) throws IOException;
 
-    public File[] getPathInSubroots(File path) throws IOException;
+    public abstract File[] getPathInSubroots(File path) throws IOException;
 
-    public void setMaxHeap(int max);
+    public abstract void setMaxHeap(int max);
 
     /**
      * @return the number of logical partitions in this configuration
      * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
-    public int getLogicalPartitionCount();
+    public abstract int getLogicalPartitionCount();
+
+    public static void setInstanceSet(Set<VoltServerConfig> instanceSet) {
+        s_instanceSet = instanceSet;
+    }
+
+    protected static void addInstance(VoltServerConfig config) {
+        if (! config.isValgrind()) {
+            return;
+        }
+
+        org.junit.Assert.assertTrue("JUnit tests that instantiate instances of LocalCluster must either a) inherit from RegressionSuite, "
+                + "or b) be a JUnit 4-style unit test that inherits from JUnit4LocalClusterTest.  "
+                + "These super classes ensure unconditional deterministic shutdown of clusters "
+                + "so that memory errors will be detected and cause JUnit tests to fail.  "
+                + "Your cooperation is appreciated to ensure product quality!",
+                s_instanceSet != null);
+        s_instanceSet.add(config);
+    }
+
+    protected static void removeInstance(VoltServerConfig config) {
+        if (! config.isValgrind()) {
+            return;
+        }
+
+        s_instanceSet.remove(config);
+    }
+
+    protected static void shutDownClusters() throws InterruptedException {
+        List<VoltServerConfig> instancesCopy = new ArrayList<>();
+        for (VoltServerConfig config : s_instanceSet) {
+            instancesCopy.add(config);
+        }
+
+        for (VoltServerConfig config : instancesCopy) {
+            config.shutDown();
+        }
+    }
 }

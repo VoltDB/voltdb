@@ -23,9 +23,13 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -41,6 +45,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
         org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class,
         org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class };
 
+    @Test
     public void testBasic() throws Exception
     {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");

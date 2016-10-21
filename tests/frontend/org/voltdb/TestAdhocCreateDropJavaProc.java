@@ -23,6 +23,12 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -41,6 +47,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
     static Class<?>[] EXTRA_CLASSES = { org.voltdb_testprocs.updateclasses.NoMeaningClass.class };
 
+    @Test
     public void testBasic() throws Exception
     {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
@@ -168,6 +175,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
     }
 
     // This test should trigger the same failure seen in ENG-6611
+    @Test
     public void testCreateUsingExistingImport() throws Exception
     {
         System.out.println("\n\n-----\n testCreateUsingExistingImport \n-----\n\n");
