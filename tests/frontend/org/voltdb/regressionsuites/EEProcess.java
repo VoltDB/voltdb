@@ -59,6 +59,10 @@ public class EEProcess {
     //
     private static String VALGRIND_OUTPUT_FILE_PATTERN = "valgrind_%s.xml";
 
+    // The output file where valgrind will leave it's output.  Creators of this
+    // class (usually LocalCluster) will be responsible for cleaning this up.
+    private File m_valgrindOutputFile = null;
+
     public int port() {
         return m_port;
     }
@@ -211,9 +215,11 @@ public class EEProcess {
             return;
         }
 
+        m_valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
+
         /*
-         * Create a thread to parse Valgrind's output and populate
-         * m_valgrindErrors with errors.
+         * Create threads that echo output from stdout and stderr prefixed by
+         * a unique ID for the spawned EE process.
          */
         final Process p = m_eeProcess;
         m_stdoutParser = new Thread() {
@@ -253,7 +259,6 @@ public class EEProcess {
         m_stderrParser = new Thread() {
             @Override
             public void run() {
-                File valgrindOutputFile = null;
                 while (true) {
                     try {
                         final String line = stderr.readLine();
@@ -275,31 +280,14 @@ public class EEProcess {
                                          + "] Returned end of stream and exit value "
                                          + p.exitValue());
                             }
-                            valgrindOutputFile = new File(String.format(VALGRIND_OUTPUT_FILE_PATTERN, m_eePID));
-                            // Note: This will not delete the valgrind output file.
-                            ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, m_valgrindErrors);
                             return;
                         }
                     } catch (final IOException e) {
                         e.printStackTrace();
                         return;
-                    } finally {
-                        //
-                        // Don't delete the valgrind file if there are any
-                        // errors.
-                        //
-                        if (valgrindOutputFile != null && m_valgrindErrors.size() == 0) {
-                            try {
-                                valgrindOutputFile.delete();
-                            } catch (Exception ex) {
-                                // We don't really care about this.
-                                ;
-                            }
-                        }
                     }
                 }
             }
-
         };
 
         m_stdoutParser.setDaemon(false);
@@ -340,7 +328,12 @@ public class EEProcess {
         } catch (IOException e) {}
     }
 
-    public void waitForShutdown() throws InterruptedException {
+    /**
+     * Shut down the EE process and return a file containing XML valgrind output.
+     * @return a File
+     * @throws InterruptedException
+     */
+    public File waitForShutdown() throws InterruptedException {
         if (m_eeProcess != null) {
             boolean done = false;
             while (!done) {
@@ -360,5 +353,7 @@ public class EEProcess {
         if (m_stderrParser != null) {
             m_stderrParser.join();
         }
+
+        return m_valgrindOutputFile;
     }
 }

@@ -177,16 +177,8 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        m_siteProcess.waitForShutdown();
-        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" +  error;
-                }
-                org.junit.Assert.fail(failString);
-            }
-        }
+        File valgrindOutputFile = m_siteProcess.waitForShutdown();
+        LocalCluster.failIfValgrindErrors(valgrindOutputFile);
     }
 
     @Override
