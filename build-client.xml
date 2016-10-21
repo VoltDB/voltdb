@@ -115,6 +115,7 @@
                   org/voltcore/utils/CompressionStrategy.java
                   org/voltcore/utils/VoltTypeUtil.java
                   org/voltcore/utils/ssl/Serializer.java
+                  org/voltcore/utils/ssl/SSLConfiguration.java
                   org/voltcore/utils/ssl/SSLDeferredSerialization.java
                   org/voltcore/utils/ssl/SSLDeferredSerializationIterator.java
                   org/voltcore/utils/ssl/SSLMessageDecrypter.java

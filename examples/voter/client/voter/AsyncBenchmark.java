@@ -147,6 +147,9 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @Option(desc = "SSL configuration file.")
+        String ssl = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -181,9 +184,17 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        clientConfig.setSSLContext(config.getSSLContext());
+        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+
+        if (config.ssl != null) {
+            try {
+                clientConfig.enableSSL();
+            } catch (Exception e) {
+                System.err.println("Failed to configure ssl, exiting");
+                System.exit(-1);
+            }
+        }
 
         client = ClientFactory.createClient(clientConfig);
 

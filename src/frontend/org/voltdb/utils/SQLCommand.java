@@ -33,7 +33,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,7 +49,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -100,6 +98,7 @@ public class SQLCommand
     private static List<String> RecallableSessionLines = new ArrayList<String>();
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
+    private static String m_sslPropsFile;
 
     private static String patchErrorMessageWithFile(String batchFileName, String message) {
 
@@ -1263,11 +1262,7 @@ public class SQLCommand
         String kerberos = "";
         List<String> queries = null;
         String ddlFile = "";
-        boolean ssl = false;
-        String sslKeystorePath = null;
-        String sslKeystorePassword = null;
-        String sslTruststorePath = null;
-        String sslTruststorePassword = null;
+        String sslConfigFile = null;
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1346,23 +1341,10 @@ public class SQLCommand
                 m_outputShowMetadata = false;
             }
 
-            // args to enable ssl
-            else if (arg.equals("--ssl")) {
-                ssl = true;
+            // arg to enable ssl from a properties file
+            else if (arg.startsWith("--ssl")) {
+                sslConfigFile = extractArgInput(arg);
             }
-            else if (arg.startsWith("--ssl-keystore-path=")) {
-                sslKeystorePath = extractArgInput(arg);
-            }
-            else if (arg.startsWith("--ssl-keystore-password=")) {
-                sslKeystorePassword = extractArgInput(arg);
-            }
-            else if (arg.startsWith("--ssl-truststore-path")) {
-                sslTruststorePath = extractArgInput(arg);
-            }
-            else if (arg.startsWith("--ssl-truststore-password")) {
-                sslTruststorePassword = extractArgInput(arg);
-            }
-
             else if (arg.equals("--debug")) {
                 m_debug = true;
             }
@@ -1401,32 +1383,15 @@ public class SQLCommand
         }
 
         // Create connection
-        ClientConfig config = new ClientConfig(user, password);
+        ClientConfig config = new ClientConfig(user, password, sslConfigFile);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-        if (ssl) {
-            if (sslKeystorePath == null || sslKeystorePassword == null || sslKeystorePath.isEmpty() || sslKeystorePassword.isEmpty()) {
-                printUsage("Specifying --ssl requires that --ssl-keystore-path and --ssl-keystore-password also be specified");
-            }
-            SSLContext sslContext = null;
-            if (sslTruststorePath == null || sslTruststorePath.isEmpty()) {
-                sslTruststorePath = sslKeystorePath;
-            }
-            if (sslTruststorePassword == null || sslTruststorePassword.isEmpty()) {
-                sslTruststorePassword = sslKeystorePassword;
-            }
+        if (sslConfigFile != null) {
             try {
-                KeyStore ks = KeyStore.getInstance("JKS");
-                ks.load(new FileInputStream(sslKeystorePath), sslKeystorePassword.toCharArray());
-                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-                kmf.init(ks, sslKeystorePassword.toCharArray());
-                sslContext = SSLContext.getInstance("TLS");
-                sslContext.init(createKeyManagers(sslKeystorePath, sslKeystorePassword, sslKeystorePassword),
-                        createTrustManagers(sslTruststorePath, sslTruststorePassword), new SecureRandom());
+                config.enableSSL();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
                 return;
             }
-            config.setSSLContext(sslContext);
         }
         try {
             // if specified enable kerberos
