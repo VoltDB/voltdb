@@ -27,9 +27,11 @@
                 return (new iQueue(this));
             };
 
-            this.BuildParamSetForClusterState = function (procedure) {
+            this.BuildParamSetForClusterState = function (procedure, parameters) {
                 var credentials = [];
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                if(parameters != undefined)
+                    credentials[credentials.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent('[' + parameters + ']');
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
                 var param = '';
@@ -148,7 +150,7 @@
                 }
                 var params = '';
                 if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote' || procedure == '@PrepareShutdown' || procedure == '@Quiesce'  ) {
-                    params = this.BuildParamSetForClusterState(procedure);
+                    params = this.BuildParamSetForClusterState(procedure, parameters);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
                 }
