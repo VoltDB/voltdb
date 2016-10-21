@@ -439,7 +439,7 @@ function loadAdminPage() {
                        '&nbsp<input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>' +
                        '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
                        '<p id="saveSnapshotMsg" style="display:none">Any data not saved to a snapshot or command log will be lost.</p>' +
-                       '<p>Continue with the shutdown?</p>';
+                       '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
 
             $('#divSaveSnapshot').html(htmlResult);
 
@@ -4410,8 +4410,10 @@ function loadAdminPage() {
         var result = $('#chkSaveSnaps').is(":checked");
         if(!result){
             $('#saveSnapshotMsg').show()
+            $('#continueShutdownMsg').show()
         } else {
             $('#saveSnapshotMsg').hide()
+            $('#continueShutdownMsg').hide()
         }
     }
 
