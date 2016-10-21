@@ -189,7 +189,9 @@ public class TestShutdownSave extends RegressionSuite
         project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
-        project.configureLogging(true, true, 2, 2, 64);
+        if (MiscUtils.isPro()) {
+            project.configureLogging(true, true, 2, 2, 64);
+        }
 
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
