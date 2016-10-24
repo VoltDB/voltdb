@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -65,12 +64,6 @@ import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -480,61 +473,22 @@ public class Inits {
         }
     }
 
-    class StartHTTPServer extends InitWork {
-        StartHTTPServer() {
-        }
+    class SetupSSL extends InitWork {
 
-        //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, String publicInterface,
-                int httpPortStart, boolean findAny, boolean mustListen) {
-
-            boolean success = false;
-            int httpPort = httpPortStart;
-            SslType sslType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
-                    m_deployment.getHttpd().getSsl() : null;
-            SslContextFactory sslContextFactory = null;
+        @Override
+        public void run() {
+            SslType sslType = m_deployment.getSsl();
             if (sslType != null && sslType.isEnabled()) {
                 try {
-                    sslContextFactory = getSSLContextFactory(sslType);
-                    sslContextFactory.start();
-                    m_config.m_sslContext = sslContextFactory.getSslContext();
+                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                    m_config.m_sslContextFactory.start();
+                    if (sslType.isExternal()) {
+                        m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                    }
                 } catch (Exception e) {
                     hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
                 }
             }
-
-            for (; true; httpPort++) {
-                try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, sslContextFactory, mustListen
-                            );
-                    success = true;
-                    break;
-                } catch (Exception e1) {
-                    if (mustListen) {
-                        if (sslType != null && sslType.isEnabled()) {
-                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
-                        } else {
-                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
-                        }
-                        System.exit(-1);
-                    }
-                }
-                if (!findAny) {
-                    break;
-                }
-            }
-            if (!success) {
-                m_rvdb.m_httpPortExtraLogMessage = String.format(
-                        "HTTP service unable to bind to ports %d through %d",
-                        httpPortStart, httpPort - 1);
-                if (mustListen) {
-                    System.exit(-1);
-                }
-                m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
-                return;
-            }
-            m_config.m_httpPort = httpPort;
         }
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
@@ -579,6 +533,52 @@ public class Inits {
                 }
             }
         }
+    }
+
+    class StartHTTPServer extends InitWork {
+        StartHTTPServer() {
+            dependsOn(SetupSSL.class);
+        }
+
+        //Setup http server with given port and interface
+        private void setupHttpServer(String httpInterface, String publicInterface,
+                int httpPortStart, boolean findAny, boolean mustListen) {
+
+            boolean success = false;
+            int httpPort = httpPortStart;
+            for (; true; httpPort++) {
+                try {
+                    m_rvdb.m_adminListener = new HTTPAdminListener(
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, m_config.m_sslContextFactory, mustListen
+                            );
+                    success = true;
+                    break;
+                } catch (Exception e1) {
+                    if (mustListen) {
+                        if (m_config.m_sslContextFactory != null) {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
+                        } else {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        }
+                        System.exit(-1);
+                    }
+                }
+                if (!findAny) {
+                    break;
+                }
+            }
+            if (!success) {
+                m_rvdb.m_httpPortExtraLogMessage = String.format(
+                        "HTTP service unable to bind to ports %d through %d",
+                        httpPortStart, httpPort - 1);
+                if (mustListen) {
+                    System.exit(-1);
+                }
+                m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
+                return;
+            }
+            m_config.m_httpPort = httpPort;
+        }
 
         @Override
         public void run() {
@@ -588,7 +588,7 @@ public class Inits {
             m_rvdb.m_jsonEnabled = false;
             boolean httpsEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                if (m_deployment.getHttpd().getSsl()!=null && m_deployment.getHttpd().getSsl().isEnabled()) {
+                if (m_config.m_sslContext != null) {
                     httpsEnabled = true;
                 }
                 httpPort = (m_deployment.getHttpd().getPort()==null) ?
@@ -612,54 +612,6 @@ public class Inits {
                 }
                 setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, httpPort, false, true);
             }
-        }
-
-
-        /**
-         * Creates the key managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-         *
-         * @param filepath - the path to the JKS keystore.
-         * @param keystorePassword - the keystore's password.
-         * @param keyPassword - the key's passsword.
-         * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
-         * @throws Exception
-         */
-        private KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
-            KeyStore keyStore = KeyStore.getInstance("JKS");
-            InputStream keyStoreIS = new FileInputStream(filepath);
-            try {
-                keyStore.load(keyStoreIS, keystorePassword.toCharArray());
-            } finally {
-                if (keyStoreIS != null) {
-                    keyStoreIS.close();
-                }
-            }
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(keyStore, keyPassword.toCharArray());
-            return kmf.getKeyManagers();
-        }
-
-        /**
-         * Creates the trust managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-         *
-         * @param filepath - the path to the JKS keystore.
-         * @param keystorePassword - the keystore's password.
-         * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
-         * @throws Exception
-         */
-        private TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream trustStoreIS = new FileInputStream(filepath);
-            try {
-                trustStore.load(trustStoreIS, keystorePassword.toCharArray());
-            } finally {
-                if (trustStoreIS != null) {
-                    trustStoreIS.close();
-                }
-            }
-            TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustFactory.init(trustStore);
-            return trustFactory.getTrustManagers();
         }
     }
 

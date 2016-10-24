@@ -36,6 +36,7 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -173,6 +174,9 @@ public class VoltDB {
         /** override for the admin port number in the deployment file */
         public int m_adminPort = DISABLED_PORT;
         public String m_adminInterface = "";
+
+        /** ssl context factory */
+        public SslContextFactory m_sslContextFactory = null;
 
         /** ssl context for client and admin ports */
         public SSLContext m_sslContext = null;

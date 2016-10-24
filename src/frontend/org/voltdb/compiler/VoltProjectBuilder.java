@@ -1125,15 +1125,8 @@ public class VoltProjectBuilder {
             }
         }
 
-        // <httpd>. Disabled unless port # is configured by a testcase
-        // Omit element(s) when null.
-        HttpdType httpd = factory.createHttpdType();
-        deployment.setHttpd(httpd);
-        httpd.setEnabled(m_httpdPortNo != -1);
-        httpd.setPort(m_httpdPortNo);
-        Jsonapi json = factory.createHttpdTypeJsonapi();
-        httpd.setJsonapi(json);
-        json.setEnabled(m_jsonApiEnabled);
+        SslType ssl = factory.createSslType();
+        deployment.setSsl(ssl);
         if (m_sslEnabled) {
             SslType sslType = factory.createSslType();
             sslType.setEnabled(m_sslEnabled);
@@ -1149,8 +1142,17 @@ public class VoltProjectBuilder {
                 store.setPassword(m_certstorePassword);
                 sslType.setTruststore(store);
             }
-            httpd.setSsl(sslType);
         }
+
+        // <httpd>. Disabled unless port # is configured by a testcase
+        // Omit element(s) when null.
+        HttpdType httpd = factory.createHttpdType();
+        deployment.setHttpd(httpd);
+        httpd.setEnabled(m_httpdPortNo != -1);
+        httpd.setPort(m_httpdPortNo);
+        Jsonapi json = factory.createHttpdTypeJsonapi();
+        httpd.setJsonapi(json);
+        json.setEnabled(m_jsonApiEnabled);
 
         // <export>
         ExportType export = factory.createExportType();
