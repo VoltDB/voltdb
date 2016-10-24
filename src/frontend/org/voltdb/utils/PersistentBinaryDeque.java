@@ -733,7 +733,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    //TODO: Should we get rid of persisted cursors on close?
     public synchronized void close() throws IOException {
         if (m_closed) {
             return;
@@ -743,6 +742,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments.values()) {
             segment.close();
         }
+        m_segments.clear();
         m_closed = true;
     }
 
@@ -772,13 +772,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized void closeAndDelete() throws IOException {
-        if (m_closed) return;
-        m_closed = true;
+        if (m_closed) {
+            return;
+        }
+        m_readCursors.clear();
+
         for (PBDSegment qs : m_segments.values()) {
             m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
             closeAndDeleteSegment(qs);
         }
         m_segments.clear();
+        m_closed = true;
     }
 
     public static class ByteBufferTruncatorResponse extends TruncatorResponse {
