@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -92,6 +93,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -425,6 +427,9 @@ public final class InvocationDispatcher {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user);
                 }
             }
+            else if ("@Rebalance".equals(procName)) {
+                return dispatchRebalance(task);
+            }
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
             if ((   "@Pause".equals(procName)
@@ -651,6 +656,54 @@ public final class InvocationDispatcher {
         return null;
 
     }
+
+    private ClientResponseImpl dispatchRebalance(StoredProcedureInvocation task) {
+
+        Set<Integer> ihids = null;
+        int kfactor = -1;
+        int hostcount = -1;
+         try {
+             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
+             hostLog.info(jsObj.toString());
+             if (jsObj.has("kfactor")) {
+                 kfactor = jsObj.getInt("kfactor");
+             }
+             if (jsObj.has("hostcount")) {
+                 hostcount = jsObj.getInt("hostcount");
+             }
+             if (jsObj.has("hosts")) {
+                 Splitter splitter = Splitter.on("-").omitEmptyStrings().trimResults();
+                 List<String> hosts = splitter.splitToList(jsObj.getString("hosts"));
+                 ihids = hosts.stream().map(Integer::parseInt).collect(Collectors.toSet());
+             }
+         } catch (JSONException e) {
+             return gracefulFailureResponse( "@Rebalance:" + e.getMessage(),task.clientHandle);
+         }
+
+         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+         if (!liveHids.containsAll(ihids)) {
+             return gracefulFailureResponse("Invalid Host Ids not member of cluster: ", task.clientHandle);
+         }
+
+         VoltTable[] tbls = new VoltTable[1];
+         tbls[0]= new VoltTable(new VoltTable.ColumnInfo( "PARAM", VoltType.STRING),
+                 new VoltTable.ColumnInfo( "VALUE", VoltType.STRING));
+
+         if (kfactor > -1) {
+             tbls[0].addRow("KFACTOR", Integer.toString(kfactor));
+         }
+
+         if (hostcount > -1) {
+             tbls[0].addRow("HOSTCOUNT", Integer.toString(hostcount));
+         }
+         if (ihids != null) {
+             for (Integer hid : ihids) {
+                 tbls[0].addRow("HOST ID", Integer.toString(hid));
+             }
+         }
+         return new ClientResponseImpl(ClientResponse.SUCCESS, tbls, "SUCCESS", task.clientHandle);
+     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
@@ -996,7 +1049,7 @@ public final class InvocationDispatcher {
         try {
             if (fut.get().longValue() != zkTxnId) {
                 return unexpectedFailureResponse(
-                        "Internal error: cannot write a shutdown snapshot because the " +
+                        "Internal error: cannot write a startup snapshot because the " +
                         "current system state is not consistent with an orderly shutdown. " +
                         "Please try \"voltadmin shutdown --save\" again.",
                         task.clientHandle);
@@ -1020,10 +1073,10 @@ public final class InvocationDispatcher {
                     .endObject();
             snapshotJson = jss.toString();
         } catch (JSONException e) {
-            VoltDB.crashLocalVoltDB("Failed to create shutdown snapshot save command", true, e);
+            VoltDB.crashLocalVoltDB("Failed to create startup snapshot save command", true, e);
             return null;
         }
-        log.info("Invoking shutdown snapshot save: " + snapshotJson);
+        log.info("Invoking startup snapshot save: " + snapshotJson);
         consoleLog.info("Taking snapshot to save database contents");
 
         final StoredProcedureInvocation saveSnapshotTask = new StoredProcedureInvocation();
@@ -1032,7 +1085,7 @@ public final class InvocationDispatcher {
         saveSnapshotTask.setParams(snapshotJson);
 
         final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
-                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Shutdown Snapshot Save"
+                ClientInterface.SHUTDONW_SAVE_CID, "Blocking Startup Snapshot Save"
                 );
         final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
             @Override

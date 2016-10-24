@@ -108,7 +108,11 @@ public class TestLeaderAppointer extends ZKTestBase {
         when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
-        m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        for (int hostId = 0; hostId < hostCount; hostId++) {
+            sphMap.put(hostId, sitesPerHost);
+        }
+        m_config = new ClusterConfig(hostCount, sphMap, replicationFactor);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
         m_hostIds = Sets.newTreeSet();
         m_hostGroups = Maps.newHashMap();

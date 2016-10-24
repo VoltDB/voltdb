@@ -558,7 +558,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         Client client3 = getClient();
         loadSomeData(client3, 50, 10);
         client3.drain();
-        assertCallbackSuccess(client);
+        assertCallbackSuccess(client3);
 
         // the old client should not work because the user has been removed.
         loadSomeData(client, 100, 10);

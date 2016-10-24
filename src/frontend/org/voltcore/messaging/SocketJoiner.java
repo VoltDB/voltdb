@@ -687,7 +687,7 @@ public class SocketJoiner {
                 socket.close();
                 if (!jsonObj.optBoolean(MAY_RETRY, false)) {
                     org.voltdb.VoltDB.crashLocalVoltDB(
-                            "Request to join cluster mesh is rejected: "
+                            "Request to join cluster is rejected: "
                             + jsonObj.optString(REASON, "rejection reason is not available"));
                 }
                 throw new CoreUtils.RetryException(jsonObj.optString(REASON, "rejection reason is not available"));
