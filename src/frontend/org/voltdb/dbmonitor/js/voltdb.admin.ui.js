@@ -435,23 +435,48 @@ function loadAdminPage() {
 
     $('#shutDownConfirmation').popup({
         open: function (event, ui, ele) {
-            var htmlResult = '<label>Save Snapshot:</label>' +
-                       '&nbsp<input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>' +
-                       '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
-                       '<p id="saveSnapshotMsg" style="display:none">Any data not saved to a snapshot or command log will be lost.</p>' +
-                       '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
+            var isProVersion = false;
+            voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
+                if (deploymentDetails != undefined) {
+                    var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                    if (clusterDetails != undefined && clusterDetails.LICENSE != undefined) {
+                        licenseInfo = clusterDetails.LICENSE;
+                        if (licenseInfo != undefined && licenseInfo != "") {
+                            isProVersion = true;
+                        }
+                    }
+                }
+                var htmlResult = '';
 
-            $('#divSaveSnapshot').html(htmlResult);
+                if(isProVersion){
+                    htmlResult += '<label>Save Snapshot:</label>' +
+                                '&nbsp <input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>';
+                }
 
-            $('#chkSaveSnaps').iCheck({
-                checkboxClass: 'icheckbox_square-aero customCheckbox',
-                increaseArea: '20%'
+                htmlResult += '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
+                    '<p id="shutdownWarningMsg" style="display:none">Any data not saved to a ' +
+                    '<span id="shutdownIntMsg" style="display:none"></span> will be lost.</p>' +
+                    '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
+
+                $('#divSaveSnapshot').html(htmlResult);
+
+                $('#chkSaveSnaps').iCheck({
+                    checkboxClass: 'icheckbox_square-aero customCheckbox',
+                    increaseArea: '20%'
+                });
+
+                $("#chkSaveSnaps").unbind("ifChanged");
+                $('#chkSaveSnaps').on('ifChanged', function () {
+                    showHideIntSnapshotMsg()
+                });
+
+                voltDbRenderer.GetCommandLogStatus(function (commandLogStatus) {
+                    VoltDbAdminConfig.isCommandLogEnabled = commandLogStatus;
+                    showHideIntSnapshotMsg()
+                });
+
             });
 
-            $("#chkSaveSnaps").unbind("ifChanged");
-            $('#chkSaveSnaps').on('ifChanged', function () {
-                showHideSnapshotMsg()
-            });
 
         },
         afterOpen: function () {
@@ -4406,15 +4431,33 @@ function loadAdminPage() {
         "Username already exists."
     );
 
-    showHideSnapshotMsg = function(){
+    showHideIntSnapshotMsg = function(){
         var result = $('#chkSaveSnaps').is(":checked");
-        if(!result){
-            $('#saveSnapshotMsg').show()
-            $('#continueShutdownMsg').show()
+        if(result && $('#chkSaveSnaps').is(':visible')){
+            if(!VoltDbAdminConfig.isCommandLogEnabled){
+                $('#shutdownIntMsg').html('command log');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }else{
+                $('#shutdownWarningMsg').hide()
+                $('#continueShutdownMsg').hide()
+                $('#shutdownIntMsg').hide()
+            }
         } else {
-            $('#saveSnapshotMsg').hide()
-            $('#continueShutdownMsg').hide()
+            if(!VoltDbAdminConfig.isCommandLogEnabled){
+                $('#shutdownIntMsg').html('snapshot and command log');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }else{
+                $('#shutdownIntMsg').html('snapshot');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }
         }
+
     }
 
 }
@@ -4423,6 +4466,7 @@ function loadAdminPage() {
     var iVoltDbAdminConfig = (function () {
 
         var currentRawAdminConfigurations;
+        this.isCommandLogEnabled = false;
         this.isAdmin = false;
         this.registeredElements = [];
         this.servers = [];
@@ -4540,6 +4584,7 @@ function loadAdminPage() {
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != null ? "Copies" : "");
             adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminEditObjects.tBoxFilePrefixValue = adminConfigValues.filePrefix;
+            VoltDbAdminConfig.isCommandLogEnabled = adminConfigValues.commandLogEnabled;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != null ? adminConfigValues.commandLogFrequencyTime : "");

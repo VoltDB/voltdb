@@ -363,6 +363,23 @@ function alertNodeClicked(obj) {
             }
         };
 
+        this.GetCommandLogStatus = function(onInformationLoaded){
+            if (VoltDbAdminConfig.isAdmin || checkSecurity) {
+                VoltDBService.GetShortApiDeployment(function (connection) {
+                    var rawData;
+                    var isCmdLogEnabled = false;
+                    if (connection != null){
+                        rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+                        if(rawData.hasOwnProperty('commandlog') && rawData['commandlog'].hasOwnProperty('enabled')){
+                            isCmdLogEnabled = rawData['commandlog']['enabled'];
+                        }
+                    }
+                    onInformationLoaded(isCmdLogEnabled);
+                });
+            } else {
+                onInformationLoaded(false);
+            }
+        }
 
         this.GetExportProperties = function (onInformationLoaded) {
 
