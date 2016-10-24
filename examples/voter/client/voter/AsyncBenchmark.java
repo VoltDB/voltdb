@@ -45,7 +45,6 @@ package voter;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -523,20 +522,6 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         VoterConfig config = new VoterConfig();
         config.parse(AsyncBenchmark.class.getName(), args);
-
-        SSLContext sslContext;
-        try {
-            KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(new FileInputStream("/Users/mteixeira/keystore.jks"), "myk5yst15r5".toCharArray());
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, "myk5yst15r5".toCharArray());
-            sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(createKeyManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5", "myk5yst15r5"),
-                    createTrustManagers("/Users/mteixeira/keystore.jks", "myk5yst15r5"), new SecureRandom());
-        } catch (Exception e) {
-            return;
-        }
-        //config.setSSLContext(sslContext);
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         benchmark.runBenchmark();
