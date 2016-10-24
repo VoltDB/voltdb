@@ -35,7 +35,7 @@ import junit.framework.TestCase;
 
 public class TestSecurityNoAdminUser extends TestCase {
 
-    LocalCluster config;
+    LocalCluster config = null;
     PipeToFile pf;
 
     public TestSecurityNoAdminUser(String name) {
@@ -44,6 +44,10 @@ public class TestSecurityNoAdminUser extends TestCase {
 
     @Override
     public void setUp() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -71,13 +75,19 @@ public class TestSecurityNoAdminUser extends TestCase {
 
     @Override
     public void tearDown() throws Exception {
-        config.shutDown();
+        if (config != null) {
+            config.shutDown();
+        }
     }
 
     /*
      *
      */
     public void testSecurityNoUsers() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;

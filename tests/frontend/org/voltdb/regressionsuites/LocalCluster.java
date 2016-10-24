@@ -673,6 +673,15 @@ public class LocalCluster implements VoltServerConfig {
             return;
         }
 
+        if (m_expectedToCrash && isValgrind()) {
+            throw new IllegalStateException("You have requested a cluster that is expected to crash "
+                    + "for a test running in a memcheck build.  "
+                    + "Currently it's not possible to reliably detect memory issues in a crashed server such that the JUnit test will fail.  "
+                    + "These issues will still show up in console output in Jenkins, which can be alarming.  "
+                    + "Probably you want to disable this test in memcheck builds.  If you'd like to have C++ memory checking "
+                    + "for your code, consider writing a test that does not crash the database.");
+        }
+
         // needs to be called before any call to pick a filename
         VoltDB.setDefaultTimezone();
 
