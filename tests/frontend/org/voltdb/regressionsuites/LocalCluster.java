@@ -1842,6 +1842,10 @@ public class LocalCluster implements VoltServerConfig {
      * @param valgrindOutputFile
      */
     public static void failIfValgrindErrors(File valgrindOutputFile) {
+        if (valgrindOutputFile == null) {
+            return;
+        }
+
         List<String> valgrindErrors = new ArrayList<>();
         ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, valgrindErrors);
         if (!valgrindErrors.isEmpty()) {
