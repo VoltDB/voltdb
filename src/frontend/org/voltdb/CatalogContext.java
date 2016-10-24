@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -314,14 +315,19 @@ public class CatalogContext {
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
         int hostCount = m_dbSettings.getCluster().hostcount();
-        int sitesPerHost = deployment.getSitesperhost();
+        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostFromZK();
+        int totalSitesCount = 0;
+        for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+            totalSitesCount += e.getValue();
+        }
+        int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
         int kFactor = deployment.getKfactor();
         logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d sites per host. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, sitesPerHost, kFactor));
+                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
         int replicas = kFactor + 1;
-        int partitionCount = sitesPerHost * hostCount / replicas;
+        int partitionCount = totalSitesCount / replicas;
         logLines.put("deployment2",
                 String.format("The entire cluster has %d %s of%s %d logical partition%s.",
                 replicas,

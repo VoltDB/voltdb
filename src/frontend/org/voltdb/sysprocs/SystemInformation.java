@@ -459,7 +459,7 @@ public class SystemInformation extends VoltSystemProcedure
         Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(clusterSettings.hostcount()));
         results.addRow("kfactor", Integer.toString(deploy.getKfactor()));
-        results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
+        results.addRow("sitesperhost", Integer.toString(VoltDB.instance().getHostMessenger().getLocalSitesCount()));
 
         String http_enabled = "false";
         int http_port = VoltDB.instance().getConfig().m_httpPort;
