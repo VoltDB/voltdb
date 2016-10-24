@@ -1389,7 +1389,7 @@ public class SQLCommand
             try {
                 config.enableSSL();
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                VoltDB.crashLocalVoltDB("Failed to write default deployment: " + e.getMessage(), false, null);
                 return;
             }
         }
