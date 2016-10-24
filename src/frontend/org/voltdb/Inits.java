@@ -55,6 +55,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -747,6 +748,7 @@ public class Inits {
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
                 if (cl == null || !cl.getEnabled()) return;
+                PathSettings paths = m_rvdb.m_paths;
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
@@ -754,11 +756,12 @@ public class Inits {
                                                       m_rvdb,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
-                                                      VoltDB.instance().getCommandLogPath(),
-                                                      VoltDB.instance().getCommandLogSnapshotPath(),
+                                                      paths.resolve(paths.getCommandLog()).getPath(),
+                                                      paths.resolve(paths.getCommandLogSnapshot()).getPath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      VoltDB.instance().getVoltDBRootPath());
+                                                      paths.getVoltDBRoot().getPath(),
+                                                      m_rvdb.m_terminusNonce);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
@@ -770,8 +773,10 @@ public class Inits {
                     m_statusTracker.setNodeState(NodeState.RECOVERING);
                 }
                 // if the restore agent found a catalog, set the following info
-                // so the right node can send it out to the others
-                if (catalog != null) {
+                // so the right node can send it out to the others. In case the
+                // restore agent chooses a terminus snapshot, it lets the restore
+                // snapshot restore and if required upgrade the snapshot catalog
+                if (catalog != null && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
@@ -801,7 +806,9 @@ public class Inits {
                                     e.getMessage()));
                         }
                     }
-                    hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    }
                     m_rvdb.m_hostIdWithStartupCatalog = hostId;
                     assert(m_rvdb.m_hostIdWithStartupCatalog >= 0);
                     m_rvdb.m_pathToStartupCatalog = catalogPath;

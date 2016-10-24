@@ -39,7 +39,6 @@ import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -53,9 +52,9 @@ public class TestShutdownSave extends RegressionSuite
         if (!MiscUtils.isPro()) return;
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
-        final Client client2 = this.getClient();
+        Client client2 = this.getClient();
         for (int i = 0; i < 256; ++i) {
-            client2.callProcedure(new Callback(), "ArbitraryDurationProc", 200);
+            client2.callProcedure("KV.INSERT", i);
         }
 
         final Client client = getAdminClient();
@@ -70,7 +69,8 @@ public class TestShutdownSave extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@SystemInformation:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertEquals("incorrect status from @SystemInformation",
+                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
         }
 
         //test query that is not allowed
@@ -80,7 +80,8 @@ public class TestShutdownSave extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("ArbitraryDurationProc:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertEquals("incorrect status from ArbitraryDurationProc",
+                    "Server shutdown in progress - new transactions are not processed.", e.getMessage());
         }
         long sum = Long.MAX_VALUE;
         while (sum > 0) {
@@ -136,7 +137,32 @@ public class TestShutdownSave extends RegressionSuite
             });
             assertTrue("(" + i + ") snapshot did not finish " + Arrays.asList(finished),
                     finished.length == 1 && finished[0].exists() && finished[0].isFile());
+        }
+        if (!cluster.isNewCli()) {
+            cluster.overrideStartCommandVerb("recover");
+        }
+        m_config.startUp(false);
+        client2 = this.getClient();
 
+        ClientResponse cr = client2.callProcedure("@Statistics", "PROCEDUREPROFILE", 0);
+        assertEquals("statistics invocation failed: " + cr.getStatusString() , ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable t = cr.getResults()[0];
+        while (t.advanceRow()) {
+            assertNotSame("detected replayed transactions", "KV.insert", t.getString(1));
+        }
+
+        cr = client2.callProcedure("@AdHoc", "SELECT COUNT(*) FROM KV;");
+        assertEquals("count(*) invocation failed: " + cr.getStatusString(), ClientResponse.SUCCESS, cr.getStatus());
+        assertEquals("content did not restore", 256L, cr.getResults()[0].asScalarLong());
+
+        m_config.shutDown();
+
+        for (int i = 0; i < HOST_COUNT; ++i) {
+            File snapDH = getSnapshotPathForHost(cluster, i);
+
+            File terminusFH = new File(snapDH.getParentFile(), VoltDB.TERMINUS_MARKER);
+            assertFalse("("+ i +") terminus file " + terminusFH + " is accessible",
+                    terminusFH.exists() && terminusFH.isFile() && terminusFH.canRead());
         }
     }
 
@@ -163,6 +189,9 @@ public class TestShutdownSave extends RegressionSuite
         project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
+        if (MiscUtils.isPro()) {
+            project.configureLogging(true, true, 2, 2, 64);
+        }
 
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
@@ -171,12 +200,5 @@ public class TestShutdownSave extends RegressionSuite
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;
-    }
-
-    class Callback implements ProcedureCallback {
-        @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            assertTrue(clientResponse.getStatus() == ClientResponse.SUCCESS);
-        }
     }
 }
