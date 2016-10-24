@@ -187,7 +187,7 @@ public class AsyncBenchmark {
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
-        if (config.ssl != null) {
+        if (config.ssl != null && !config.ssl.isEmpty()) {
             try {
                 clientConfig.enableSSL();
             } catch (Exception e) {
