@@ -262,6 +262,7 @@ public class VoltProjectBuilder {
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
     boolean m_sslEnabled = false;
+    boolean m_sslExternal = false;
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -591,6 +592,10 @@ public class VoltProjectBuilder {
 
     public void setSslEnabled(final boolean enabled) {
         m_sslEnabled = enabled;
+    }
+
+    public void setSslExternal(final boolean enabled) {
+        m_sslExternal = enabled;
     }
 
     public void setKeyStoreInfo(final String path, final String password) {
@@ -1127,21 +1132,19 @@ public class VoltProjectBuilder {
 
         SslType ssl = factory.createSslType();
         deployment.setSsl(ssl);
-        if (m_sslEnabled) {
-            SslType sslType = factory.createSslType();
-            sslType.setEnabled(m_sslEnabled);
-            if (m_keystore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_keystore);
-                store.setPassword(m_keystorePassword);
-                sslType.setKeystore(store);
-            }
-            if (m_certstore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_certstore);
-                store.setPassword(m_certstorePassword);
-                sslType.setTruststore(store);
-            }
+        ssl.setEnabled(m_sslEnabled);
+        ssl.setExternal(m_sslExternal);
+        if (m_keystore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_keystore);
+            store.setPassword(m_keystorePassword);
+            ssl.setKeystore(store);
+        }
+        if (m_certstore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_certstore);
+            store.setPassword(m_certstorePassword);
+            ssl.setTruststore(store);
         }
 
         // <httpd>. Disabled unless port # is configured by a testcase

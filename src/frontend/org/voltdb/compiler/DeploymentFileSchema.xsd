@@ -308,16 +308,6 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- ssl -->
-  <xs:complexType name="sslType">
-    <xs:sequence>
-      <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
-      <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
-    </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
-    <xs:attribute name="external" type="xs:boolean" default="false"/>
-  </xs:complexType>
-
   <!-- <httpd> -->
   <xs:complexType name="httpdType">
     <xs:sequence>
@@ -334,6 +324,16 @@
   <xs:complexType name="keyOrTrustStoreType">
       <xs:attribute name="path" type="xs:string" use="required"/>
       <xs:attribute name="password" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ssl -->
+  <xs:complexType name="sslType">
+    <xs:sequence>
+      <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="external" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
