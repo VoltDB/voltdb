@@ -130,12 +130,12 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     @Override
-    protected String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
+    protected TablePopulationRequirements checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
         return null;
     }
 
     @Override
-    public List<String[]> checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
+    public List<TablePopulationRequirements> checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         return null;
     }
 }

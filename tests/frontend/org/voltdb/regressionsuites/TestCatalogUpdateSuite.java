@@ -34,8 +34,6 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.Test;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs;
@@ -62,6 +60,8 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -192,6 +192,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                 new double[] {x}, new String[] {"a"});
 
         loadSomeData(client, 50, 5);
+        client.drain();
         assertTrue(callbackSuccess);
     }
 

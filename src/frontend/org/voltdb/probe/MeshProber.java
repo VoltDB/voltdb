@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,6 +90,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String BARE = "bare";
     private static final String START_ACTION = "startAction";
     private static final String ENTERPRISE = "enterprise";
+    private static final String TERMINUS_NONCE = "terminusNonce";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
@@ -193,6 +195,7 @@ public class MeshProber implements JoinAcceptor {
     protected final Supplier<NodeState> m_nodeStateSupplier;
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
+    protected final String m_terminusNonce;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
     /*
      * on probe startup mode this future is set when there are enough
@@ -205,7 +208,7 @@ public class MeshProber implements JoinAcceptor {
             VersionChecker versionChecker, boolean enterprise, StartAction startAction,
             boolean bare, UUID configHash, Supplier<Integer> hostCountSupplier,
             int kFactor, boolean paused, Supplier<NodeState> nodeStateSupplier,
-            boolean addAllowed, boolean safeMode) {
+            boolean addAllowed, boolean safeMode, String terminusNonce) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
@@ -219,6 +222,8 @@ public class MeshProber implements JoinAcceptor {
         checkArgument(coordinators.size() <= hostCountSupplier.get(),
                 "host count %s is less then the number of coordinators %s",
                 hostCountSupplier.get(), coordinators.size());
+        checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
+                "terminus should not be blank");
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;
@@ -232,6 +237,7 @@ public class MeshProber implements JoinAcceptor {
         this.m_nodeStateSupplier = nodeStateSupplier;
         this.m_addAllowed = addAllowed;
         this.m_safeMode = safeMode;
+        this.m_terminusNonce = terminusNonce;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
     }
@@ -298,6 +304,10 @@ public class MeshProber implements JoinAcceptor {
         return m_safeMode;
     }
 
+    public String getTerminusNonce() {
+        return m_terminusNonce;
+    }
+
     public HostCriteria asHostCriteria() {
         return new HostCriteria(
                 m_paused,
@@ -309,7 +319,8 @@ public class MeshProber implements JoinAcceptor {
                 m_hostCountSupplier.get(),
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
-                m_safeMode
+                m_safeMode,
+                m_terminusNonce
                 );
     }
 
@@ -324,7 +335,8 @@ public class MeshProber implements JoinAcceptor {
                 m_hostCountSupplier.get(),
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
-                m_safeMode
+                m_safeMode,
+                m_terminusNonce
                 );
     }
 
@@ -504,6 +516,7 @@ public class MeshProber implements JoinAcceptor {
         int bare = 0; // node has no recoverable artifacts (Command Logs, Snapshots)
         int unmeshed = 0;
         int operational = 0;
+        int haveTerminus = 0;
         int hostCount = getHostCount();
 
         // both paused and safemode need to be specified on only one node to
@@ -511,6 +524,8 @@ public class MeshProber implements JoinAcceptor {
         // any nodes in operational state
         boolean paused = isPaused();
         boolean safemode = isSafeMode();
+
+        final NavigableSet<String> terminusNonces = new TreeSet<>();
 
         for (HostCriteria c: hostCriteria.values()) {
             if (c.getNodeState().operational()) {
@@ -528,6 +543,10 @@ public class MeshProber implements JoinAcceptor {
                 paused = c.isPaused();
             }
             safemode = safemode || c.isSafeMode();
+            if (c.getTerminusNonce() != null) {
+                terminusNonces.add(c.getTerminusNonce());
+                ++haveTerminus;
+            }
         }
         // not enough host criteria to make a determination
         if (hostCriteria.size() < hostCount && operational == 0) {
@@ -553,9 +572,19 @@ public class MeshProber implements JoinAcceptor {
                     + paused + ", and safemode: " + safemode);
         }
 
+        if (terminusNonces.size() > 1) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Detected multiple startup snapshots, cannot "
+                    + "proceed with cluster startup. Snapshot IDs " + terminusNonces);
+        }
+
+        String terminusNonce = terminusNonces.pollFirst();
+        if (operational == 0 && haveTerminus <= (hostCount - ksafety)) {
+            terminusNonce = null;
+        }
+
         if (getStartAction() != StartAction.PROBE) {
             m_probedDetermination.set(new Determination(
-                    getStartAction(), getHostCount(), paused));
+                    getStartAction(), getHostCount(), paused, terminusNonce));
             return;
         }
 
@@ -583,7 +612,8 @@ public class MeshProber implements JoinAcceptor {
                     + (unmeshed - bare) + " nodes have them");
             return;
         }
-        final Determination dtrm = new Determination(determination, hostCount, paused);
+
+        final Determination dtrm = new Determination(determination, hostCount, paused, terminusNonce);
         if (m_networkLog.isDebugEnabled()) {
             m_networkLog.debug("made the following " + dtrm);
         }
@@ -599,7 +629,7 @@ public class MeshProber implements JoinAcceptor {
                     "interrupted while waiting to determine the cluster start action",
                     false, e);
         }
-        return new Determination(null,-1, false);
+        return new Determination(null,-1, false, null);
     }
 
     @Generated("by eclipse's equals and hashCode source generators")
@@ -630,6 +660,7 @@ public class MeshProber implements JoinAcceptor {
         jw.key(PAUSED).value(m_paused);
         jw.key(ADD_ALLOWED).value(m_addAllowed);
         jw.key(SAFE_MODE).value(m_safeMode);
+        jw.key(TERMINUS_NONCE).value(m_terminusNonce);
         jw.endObject();
     }
 
@@ -648,11 +679,14 @@ public class MeshProber implements JoinAcceptor {
         public final StartAction startAction;
         public final int hostCount;
         public final boolean paused;
+        public final String terminusNonce;
 
-        private Determination(StartAction startAction, int hostCount, boolean paused) {
+        private Determination(StartAction startAction, int hostCount,
+                boolean paused, String terminusNonce) {
             this.startAction = startAction;
             this.hostCount = hostCount;
             this.paused = paused;
+            this.terminusNonce = terminusNonce;
         }
 
         @Override @Generated("by eclipse's equals and hashCode source generators")
@@ -663,6 +697,8 @@ public class MeshProber implements JoinAcceptor {
             result = prime * result + (paused ? 1231 : 1237);
             result = prime * result
                     + ((startAction == null) ? 0 : startAction.hashCode());
+            result = prime * result
+                    + ((terminusNonce == null) ? 0 : terminusNonce.hashCode());
             return result;
         }
 
@@ -681,13 +717,18 @@ public class MeshProber implements JoinAcceptor {
                 return false;
             if (startAction != other.startAction)
                 return false;
+            if (terminusNonce == null) {
+                if (other.terminusNonce != null)
+                    return false;
+            } else if (!terminusNonce.equals(other.terminusNonce))
+                return false;
             return true;
         }
 
         @Override
         public String toString() {
             return "Determination [startAction=" + startAction + ", hostCount="
-                    + hostCount + ", paused=" + paused + "]";
+                    + hostCount + ", paused=" + paused + ", terminusNonce=" + terminusNonce + "]";
         }
     }
 
@@ -712,6 +753,7 @@ public class MeshProber implements JoinAcceptor {
                 Suppliers.ofInstance(NodeState.INITIALIZING);
         protected boolean m_addAllowed = false;
         protected boolean m_safeMode = false;
+        protected String m_terminusNonce = null;
 
         protected Builder() {
         }
@@ -729,6 +771,7 @@ public class MeshProber implements JoinAcceptor {
             m_nodeStateSupplier = o.m_nodeStateSupplier;
             m_addAllowed = o.m_addAllowed;
             m_safeMode = o.m_safeMode;
+            m_terminusNonce = o.m_terminusNonce;
             return this;
         }
 
@@ -810,6 +853,11 @@ public class MeshProber implements JoinAcceptor {
             return this;
         }
 
+        public Builder terminusNonce(String terminusNonce) {
+            m_terminusNonce = terminusNonce;
+            return this;
+        }
+
         public MeshProber build() {
             if (m_hostCountSupplier == null && m_coordinators != null) {
                 m_hostCountSupplier = Suppliers.ofInstance(m_coordinators.size());
@@ -826,7 +874,8 @@ public class MeshProber implements JoinAcceptor {
                     m_paused,
                     m_nodeStateSupplier,
                     m_addAllowed,
-                    m_safeMode
+                    m_safeMode,
+                    m_terminusNonce
                     );
         }
     }

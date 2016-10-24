@@ -1098,12 +1098,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context,
             ReplicationRole replicationRole,
             Cartographer cartographer,
-            int partitionCount,
             InetAddress clientIntf,
             int clientPort,
             InetAddress adminIntf,
             int adminPort,
-            long timestampTestingSalt,
             SSLContext sslContext) throws Exception {
 
         /*

@@ -17,11 +17,14 @@
 
 package org.voltdb;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -142,6 +145,9 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.PathSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
@@ -158,6 +164,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -311,6 +318,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
+
+    /**
+     * Startup snapshot nonce taken on shutdown --save
+     */
+    String m_terminusNonce = null;
 
     private int m_maxThreadsCount;
 
@@ -777,6 +789,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_config.m_startAction = determination.startAction;
             m_config.m_hostCount = determination.hostCount;
 
+            m_terminusNonce = determination.terminusNonce;
+
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = m_config.m_startAction.doesRejoin();
@@ -807,6 +821,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
             }
+
+            // Write local sitesPerHost to ZK
+            if (config.m_sitesperhost == VoltDB.UNDEFINED) {
+                config.m_sitesperhost = readDepl.deployment.getCluster().getSitesperhost();
+            } else {
+                hostLog.info("CLI overrides the local sites count to " + config.m_sitesperhost);
+                consoleLog.info("CLI overrides the local sites count to " + config.m_sitesperhost);
+            }
+            m_messenger.registerSitesPerHostToZK(config.m_sitesperhost);
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -922,7 +945,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          clusterConfig.getSitesPerHost());
+                                                                          m_messenger.getLocalSitesCount());
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
@@ -1090,12 +1113,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 m_clientInterface = ClientInterface.create(m_messenger, m_catalogContext, m_config.m_replicationRole,
                         m_cartographer,
-                        m_configuredNumberOfPartitions,
                         clientIntf,
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_timestampTestingSalt,
                         m_config.m_sslContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -1584,10 +1605,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             topo = joinCoordinator.getTopology();
         }
         else if (!startAction.doesRejoin()) {
-            int sitesperhost = m_catalogContext.getDeployment().getCluster().getSitesperhost();
             int hostcount = m_clusterSettings.get().hostcount();
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            m_messenger.waitForAllSitesPerHostToBeRegistered(hostcount);
+            ClusterConfig clusterConfig = new ClusterConfig(hostcount,
+                                                            m_messenger.getSitesPerHostFromZK(),
+                                                            kfactor);
             if (!clusterConfig.validate()) {
                 VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
             }
@@ -1914,6 +1937,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
                         + m_config.m_pathToDeployment, false, null);
             }
+
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
              * Trick here is to print out all applicable problems and then stop, rather than stopping
@@ -2364,6 +2388,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
                 .addAllowed(m_config.m_enableAdd)
                 .safeMode(m_config.m_safeMode)
+                .terminusNonce(getTerminusNonce())
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();
@@ -2423,15 +2448,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clusterSettings.get().store();
         } else if (m_myHostId == 0) {
             m_clusterSettings.store(m_messenger.getZK());
-        }
-        ClusterConfig config = new ClusterConfig(
-                m_clusterSettings.get().hostcount(),
-                clusterType.getSitesperhost(),
-                clusterType.getKfactor()
-                );
-
-        if (!config.validate()) {
-            VoltDB.crashLocalVoltDB("Cluster parameters failed validation: " + config.getErrorMsg());;
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
         return determination;
@@ -3911,5 +3927,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
+    }
+
+    private final Supplier<String> terminusNonceSupplier = Suppliers.memoize(new Supplier<String>() {
+        @Override
+        public String get() {
+            File markerFH = new File(m_paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
+            // file needs to be both writable and readable as it will be deleted onRestoreComplete
+            if (!markerFH.exists() || !markerFH.isFile() || !markerFH.canRead() || !markerFH.canWrite()) {
+                return null;
+            }
+            String nonce = null;
+            try (BufferedReader rdr = new BufferedReader(new FileReader(markerFH))){
+                nonce = rdr.readLine();
+            } catch (IOException e) {
+                Throwables.propagate(e); // highly unlikely
+            }
+            // make sure that there is a snapshot associated with the terminus nonce
+            HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
+            FileFilter filter = new SnapshotUtil.SnapshotFilter();
+
+            SnapshotUtil.retrieveSnapshotFiles(
+                    m_paths.resolve(m_paths.getSnapshoth()),
+                    snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
+
+            return snapshots.containsKey(nonce) ? nonce : null;
+        }
+    });
+
+    /**
+     * Reads the file containing the startup snapshot nonce
+     * @return null if the file is not accessible, or the startup snapshot nonce
+     */
+    private String getTerminusNonce() {
+        return terminusNonceSupplier.get();
     }
 }

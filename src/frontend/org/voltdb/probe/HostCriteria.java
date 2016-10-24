@@ -48,6 +48,7 @@ public class HostCriteria {
     public final static String NODE_STATE = "nodeState";
     public final static String ADD_ALLOWED = "addAllowed";
     public final static String SAFE_MODE = "safeMode";
+    public final static String TERMINUS_NONCE = "terminusNonce";
 
     public final static UUID UNDEFINED = new UUID(0L,0L);
 
@@ -69,7 +70,8 @@ public class HostCriteria {
                 && jo.has(MESH_HASH) && jo.getString(MESH_HASH) != null && !jo.getString(MESH_HASH).trim().isEmpty()
                 && jo.has(START_ACTION) && jo.getString(START_ACTION) != null && !jo.getString(START_ACTION).trim().isEmpty()
                 && jo.has(NODE_STATE) && jo.getString(NODE_STATE) != null && !jo.getString(NODE_STATE).trim().isEmpty()
-                && jo.has(HOST_COUNT) && jo.getInt(HOST_COUNT) > 0;
+                && jo.has(HOST_COUNT) && jo.getInt(HOST_COUNT) > 0
+                && (jo.optString(TERMINUS_NONCE, null) == null || !jo.optString(TERMINUS_NONCE).trim().isEmpty());
         } catch (JSONException e) {
             return false;
         }
@@ -89,6 +91,7 @@ public class HostCriteria {
     protected final NodeState m_nodeState;
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
+    protected final String m_terminusNonce;
 
     public HostCriteria(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
@@ -102,15 +105,19 @@ public class HostCriteria {
         m_nodeState = NodeState.valueOf(jo.optString(NODE_STATE, NodeState.INITIALIZING.name()));
         m_addAllowed = jo.optBoolean(ADD_ALLOWED, false);
         m_safeMode = jo.optBoolean(SAFE_MODE, false);
+        m_terminusNonce = jo.optString(TERMINUS_NONCE, null);
     }
 
     public HostCriteria(boolean paused, UUID configHash, UUID meshHash,
             boolean enterprise, StartAction startAction, boolean bare,
-            int hostCount, NodeState nodeState, boolean addAllowed, boolean safeMode) {
+            int hostCount, NodeState nodeState, boolean addAllowed,
+            boolean safeMode, String terminusNonce) {
         checkArgument(configHash != null, "config hash is null");
         checkArgument(meshHash != null, "mesh hash is null");
         checkArgument(startAction != null, "start action is null");
         checkArgument(hostCount > 0, "host count %s is less then one", hostCount);
+        checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
+                "terminus should not be blank");
 
         m_paused = paused;
         m_configHash = configHash;
@@ -122,6 +129,7 @@ public class HostCriteria {
         m_nodeState = nodeState;
         m_addAllowed = addAllowed;
         m_safeMode = safeMode;
+        m_terminusNonce = terminusNonce;
     }
 
     public boolean isPaused() {
@@ -167,6 +175,10 @@ public class HostCriteria {
         return m_safeMode;
     }
 
+    public String getTerminusNonce() {
+        return m_terminusNonce;
+    }
+
     public JSONObject appendTo(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
         try {
@@ -180,6 +192,7 @@ public class HostCriteria {
             jo.put(NODE_STATE, m_nodeState.name());
             jo.put(ADD_ALLOWED, m_addAllowed);
             jo.put(SAFE_MODE, m_safeMode);
+            jo.put(TERMINUS_NONCE, m_terminusNonce);
         } catch (JSONException e) {
             Throwables.propagate(e);
         }
@@ -215,6 +228,13 @@ public class HostCriteria {
         if (!m_configHash.equals(o.m_configHash)) {
             ilb.add("Servers are initialized with deployment options that do not match");
         }
+        if (   m_terminusNonce != null
+            && o.m_terminusNonce != null
+            && !m_terminusNonce.equals(o.m_terminusNonce))
+        {
+            ilb.add("Servers have different startup snapshots nonces: "
+                    + m_terminusNonce + " vs. " + o.m_terminusNonce);
+        }
         return ilb.build();
     }
 
@@ -231,6 +251,8 @@ public class HostCriteria {
         result = prime * result + m_hostCount;
         result = prime * result
                 + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
+        result = prime * result
+                + ((m_terminusNonce == null) ? 0 : m_terminusNonce.hashCode());
         result = prime * result + (m_paused ? 1231 : 1237);
         result = prime * result
                 + ((m_startAction == null) ? 0 : m_startAction.hashCode());
@@ -268,6 +290,11 @@ public class HostCriteria {
                 return false;
         } else if (!m_meshHash.equals(other.m_meshHash))
             return false;
+        if (m_terminusNonce == null) {
+            if (other.m_terminusNonce != null)
+                return false;
+        } else if (!m_terminusNonce.equals(other.m_terminusNonce))
+            return false;
         if (m_paused != other.m_paused)
             return false;
         if (m_startAction != other.m_startAction)
@@ -283,6 +310,7 @@ public class HostCriteria {
                 + ", meshHash=" + m_meshHash + ", enterprise=" + m_enterprise
                 + ", startAction=" + m_startAction + ", bare=" + m_bare
                 + ", hostCount=" + m_hostCount + ", nodeState=" + m_nodeState
-                + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode + "]";
+                + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode
+                + ", terminusNonce=" + m_terminusNonce + "]";
     }
 }
