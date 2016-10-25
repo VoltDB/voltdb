@@ -3525,8 +3525,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         // ENG-10939
         System.out.println("STARTING testMultiSignatureFunctionInStoredProcedure");
         Client client = getClient();
-        ClientResponse cr = null;
-        cr = client.callProcedure("TEST_SUBSTRING_INPROC", 12, "string");
+        ClientResponse cr = client.callProcedure("TEST_SUBSTRING_INPROC", 12, "string");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
