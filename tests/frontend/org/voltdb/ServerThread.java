@@ -26,11 +26,9 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
-import org.aeonbits.owner.ConfigFactory;
 import org.voltcore.common.Constants;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.probe.MeshProber;
-import org.voltdb.settings.Settings;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -151,14 +149,12 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
         VoltDB.initialize(m_config);
         VoltDB.instance().run();
     }
 
     //Call this if you are doing init only
     public void initialize() {
-        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
         VoltDB.initialize(m_config);
     }
 

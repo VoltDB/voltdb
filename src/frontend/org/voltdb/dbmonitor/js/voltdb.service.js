@@ -285,6 +285,56 @@
             }
         };
 
+        this.GetExportTablesInformation = function (onConnectionAdded) {
+            try {
+                var processName = "EXPORT_TABLE_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["TABLE"];
+                var values = ['0'];
+                var lconnection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (lconnection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
+        this.GetImportRequestInformation = function (onConnectionAdded) {
+            try {
+                var processName = "IMPORT_REQUEST_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["IMPORTER"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
         this.GetMemoryInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_MEMORY";
@@ -931,6 +981,93 @@
 
         };
 
+        this.PrepareShutdownCluster = function (onConnectionAdded) {
+            try {
+                var processName = "PREPARE_SHUTDOWN_CLUSTER";
+                var procedureNames = ['@PrepareShutdown'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                            onConnectionAdded(connection, status);
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
+
+        this.QuiesceCluster = function (onConnectionAdded) {
+            try {
+                var processName = "QUIESCE_CLUSTER";
+                var procedureNames = ['@Quiesce'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                            onConnectionAdded(connection, status);
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
+
+        this.GetDrProducerInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DR_PRODUCER_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["DRPRODUCER"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
         this.PromoteCluster = function (onConnectionAdded) {
             try {
                 var processName = "SYSTEMINFORMATION_PROMOTECLUSTER";
@@ -1220,6 +1357,33 @@
 
         };
         //
+
+        this.GetLiveClientsInfo = function (onConnectionAdded) {
+            try {
+                var processName = "LIVE_CLIENTS_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["LIVECLIENTS"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+                }
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
 
         //Get host and site count
         this.GetHostAndSiteCount = function (onConnectionAdded) {

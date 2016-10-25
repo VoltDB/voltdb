@@ -46,6 +46,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -138,6 +139,7 @@ public class LocalCluster implements VoltServerConfig {
     private String[] m_buildStringOverrides = null;
 
     private String[] m_modeOverrides = null;
+    private Map<Integer, Integer> m_sitesperhostOverrides = null;
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -270,6 +272,10 @@ public class LocalCluster implements VoltServerConfig {
 
         m_siteCount = siteCount;
         m_hostCount = hostCount;
+        m_sitesperhostOverrides = Maps.newHashMap();
+        for (int hostId = 0; hostId < hostCount; hostId++) {
+            m_sitesperhostOverrides.put(hostId, m_siteCount);
+        }
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setNewCli(isNewCli);
         if (kfactor > 0 && !MiscUtils.isPro()) {
@@ -541,6 +547,11 @@ public class LocalCluster implements VoltServerConfig {
         if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
             assert(m_modeOverrides[hostId] != null);
             cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+        }
+
+        if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
+            assert(m_sitesperhostOverrides.containsKey(hostId));
+            cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
         }
 
         // for debug, dump the command line to a unique file.
@@ -998,6 +1009,12 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
             }
 
+            if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
+                assert(m_sitesperhostOverrides.containsKey(hostId));
+                cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
+            }
+
+
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -1207,6 +1224,12 @@ public class LocalCluster implements VoltServerConfig {
             }
             //Rejoin does not do paused mode.
 
+            //Rejoin mixed sitesperhost
+            if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
+                assert(m_sitesperhostOverrides.containsKey(hostId));
+                rejoinCmdLn.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
+            }
+
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
             for (String element : rejoinCmdLnStr) {
@@ -1376,15 +1399,8 @@ public class LocalCluster implements VoltServerConfig {
         shutDownExternal(false);
     }
 
-    public synchronized void shutDownExternal(boolean forceKillEEProcs)
-    {
+    public void waitForNodesToShutdown() {
         if (m_cluster != null) {
-            // kill all procs
-            for (Process proc : m_cluster) {
-                if (proc == null)
-                    continue;
-                proc.destroy();
-            }
 
             // join on all procs
             for (Process proc : m_cluster) {
@@ -1426,6 +1442,22 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         m_eeProcs.clear();
+
+        m_running = false;
+
+    }
+
+    public synchronized void shutDownExternal(boolean forceKillEEProcs)
+    {
+        if (m_cluster != null) {
+            // kill all procs
+            for (Process proc : m_cluster) {
+                if (proc == null)
+                    continue;
+                proc.destroy();
+            }
+        }
+        waitForNodesToShutdown();
     }
 
     @Override
@@ -1627,6 +1659,13 @@ public class LocalCluster implements VoltServerConfig {
         m_modeOverrides = modes;
     }
 
+    public void setOverridesForSitesperhost(Map<Integer, Integer> sphMap) {
+        assert(sphMap != null);
+        assert(!sphMap.isEmpty());
+
+        m_sitesperhostOverrides = sphMap;
+    }
+
     @Override
     public void setMaxHeap(int heap) {
         templateCmdLine.setMaxHeap(heap);
@@ -1668,7 +1707,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
         cl.m_leader = config.m_leader;
-        cl.m_coordinators = ImmutableSortedSet.copyOf(cl.m_coordinators);
+        cl.m_coordinators = ImmutableSortedSet.copyOf(config.m_coordinators);
     }
 
     public static boolean isMemcheckDefined() {

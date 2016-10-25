@@ -727,7 +727,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
+    protected void coreLoadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -752,7 +752,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 

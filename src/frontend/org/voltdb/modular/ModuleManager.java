@@ -17,9 +17,9 @@
 
 package org.voltdb.modular;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import java.io.File;
 import java.net.URI;
@@ -78,13 +78,36 @@ public class ModuleManager {
             .add("org.voltdb.types;")
             .build();
 
-    final static File TEMPDH = new File(
-            System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"))
-            );
-
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
+
+    private final static AtomicReference<File> CACHE_ROOT = new AtomicReference<>();
+
+    private static ModuleManager m_self = null;
+
+    public static void initializeCacheRoot(File cacheRoot) {
+        if (CACHE_ROOT.compareAndSet(null, checkNotNull(cacheRoot))) {
+            if (!cacheRoot.exists() && !cacheRoot.mkdirs()) {
+                throw new SetUpException("Failed to create required OSGI cache directory: " + cacheRoot.getAbsolutePath());
+            }
+            if (   !cacheRoot.isDirectory()
+                || !cacheRoot.canRead()
+                || !cacheRoot.canWrite()
+                || !cacheRoot.canExecute())
+            {
+                throw new SetUpException("Cannot access OSGI cache directory: " + cacheRoot.getAbsolutePath());
+            }
+            m_self = new ModuleManager(cacheRoot);
+        }
+    }
+
+    public static void resetCacheRoot() {
+        File cacheRoot = CACHE_ROOT.get();
+        if (cacheRoot != null && CACHE_ROOT.compareAndSet(cacheRoot, null)) {
+            m_self = null;
+        }
+    }
 
     private final static Function<String,String> appendVersion = new Function<String, String>() {
         @Override
@@ -93,13 +116,8 @@ public class ModuleManager {
         }
     };
 
-    // Initialization on demand holder
-    private static class LazyHolder {
-        private static final ModuleManager INSTANCE = new ModuleManager();
-    }
-
     public static ModuleManager instance() {
-        return LazyHolder.INSTANCE;
+        return m_self;
     }
 
     static ModularException loggedModularException(Throwable e, String msg, Object...args) {
@@ -109,23 +127,13 @@ public class ModuleManager {
     }
 
     public static URI bundleURI(File fl) {
-        return URI.create("file://" + fl.getAbsolutePath());
+        return fl.toPath().toUri();
     }
 
     private final Framework m_framework;
     private final BundleRef m_bundles;
 
-    private ModuleManager() {
-
-        //Create a directory in temp + username
-        File f = new File(TEMPDH, System.getProperty("user.name"));
-        if (!f.exists() && !f.mkdirs()) {
-            throw new SetUpException("Failed to create required OSGI cache directory: " + f.getAbsolutePath());
-        }
-
-        if (!f.isDirectory() || !f.canRead() || !f.canWrite() || !f.canExecute()) {
-            throw new SetUpException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
-        }
+    private ModuleManager(File cacheRoot) {
 
         String systemPackagesSpec = FluentIterable
                 .from(SYSTEM_PACKAGES)
@@ -135,7 +143,7 @@ public class ModuleManager {
         Map<String, String> frameworkProps  = ImmutableMap.<String,String>builder()
                 .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesSpec)
                 .put("org.osgi.framework.storage.clean", "onFirstInit")
-                .put("felix.cache.rootdir", f.getAbsolutePath())
+                .put("felix.cache.rootdir", cacheRoot.getAbsolutePath())
                 .put("felix.cache.locking", Boolean.FALSE.toString())
                 .build();
 

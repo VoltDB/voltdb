@@ -56,6 +56,8 @@ public class VoltZK {
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
     public static final String importerBase = "/db/import";
+    // This node is used for keeping local sites count under its path individually
+    public static final String sitesPerHost = "/db/sitesperhost";
 
     /*
      * Processes that want to block catalog updates create children here
@@ -124,6 +126,9 @@ public class VoltZK {
 
     // Cluster settings
     public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
+
+    // Shutdown save snapshot guard
+    public static final String shutdown_save_guard = "/db/shutdown_save_guard";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {

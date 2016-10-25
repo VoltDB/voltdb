@@ -26,13 +26,15 @@ class OverviewModule extends Module {
         sitePerHostField                { $(id:"txtSitePerHost") }
 
         // K-Safety
-        ksafetyText                     { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(2) > td.configLabel") }
+        ksafetyText                     { $("#adminTbl > tbody > tr:nth-child(2) > td.configLabel") }
         ksafetyField                    { $(id:"txtKSafety") }
 
+
         // Partition Detection
-        partitionDetectionText          { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.security > td.configLabel") }
-        partitionDetectionCheckbox      { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.security > td:nth-child(2) > div > ins") }
+        partitionDetectionText          { $("#adminTbl > tbody > tr.security > td.configLabel") }
+        partitionDetectionCheckbox      { $("#adminTbl > tbody > tr.security > td:nth-child(2) > div > ins") }
         partitionDetectionStatus        { $(id:"txtPartitionDetection") }
+
 
         // Security
         securityText                    { $("#row-6 > td.configLabel > a > span") }
@@ -66,7 +68,7 @@ class OverviewModule extends Module {
         httpAccessCheckbox              { $("#row-1 > td:nth-child(2) > div > ins") }
         httpAccessStatus                { $(id:"txtHttpAccess") }
 
-        jsonApiText                     {$("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.child-row-1.subLabelRow > td.configLabel")}
+        jsonApiText                     {$("#adminTbl > tbody > tr.child-row-1.subLabelRow > td.configLabel")}
         jsonApiCheckbox                 { $(id:"chkAutoSnapshot") }
 
         // Auto Snapshots
@@ -74,22 +76,22 @@ class OverviewModule extends Module {
         autoSnapshotsCheckbox           { $("#row-2 > td:nth-child(2) > div > ins") }
         autoSnapshotsStatus             { $(id:"txtAutoSnapshot") }
 
-        filePrefixText                  { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(10) > td.configLabel") }
-        frequencyText                   { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(11) > td.configLabel") }
-        retainedText                    { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(12) > td.configLabel") }
+        filePrefixText                  { $("#adminTbl1 > tbody > tr:nth-child(2) > td.configLabel") }
+        frequencyText                   { $("#adminTbl1 > tbody > tr:nth-child(3) > td.configLabel") }
+        retainedText                    { $("#adminTbl1 > tbody > tr:nth-child(4) > td.configLabel") }
 
         filePrefixField                 { $(id:"txtFilePrefix") }
         frequencyField                  { $(id:"txtFrequency") }
         retainedField                   { $(id:"txtRetained") }
 
         // Command Logging
-        commandLoggingText              { $(class:"fontFamily", text:"Command Logging") }
+        commandLoggingText              { $("#row-3 > td.configLabel > a > span") }
         commandLoggingCheckbox          { $("#row-3 > td:nth-child(2) > div > ins") }
         commandLoggingStatus            { $(id:"txtCommandLog") }
 
-        logFrequencyTimeText            { $("td", class:"configLabel", 13) }
-        logFrequencyTransactionsText    { $("td", class:"configLabel", 14) }
-        logSegmentSizeText              { $("td", class:"configLabel", 15) }
+        logFrequencyTimeText            { $("#adminTbl1 > tbody > tr:nth-child(6) > td.configLabel") }
+        logFrequencyTransactionsText    { $("#adminTbl1 > tbody > tr:nth-child(7) > td.configLabel") }
+        logSegmentSizeText              { $("#adminTbl1 > tbody > tr:nth-child(8) > td.configLabel") }
 
         logFrequencyTimeField           { $(id:"txtLogFrequencyTime") }
         logFrequencyTransactionsField   { $(id:"txtLogFreqTransaction") }
@@ -173,19 +175,21 @@ class OverviewModule extends Module {
         maxJavaHeapText                 { $("#adminTbl > tbody > tr:nth-child(21) > td.configLabel") }
         maxJavaHeapField                { $(id:"txtMaxJavaHeap") }
 
-        heartbeatTimeoutText            { $("#adminTbl > tbody > tr:nth-child(22) > td.configLabel") }
+        heartbeatTimeoutText            { $("#adminTbl1 > tbody > tr:nth-child(14) > td.configLabel") }
         heartbeatTimeoutField           { $(id:"txtHeartbeatTimeout") }
 
-        queryTimeoutText                { $("#adminTbl > tbody > tr:nth-child(23) > td.configLabel") }
+        queryTimeoutText                { $("#adminTbl1 > tbody > tr:nth-child(15) > td.configLabel") }
         queryTimeoutField               { $(id:"txtQueryTimeout") }
 
-        maxTempTableMemoryText          { $("#adminTbl > tbody > tr:nth-child(24) > td.configLabel") }
+        maxTempTableMemoryText          { $("#adminTbl1 > tbody > tr:nth-child(16) > td.configLabel") }
         maxTempTableMemoryField         { $(id:"txtMaxTempTableMemory") }
 
-        snapshotPriorityText            { $("#adminTbl > tbody > tr:nth-child(25) > td.configLabel") }
+        snapshotPriorityText            { $("#adminTbl1 > tbody > tr:nth-child(17) > td.configLabel") }
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
-        memoryLimitText                 { $("#adminTbl > tbody > tr:nth-child(26) > td.configLabel") }
+
+
+        memoryLimitText                 { $("#adminTbl1 > tbody > tr:nth-child(18) > td.configLabel") }
         memoryLimitField                { $("#txtMemoryLimit") }
         memoryLimitType                 { $(id:"selMemoryLimitUnit") }
         memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }

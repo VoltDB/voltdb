@@ -118,7 +118,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                             int producerPartitionId = e.getKey();
                             int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
                             DRConsumerDrIdTracker tracker =
-                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId);
+                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId, producerPartitionId);
                             context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
                         }
                     }

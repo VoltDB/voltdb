@@ -815,7 +815,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     def String getIdOfSaveButton(int index) {
-            return "#querySaveBtn-" + String.valueOf(index)
+        return "#querySaveBtn-" + String.valueOf(index)
     }
 
     def String getIdOfDeleteTab(int index) {

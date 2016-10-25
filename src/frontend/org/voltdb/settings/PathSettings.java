@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 
 import org.aeonbits.owner.Config.Sources;
 import org.aeonbits.owner.ConfigFactory;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
@@ -132,7 +132,7 @@ public interface PathSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
-        File configDH = resolve(new File(VoltDB.CONFIG_DIR));
+        File configDH = resolve(new File(Constants.CONFIG_DIR));
         File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {

@@ -215,6 +215,34 @@ public class StoredProcedureInvocation implements JSONString {
         // 2 is one byte for ext type, one for size
         int allPartitionExtensionSize = m_allPartition ? 2 : 0;
 
+        // compute the size
+        int size =
+            1 + // type
+            4 + getProcNameBytes().length + // procname
+            8 + // client handle
+            1 + // extension count
+            batchExtensionSize + allPartitionExtensionSize + // extensions
+            getSerializedParamSize(); // parameters
+        assert(size > 0); // sanity
+
+        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
+        return size;
+    }
+
+    /**
+     * Get the serialized size of this SPI in the original serialization version.
+     * This is currently used by DR.
+     */
+    public int getSerializedSizeForOriginalVersion()
+    {
+        return (1 + // type
+                4 + getProcNameBytes().length + // procname
+                8 + // client handle
+                getSerializedParamSize());
+    }
+
+    private int getSerializedParamSize()
+    {
         // get params size
         int serializedParamSize = 0;
         if (serializedParams != null) {
@@ -226,38 +254,27 @@ public class StoredProcedureInvocation implements JSONString {
             serializedParamSize = pset.getSerializedSize();
             if ((pset.size() > 0) && (serializedParamSize <= 2)) {
                 throw new IllegalStateException(String.format("Parameter set for invocation " +
-                        "%s doesn't have the proper size (currently = %s)",
-                        getProcName(), serializedParamSize));
+                                                              "%s doesn't have the proper size (currently = %s)",
+                                                              getProcName(), serializedParamSize));
             }
         }
         else {
             // illegal state
             throw new IllegalStateException("StoredProcedureInvocation instance params in invalid state.");
         }
-
-        // compute the size
-        int size =
-            1 + // type
-            4 + getProcNameBytes().length + // procname
-            8 + // client handle
-            1 + // extension count
-            batchExtensionSize + allPartitionExtensionSize + // extensions
-            serializedParamSize; // parameters
-        assert(size > 0); // sanity
-
-        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
-        return size;
+        return serializedParamSize;
     }
 
     /**
-     * Hack for SyncSnapshotBuffer.
+     * Hack for SyncSnapshotBuffer. Note that this is using the ORIGINAL (version 0) serialization format.
      * Moved to this file from that one so you might see it sooner than I did.
      * If you change the serialization, you have to change this too.
      */
     public static int getLoadVoltTablesMagicSeriazlizedSize(Table catTable, boolean isPartitioned) {
 
         // code below is used to compute the right value slowly
-        /*StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        /*
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@LoadVoltTableSP");
         if (isPartitioned) {
             spi.setParams(0, catTable.getTypeName(), null);
@@ -265,15 +282,17 @@ public class StoredProcedureInvocation implements JSONString {
         else {
             spi.setParams(0, catTable.getTypeName(), null);
         }
-        int size = spi.getSerializedSize() + 4;
+        int size = spi.getSerializedSizeForOriginalVersion() + 4;
         int realSize = size - catTable.getTypeName().getBytes(Constants.UTF8ENCODING).length;
         System.err.printf("@LoadVoltTable** padding size: %d or %d\n", size, realSize);
-        return size;*/
+        return size;
+        */
 
         // Magic size of @LoadVoltTable* StoredProcedureInvocation
         int tableNameLengthInBytes =
                 catTable.getTypeName().getBytes(Constants.UTF8ENCODING).length;
-        int metadataSize = 42 + tableNameLengthInBytes;
+        int metadataSize = 41 + // serialized size for original version
+                           tableNameLengthInBytes;
         if (isPartitioned) {
             metadataSize += 5;
         }
@@ -308,6 +327,37 @@ public class StoredProcedureInvocation implements JSONString {
             ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
         }
 
+        serializeParams(buf);
+
+        int len = buf.position() - startPosition;
+        assert(len == getSerializedSize());
+    }
+
+    /**
+     * Serializes this SPI in the original serialization version.
+     * This is currently used by DR.
+     */
+    public void flattenToBufferForOriginalVersion(ByteBuffer buf) throws IOException
+    {
+        assert((params != null) || (serializedParams != null));
+
+        // for self-check assertion
+        int startPosition = buf.position();
+
+        buf.put(ProcedureInvocationType.ORIGINAL.getValue());
+
+        SerializationHelper.writeVarbinary(getProcNameBytes(), buf);
+
+        buf.putLong(clientHandle);
+
+        serializeParams(buf);
+
+        int len = buf.position() - startPosition;
+        assert(len == getSerializedSizeForOriginalVersion());
+    }
+
+    private void serializeParams(ByteBuffer buf) throws IOException
+    {
         if (serializedParams != null)
         {
             if (serializedParams.hasArray())
@@ -338,9 +388,6 @@ public class StoredProcedureInvocation implements JSONString {
                 throw e;
             }
         }
-
-        int len = buf.position() - startPosition;
-        assert(len == getSerializedSize());
     }
 
     public void initFromBuffer(ByteBuffer buf) throws IOException

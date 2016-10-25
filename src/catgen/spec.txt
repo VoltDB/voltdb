@@ -22,7 +22,6 @@ end
 
 begin Deployment javaonly         "Run-time deployment settings"
   int kfactor                     "The required k-safety factor"
-  int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 
@@ -142,6 +141,7 @@ begin MaterializedViewHandlerInfo       "Information used to build and update a 
   TableRef* sourceTables                "Source table(s) of this materialized view"
   Table? destTable                      "The table which will be updated when the source table is updated"
   int groupByColumnCount                "Number of group by columns"
+  bool isSafeWithNonemptySources        "Is this a materialized view which may be created with nonempty source tables"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
@@ -152,6 +152,7 @@ begin MaterializedViewInfo          "Information used to build and update a mate
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
   IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
   Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
+  bool isSafeWithNonemptySources    "Is this a materialized view which may be created with nonempty source tables"
 end
 
 begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"

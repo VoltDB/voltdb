@@ -178,8 +178,11 @@ public abstract class ExpressionUtil {
     }
 
     public static boolean isColumnEquivalenceFilter(AbstractExpression expr) {
-        // Ignore expressions that are not of COMPARE_EQUAL type
-        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+        // Ignore expressions that are not of COMPARE_EQUAL or
+        // COMPARE_NOTDISTINCT type
+        ExpressionType type = expr.getExpressionType();
+        if (type != ExpressionType.COMPARE_EQUAL &&
+                type != ExpressionType.COMPARE_NOTDISTINCT) {
             return false;
         }
         AbstractExpression leftExpr = expr.getLeft();
@@ -376,6 +379,19 @@ public abstract class ExpressionUtil {
                 return isNullRejectingExpression(expr.m_left.m_left, tableAlias);
             }
             return isNullRejectingExpression(expr.m_left, tableAlias);
+        }
+        if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
+            // IS NOT DISTINCT FROM is not NULL rejecting,
+            // particularly when applied to pairs of NULL values.
+            //TODO: There are subcases that actually are NULL rejecting,
+            // with various degrees of easy detectability here, namely...
+            // ...IS NOT DISTINCT FROM <non-null-constant>
+            // ...IS NOT DISTINCT FROM <non-nullable-column>
+            // ...IS NOT DISTINCT FROM <most-expressions-built-of-these>
+            // but for now, we are lazy in the planner and possibly slower
+            // at runtime, keeping the joins outer and relying more on the
+            // runtime filters.
+            return false;
         }
         if (exprType == ExpressionType.OPERATOR_IS_NULL) {
             // IS NOT NULL is NULL rejecting -- IS NULL is not

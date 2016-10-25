@@ -566,8 +566,13 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
         if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (const FatalException &e) {
-        crashVoltDB(e);
+    }
+    catch (const SerializableEEException &e) {
+        m_engine->resetReusedResultOutputBuffer();
+        e.serialize(m_engine->getExceptionOutputSerializer());
+    }
+    catch (const FatalException &fe) {
+        crashVoltDB(fe);
     }
     return kErrorCode_Error;
 }
