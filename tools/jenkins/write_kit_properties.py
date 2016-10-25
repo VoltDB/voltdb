@@ -14,7 +14,15 @@ jenkins_vars=[
     'BUILD_TAG',
     'GIT_COMMIT',
     'GIT_BRANCH',
+    'GIT_URL',
 ]
+
+repos = dict(voltdb='unknown', pro='unknown')
+
+def map_repo(url, branch):
+    for r in repos.iterkeys():
+        if r in url:
+            repos[r] = branch.split('origin/')[-1]
 
 sv_prefix = 'kit_'
 outfile = 'workspace_params.properties'
@@ -31,12 +39,20 @@ for jv in jenkins_vars:
     else:
         stored_vars_map[sv] = 'unknown'
 
+map_repo(stored_vars_map['kit_git_url'], stored_vars_map['kit_git_branch'])
+
+#Map all additional git repos
+for i in range(1, 10):
+    jv = 'GIT_URL_%s' % i
+    if jv not in os.environ:
+        break
+    map_repo(os.environ[jv], os.environ[jv.replace('URL', 'BRANCH')])
+
 #BRANCH is used by downstream jobs
-job = os.getenv('JOB_NAME')
-if job.startswith('branch-kit-system-test-build-'):
-    branch = job.replace('branch-kit-system-test-build-','')
-else:
-    branch = os.getenv('BRANCH') or stored_vars_map[sv_prefix + 'git_branch'].split('/')[-1]
+branch = repos['voltdb']
+if repos['voltdb'] != repos['pro']:
+    branch += ("/" + repos['pro'])
+
 stored_vars_map['BRANCH'] = branch
 
 with open (outfile,'w') as f:
