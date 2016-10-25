@@ -46,9 +46,6 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -60,7 +57,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -164,6 +160,9 @@ public class SyncBenchmark {
 
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
+
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
 
         @Override
         public void validate() {
@@ -286,7 +285,15 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "");
+        ClientConfig clientConfig = new ClientConfig("", "", config.sslfile);
+        if (config.sslfile != null && !config.sslfile.isEmpty()) {
+            try {
+                clientConfig.enableSSL();
+            } catch (Exception e) {
+                System.err.println("Failed to configure ssl, exiting");
+                System.exit(-1);
+            }
+        }
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
