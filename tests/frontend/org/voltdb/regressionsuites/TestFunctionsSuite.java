@@ -3522,6 +3522,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     public void testMultiSignatureFunctionInStoredProcedure() throws Exception {
+        // ENG-10939
         System.out.println("STARTING testMultiSignatureFunctionInStoredProcedure");
         Client client = getClient();
         ClientResponse cr = null;
