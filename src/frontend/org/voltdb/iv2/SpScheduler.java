@@ -1059,6 +1059,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
+        } else {
+            // Generate a dummy response message when this site has not seen previous FragmentTaskMessage,
+            // the leader may have started to wait for replicas' response messages.
+            // This can happen in the early phase of site rejoin before replica receiving the snapshot initiation,
+            // it also means this CompleteTransactionMessage message will be dropped because it's after snapshot.
+            final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
+            resp.m_sourceHSId = m_mailbox.getHSId();
+            handleCompleteTransactionResponseMessage(resp);
         }
     }
 
