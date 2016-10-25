@@ -83,7 +83,7 @@ public class MpScheduler extends Scheduler
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new MpTransactionTaskQueue(m_tasks, getCurrentTxnId());
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
         m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
