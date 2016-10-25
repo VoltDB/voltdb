@@ -4200,7 +4200,7 @@ public class ParserDQL extends ParserBase {
 
             rewind(position);
             // Discard parsed parameters along with the token rewinding.
-            for (int i=compileContext.parameters.size()-1; i>=prevParamCount; i--) {
+            for (int i = compileContext.parameters.size()-1; i >= prevParamCount; i--) {
                 compileContext.parameters.remove(i);
             }
 
