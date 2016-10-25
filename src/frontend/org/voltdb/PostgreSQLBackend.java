@@ -117,17 +117,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // Regex patterns for a typical column, constant, or column expression
     // (including functions, operators, etc.); used, e.g., for modifying an AVG
     // query or a division (col1 / col2) query.
-    // Note: an AS or FROM can occur here (rarely) if certain functions occur
-    // within another function, such as AVG, e.g., AVG(CAST(VCHAR AS INTEGER))
+    // Note 1: WHERE and SELECT are specifically forbidden since they are not
+    // function names, but they sometimes occur before parentheses; parentheses
+    // without an actual function name do match here.
+    // Note 2: an AS or FROM can occur here (rarely) if certain functions occur
+    // within an otherwise matching expression, e.g., AVG(CAST(VCHAR AS INTEGER))
     // or AVG(EXTRACT(DAY FROM PAST))
     private static final String COLUMN_NAME   = "(\\w+\\.)?(?<column1>\\w+)";
-    private static final String FUNCTION_NAME = "(\\w*\\s*\\(\\s*)*";
+    private static final String FUNCTION_NAME = "(?!WHERE|SELECT)((\\b\\w+\\s*)?\\(\\s*)*";
     private static final String FUNCTION_END  = "(\\s+(AS|FROM)\\s+\\w+\\s*\\))?(\\s*\\))*";
     private static final String ARITHMETIC_OP = "\\s*(\\+|\\-|\\*|\\/)\\s*";
-    private static final String COLUMN_EXPRESSION_PATTERN =
-            FUNCTION_NAME + COLUMN_NAME + FUNCTION_END
-            + "(" + ARITHMETIC_OP + FUNCTION_NAME
-                  + COLUMN_NAME.replace("column1", "column2") + FUNCTION_END
+    private static final String SIMPLE_COLUMN_EXPRESSION = FUNCTION_NAME + COLUMN_NAME + FUNCTION_END;
+    private static final String COLUMN_EXPRESSION_PATTERN = SIMPLE_COLUMN_EXPRESSION
+            + "(" + ARITHMETIC_OP + SIMPLE_COLUMN_EXPRESSION.replace("column1", "column2")
             + ")*";
 
     // Captures the use of AVG(columnExpression), which PostgreSQL handles
@@ -147,8 +149,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // Captures the use of expression1 / expression2, which PostgreSQL handles
     // differently, when the expressions are of one of the integer types
     private static final Pattern divisionQuery = Pattern.compile(
-            COLUMN_EXPRESSION_PATTERN + "\\s*/\\s*" + COLUMN_EXPRESSION_PATTERN
-            .replace("column1", "column3").replace("column2", "column4"),
+            SIMPLE_COLUMN_EXPRESSION + "\\s*\\/\\s*"
+            + SIMPLE_COLUMN_EXPRESSION.replace("column1", "column2"),
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing expression1 / expression2, where the
     // expressions are of an integer type, for which PostgreSQL returns a
@@ -156,8 +158,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // so change it to: TRUNC ( expression1 / expression2 )
     private static final QueryTransformer divisionQueryTransformer
             = new QueryTransformer(divisionQuery)
-            .prefix("TRUNC ( ").suffix(" )")
-            .groups("column1", "column2", "column3", "column4")
+            .prefix("TRUNC ( ").suffix(" ) ").groups("column1", "column2")
             .useWholeMatch().columnType(ColumnType.INTEGER);
 
     // Captures the use of CEILING(columnName) or FLOOR(columnName)
@@ -401,7 +402,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     public String transformDML(String dml) {
         return transformQuery(dml, orderByQueryTransformer,
                 avgQueryTransformer, divisionQueryTransformer,
-                ceilingOrFloorQueryTransformer,
+                //ceilingOrFloorQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
                 stringConcatQueryTransformer, varbinaryConstantTransformer,
                 upsertValuesQueryTransformer, upsertSelectQueryTransformer);
@@ -454,6 +455,83 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             result = !result;
         }
         return result;
+    }
+
+    /** Returns the number of occurrences of the specified character in the specified String. */
+    static private int numOccurencesOfCharIn(String str, char ch) {
+        int num = 0;
+        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
+            num++;
+        }
+        return num;
+    }
+
+    /** Returns the Nth occurrence of the specified character in the specified String. */
+    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
+        int index = -1;
+        for (int i=0; i < n; i++) {
+            index = str.indexOf(ch, index+1);
+            if (index < 0) {
+                return -1;
+            }
+        }
+        return index;
+    }
+
+    /** TODO:
+     *  Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
+     *  and <i>suffix</i> concatenated (in that order), but being careful not
+     *  to include more close-parentheses than open-parentheses: if the group
+     *  does contain more close-parens than open-parens, the <i>suffix</i> is
+     *  inserted just after the matching close-parens (i.e., after the number
+     *  of close-parens that equals the number of open-parens), instead of at
+     *  the very end; but if there are no open-parens, then the <i>suffix</i>
+     *  is inserted just before the first close-parens. */
+    @Override
+    protected String handleParens(String group, String prefix, String suffix) {
+        // Default values, which indicate that the prefix simply goes before
+        // the entire group, and the suffix simply follows the entire group
+        int p_index = 0;
+        int s_index = group.length();
+
+        int numOpenParens  = numOccurencesOfCharIn(group, '(');
+        int numCloseParens = numOccurencesOfCharIn(group, ')');
+        // Special case, for divisionQueryTransformer, i.e., the group is
+        // something like: expression1 / expression2; check if the expressions
+        // have too many close parentheses in them
+        if ("TRUNC ( ".equals(prefix) && !group.toUpperCase().startsWith("AVG")) {
+            int numDivOperators = numOccurencesOfCharIn(group, '/');
+            int div_index = -2;
+            if (numDivOperators > 0) {
+                div_index = group.indexOf('/');
+                String subgroup = group.substring(0, div_index);
+                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
+                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
+                if (numOpenParens > numCloseParens) {
+                    // Put the prefix after the last unmatched open parenthesis
+                    p_index = indexOfNthOccurrenceOfCharIn(subgroup, '(', numOpenParens-numCloseParens) + 1;
+                }
+                subgroup = group.substring(div_index);
+                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
+                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
+                if (numCloseParens > numOpenParens) {
+                    // Put the suffix before the first unmatched closed parenthesis
+                    s_index = div_index + indexOfNthOccurrenceOfCharIn(subgroup, ')', numOpenParens+1);
+                }
+            }
+        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
+        // something like: AVG(expression); check if the expression does has
+        // too many close parentheses in it
+        } else if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
+            if (numOpenParens == 0) {
+                s_index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
+            } else {
+                s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
+            }
+        }
+        return (           group.substring(0, p_index)
+                + prefix + group.substring(p_index, s_index) + suffix
+                         + group.substring(s_index)                  );
     }
 
     /** Returns the specified String, after replacing certain "variables", such
@@ -660,7 +738,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } else {
                 index = groupNames.indexOf(groupName);
                 if (index > -1 && index < groupValues.size()) {
-                    matcher.appendReplacement(modified_str, groupValues.get(index));
+                    String groupValue = groupValues.get(index);
+                    matcher.appendReplacement(modified_str, (groupValue == null ? "" : groupValue));
                 } else {
                     // No match: give up on this "variable"
                     matcher.appendReplacement(modified_str, "{"+groupName+"}");

@@ -32,6 +32,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -291,6 +292,40 @@ public abstract class NonVoltDBBackend {
             return this;
         }
 
+        // Used by the toString() method.
+        @SuppressWarnings("rawtypes")
+        private String getNonEmptyValue(String name, Object value) {
+            if (value == null) {
+                return "";
+            } else if (value instanceof Collection && ((Collection)value).isEmpty()) {
+                return "";
+            } else if (!value.toString().isEmpty()) {
+                return "";
+            } else {
+                return "\n  " + name + ": " + value;
+            }
+        }
+
+        // Useful for debugging
+        @Override
+        public String toString() {
+            String result = "Pattern: " + m_queryPattern
+                    + getNonEmptyValue("initialText", m_initialText)
+                    + getNonEmptyValue("prefix",      m_prefix)
+                    + getNonEmptyValue("suffix",      m_suffix)
+                    + getNonEmptyValue("altSuffix",   m_altSuffix)
+                    + getNonEmptyValue("useAltSuffixAfter", m_useAltSuffixAfter)
+                    + getNonEmptyValue("replacementText",   m_replacementText)
+                    + getNonEmptyValue("columnType", m_columnType)
+                    + getNonEmptyValue("multiplier", m_multiplier)
+                    + getNonEmptyValue("minimum", m_minimum)
+                    + getNonEmptyValue("groups",  m_groups)
+                    + getNonEmptyValue("groupReplacementTexts", m_groupReplacementTexts)
+                    + getNonEmptyValue("useWholeMatch", (m_useWholeMatch ? "true" : "false"))
+                    + getNonEmptyValue("debugPrint",    (m_debugPrint    ? "true" : "false"));
+            return result;
+        }
+
     }
 
     /** Returns all column names for the specified table, in the order defined
@@ -394,27 +429,6 @@ public abstract class NonVoltDBBackend {
         }
     }
 
-    /** Returns the number of occurrences of the specified character in the specified String. */
-    static private int numOccurencesOfCharIn(String str, char ch) {
-        int num = 0;
-        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
-            num++;
-        }
-        return num;
-    }
-
-    /** Returns the Nth occurrence of the specified character in the specified String. */
-    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
-        int index = -1;
-        for (int i=0; i < n; i++) {
-            index = str.indexOf(ch, index+1);
-            if (index < 0) {
-                return -1;
-            }
-        }
-        return index;
-    }
-
     /** Returns the column type name, in VoltDB, corresponding to the specified
      *  column type name in the comparison non-VoltDB backend database. This
      *  base version merely passes back the identical column type name, but it
@@ -422,6 +436,15 @@ public abstract class NonVoltDBBackend {
      *  that database. */
     protected String getVoltColumnTypeName(String columnTypeName) {
         return columnTypeName;
+    }
+
+    /** This base version simply returns a String consisting of the <i>prefix</i>,
+     *  <i>group</i>, and <i>suffix</i> concatenated (in that order); however,
+     *  it may be overridden to do something more complicated, to make sure that
+     *  the prefix and suffix go in the right place, relative to any parentheses
+     *  found in the group. */
+    protected String handleParens(String group, String prefix, String suffix) {
+        return prefix + group + suffix;
     }
 
     /** Potentially returns the specified String, after replacing certain
@@ -432,32 +455,8 @@ public abstract class NonVoltDBBackend {
      *  sub-classes, to determine appropriate changes for that non-VoltDB
      *  backend database. */
     protected String replaceGroupNameVariables(String str,
-            List<String> groupNames,List<String> groupValues) {
+            List<String> groupNames, List<String> groupValues) {
         return str;
-    }
-
-    /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
-     *  and <i>suffix</i> concatenated (in that order), but being careful not
-     *  to include more close-parentheses than open-parentheses: if the group
-     *  does contain more close-parens than open-parens, the <i>suffix</i> is
-     *  inserted just after the matching close-parens (i.e., after the number
-     *  of close-parens that equals the number of open-parens), instead of at
-     *  the very end; but if there are no open-parens, then the <i>suffix</i>
-     *  is inserted just before the first close-parens. */
-    static private String handleParens(String group, String prefix, String suffix) {
-        int numOpenParens  = numOccurencesOfCharIn(group, '(');
-        int numCloseParens = numOccurencesOfCharIn(group, ')');
-        if (numOpenParens >= numCloseParens || suffix.isEmpty()) {
-            return (prefix + group + suffix);
-        } else {  // numOpenParens < numCloseParens
-            int index;
-            if (numOpenParens == 0) {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
-            } else {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
-            }
-            return (prefix + group.substring(0, index) + suffix + group.substring(index));
-        }
     }
 
     /**
@@ -534,20 +533,18 @@ public abstract class NonVoltDBBackend {
                 // that use that type; so if the relevant column(s) are not of
                 // the specified type, no changes are needed
                 boolean noChangesNeeded = false;
-                if (qt.m_columnType != null) {
-                    // When columnType is GEO, check whether the last, and
-                    // presumably only, column is not of that type
-                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup)) {
-                        noChangesNeeded = true;
-                    // When columnType is INTEGER, check whether any of the
-                    // columns (or constants) are non-integer
-                    } else if (qt.m_columnType == ColumnType.INTEGER) {
-                        for (int i=0; i < groups.size(); i++) {
-                            String group = groups.get(i);
-                            if (group != null && !isInteger(group)) {
-                                noChangesNeeded = true;
-                                break;
-                            }
+                // When columnType is GEO, check whether the last, and
+                // presumably only, column is not of that type
+                if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup)) {
+                    noChangesNeeded = true;
+                // When columnType is INTEGER, check whether any of the columns
+                // (or constants) are non-integer
+                } else if (qt.m_columnType == ColumnType.INTEGER) {
+                    for (int i=0; i < groups.size(); i++) {
+                        String group = groups.get(i);
+                        if (group != null && !isInteger(group)) {
+                            noChangesNeeded = true;
+                            break;
                         }
                     }
                 }
