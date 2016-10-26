@@ -38,7 +38,7 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
-import org.voltdb.settings.NodeSettings;
+import org.voltdb.settings.PathSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -178,8 +178,8 @@ public class CatalogContext {
         return m_dbSettings.getCluster();
     }
 
-    public NodeSettings getNodeSettings() {
-        return m_dbSettings.getNodeSetting();
+    public PathSettings getPaths() {
+        return m_dbSettings.getPath();
     }
 
     public CatalogContext update(
@@ -315,7 +315,7 @@ public class CatalogContext {
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
         int hostCount = m_dbSettings.getCluster().hostcount();
-        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
+        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostFromZK();
         int totalSitesCount = 0;
         for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
             totalSitesCount += e.getValue();

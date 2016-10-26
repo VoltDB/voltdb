@@ -139,7 +139,7 @@ public class SystemInformationAgent extends OpsAgent
         CatalogContext catalogContext = getCatalogContext();
         VoltTable result =
                 SystemInformation.populateDeploymentProperties(catalogContext.cluster,
-                        catalogContext.database, catalogContext.getClusterSettings(), catalogContext.getNodeSettings());
+                        catalogContext.database, catalogContext.getClusterSettings());
         if (result == null) {
             sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
                     "Unable to collect DEPLOYMENT information for @SystemInformation", psr.clientData);
