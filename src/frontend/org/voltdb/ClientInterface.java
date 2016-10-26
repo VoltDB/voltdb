@@ -1360,7 +1360,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

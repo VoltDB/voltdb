@@ -50,6 +50,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.InvocationDispatcher.Check;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
@@ -1248,7 +1249,7 @@ SnapshotCompletionInterest, Promotable
             }
         });
         spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
-        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true);
+        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true, Check.NO_INVOCATION);
         if (cr != null) {
             m_clientAdapterCallback.handleResponse(cr);
         }
