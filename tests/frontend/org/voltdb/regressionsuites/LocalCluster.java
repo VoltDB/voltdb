@@ -1452,17 +1452,6 @@ public class LocalCluster implements VoltServerConfig {
             failIfValgrindErrors(valgrindOutputFile);
         }
 
-        if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                StringBuilder failString = new StringBuilder();
-                final Iterator<String> iter = EEProcess.m_valgrindErrors.iterator();
-                while (iter.hasNext()) {
-                    failString.append("\n" + iter.next());
-                }
-                org.junit.Assert.fail(failString.toString());
-            }
-        }
-
         m_eeProcs.clear();
 
         m_running = false;

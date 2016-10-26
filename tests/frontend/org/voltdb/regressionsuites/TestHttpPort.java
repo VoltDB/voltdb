@@ -32,9 +32,7 @@ import java.security.SecureRandom;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import junit.framework.TestCase;
-
-public class TestHttpPort extends TestCase {
+public class TestHttpPort extends ServerTestCase {
 
     PortListener ncprocess;
     PipeToFile pf;
@@ -94,7 +92,9 @@ public class TestHttpPort extends TestCase {
         if (ncprocess != null) {
             ncprocess.close();
         }
-        config.shutDown();
+        if (config != null) {
+            config.shutDown();
+        }
     }
 
     /*
