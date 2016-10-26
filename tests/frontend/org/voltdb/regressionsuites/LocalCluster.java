@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -672,6 +673,15 @@ public class LocalCluster implements VoltServerConfig {
             return;
         }
 
+        if (m_expectedToCrash && isValgrind()) {
+            throw new IllegalStateException("You have requested a cluster that is expected to crash "
+                    + "for a test running in a memcheck build.  "
+                    + "Currently it's not possible to reliably detect memory issues in a crashed server such that the JUnit test will fail.  "
+                    + "These issues will still show up in console output in Jenkins, which can be alarming.  "
+                    + "Probably you want to disable this test in memcheck builds.  If you'd like to have C++ memory checking "
+                    + "for your code, consider writing a test that does not crash the database.");
+        }
+
         // needs to be called before any call to pick a filename
         VoltDB.setDefaultTimezone();
 
@@ -810,19 +820,23 @@ public class LocalCluster implements VoltServerConfig {
         Process proc = m_cluster.get(procIndex);
         proc.destroy();
         int retval = 0;
+        File valgrindOutputFile = null;
         try {
             retval = proc.waitFor();
             EEProcess eeProc = m_eeProcs.get(procIndex);
-            eeProc.waitForShutdown();
+            valgrindOutputFile = eeProc.waitForShutdown();
         } catch (InterruptedException e) {
             log.info("External VoltDB process is acting crazy.");
         } finally {
             m_cluster.set(procIndex, null);
         }
+
         // exit code 143 is the forcible shutdown code from .destroy()
         if (retval != 0 && retval != 143) {
             log.info("killOne: External VoltDB process terminated abnormally with return: " + retval);
         }
+
+        failIfValgrindErrors(valgrindOutputFile);
     }
 
     private void initOne(int hostId, boolean clearLocalDataDirectories) throws IOException {
@@ -1168,11 +1182,14 @@ public class LocalCluster implements VoltServerConfig {
         // rebuild the EE proc set.
         if (templateCmdLine.target().isIPC && m_eeProcs.contains(hostId)) {
             EEProcess eeProc = m_eeProcs.get(hostId);
+            File valgrindOutputFile = null;
             try {
-                eeProc.waitForShutdown();
+                valgrindOutputFile = eeProc.waitForShutdown();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
+
+            failIfValgrindErrors(valgrindOutputFile);
         }
         if (templateCmdLine.target().isIPC) {
             String logfile = "LocalCluster_host_" + hostId + ".log";
@@ -1391,7 +1408,8 @@ public class LocalCluster implements VoltServerConfig {
             if (forceKillEEProcs) {
                 eeProc.destroy();
             }
-            eeProc.waitForShutdown();
+            File valgrindOutputFile = eeProc.waitForShutdown();
+            failIfValgrindErrors(valgrindOutputFile);
         }
     }
 
@@ -1424,21 +1442,14 @@ public class LocalCluster implements VoltServerConfig {
         if (m_cluster != null) m_cluster.clear();
 
         for (EEProcess proc : m_eeProcs) {
+            File valgrindOutputFile = null;
             try {
-                proc.waitForShutdown();
+                valgrindOutputFile = proc.waitForShutdown();
             } catch (InterruptedException e) {
                 log.error("Unable to wait for EEProcess to die: " + proc.toString(), e);
             }
-        }
 
-        if (templateCmdLine.target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" + error;
-                }
-                org.junit.Assert.fail(failString);
-            }
+            failIfValgrindErrors(valgrindOutputFile);
         }
 
         m_eeProcs.clear();
@@ -1818,5 +1829,32 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public int getLogicalPartitionCount() {
         return (m_siteCount * m_hostCount) / (m_kfactor + 1);
+    }
+
+    /**
+     * Parse the output file produced by valgrind and produce a JUnit failure if
+     * valgrind found any errors.
+     *
+     * Deletes the valgrind file if there are no errors.
+     *
+     * @param valgrindOutputFile
+     */
+    public static void failIfValgrindErrors(File valgrindOutputFile) {
+        if (valgrindOutputFile == null) {
+            return;
+        }
+
+        List<String> valgrindErrors = new ArrayList<>();
+        ValgrindXMLParser.processValgrindOutput(valgrindOutputFile, valgrindErrors);
+        if (!valgrindErrors.isEmpty()) {
+            String failString = "";
+            for (final String error : valgrindErrors) {
+                failString = failString + "\n" +  error;
+            }
+            org.junit.Assert.fail(failString);
+        }
+        else {
+            valgrindOutputFile.delete();
+        }
     }
 }

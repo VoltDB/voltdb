@@ -27,16 +27,15 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.security.SecureRandom;
-
-import static junit.framework.Assert.fail;
-import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
+import junit.framework.TestCase;
+
 public class TestSecurityNoAdminUser extends TestCase {
 
+    LocalCluster config = null;
     PipeToFile pf;
 
     public TestSecurityNoAdminUser(String name) {
@@ -45,6 +44,10 @@ public class TestSecurityNoAdminUser extends TestCase {
 
     @Override
     public void setUp() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -52,7 +55,7 @@ public class TestSecurityNoAdminUser extends TestCase {
             builder.setSecurityEnabled(true, false);
             String catalogJar = "dummy.jar";
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             config.setHasLocalServer(false);
             //We expect it to crash
@@ -70,10 +73,21 @@ public class TestSecurityNoAdminUser extends TestCase {
         }
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        if (config != null) {
+            config.shutDown();
+        }
+    }
+
     /*
      *
      */
     public void testSecurityNoUsers() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;
