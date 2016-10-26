@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
@@ -38,7 +39,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
-
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -53,13 +53,28 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     // API
     //
 
+    public static class LeaderCallBackInfo {
+        Long m_HSID;
+        boolean m_isBalanceSPIRequested;
+
+        public LeaderCallBackInfo(Long hsid, boolean isRequested) {
+            m_HSID = hsid;
+            m_isBalanceSPIRequested = isRequested;
+        }
+
+        @Override
+        public String toString() {
+            return "leader hsid: " + CoreUtils.hsIdToString(m_HSID) + ", is balance SPI requested:" + m_isBalanceSPIRequested;
+        }
+    }
+
     /**
      * Callback is passed an immutable cache when a child (dis)appears/changes.
      * Callback runs in the LeaderCache's ES (not the zk trigger thread).
      */
     public abstract static class Callback
     {
-        abstract public void run(ImmutableMap<Integer, Long> cache);
+        abstract public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache);
     }
 
     /** Instantiate a LeaderCache of parent rootNode. The rootNode must exist. */
@@ -101,7 +116,11 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested cache from shutdown LeaderCache.");
         }
-        return m_publicCache;
+        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+        for (Entry<Integer, LeaderCallBackInfo> e : m_publicCache.entrySet()) {
+            cacheCopy.put(e.getKey(), e.getValue().m_HSID);
+        }
+        return ImmutableMap.copyOf(cacheCopy);
     }
 
     /**
@@ -109,7 +128,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     @Override
     public Long get(int partitionId) {
-        return m_publicCache.get(partitionId);
+        return m_publicCache.get(partitionId).m_HSID;
     }
 
     /**
@@ -117,14 +136,22 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     @Override
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException {
+        put(partitionId, Long.toString(HSId));
+    }
+
+    /**
+     * Create or update a new rootNode child
+     */
+    @Override
+    public void put(int partitionId, String HSIdStr) throws KeeperException, InterruptedException {
         try {
             m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                    Long.toString(HSId).getBytes(Charsets.UTF_8),
+                    HSIdStr.getBytes(Charsets.UTF_8),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         }
         catch (KeeperException.NodeExistsException e) {
             m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                    Long.toString(HSId).getBytes(Charsets.UTF_8), -1);
+                    HSIdStr.getBytes(Charsets.UTF_8), -1);
         }
     }
 
@@ -146,7 +173,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private Set<String> m_lastChildren = new HashSet<String>();
 
     // the cache exposed to the public. Start empty. Love it.
-    private volatile ImmutableMap<Integer, Long> m_publicCache = ImmutableMap.of();
+    private volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
 
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
@@ -224,6 +251,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     };
 
+    // example zkPath string: /db/iv2masters/1
     private static int getPartitionIdFromZKPath(String zkPath)
     {
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
@@ -256,12 +284,15 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             callbacks.add(cb);
         }
 
-        HashMap<Integer, Long> cache = new HashMap<Integer, Long>();
+        HashMap<Integer, LeaderCallBackInfo> cache = new HashMap<Integer, LeaderCallBackInfo>();
         for (ByteArrayCallback callback : callbacks) {
             try {
                 byte payload[] = callback.getData();
-                long HSId = Long.valueOf(new String(payload, "UTF-8"));
-                cache.put(getPartitionIdFromZKPath(callback.getPath()), HSId);
+                String data = new String(payload, "UTF-8");
+                long HSId = ZKUtil.getHSId(data);
+                boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPIRequest(data);
+                Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
+                cache.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));
             } catch (KeeperException.NoNodeException e) {
                 // child may have been deleted between the parent trigger and getData.
             }
@@ -278,21 +309,39 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      * a deleted child or a child with modified data.
      */
     private void processChildEvent(WatchedEvent event) throws Exception {
-        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_publicCache);
+        HashMap<Integer, LeaderCallBackInfo> cacheCopy = new HashMap<Integer, LeaderCallBackInfo>(m_publicCache);
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
             // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
-            long HSId = Long.valueOf(new String(payload, "UTF-8"));
-            cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
+            String data = new String(payload, "UTF-8");
+            long HSId = ZKUtil.getHSId(data);
+            boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPIRequest(data);
+
+            Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
+            cacheCopy.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));
         } catch (KeeperException.NoNodeException e) {
             // rtb: I think result's path is the same as cb.getPath()?
-            cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
+            Integer partitionId = getPartitionIdFromZKPath(event.getPath());
+            cacheCopy.remove(partitionId);
         }
         m_publicCache = ImmutableMap.copyOf(cacheCopy);
         if (m_cb != null) {
             m_cb.run(m_publicCache);
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("LeaderCache, root node:").append(m_rootNode).append("\n");
+        sb.append("public cache: partition id -> HSId -> isBalanceSPI\n");
+        for (Entry<Integer, LeaderCallBackInfo> entry: m_publicCache.entrySet()) {
+            sb.append("             ").append(entry.getKey()).append(" -> ").append(entry.getValue())
+            .append("\n");
+        }
+
+        return sb.toString();
     }
 }

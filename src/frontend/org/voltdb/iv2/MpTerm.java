@@ -20,7 +20,7 @@ package org.voltdb.iv2;
 import java.lang.InterruptedException;
 
 import java.util.*;
-
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -33,6 +33,7 @@ import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -57,11 +58,13 @@ public class MpTerm implements Term
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
-            for (Long HSId : cache.values()) {
-                builder.add(HSId);
+            HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                builder.add(e.getValue().m_HSID);
+                cacheCopy.put(e.getKey(), e.getValue().m_HSID);
             }
             final SortedSet<Long> updatedLeaders = builder.build();
             tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(updatedLeaders));
@@ -70,7 +73,7 @@ public class MpTerm implements Term
                       + CoreUtils.hsIdCollectionToString(updatedLeaders));
             m_knownLeaders = updatedLeaders;
 
-            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cache);
+            m_mailbox.updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy);
         }
     };
 

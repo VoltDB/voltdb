@@ -25,5 +25,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
  */
 public interface LeaderCacheWriter {
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException;
+    public void put(int partitionId, String HSIdStr) throws KeeperException, InterruptedException;
 }
 

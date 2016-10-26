@@ -18,19 +18,26 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.BalanceSPIResponseMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -98,6 +105,10 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
+                    m_partitionId + ", survivors: " + Arrays.toString(survivors.get().toArray()));
+        }
         setRepairAlgoInternal(ra);
         return ra;
     }
@@ -307,6 +318,52 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
+        else if (message instanceof BalanceSPIMessage) {
+            BalanceSPIMessage msg = (BalanceSPIMessage) message;
+
+            VoltDBInterface voltInstance = VoltDB.instance();
+            HostMessenger messenger = voltInstance.getHostMessenger();
+            ZooKeeper zk = messenger.getZK();
+
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(VoltZK.debugLeadersInfo(zk));
+                tmLog.debug("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
+                        msg.getParititionId() + ", hsid:" + msg.getNewLeaderHSId());
+            }
+            LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+            try {
+                leaderAppointee.start(true);
+                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
+                leaderAppointee.put(msg.getParititionId(), hsidStr);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            } catch (KeeperException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    leaderAppointee.shutdown();
+                } catch (InterruptedException e) {
+                }
+            }
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(VoltZK.debugLeadersInfo(zk));
+            }
+
+            return;
+        }
+        else if (message instanceof BalanceSPIResponseMessage) {
+            if (tmLog.isDebugEnabled()) {
+                hostLog.debug("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
+                        + " current is_leader:" + m_scheduler.isLeader());
+            }
+            // TODO: set the leader state back, theoretically return status of the BalanceSPI invocation,
+            // restart the miss-routed transactions, etc.
+            m_scheduler.setLeaderState(false);
+            return;
+        }
+
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);

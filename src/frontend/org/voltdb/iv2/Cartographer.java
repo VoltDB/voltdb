@@ -52,6 +52,7 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -105,12 +106,12 @@ public class Cartographer extends StatsSource
     LeaderCache.Callback m_MPICallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             // Every MPI change means a new single MPI.  Just do the right thing here
             int pid = MpInitiator.MP_INIT_PID;
             // Can be zero-length at startup
             if (cache.size() > 0) {
-                sendLeaderChangeNotify(cache.get(pid), pid);
+                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid);
             }
         }
     };
@@ -118,25 +119,35 @@ public class Cartographer extends StatsSource
     LeaderCache.Callback m_SPIMasterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             // We know there's a 1:1 mapping between partitions and HSIds in this map.
             // let's flip it
             Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
-            for (Entry<Integer, Long> e : cache.entrySet()) {
-                hsIdToPart.put(e.getValue(), e.getKey());
+            Set<LeaderCallBackInfo> newMasters = new HashSet<LeaderCallBackInfo>();
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                Long hsid = e.getValue().m_HSID;
+                hsIdToPart.put(hsid, e.getKey());
+                if (!m_currentSPMasters.contains(hsid)) {
+                    // we want to see items which are present in the new map but not in the old,
+                    // these are newly promoted SPIs
+                    newMasters.add(e.getValue());
+                }
             }
-            Set<Long> newMasters = new HashSet<Long>();
-            newMasters.addAll(cache.values());
-            // we want to see items which are present in the new map but not in the old,
-            // these are newly promoted SPIs
-            newMasters.removeAll(m_currentSPMasters);
             // send the messages indicating promotion from here for each new master
-            for (long newMaster : newMasters) {
-                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
+            for (LeaderCallBackInfo newMasterInfo : newMasters) {
+                Long newMaster = newMasterInfo.m_HSID;
+                if (newMasterInfo.m_isBalanceSPIRequested) {
+                    Integer partitionId = hsIdToPart.get(newMaster);
+                    hostLog.info("SPI migration requested for partition:"  + partitionId + " to new hsid: " + newMaster);
+                } else {
+                    sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
+                }
             }
 
             m_currentSPMasters.clear();
-            m_currentSPMasters.addAll(cache.values());
+            for (LeaderCallBackInfo leader: cache.values()) {
+                m_currentSPMasters.add(leader.m_HSID);
+            }
         }
     };
 
@@ -210,7 +221,7 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
-            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 

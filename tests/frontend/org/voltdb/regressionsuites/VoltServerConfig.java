@@ -164,4 +164,6 @@ public interface VoltServerConfig {
      * @return the number of logical partitions in this configuration
      * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
     public int getLogicalPartitionCount();
+
+    public int getKfactor();
 }

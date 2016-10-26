@@ -50,6 +50,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -72,7 +73,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     LeaderCache.Callback m_changeCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             m_newAppointee.set(true);
         }
     };

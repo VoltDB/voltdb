@@ -17,12 +17,17 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -38,8 +43,10 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.BalanceSPIResponseMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -51,22 +58,33 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private boolean m_promoted = false;
+    private boolean m_isBalanceSPIRequested = false;
     private final TickProducer m_tickProducer;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
-            for (Long HSId : cache.values()) {
-                if (HSId == getInitiatorHSId()) {
-                    if (!m_promoted) {
-                        acceptPromotion();
-                        m_promoted = true;
-                    }
-                    break;
+            String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
+
+            if (tmLog.isDebugEnabled()) {
+                if (cache != null) {
+                    tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                    tmLog.debug(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
                 }
+            }
+
+            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
+                Long HSId = entry.getValue().m_HSID;
+                if (HSId != getInitiatorHSId()) {
+                    continue;
+                }
+                m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
+
+                acceptPromotion();
+                break;
+
             }
         }
     };
@@ -132,6 +150,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[SpInitiator:acceptPromotion()]...");
+            }
 
             long startTime = System.currentTimeMillis();
             Boolean success = false;
@@ -169,6 +190,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
+                    if (m_isBalanceSPIRequested) {
+                        List<Long> survivors = new ArrayList<Long>(m_term.getInterestingHSIds().get());
+                        survivors.remove(m_initiatorMailbox.getHSId());
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("[acceptPromotion] repair survivors to change original leader state:" +
+                                    Arrays.toString(survivors.toArray()));
+                        }
+
+                        BalanceSPIResponseMessage msg = new BalanceSPIResponseMessage();
+                        m_initiatorMailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(survivors), msg);
+                    }
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.

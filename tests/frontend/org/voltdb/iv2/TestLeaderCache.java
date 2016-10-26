@@ -22,7 +22,9 @@
  */
 package org.voltdb.iv2;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import static org.junit.Assert.assertEquals;
 
@@ -35,6 +37,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.voltcore.zk.ZKTestBase;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -46,9 +49,14 @@ public class TestLeaderCache extends ZKTestBase {
     {
         volatile ImmutableMap<Integer, Long> m_cache = null;
 
-        public void run(ImmutableMap<Integer, Long> cache)
+        @Override
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
-            m_cache = cache;
+            HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
+            for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
+                cacheCopy.put(e.getKey(), e.getValue().m_HSID);
+            }
+            m_cache = ImmutableMap.copyOf(cacheCopy);
         }
     }
 

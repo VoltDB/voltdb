@@ -102,6 +102,54 @@ public class VoltZK {
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
+    public static final String debugLeadersInfo(ZooKeeper zk) {
+        StringBuilder build = new StringBuilder();
+        build.append(printZKDir(zk, iv2masters));
+        build.append(printZKDir(zk, iv2appointees));
+        build.append(printZKDir(zk, iv2mpi));
+        build.append(printZKDir(zk, leaders));
+        build.append(printZKDir(zk, leaders_initiators));
+        build.append(printZKDir(zk, leaders_globalservice));
+        build.append(printZKDir(zk, lastKnownLiveNodes));
+
+        return build.toString();
+    }
+
+    private static final String printZKDir(ZooKeeper zk, String dir) {
+        StringBuilder build = new StringBuilder();
+        build.append("zookeeper ").append(dir).append(": ");
+        try {
+            List<String> keys = zk.getChildren(dir, null);
+            boolean isData = true;
+            for (String key: keys) {
+                String path = ZKUtil.joinZKPath(dir, key);
+                byte[] arr = zk.getData(path, null, null);
+
+                if (arr != null) {
+                    String data = new String(arr, "UTF-8");
+                    build.append(key).append(" -> ").append(data).append(",");
+                } else {
+                    // path may be a dir instead
+                    isData = false;
+                    List<String> children = zk.getChildren(path, null);
+                    if (children != null) {
+                        build.append("\n").append(printZKDir(zk, path));
+                    }
+                }
+            }
+            if (isData) {
+                build.append("\n");
+            }
+        } catch (KeeperException e) {
+            build.append(e.getMessage());
+        } catch (InterruptedException e) {
+            build.append(e.getMessage());
+        } catch (UnsupportedEncodingException e) {
+            build.append(e.getMessage());
+        }
+        return build.toString();
+}
+
     // flag of initialization process complete
     public static final String init_completed = "/db/init_completed";
 

@@ -84,6 +84,34 @@ public class ZKUtil {
         return path;
     }
 
+    private static final String BALANCE_SPI_SUFFIX = "_BALANCE_SPI_REQUEST";
+
+    /**
+     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
+     * When this string is updated, we can tell the reason why HSID is changed.
+     */
+    public static String suffixHSIdsWithBalanceSPIRequest(Long HSId) {
+        return Long.toString(HSId) + BALANCE_SPI_SUFFIX;
+    }
+
+    /**
+     * Is the data string hsid written because of balance SPI request?
+     */
+    public static boolean isHSIdFromBalanceSPIRequest(String hsid) {
+        return hsid.endsWith(BALANCE_SPI_SUFFIX);
+    }
+
+    /**
+     * Given a data string, figure out what's the long HSID number. Usually the data string
+     * is read from the zookeeper node.
+     */
+    public static long getHSId(String hsid) {
+        if (isHSIdFromBalanceSPIRequest(hsid)) {
+            return Long.parseLong(hsid.substring(0, hsid.length() - BALANCE_SPI_SUFFIX.length()));
+        }
+        return Long.parseLong(hsid);
+    }
+
     public static File getUploadAsTempFile( ZooKeeper zk, String path, String prefix) throws Exception {
         byte data[] = retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
         File tempFile = File.createTempFile("foo", "bar");

@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,6 +51,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -228,6 +230,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
+        if (tmLog.isDebugEnabled()) {
+            hostLog.debug("[updateReplicas] replicas: " + Arrays.toString(replicas.toArray()));
+            if (partitionMasters != null && partitionMasters.keySet() != null) {
+                hostLog.debug("[updateReplicas] partition master keys: " + Arrays.toString(partitionMasters.keySet().toArray()));
+            }
+            if (partitionMasters != null && partitionMasters.values() != null) {
+                hostLog.debug("[updateReplicas] partition master values: " + Arrays.toString(partitionMasters.values().toArray()));
+            }
+        }
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
@@ -429,6 +440,30 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
+
+        if ("@BalanceSPI".equals(procedureName)) {
+            // this is a @BalanceSPI system procedure that will reset the max transaction id on new leader
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[SpScheduler] Receive @BalanceSPI invocation...");
+            }
+
+            final Object[] params = message.getParameters();
+            try {
+                int pid = Integer.parseInt(params[1].toString());
+                int hostId = Integer.parseInt(params[2].toString());
+                int siteId = Integer.parseInt(params[3].toString());
+                long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
+
+                BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
+                m_mailbox.send(newLeaderHSId, balanceSpiMsg);
+
+                // TODO: add a spi migration boolean flag to disable running new transactions from now on
+            } catch(NumberFormatException e) {
+                tmLog.error(e.getMessage());
+                throw e;
+            }
+        }
+
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
             /*

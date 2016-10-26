@@ -46,6 +46,8 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.Promotable;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -215,8 +217,8 @@ public class LeaderAppointer implements Promotable
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
-            Set<Long> currentLeaders = new HashSet<Long>(cache.values());
+        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
+            Set<LeaderCallBackInfo> currentLeaders = new HashSet<LeaderCallBackInfo>(cache.values());
             tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 try {
@@ -311,6 +313,9 @@ public class LeaderAppointer implements Promotable
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
         ImmutableMap<Integer, Long> appointees = m_iv2appointees.pointInTimeCache();
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("appointees.toString(): " + appointees.toString());
+        }
         // Figure out what conditions we assumed leadership under.
         if (appointees.size() == 0)
         {
@@ -399,16 +404,16 @@ public class LeaderAppointer implements Promotable
 
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
                 //instantiated
-                if (m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
+                int partId = master.getKey();
+                if (m_removedPartitionsAtPromotionTime.contains(partId)) {
                     tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
                     continue;
                 }
 
-                int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partId);
-                m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
-                Pair<BabySitter, List<String>> sitterstuff =
-                        BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                PartitionCallback cb = new PartitionCallback(partId, master.getValue());
+                m_callbacks.put(partId, cb);
+                Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, cb, m_es);
 
                 //We could get this far and then find out that creating this particular
                 //babysitter triggered cleanup so we need to bail out here as well
