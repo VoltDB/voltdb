@@ -19,7 +19,7 @@ package org.voltdb;
 
 import org.voltcore.network.Connection;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.InvocationDispatcher.Check;
+import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.dtxn.TransactionCreator;
 
 /**
@@ -72,7 +72,7 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public ClientResponseImpl dispatch(StoredProcedureInvocation invocation,
-            Connection connection, boolean isAdmin, Check bypass) {
+            Connection connection, boolean isAdmin, OverrideCheck bypass) {
 
         final InvocationClientHandler handler = new InvocationClientHandler() {
 

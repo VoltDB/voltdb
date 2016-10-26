@@ -41,7 +41,7 @@ public class UpdateCatalogAcceptancePolicy extends InvocationValidationPolicy {
         // Either the catalog bytes or the deployment string can be null, indicating
         // that the user doesn't want to change that component.  Null values will
         // be populated correctly by the AsyncCompilerAgentHelper downstream.
-        Object [] paramsArray = params.toArray();
+        final Object [] paramsArray = params.toArray();
         if (paramsArray.length != 2)
         {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,

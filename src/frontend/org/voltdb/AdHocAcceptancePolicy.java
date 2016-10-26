@@ -40,7 +40,7 @@ public class AdHocAcceptancePolicy extends InvocationValidationPolicy {
         }
 
         ParameterSet params = invocation.getParams();
-        Object [] paramsArray = params.toArray();
+        final Object [] paramsArray = params.toArray();
         // Make sure there is at least 1 parameter!  ENG-4921
         if (paramsArray.length < 1) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,

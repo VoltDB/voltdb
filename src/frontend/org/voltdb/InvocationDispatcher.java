@@ -106,16 +106,16 @@ public final class InvocationDispatcher {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    public enum Check {
+    public enum OverrideCheck {
         NONE(false, false, false),
-        NO_INVOCATION(false, false, true)
+        INVOCATION(false, false, true)
         ;
 
         final boolean skipAdmimCheck;
         final boolean skipPermissionCheck;
         final boolean skipInvocationCheck;
 
-        Check(boolean skipAdminCheck, boolean skipPermissionCheck, boolean skipInvocationCheck) {
+        OverrideCheck(boolean skipAdminCheck, boolean skipPermissionCheck, boolean skipInvocationCheck) {
             this.skipAdmimCheck = skipAdminCheck;
             this.skipPermissionCheck = skipPermissionCheck;
             this.skipInvocationCheck = skipInvocationCheck;
@@ -279,7 +279,7 @@ public final class InvocationDispatcher {
             InvocationClientHandler handler,
             Connection ccxn,
             AuthUser user,
-            Check bypass)
+            OverrideCheck bypass)
     {
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
@@ -1044,7 +1044,7 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl takeShutdownSaveSnapshot(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user, Check bypass
+            final AuthUser user, OverrideCheck bypass
             )
     {
         // shutdown save snapshot is available for Pro edition only
@@ -1225,7 +1225,7 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user, Check bypass
+            final AuthUser user, OverrideCheck bypass
             )
     {
         CatalogContext catalogContext = m_catalogContext.get();

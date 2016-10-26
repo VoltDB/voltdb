@@ -38,7 +38,7 @@ public class UpdateClassesAcceptancePolicy extends InvocationValidationPolicy {
         }
 
         ParameterSet params = invocation.getParams();
-        Object [] paramsArray = params.toArray();
+        final Object [] paramsArray = params.toArray();
         // Either the jar bytes or the deletion can be null, indicating
         // that the user doesn't want to change that component.
         if (paramsArray.length != 2)
