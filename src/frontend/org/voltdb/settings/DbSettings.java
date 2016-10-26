@@ -23,10 +23,10 @@ import com.google_voltpatches.common.base.Supplier;
 
 public class DbSettings {
 
-    private final PathSettings m_paths;
+    private final NodeSettings m_nodeSettings;
     private final Supplier<ClusterSettings> m_cluster;
-    public DbSettings(Supplier<ClusterSettings> clusterSettings, PathSettings pathSettings) {
-        m_paths = pathSettings;
+    public DbSettings(Supplier<ClusterSettings> clusterSettings, NodeSettings pathSettings) {
+        m_nodeSettings = pathSettings;
         m_cluster = clusterSettings;
     }
     /**
@@ -34,7 +34,7 @@ public class DbSettings {
      * @param dt deployment JAXB object
      */
     public DbSettings(DeploymentType dt) {
-        m_paths = PathSettings.create(CatalogUtil.asPathSettingsMap(dt));
+        m_nodeSettings = NodeSettings.create(CatalogUtil.asNodeSettingsMap(dt));
         m_cluster = ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).asSupplier();
     }
 
@@ -42,13 +42,13 @@ public class DbSettings {
         return m_cluster.get();
     }
 
-    public PathSettings getPath() {
-        return m_paths;
+    public NodeSettings getNodeSetting() {
+        return m_nodeSettings;
     }
 
     @Override
     public String toString() {
-        return "DbSettings [paths=" + m_paths + ", cluster=" + m_cluster
+        return "DbSettings [paths=" + m_nodeSettings + ", cluster=" + m_cluster
                 + "]";
     }
 }
