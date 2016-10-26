@@ -1050,15 +1050,27 @@ public final class InvocationDispatcher {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            return dispatch(task, handler, ccxn, user, null);
+            return dispatch(task, handler, ccxn, user, bypass);
         }
+
         Object p0 = task.getParams().getParam(0);
-        if (!(p0 instanceof Long)) {
+        final long zkTxnId;
+        if (p0 instanceof Long) {
+            zkTxnId = ((Long)p0).longValue();
+        } else if (p0 instanceof String) {
+            try {
+                zkTxnId = Long.parseLong((String)p0);
+            } catch (NumberFormatException e) {
+                return gracefulFailureResponse(
+                        "Incorrect argument type",
+                        task.clientHandle);
+            }
+        } else {
             return gracefulFailureResponse(
                     "Incorrect argument type",
                     task.clientHandle);
+
         }
-        final long zkTxnId = ((Long)p0).longValue();
         VoltDBInterface voltdb = VoltDB.instance();
 
         if (!voltdb.isShuttingdown()) {
