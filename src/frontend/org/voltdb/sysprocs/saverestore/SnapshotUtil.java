@@ -83,7 +83,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -464,7 +464,7 @@ public class SnapshotUtil {
     /**
      * Write the shutdown save snapshot terminus marker
      */
-    public static Runnable writeTerminusMarker(final String nonce, final PathSettings paths, final VoltLogger logger) {
+    public static Runnable writeTerminusMarker(final String nonce, final NodeSettings paths, final VoltLogger logger) {
         final File f = new File(paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
         return new Runnable() {
             @Override

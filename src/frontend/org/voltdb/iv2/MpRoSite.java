@@ -56,7 +56,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -118,7 +118,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public PathSettings getPaths() {
+        public NodeSettings getPaths() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
@@ -139,6 +139,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getSiteId() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public int getLocalSitesCount() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
