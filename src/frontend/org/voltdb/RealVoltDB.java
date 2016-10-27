@@ -2161,7 +2161,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         CatalogUtil.asNodeSettingsMap(deployment));
                 break;
             default:
-                nodeSettings = NodeSettings.create(CatalogUtil.asNodeSettingsMap(deployment));
+                nodeSettings = NodeSettings.create(
+                        config.asNodeSettingsMap(),
+                        CatalogUtil.asNodeSettingsMap(deployment));
                 Settings.initialize(nodeSettings.getVoltDBRoot());
                 config.m_voltdbRoot = nodeSettings.getVoltDBRoot();
                 break;
