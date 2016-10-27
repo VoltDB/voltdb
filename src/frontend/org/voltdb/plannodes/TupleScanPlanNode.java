@@ -36,7 +36,8 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
         PARAM_IDX;
     }
 
-    private List<AbstractExpression> m_columnList = new ArrayList<AbstractExpression>();
+    private List<AbstractExpression> m_columnList =
+            new ArrayList<AbstractExpression>();
 
     public TupleScanPlanNode() {
         super();
@@ -48,13 +49,14 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
      * @param
      * @param
      */
-    public TupleScanPlanNode(String subqueryName, List<AbstractExpression> columnExprs) {
+    public TupleScanPlanNode(String subqueryName,
+            List<AbstractExpression> columnExprs) {
         super(subqueryName, subqueryName);
         m_isSubQuery = true;
         m_hasSignificantOutputSchema = true;
         // copy columns
         for (AbstractExpression columnExpr : columnExprs) {
-            m_columnList.add((AbstractExpression) columnExpr.clone());
+            m_columnList.add(columnExpr.clone());
         }
     }
 
@@ -74,14 +76,13 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
                 // must produce a tuple value expression for this column.
                 String columnName = "C" + Integer.toString(columnIdx);
                 TupleValueExpression tve = new TupleValueExpression(
-                        m_targetTableName, m_targetTableAlias, columnName, columnName, columnIdx);
-
-                tve.setTypeSizeBytes(pve.getValueType(), pve.getValueSize(), pve.getInBytes());
-                m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                        m_targetTableAlias,
-                        columnName,
-                        columnName,
-                        tve));
+                        m_targetTableName, m_targetTableAlias,
+                        columnName, columnName,
+                        pve, columnIdx);
+                m_tableSchema.addColumn(
+                        m_targetTableName, m_targetTableAlias,
+                        columnName, columnName,
+                        tve);
                 ++columnIdx;
             }
             m_outputSchema = m_tableSchema;
@@ -93,11 +94,11 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes() {
         // output columns
         for (SchemaColumn col : m_outputSchema.getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+            assert(colExpr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) colExpr;
+            tve.setColumnIndexUsingSchema(m_tableSchema);
         }
         m_outputSchema.sortByTveIndex();
     }

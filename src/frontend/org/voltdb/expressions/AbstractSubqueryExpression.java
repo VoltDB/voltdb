@@ -108,20 +108,9 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     }
 
     @Override
-    public Object clone() {
+    public AbstractSubqueryExpression clone() {
         AbstractSubqueryExpression clone = (AbstractSubqueryExpression) super.clone();
-        clone.m_subqueryId = m_subqueryId;
-        clone.m_subqueryNodeId = m_subqueryNodeId;
-        clone.m_subqueryNode = m_subqueryNode;
-        clone.setExpressionType(m_type);
-        clone.m_valueType = m_valueType;
-        clone.m_valueSize = m_valueSize;
-        if (!m_parameterIdxList.isEmpty()) {
-            clone.m_parameterIdxList = new ArrayList<Integer>();
-            for (Integer paramIdx : m_parameterIdxList) {
-                clone.m_parameterIdxList.add(paramIdx);
-            }
-        }
+        clone.m_parameterIdxList = new ArrayList<>(m_parameterIdxList);
         return clone;
     }
 

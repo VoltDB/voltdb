@@ -43,7 +43,6 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 public abstract class AbstractScanPlanNode extends AbstractPlanNode {
-
     public enum Members {
         PREDICATE,
         TARGET_TABLE_NAME,
@@ -55,6 +54,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // Store the columns from the table as an internal NodeSchema
     // for consistency of interface
     protected NodeSchema m_tableSchema = null;
+    private NodeSchema m_preAggOutputSchema;
     // Store the columns we use from this table as an internal schema
     protected NodeSchema m_tableScanSchema = new NodeSchema();
     protected Map<Integer, Integer> m_differentiatorMap = new HashMap<>();
@@ -190,13 +190,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_predicate = ExpressionUtil.cloneAndCombinePredicates(colExps);
     }
 
-    protected void setScanColumns(List<SchemaColumn> scanColumns)
-    {
+    protected void setScanColumns(List<SchemaColumn> scanColumns) {
         assert(scanColumns != null);
         int i = 0;
         for (SchemaColumn col : scanColumns) {
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            m_differentiatorMap.put(tve.getDifferentiator(), i);
+            int difftor = tve.getDifferentiator();
+            m_differentiatorMap.put(difftor, i);
             SchemaColumn clonedCol = col.clone();
             clonedCol.setDifferentiator(i);
             m_tableScanSchema.addColumn(clonedCol);
@@ -218,18 +218,17 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * since unused columns are typically omitted from the output schema
      * of the scan.
      *
-     * @param  existing differentiator field of a TVE
-     * @return new differentiator value
+     * @param  tve
      */
     @Override
-    public int adjustDifferentiatorField(int storageIndex) {
+    public void adjustDifferentiatorField(TupleValueExpression tve) {
+        int storageIndex = tve.getColumnIndex();
         Integer scanIndex = m_differentiatorMap.get(storageIndex);
         assert(scanIndex != null);
-        return scanIndex;
+        tve.setDifferentiator(storageIndex);
     }
 
-    NodeSchema getTableSchema()
-    {
+    NodeSchema getTableSchema() {
         return m_tableSchema;
     }
 
@@ -251,110 +250,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // fill in the table schema if we haven't already
         if (m_tableSchema == null) {
-            if (isSubQuery()) {
-                assert(m_children.size() == 1);
-                m_children.get(0).generateOutputSchema(db);
-                m_tableSchema = m_children.get(0).getOutputSchema();
-                // step to transfer derived table schema to upper level
-                m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
-
-            } else {
-                m_tableSchema = new NodeSchema();
-                CatalogMap<Column> cols = db.getTables().getExact(m_targetTableName).getColumns();
-                // you don't strictly need to sort this, but it makes diff-ing easier
-                for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
-                {
-                    // must produce a tuple value expression for this column.
-                    TupleValueExpression tve = new TupleValueExpression(
-                            m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(),
-                            col.getIndex());
-
-                    tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
-                    m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                             m_targetTableAlias,
-                                                             col.getTypeName(),
-                                                             col.getTypeName(),
-                                                             tve, col.getIndex()));
-                }
-            }
+            initTableSchema(db);
         }
 
-        // Until the scan has an implicit projection rather than an explicitly
-        // inlined one, the output schema generation is going to be a bit odd.
-        // It will depend on two bits of state: whether any scan columns were
-        // specified for this table and whether or not there is an inlined
-        // projection.
-        //
-        // If there is an inlined projection, then we'll just steal that
-        // output schema as our own.
-        // If there is no inlined projection, then, if there are no scan columns
-        // specified, use the entire table's schema as the output schema.
-        // Otherwise add an inline projection that projects the scan columns
-        // and then take that output schema as our own.
-        // These have the effect of repeatably generating the correct output
-        // schema if called again and again, but also allowing the planner
-        // to overwrite the inline projection and still have the right thing
-        // happen.
-        //
-        // Note that when an index scan is inlined into a join node (as with
-        // nested loop index joins), then there will be a project node inlined into
-        // the index scan node that determines which columns from the inner table
-        // are used as an output of the join, but that predicates evaluated against
-        // this table should use the complete schema of the table being scanned.
-        // See also the comments in NestLoopIndexPlanNode.resolveColumnIndexes.
-        // Related tickets: ENG-9389, ENG-9533.
-        ProjectionPlanNode proj =
-            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null) {
-            // Does this operation needs to change complex expressions
-            // into tuple value expressions with an column alias?
-            // Is this always true for clone?  Or do we need a new method?
-            m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
-            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
-        }
-        else if (m_tableScanSchema.size() != 0) {
-            // Order the scan columns according to the table schema
-            // before we stick them in the projection output
-            List<TupleValueExpression> scan_tves =
-                    new ArrayList<TupleValueExpression>();
-            int i = 0;
-            for (SchemaColumn col : m_tableScanSchema.getColumns())
-            {
-                assert(col.getExpression() instanceof TupleValueExpression);
-                col.setDifferentiator(i);
-                scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
-                ++i;
-            }
-            // and update their indexes against the table schema
-            for (TupleValueExpression tve : scan_tves)
-            {
-                int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-                tve.setColumnIndex(index);
-            }
-            m_tableScanSchema.sortByTveIndex();
-            // Create inline projection to map table outputs to scan outputs
-            ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-            projectionNode.setOutputSchema(m_tableScanSchema);
-            addInlinePlanNode(projectionNode);
-            // a bit redundant but logically consistent
-            m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
-            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
-        }
-        else {
-            // We come here if m_tableScanSchema is empty.
-            //
-            // m_tableScanSchema might be empty for cases like
-            //   select now from table;
-            // where there are no columns in the table that are accessed.
-            //
-            // Just fill m_outputSchema with the table's columns.
-            m_outputSchema = m_tableSchema.clone();
-            m_hasSignificantOutputSchema = true;
-        }
+        initPreAggOutputSchema();
 
         // Generate the output schema for subqueries
         Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
@@ -372,43 +274,138 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+
+    // Until the scan has an implicit projection rather than an explicitly
+    // inlined one, the output schema generation is going to be a bit odd.
+    // It will depend on two bits of state: whether any scan columns were
+    // specified for this table and whether or not there is an inlined
+    // projection.
+    //
+    // If there is an inlined projection, then we'll just steal that
+    // output schema as our own.
+    // If there is no inlined projection, then, if there are no scan columns
+    // specified, use the entire table's schema as the output schema.
+    // Otherwise add an inline projection that projects the scan columns
+    // and then take that output schema as our own.
+    // These have the effect of repeatably generating the correct output
+    // schema if called again and again, but also allowing the planner
+    // to overwrite the inline projection and still have the right thing
+    // happen.
+    //
+    // Note that when an index scan is inlined into a join node (as with
+    // nested loop index joins), then there will be a project node inlined into
+    // the index scan node that determines which columns from the inner table
+    // are used as an output of the join, but that predicates evaluated against
+    // this table should use the complete schema of the table being scanned.
+    // See also the comments in NestLoopIndexPlanNode.resolveColumnIndexes.
+    // Related tickets: ENG-9389, ENG-9533.
+    private void initPreAggOutputSchema() {
+        ProjectionPlanNode proj =
+            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (proj != null) {
+            // Does this operation needs to change complex expressions
+            // into tuple value expressions with an column alias?
+            // Is this always true for clone?  Or do we need a new method?
+            m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
+            // It's just a cheap knock-off of the projection's
+            m_hasSignificantOutputSchema = false;
+        }
+        else if (m_tableScanSchema.size() != 0) {
+            // Order the scan columns according to the table schema
+            // before we stick them in the projection output
+            int difftor = 0;
+            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
+                col.setDifferentiator(difftor);
+                ++difftor;
+                AbstractExpression colExpr = col.getExpression();
+                assert(colExpr instanceof TupleValueExpression);
+                TupleValueExpression tve = (TupleValueExpression) colExpr;
+                tve.setColumnIndexUsingSchema(m_tableSchema);
+            }
+            // and update their indexes against the table schema
+            m_tableScanSchema.sortByTveIndex();
+
+            // Create inline projection to map table outputs to scan outputs
+            ProjectionPlanNode projectionNode =
+                    new ProjectionPlanNode(m_tableScanSchema);
+            addInlinePlanNode(projectionNode);
+            // a bit redundant but logically consistent
+            m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
+        }
+        else {
+            // We come here if m_tableScanSchema is empty.
+            //
+            // m_tableScanSchema might be empty for cases like
+            //   select now from table;
+            // where there are no columns in the table that are accessed.
+            //
+            // Just fill m_outputSchema with the table's columns.
+            m_outputSchema = m_tableSchema.clone();
+            m_hasSignificantOutputSchema = true;
+        }
+        m_preAggOutputSchema = m_outputSchema;
+    }
+
+    private void initTableSchema(Database db) {
+        if (isSubQuery()) {
+            assert(m_children.size() == 1);
+            AbstractPlanNode childNode = m_children.get(0);
+            childNode.generateOutputSchema(db);
+            m_tableSchema = childNode.getOutputSchema();
+            // step to transfer derived table schema to upper level
+            m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
+        }
+        else {
+            m_tableSchema = new NodeSchema();
+            CatalogMap<Column> cols =
+                    db.getTables().getExact(m_targetTableName).getColumns();
+            // you don't strictly need to sort this,
+            // but it makes diff-ing easier
+            List<Column> sortedCols =
+                    CatalogUtil.getSortedCatalogItems(cols, "index");
+            for (Column col : sortedCols) {
+                // must produce a tuple value expression for this column.
+                TupleValueExpression tve = new TupleValueExpression(
+                        m_targetTableName, m_targetTableAlias,
+                        col, col.getIndex());
+                m_tableSchema.addColumn(m_targetTableName, m_targetTableAlias,
+                        col.getTypeName(), col.getTypeName(),
+                        tve, col.getIndex());
+            }
+        }
+    }
+
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // The following applies to both seq and index scan.  Index scan has
         // some additional expressions that need to be handled as well
 
         // predicate expression
         List<TupleValueExpression> predicate_tves =
             ExpressionUtil.getTupleValueExpressions(m_predicate);
-        for (TupleValueExpression tve : predicate_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+        for (TupleValueExpression tve : predicate_tves) {
+            tve.setColumnIndexUsingSchema(m_tableSchema);
         }
 
         // inline projection
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null)
-        {
+        if (proj != null) {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
             m_outputSchema = proj.getOutputSchema().clone();
-            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
-        else
-        {
-            // output columns
-            // if there was an inline projection we will have copied these already
-            // otherwise we need to iterate through the output schema TVEs
+        else {
+            m_outputSchema = m_preAggOutputSchema;
+            // With no inline projection to define the output columns,
+            // iterate through the output schema TVEs
             // and sort them by table schema index order.
-            for (SchemaColumn col : m_outputSchema.getColumns())
-            {
+            for (SchemaColumn col : m_outputSchema.getColumns()) {
+                AbstractExpression colExpr = col.getExpression();
                 // At this point, they'd better all be TVEs.
-                assert(col.getExpression() instanceof TupleValueExpression);
-                TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-                int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-                tve.setColumnIndex(index);
+                assert(colExpr instanceof TupleValueExpression);
+                TupleValueExpression tve = (TupleValueExpression) colExpr;
+                tve.setColumnIndexUsingSchema(m_tableSchema);
             }
             m_outputSchema.sortByTveIndex();
         }
@@ -435,7 +432,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         if (aggNode != null) {
             aggNode.resolveColumnIndexesUsingSchema(m_outputSchema);
-            m_outputSchema = aggNode.getOutputSchema().clone();
+            m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             // Aggregate plan node change its output schema, and
             // EE does not have special code to get output schema from inlined aggregate node.
             m_hasSignificantOutputSchema = true;
@@ -500,4 +497,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             collected.addAll(m_predicate.findAllSubexpressionsOfClass(aeClass));
         }
     }
+
+    protected void copyDifferentiatorMap(
+            Map<Integer, Integer> diffMap) {
+        m_differentiatorMap = new HashMap<>(diffMap);
+    }
+
 }
