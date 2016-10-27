@@ -340,14 +340,13 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         try {
             long rc = 0;
             do {
-                // if more buffers need to be encrypted
-                if (m_buffsToWrite.isEmpty()) {
-                    // but there's no more data to encrypt
+                // TODO needs cleanup
+                if (m_sslEngine == null) {
                     if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
                         return bytesWritten;
                     }
-                    // get the next buffer to encrypt
-                    ByteBuffer buffer;
+
+                    ByteBuffer buffer = null;
                     if (m_currentWriteBuffer == null) {
                         m_currentWriteBuffer = m_queuedBuffers.poll();
                         buffer = m_currentWriteBuffer.b();
@@ -355,32 +354,65 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                     } else {
                         buffer = m_currentWriteBuffer.b();
                     }
-                    // wrap the buffer, the results go into m_buffsToWrite
-                    m_sizeOfBuffToWrite = buffer.remaining();
-                    wrap(buffer);
-                    m_currentWriteBuffer.discard();
-                    m_currentWriteBuffer = null;
-                }
 
-                Iterator<ByteBuffer> buffsIter = m_buffsToWrite.iterator();
-                while (buffsIter.hasNext()) {
-                    ByteBuffer buffToWrite = buffsIter.next();
-                    rc = channel.write(buffToWrite);
-                    bytesWritten += rc;
-                    if (buffToWrite.hasRemaining()) {
+                    rc = channel.write(buffer);
+
+                    //Discard the buffer back to a pool if no data remains
+                    if (buffer.hasRemaining()) {
                         if (!m_hadBackPressure) {
                             backpressureStarted();
                         }
-                        break;
                     } else {
-                        buffsIter.remove();
+                        m_currentWriteBuffer.discard();
+                        m_currentWriteBuffer = null;
+                        m_messagesWritten++;
                     }
+                    bytesWritten += rc;
+
+                } else {
+
+                    // if more buffers need to be encrypted
+                    if (m_buffsToWrite.isEmpty()) {
+                        // but there's no more data to encrypt
+                        if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                            return bytesWritten;
+                        }
+                        // get the next buffer to encrypt
+                        ByteBuffer buffer;
+                        if (m_currentWriteBuffer == null) {
+                            m_currentWriteBuffer = m_queuedBuffers.poll();
+                            buffer = m_currentWriteBuffer.b();
+                            buffer.flip();
+                        } else {
+                            buffer = m_currentWriteBuffer.b();
+                        }
+                        // wrap the buffer, the results go into m_buffsToWrite
+                        m_sizeOfBuffToWrite = buffer.remaining();
+                        wrap(buffer);
+                        m_currentWriteBuffer.discard();
+                        m_currentWriteBuffer = null;
+                    }
+
+                    Iterator<ByteBuffer> buffsIter = m_buffsToWrite.iterator();
+                    while (buffsIter.hasNext()) {
+                        ByteBuffer buffToWrite = buffsIter.next();
+                        rc = channel.write(buffToWrite);
+                        bytesWritten += rc;
+                        if (buffToWrite.hasRemaining()) {
+                            if (!m_hadBackPressure) {
+                                backpressureStarted();
+                            }
+                            break;
+                        } else {
+                            buffsIter.remove();
+                        }
+                    }
+                    if (!buffsIter.hasNext()) {
+                        m_messagesWritten++;
+                        bytesWritten += m_sizeOfBuffToWrite;
+                    }
+                    bytesWritten += rc;
                 }
-                if (!buffsIter.hasNext()) {
-                    m_messagesWritten++;
-                    bytesWritten += m_sizeOfBuffToWrite;
-                }
-                bytesWritten += rc;
 
             } while (rc > 0);
         } finally {
