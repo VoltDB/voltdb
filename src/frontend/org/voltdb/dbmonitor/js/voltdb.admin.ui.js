@@ -435,11 +435,55 @@ function loadAdminPage() {
 
     $('#shutDownConfirmation').popup({
         open: function (event, ui, ele) {
+            var isProVersion = false;
+            voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
+                if (deploymentDetails != undefined) {
+                    var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                    if (clusterDetails != undefined && clusterDetails.LICENSE != undefined) {
+                        licenseInfo = clusterDetails.LICENSE;
+                        if (licenseInfo != undefined && licenseInfo != "") {
+                            isProVersion = true;
+                        }
+                    }
+                }
+                var htmlResult = '';
+
+                if(isProVersion){
+                    htmlResult += '<label>Save Snapshot:</label>' +
+                                '&nbsp <input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>';
+                }
+
+                htmlResult += '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
+                    '<p id="shutdownWarningMsg" style="display:none">Any data not saved to a ' +
+                    '<span id="shutdownIntMsg" style="display:none"></span> will be lost.</p>' +
+                    '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
+
+                $('#divSaveSnapshot').html(htmlResult);
+
+                $('#chkSaveSnaps').iCheck({
+                    checkboxClass: 'icheckbox_square-aero customCheckbox',
+                    increaseArea: '20%'
+                });
+
+                $("#chkSaveSnaps").unbind("ifChanged");
+                $('#chkSaveSnaps').on('ifChanged', function () {
+                    showHideIntSnapshotMsg()
+                });
+
+                voltDbRenderer.GetCommandLogStatus(function (commandLogStatus) {
+                    VoltDbAdminConfig.isCommandLogEnabled = commandLogStatus;
+                    showHideIntSnapshotMsg()
+                });
+
+            });
+
+
         },
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnShutdownConfirmationOk").unbind("click");
             $("#btnShutdownConfirmationOk").on("click", function () {
+                VoltDbAdminConfig.isSaveSnapshot = $('#chkSaveSnaps').is(":checked");
                 $("#btnPrepareShutdown").trigger("click")
                 $(".popup_close").hide();
                 //Close the popup
@@ -492,7 +536,9 @@ function loadAdminPage() {
     }
 
     var serverShutdown = function(popup){
-        voltDbRenderer.prepareShutdownCluster(function (status) {
+        showHideShutdownErrMsg(true);
+        displayShutdownStatus("liPrepareShutdown", "load")
+        voltDbRenderer.prepareShutdownCluster(function (prepare_status) {
             console.log("Preparing for shutdown.");
             displayShutdownStatus("liPrepareShutdown", "load");
             displayShutdownStatus("liQueueExpData", "normal");
@@ -501,7 +547,9 @@ function loadAdminPage() {
             displayShutdownStatus("liCompleteOutstandingImp", "normal");
             displayShutdownStatus("liShutdownReady", "normal");
             showHideShutdownErrMsg(true);
-            if (status != 0) {
+            var status = prepare_status.status;
+            var zk_pause_txn_id =  prepare_status.zk_pause_txn_id;
+            if (status != 1) {
                 console.log("The preparation for shutdown failed with status: " + status + ".");
                 displayShutdownStatus("liPrepareShutdown", "failure");
                 showHideShutdownErrMsg(false, "The preparation for shutdown failed with status: " + status + ".")
@@ -543,7 +591,7 @@ function loadAdminPage() {
                                     if((drDetails["DrProducer"].partition_min == undefined || $.isEmptyObject(drDetails["DrProducer"].partition_min)) &&
                                         exportTableDetails["ExportTables"]["last_table_stat_time"] == 1){
                                         // there are no outstanding export or dr transactions
-                                        continueShutdown(popup)
+                                        continueShutdown(popup, zk_pause_txn_id)
                                         return
                                     }
                                     // after 10 seconds notify admin of what transactions have not drained
@@ -566,7 +614,7 @@ function loadAdminPage() {
                                                                                   drDetails["DrProducer"].partition_min_host, notifyInterval);
                                                         if(result){
                                                             clearInterval(setDrExpInterval)
-                                                            continueShutdown(popup)
+                                                            continueShutdown(popup, zk_pause_txn_id)
                                                             return;
                                                         }
                                                     }, exportTableDetails);
@@ -578,7 +626,7 @@ function loadAdminPage() {
                                                                               drDetails["DrProducer"].partition_min_host, notifyInterval);
                                                     if(result){
                                                         clearInterval(setDrExpInterval)
-                                                        continueShutdown(popup)
+                                                        continueShutdown(popup, zk_pause_txn_id)
                                                         return;
                                                     }
                                                 }
@@ -595,7 +643,7 @@ function loadAdminPage() {
                                                                      drDetails["DrProducer"].partition_min_host, notifyInterval);
                                                     if(result){
                                                         clearInterval(setDrExpInterval)
-                                                        continueShutdown(popup)
+                                                        continueShutdown(popup, zk_pause_txn_id)
                                                         return;
                                                     }
                                                 });
@@ -607,7 +655,7 @@ function loadAdminPage() {
                                                                  drDetails["DrProducer"].partition_min_host, notifyInterval);
                                                 if(result){
                                                     clearInterval(setDrExpInterval)
-                                                    continueShutdown(popup)
+                                                    continueShutdown(popup, zk_pause_txn_id)
                                                     return;
                                                 }
                                             }
@@ -633,7 +681,7 @@ function loadAdminPage() {
     var isClientTransFinish = false;
     var isImportRequestFinish = false
 
-    var continueShutdown = function(popup){
+    var continueShutdown = function(popup, zk_pause_txn_id){
         displayShutdownStatus("liCompleteOutstandingExpDr", "ok")
         console.log('All export and DR transactions have been processed.')
         isClientTransFinish = false;
@@ -655,17 +703,31 @@ function loadAdminPage() {
                             window.clearInterval(VoltDbUI.connectionTimeInterval);
                         }, 10000);
                         $(".popup_close").show();
-                        voltDbRenderer.shutdownCluster(function (success) {
-                            if (!success) {
-                                clearTimeout(shutdownTimeout);
-                                console.log("Unable to shutdown cluster.");
-                                displayShutdownStatus("liShutdownReady", "failure");
-                                showHideShutdownErrMsg(false, "Unable to shutdown cluster.")
-                                $(".popup_close").show();
-                            }
-                            $("#overlay").hide();
+                        if(VoltDbAdminConfig.isSaveSnapshot){
+                            voltDbRenderer.shutdownCluster(function (success) {
+                                if (!success) {
+                                    clearTimeout(shutdownTimeout);
+                                    console.log("Unable to shutdown cluster.");
+                                    displayShutdownStatus("liShutdownReady", "failure");
+                                    showHideShutdownErrMsg(false, "Unable to shutdown cluster.")
+                                    $(".popup_close").show();
+                                }
+                                $("#overlay").hide();
 
-                        });
+                            }, zk_pause_txn_id);
+                        } else {
+                            voltDbRenderer.shutdownCluster(function (success) {
+                                if (!success) {
+                                    clearTimeout(shutdownTimeout);
+                                    console.log("Unable to shutdown cluster.");
+                                    displayShutdownStatus("liShutdownReady", "failure");
+                                    showHideShutdownErrMsg(false, "Unable to shutdown cluster.")
+                                    $(".popup_close").show();
+                                }
+                                $("#overlay").hide();
+
+                            });
+                        }
                     }
                 },2000)
             }
@@ -4371,12 +4433,42 @@ function loadAdminPage() {
         "Username already exists."
     );
 
+    showHideIntSnapshotMsg = function(){
+        var result = $('#chkSaveSnaps').is(":checked");
+        if(result && $('#chkSaveSnaps').is(':visible')){
+            if(!VoltDbAdminConfig.isCommandLogEnabled){
+                $('#shutdownIntMsg').html('command log');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }else{
+                $('#shutdownWarningMsg').hide()
+                $('#continueShutdownMsg').hide()
+                $('#shutdownIntMsg').hide()
+            }
+        } else {
+            if(!VoltDbAdminConfig.isCommandLogEnabled){
+                $('#shutdownIntMsg').html('snapshot and command log');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }else{
+                $('#shutdownIntMsg').html('snapshot');
+                $('#continueShutdownMsg').show()
+                $('#shutdownWarningMsg').show()
+                $('#shutdownIntMsg').show()
+            }
+        }
+
+    }
+
 }
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
 
         var currentRawAdminConfigurations;
+        this.isCommandLogEnabled = false;
         this.isAdmin = false;
         this.registeredElements = [];
         this.servers = [];
@@ -4420,6 +4512,7 @@ function loadAdminPage() {
         this.isImportConfigLoading = false;
         this.orgTypeValue = "";
         this.exportTypes = [];
+        this.isSaveSnapshot = false;
 
         this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
             this.hostId = hostIdvalue;
@@ -4493,6 +4586,7 @@ function loadAdminPage() {
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != null ? "Copies" : "");
             adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminEditObjects.tBoxFilePrefixValue = adminConfigValues.filePrefix;
+            VoltDbAdminConfig.isCommandLogEnabled = adminConfigValues.commandLogEnabled;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != null ? adminConfigValues.commandLogFrequencyTime : "");
