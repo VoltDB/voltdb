@@ -50,7 +50,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     private boolean m_debugging_set_this_to_retry_failures = false;
 
     @Before
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
