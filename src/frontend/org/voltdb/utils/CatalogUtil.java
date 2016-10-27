@@ -134,7 +134,7 @@ import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -1069,15 +1069,16 @@ public abstract class CatalogUtil {
                 .build();
     }
 
-    public final static Map<String,String> asPathSettingsMap(DeploymentType depl) {
+    public final static Map<String,String> asNodeSettingsMap(DeploymentType depl) {
         PathsType paths = depl.getPaths();
         return ImmutableMap.<String,String>builder()
-                .put(PathSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
-                .put(PathSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
-                .put(PathSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
-                .put(PathSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
-                .put(PathSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
-                .put(PathSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
+                .put(NodeSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
+                .put(NodeSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
+                .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
+                .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
+                .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
                 .build();
     }
 

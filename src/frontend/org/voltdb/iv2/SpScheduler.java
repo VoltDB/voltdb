@@ -169,7 +169,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
@@ -415,10 +415,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
-    }
-
-    private long getMaxTaskedSpHandle() {
-        return m_pendingTasks.getMaxTaskedSpHandle();
     }
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
