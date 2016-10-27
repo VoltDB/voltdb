@@ -125,6 +125,9 @@ public class VoltZK {
     // Cluster settings
     public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
 
+    // Shutdown save snapshot guard
+    public static final String shutdown_save_guard = "/db/shutdown_save_guard";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,

@@ -34,11 +34,10 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.base.Supplier;
 
 public class TestAdHocPlans extends AdHocQueryTester {
 
@@ -53,8 +52,10 @@ public class TestAdHocPlans extends AdHocQueryTester {
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        Supplier<ClusterSettings> settings = config.asClusterSettings().asSupplier();
-        CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0);
+        DbSettings dbSettings = new DbSettings(
+                config.asClusterSettings().asSupplier(),
+                NodeSettings.create(config.asPathSettingsMap()));
+        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 

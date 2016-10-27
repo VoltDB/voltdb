@@ -404,7 +404,7 @@
 
                 
 			    // If modal isn't specified, bind click event
-				if (!p.o.modal && p.ele.id != "loginLink" && p.ele.id != "conPopup" && p.ele.id != "serUnavailablePopup") {
+				if (!p.o.modal && p.ele.id != "loginLink" && p.ele.id != "conPopup" && p.ele.id != "btnPrepareShutdown" && p.ele.id != "serUnavailablePopup") {
 
 					$back.one('click.popup', function(){
 						p.close();

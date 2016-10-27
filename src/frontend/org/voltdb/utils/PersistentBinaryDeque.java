@@ -137,10 +137,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
         @Override
         public int getNumObjects() throws IOException {
-            if (m_closed) {
-                throw new IOException("Reader " + m_cursorId + " has been closed");
+            synchronized(PersistentBinaryDeque.this) {
+                if (m_closed) {
+                    throw new IOException("Reader " + m_cursorId + " has been closed");
+                }
+                return m_numObjects - m_numObjectsDeleted - m_numRead;
             }
-            return m_numObjects - m_numObjectsDeleted - m_numRead;
         }
 
         /*
@@ -244,13 +246,13 @@ public class PersistentBinaryDeque implements BinaryDeque {
     private final File m_path;
     private final String m_nonce;
     private boolean m_initializedFromExistingFiles = false;
+    private boolean m_awaitingTruncation = false;
 
     //Segments that are no longer being written to and can be polled
     //These segments are "immutable". They will not be modified until deletion
     private final TreeMap<Long, PBDSegment> m_segments = new TreeMap<>();
     private volatile boolean m_closed = false;
     private final HashMap<String, ReadCursor> m_readCursors = new HashMap<>();
-    private RandomAccessFile m_cursorsWriter;
     private int m_numObjects;
     private int m_numDeleted;
 
@@ -390,8 +392,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         writeSegment.openForWrite(true);
 
         m_numObjects = countNumObjects();
-        // load saved cursors
-        readCursorFile(new File(m_path, m_nonce + ".pbd.cursors"));
         assertions();
     }
 
@@ -402,21 +402,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         return numObjects;
-    }
-
-    private void readCursorFile(File file) {
-        try {
-            m_cursorsWriter = new RandomAccessFile(file, "rwd");
-            String cursorId = null;
-            while ((cursorId=m_cursorsWriter.readUTF()) != null) {
-                m_readCursors.put(cursorId, new ReadCursor(cursorId, m_numDeleted));
-                m_cursorsWriter.readUTF();
-            }
-        } catch(EOFException e) {
-            // Nothing to read
-        } catch(IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override
@@ -687,15 +672,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (reader == null) {
             reader = new ReadCursor(cursorId, m_numDeleted);
             m_readCursors.put(cursorId, reader);
-            persistCursor(cursorId);
         }
 
         return reader;
-    }
-
-    private void persistCursor(String cursorId) throws IOException {
-        m_cursorsWriter.writeUTF(cursorId);
-        m_cursorsWriter.writeUTF(System.getProperty("line.separator"));
     }
 
     private boolean canDeleteSegment(PBDSegment segment) throws IOException {
@@ -739,7 +718,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         for (PBDSegment segment : m_segments.values()) {
             segment.close();
         }
-        m_cursorsWriter.close();
         m_closed = true;
     }
 
@@ -815,7 +793,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public int getNumObjects() throws IOException {
+    public synchronized int getNumObjects() throws IOException {
         int numObjects = 0;
         for (PBDSegment segment : m_segments.values()) {
             numObjects += segment.getNumEntries();
@@ -864,5 +842,15 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         return numOpen;
+    }
+
+    public boolean isAwaitingTruncation()
+    {
+        return m_awaitingTruncation;
+    }
+
+    public void setAwaitingTruncation(boolean m_awaitingTruncation)
+    {
+        this.m_awaitingTruncation = m_awaitingTruncation;
     }
 }

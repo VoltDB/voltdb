@@ -545,13 +545,6 @@ $(document).ready(function () {
         }
     });
 
-    // Implements Scroll in Server List div
-    //$('#tabScroller').slimscroll({
-    //    disableFadeOut: true,
-    //    alwaysVisible: true,
-    //    railVisible: true,
-    //    height: '225px'
-    //});
     $tabs = $("#worktabs").tabs();
 
     if(localStorage.queries == undefined || localStorage.queries == '{}')

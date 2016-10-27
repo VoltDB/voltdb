@@ -102,11 +102,12 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
     }
     allocateMinMaxSearchKeyTuple();
 
-    m_fallbackExecutorVectors.clear();
-    m_usePlanForAgg.clear();
+    m_fallbackExecutorVectors.resize(fallbackQueryStmts.size());
+    m_usePlanForAgg.resize(fallbackQueryStmts.size(), false);
     VoltDBEngine* engine = ExecutorContext::getEngine();
     int idx = 0;
     BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
+        int key = std::stoi(labeledStatement.first);
         catalog::Statement *stmt = labeledStatement.second;
         const string& b64plan = stmt->fragments().begin()->second->plannodetree();
         const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
@@ -114,7 +115,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
         boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
         // We don't need the send executor.
         execVec->getRidOfSendExecutor();
-        m_fallbackExecutorVectors.push_back(execVec);
+        m_fallbackExecutorVectors[key] = execVec;
 
         /* Decide if we should use the plan or still stick to the hard coded function. -- yzhang
          * For now, we only use the plan to refresh the materialzied view when:
@@ -143,7 +144,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
                 usePlanForAgg = true;
             }
         }
-        m_usePlanForAgg.push_back(usePlanForAgg);
+        m_usePlanForAgg[key] = usePlanForAgg;
 
 #ifdef VOLT_TRACE_ENABLED
         if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
@@ -361,7 +362,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     params[colindex] = oldValue;
     // executing the stored plan.
     vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
-    Table *tbl = context->executeExecutors(executorList, 0);
+    UniqueTempTableResult tbl = context->executeExecutors(executorList, 0);
     assert(tbl);
     // get the fallback value from the returned table.
     TableIterator iterator = tbl->iterator();
@@ -379,7 +380,6 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
         params[colindex] = backups[colindex];
     }
-    context->cleanupExecutorsForSubquery(executorList);
     return newVal;
 }
 

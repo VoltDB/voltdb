@@ -70,7 +70,8 @@ public class StoredProcedureInvocation implements JSONString {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
-    private int batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+    private int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+    private boolean m_allPartition = false;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -89,7 +90,8 @@ public class StoredProcedureInvocation implements JSONString {
             copy.serializedParams = null;
         }
 
-        copy.batchTimeout = batchTimeout;
+        copy.m_batchTimeout = m_batchTimeout;
+        copy.m_allPartition = m_allPartition;
 
         return copy;
     }
@@ -167,6 +169,22 @@ public class StoredProcedureInvocation implements JSONString {
         return clientHandle;
     }
 
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    public void setBatchTimeout(int timeout) {
+        m_batchTimeout = timeout;
+    }
+
+    public void setAllPartition(boolean allPartition) {
+        m_allPartition = allPartition;
+    }
+
+    public boolean getAllPartition() {
+        return m_allPartition;
+    }
+
     /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
@@ -191,10 +209,40 @@ public class StoredProcedureInvocation implements JSONString {
      */
     public int getSerializedSize()
     {
-        // get batch extension size
+        // get extension sizes - if not present, size is 0 for each
         // 6 is one byte for ext type, one for size, and 4 for integer value
-        int batchExtensionSize = batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
+        int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
+        // 2 is one byte for ext type, one for size
+        int allPartitionExtensionSize = m_allPartition ? 2 : 0;
 
+        // compute the size
+        int size =
+            1 + // type
+            4 + getProcNameBytes().length + // procname
+            8 + // client handle
+            1 + // extension count
+            batchExtensionSize + allPartitionExtensionSize + // extensions
+            getSerializedParamSize(); // parameters
+        assert(size > 0); // sanity
+
+        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
+        return size;
+    }
+
+    /**
+     * Get the serialized size of this SPI in the original serialization version.
+     * This is currently used by DR.
+     */
+    public int getSerializedSizeForOriginalVersion()
+    {
+        return (1 + // type
+                4 + getProcNameBytes().length + // procname
+                8 + // client handle
+                getSerializedParamSize());
+    }
+
+    private int getSerializedParamSize()
+    {
         // get params size
         int serializedParamSize = 0;
         if (serializedParams != null) {
@@ -206,38 +254,27 @@ public class StoredProcedureInvocation implements JSONString {
             serializedParamSize = pset.getSerializedSize();
             if ((pset.size() > 0) && (serializedParamSize <= 2)) {
                 throw new IllegalStateException(String.format("Parameter set for invocation " +
-                        "%s doesn't have the proper size (currently = %s)",
-                        getProcName(), serializedParamSize));
+                                                              "%s doesn't have the proper size (currently = %s)",
+                                                              getProcName(), serializedParamSize));
             }
         }
         else {
             // illegal state
             throw new IllegalStateException("StoredProcedureInvocation instance params in invalid state.");
         }
-
-        // compute the size
-        int size =
-            1 + // type
-            4 + getProcNameBytes().length + // procname
-            8 + // client handle
-            1 + // extension count
-            batchExtensionSize + // timeout ext
-            serializedParamSize; // parameters
-        assert(size > 0); // sanity
-
-        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
-        return size;
+        return serializedParamSize;
     }
 
     /**
-     * Hack for SyncSnapshotBuffer.
+     * Hack for SyncSnapshotBuffer. Note that this is using the ORIGINAL (version 0) serialization format.
      * Moved to this file from that one so you might see it sooner than I did.
      * If you change the serialization, you have to change this too.
      */
     public static int getLoadVoltTablesMagicSeriazlizedSize(Table catTable, boolean isPartitioned) {
 
         // code below is used to compute the right value slowly
-        /*StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        /*
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@LoadVoltTableSP");
         if (isPartitioned) {
             spi.setParams(0, catTable.getTypeName(), null);
@@ -245,15 +282,17 @@ public class StoredProcedureInvocation implements JSONString {
         else {
             spi.setParams(0, catTable.getTypeName(), null);
         }
-        int size = spi.getSerializedSize() + 4;
+        int size = spi.getSerializedSizeForOriginalVersion() + 4;
         int realSize = size - catTable.getTypeName().getBytes(Constants.UTF8ENCODING).length;
         System.err.printf("@LoadVoltTable** padding size: %d or %d\n", size, realSize);
-        return size;*/
+        return size;
+        */
 
         // Magic size of @LoadVoltTable* StoredProcedureInvocation
         int tableNameLengthInBytes =
                 catTable.getTypeName().getBytes(Constants.UTF8ENCODING).length;
-        int metadataSize = 42 + tableNameLengthInBytes;
+        int metadataSize = 41 + // serialized size for original version
+                           tableNameLengthInBytes;
         if (isPartitioned) {
             metadataSize += 5;
         }
@@ -274,15 +313,51 @@ public class StoredProcedureInvocation implements JSONString {
 
         buf.putLong(clientHandle);
 
-        // there is one possible extension
-        if (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
-            buf.put((byte) 0);
+        // there are two possible extensions, count which apply
+        byte extensionCount = 0;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
+        if (m_allPartition) ++extensionCount;
+        // write the count as one byte
+        buf.put(extensionCount);
+        // write any extensions that apply
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, m_batchTimeout);
         }
-        else {
-            buf.put((byte) 1);
-            ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, batchTimeout);
+        if (m_allPartition) {
+            ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
         }
 
+        serializeParams(buf);
+
+        int len = buf.position() - startPosition;
+        assert(len == getSerializedSize());
+    }
+
+    /**
+     * Serializes this SPI in the original serialization version.
+     * This is currently used by DR.
+     */
+    public void flattenToBufferForOriginalVersion(ByteBuffer buf) throws IOException
+    {
+        assert((params != null) || (serializedParams != null));
+
+        // for self-check assertion
+        int startPosition = buf.position();
+
+        buf.put(ProcedureInvocationType.ORIGINAL.getValue());
+
+        SerializationHelper.writeVarbinary(getProcNameBytes(), buf);
+
+        buf.putLong(clientHandle);
+
+        serializeParams(buf);
+
+        int len = buf.position() - startPosition;
+        assert(len == getSerializedSizeForOriginalVersion());
+    }
+
+    private void serializeParams(ByteBuffer buf) throws IOException
+    {
         if (serializedParams != null)
         {
             if (serializedParams.hasArray())
@@ -313,9 +388,6 @@ public class StoredProcedureInvocation implements JSONString {
                 throw e;
             }
         }
-
-        int len = buf.position() - startPosition;
-        assert(len == getSerializedSize());
     }
 
     public void initFromBuffer(ByteBuffer buf) throws IOException
@@ -324,6 +396,9 @@ public class StoredProcedureInvocation implements JSONString {
         // this will throw for an unexpected type, like the DRv1 type, for example
         type = ProcedureInvocationType.typeFromByte(version);
         m_procNameBytes = null;
+        // set these to defaults so old versions don't worry about them
+        m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+        m_allPartition = false;
 
         switch (type) {
             case ORIGINAL:
@@ -336,9 +411,6 @@ public class StoredProcedureInvocation implements JSONString {
                 initVersion2FromBuffer(buf);
                 break;
         }
-
-        // ensure extension count is correct
-        setBatchTimeout(batchTimeout);
     }
 
     private void initOriginalFromBuffer(ByteBuffer buf) throws IOException {
@@ -365,13 +437,13 @@ public class StoredProcedureInvocation implements JSONString {
     private void initVersion1FromBuffer(ByteBuffer buf) throws IOException {
         BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(buf.get());
         if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
-            batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+            m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
         } else {
-            batchTimeout = buf.getInt();
+            m_batchTimeout = buf.getInt();
             // Client side have already checked the batchTimeout value, but,
             // on server side, we should check non-negative batchTimeout value again
             // in case of someone is using a non-standard client.
-            if (batchTimeout < 0) {
+            if (m_batchTimeout < 0) {
                 throw new IllegalArgumentException("Timeout value can't be negative." );
             }
         }
@@ -393,7 +465,7 @@ public class StoredProcedureInvocation implements JSONString {
         clientHandle = buf.getLong();
 
         // default values for extensions
-        batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+        m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
         // read any invocation extensions and skip any we don't recognize
         int extensionCount = buf.get();
 
@@ -410,7 +482,11 @@ public class StoredProcedureInvocation implements JSONString {
             final byte type = ProcedureInvocationExtensions.readNextType(buf);
             switch (type) {
             case ProcedureInvocationExtensions.BATCH_TIMEOUT:
-                batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
+                m_batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
+                break;
+            case ProcedureInvocationExtensions.ALL_PARTITION:
+                // note this always returns true as it's just a flag
+                m_allPartition = ProcedureInvocationExtensions.readAllPartition(buf);
                 break;
             default:
                 ProcedureInvocationExtensions.skipUnknownExtension(buf);
@@ -441,7 +517,7 @@ public class StoredProcedureInvocation implements JSONString {
             retval += "null";
         retval += ")";
         retval += " type=" + String.valueOf(type);
-        retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(batchTimeout);
+        retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(m_batchTimeout);
         retval += " clientHandle=" + String.valueOf(clientHandle);
 
         return retval;
@@ -492,13 +568,5 @@ public class StoredProcedureInvocation implements JSONString {
             throw new RuntimeException("Failed to serialize an invocation to JSON.", e);
         }
         return js.toString();
-    }
-
-    public int getBatchTimeout() {
-        return batchTimeout;
-    }
-
-    public void setBatchTimeout(int timeout) {
-        batchTimeout = timeout;
     }
 }

@@ -126,13 +126,13 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 
-Table* ExecutorContext::executeExecutors(int subqueryId)
+UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     return executeExecutors(executorList, subqueryId);
 }
 
-Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
                                          int subqueryId)
 {
     // Walk through the list and execute each plannode.
@@ -185,7 +185,15 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         }
         throw;
     }
-    return executorList[ttl-1]->getPlanNode()->getOutputTable();
+
+    // Cleanup all but the temp table produced by the last executor.
+    // The last temp table is the result which the caller may care about.
+    for (int i = 0; i < executorList.size() - 1; ++i) {
+        executorList[i]->cleanupTempOutputTable();
+    }
+
+    TempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    return UniqueTempTableResult(result);
 }
 
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
@@ -285,6 +293,12 @@ void ExecutorContext::checkTransactionForDR() {
                 }
             }
         }
+    }
+}
+
+void TempTableTupleDeleter::operator()(TempTable* tbl) const {
+    if (tbl != NULL) {
+        tbl->deleteAllTempTuples();
     }
 }
 

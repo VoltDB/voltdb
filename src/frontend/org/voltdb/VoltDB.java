@@ -48,7 +48,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -83,11 +83,12 @@ public class VoltDB {
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
+    public static final String TERMINUS_MARKER = ".shutdown_snapshot";
     public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
-    public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
+    public static final String MODULE_CACHE = ".bundles-cache";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -295,6 +296,9 @@ public class VoltDB {
         /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
 
+        /** not sites per host actually, number of local sites in this node */
+        public int m_sitesperhost = UNDEFINED;
+
         /** allow elastic joins */
         public boolean m_enableAdd = false;
 
@@ -442,6 +446,8 @@ public class VoltDB {
                     m_meshBrokers = sbld.toString();
                 } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
+                } else if (arg.equals("sitesperhost")){
+                    m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {
@@ -614,10 +620,6 @@ public class VoltDB {
                 }
             }
 
-            if (!m_publicInterface.isEmpty()) {
-                m_httpPortInterface = m_publicInterface;
-            }
-
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -692,7 +694,13 @@ public class VoltDB {
         public Map<String,String> asPathSettingsMap() {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
-                    .put(PathSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
+        public Map<String, String> asNodeSettingsMap() {
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_sitesperhost))
                     .build();
         }
 
@@ -704,8 +712,9 @@ public class VoltDB {
             return ImmutableList.<File>builder()
                     .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
                     .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.CONFIG_DIR))
+                    .add(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR))
                     .add(new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.TERMINUS_MARKER))
                     .build();
         }
 
@@ -715,7 +724,7 @@ public class VoltDB {
         private void checkInitializationMarker() {
 
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
+            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
             File configCFH = null;
             File optCFH = null;
 

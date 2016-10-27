@@ -44,6 +44,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractExpression.MVUnsafeOperators;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -172,7 +173,11 @@ public class MaterializedViewProcessor {
                 pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
                 pkConstraint.setIndex(pkIndex);
             }
-
+            // If we have an unsafe MV message, then
+            // remember it here.  We don't really know how
+            // to transfer the message through the catalog, but
+            // we can transmit the existence of the message.
+            boolean isSafeForNonemptyTables = (stmt.getUnsafeMVMessage() == null);
             // Here the code path diverges for different kinds of views (single table view and joined table view)
             if (isMultiTableView) {
                 // Materialized view on joined tables
@@ -240,6 +245,7 @@ public class MaterializedViewProcessor {
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
                 }
+                mvHandlerInfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
             }
             else { // =======================================================================================
                 // Materialized view on single table
@@ -374,6 +380,7 @@ public class MaterializedViewProcessor {
                     destTable.setIsreplicated(false);
                     setGroupedTablePartitionColumn(matviewinfo, srcTable.getPartitioncolumn());
                 }
+                matviewinfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
             } // end if single table view materialized view.
         }
     }
@@ -459,14 +466,19 @@ public class MaterializedViewProcessor {
      * @param stmt The output from the parser describing the select statement that creates the view.
      * @throws VoltCompilerException
      */
+
     private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
         StringBuffer msg = new StringBuffer();
         msg.append("Materialized view \"" + viewName + "\" ");
 
-        List <AbstractExpression> checkExpressions = new ArrayList<>();
+        if (stmt.getParameters().length > 0) {
+            msg.append("contains placeholders (?), which are not allowed in the SELECT query for a view.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
 
+        List <AbstractExpression> checkExpressions = new ArrayList<>();
         int i;
         // First, check the group by columns.  They are at
         // the beginning of the display list.
@@ -484,8 +496,9 @@ public class MaterializedViewProcessor {
                 msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
                 throw m_compiler.new VoltCompilerException(msg.toString());
             }
+
             // collect all the expressions and we will check
-            // for other gaurds on all of them together
+            // for other guards on all of them together
             checkExpressions.add(outcol.expression);
         }
 
@@ -541,6 +554,17 @@ public class MaterializedViewProcessor {
         }
 
         // Check some other materialized view specific things.
+        //
+        // Check to see if the expression is safe for creating
+        // views on nonempty tables.
+        MVUnsafeOperators unsafeOps = new MVUnsafeOperators();
+        for (AbstractExpression expr : checkExpressions) {
+            expr.findNonemptyMVSafeOperations(unsafeOps);
+        }
+        if (unsafeOps.isUnsafe()) {
+            stmt.setUnsafeMVMessage(unsafeOps.toString());
+        }
+
         if (stmt.hasSubquery()) {
             msg.append("with subquery sources is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
@@ -560,7 +584,7 @@ public class MaterializedViewProcessor {
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
-        if (stmt.m_having != null) {
+        if (stmt.getHavingPredicate() != null) {
             msg.append("with HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -664,6 +688,7 @@ public class MaterializedViewProcessor {
                           null, // no user-supplied join order
                           DeterminismMode.FASTER,
                           StatementPartitioning.inferPartitioning());
+
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
@@ -761,7 +786,7 @@ public class MaterializedViewProcessor {
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
             Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr) {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+        StmtTableScan tableScan = new StmtTargetTableScan(srcTable);
 
         // Candidate index. If we can find an index covering both group-by columns and aggExpr (optimal) then we will
         // return immediately.
@@ -1020,5 +1045,19 @@ public class MaterializedViewProcessor {
         // If the last part of the index does not match the MIN/MAX expression
         // this is not the optimal index candidate for now
         return false;
+    }
+
+    /**
+     * If the argument table is a single-table materialized view,
+     * then return the attendant MaterializedViewInfo object.  Otherwise
+     * return null.
+     */
+    public static MaterializedViewInfo getMaterializedViewInfo(Table tbl) {
+        MaterializedViewInfo mvInfo = null;
+        Table source = tbl.getMaterializer();
+        if (source != null) {
+            mvInfo = source.getViews().get(tbl.getTypeName());
+        }
+        return mvInfo;
     }
 }

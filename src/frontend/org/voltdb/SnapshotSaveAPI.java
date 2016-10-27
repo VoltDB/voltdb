@@ -47,6 +47,7 @@ import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -54,7 +55,6 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -115,7 +115,6 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
-        final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
             try {
@@ -174,7 +173,7 @@ public class SnapshotSaveAPI
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds);
+                            remoteDataCenterLastIds, finalJsData);
                     createSetupIv2(
                             file_path,
                             pathType,
@@ -194,6 +193,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
+            final int numLocalSites = context.getLocalSitesCount();
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)

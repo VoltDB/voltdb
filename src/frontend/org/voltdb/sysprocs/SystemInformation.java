@@ -53,6 +53,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
@@ -129,7 +130,8 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
-                result = populateDeploymentProperties(context.getCluster(), context.getDatabase(), m_settings);
+                result = populateDeploymentProperties(context.getCluster(),
+                        context.getDatabase(), m_clusterSettings, m_nodeSettings);
             }
             else
             {
@@ -449,7 +451,10 @@ public class SystemInformation extends VoltSystemProcedure
     }
 
     static public VoltTable populateDeploymentProperties(
-            Cluster cluster, Database database, ClusterSettings clusterSettings)
+            Cluster cluster,
+            Database database,
+            ClusterSettings clusterSettings,
+            NodeSettings nodeSettings)
     {
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
@@ -459,7 +464,7 @@ public class SystemInformation extends VoltSystemProcedure
         Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(clusterSettings.hostcount()));
         results.addRow("kfactor", Integer.toString(deploy.getKfactor()));
-        results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
+        results.addRow("sitesperhost", Integer.toString(nodeSettings.getLocalSitesCount()));
 
         String http_enabled = "false";
         int http_port = VoltDB.instance().getConfig().m_httpPort;

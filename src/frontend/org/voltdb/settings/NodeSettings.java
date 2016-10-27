@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 
 import org.aeonbits.owner.Config.Sources;
 import org.aeonbits.owner.ConfigFactory;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
@@ -41,7 +41,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 @Sources({"file:${org.voltdb.config.dir}/path.properties", "file:${org.voltdb.config.dir}/../.paths"})
-public interface PathSettings extends Settings {
+public interface NodeSettings extends Settings {
 
     public final static String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";
     public final static String CL_PATH_KEY = "org.voltdb.path.command_log";
@@ -49,6 +49,7 @@ public interface PathSettings extends Settings {
     public final static String VOLTDBROOT_PATH_KEY = "org.voltdb.path.voltdbroot";
     public final static String EXPORT_OVERFLOW_PATH_KEY = "org.voltdb.path.export_overflow";
     public final static String DR_OVERFLOW_PATH_KEY = "org.voltdb.path.dr_overflow";
+    public final static String LOCAL_SITES_COUNT_KEY = "org.voltdb.local_sites_count";
 
     @Key(VOLTDBROOT_PATH_KEY)
     public VoltFile getVoltDBRoot();
@@ -68,8 +69,12 @@ public interface PathSettings extends Settings {
     @Key(DR_OVERFLOW_PATH_KEY)
     public File getDROverflow();
 
-    public static PathSettings create(Map<?, ?>...imports) {
-        return ConfigFactory.create(PathSettings.class, imports);
+    @Key(LOCAL_SITES_COUNT_KEY)
+    @DefaultValue("8")
+    public int getLocalSitesCount();
+
+    public static NodeSettings create(Map<?, ?>...imports) {
+        return ConfigFactory.create(NodeSettings.class, imports);
     }
 
     default File resolve(File path) {
@@ -132,7 +137,7 @@ public interface PathSettings extends Settings {
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
-        File configDH = resolve(new File(VoltDB.CONFIG_DIR));
+        File configDH = resolve(new File(Constants.CONFIG_DIR));
         File logDH = resolve(new File("log"));
         for (File path: managedArtifactsPaths.values()) {
             if (!path.exists() && !path.mkdirs()) {
@@ -181,6 +186,7 @@ public interface PathSettings extends Settings {
             for (Map.Entry<String, File> e: getManagedArtifactPaths().entrySet()) {
                 mb.put(e.getKey(), e.getValue().getCanonicalPath());
             }
+            mb.put(LOCAL_SITES_COUNT_KEY, Integer.toString(getLocalSitesCount()));
         } catch (IOException e) {
             throw new SettingsException("failed to canonicalize" + this);
         }

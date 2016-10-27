@@ -3521,6 +3521,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    public void testMultiSignatureFunctionInStoredProcedure() throws Exception {
+        // ENG-10939
+        System.out.println("STARTING testMultiSignatureFunctionInStoredProcedure");
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("TEST_SUBSTRING_INPROC", 12, "string");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -4044,6 +4052,8 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
+
+        project.addStmtProcedure("TEST_SUBSTRING_INPROC", "SELECT * FROM INLINED_VC_VB_TABLE WHERE ABS(?) > 1 AND SUBSTRING(CAST(? AS VARCHAR),1,3) = 'str';");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

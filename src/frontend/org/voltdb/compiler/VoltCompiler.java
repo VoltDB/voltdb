@@ -676,7 +676,10 @@ public class VoltCompiler {
             Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
             int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
             int kfactor = deployment != null ? deployment.getKfactor() : 0;
-            int sitesPerHost = deployment != null ? deployment.getSitesperhost() : 8;
+            int sitesPerHost = 8;
+            if  (voltdb != null && voltdb.getCatalogContext() != null) {
+                sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
+            }
             boolean isPro = MiscUtils.isPro();
 
             long minHeapRqt = RealVoltDB.computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);

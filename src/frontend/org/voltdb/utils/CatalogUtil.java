@@ -133,7 +133,8 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -1068,24 +1069,25 @@ public abstract class CatalogUtil {
                 .build();
     }
 
-    public final static Map<String,String> asPathSettingsMap(DeploymentType depl) {
+    public final static Map<String,String> asNodeSettingsMap(DeploymentType depl) {
         PathsType paths = depl.getPaths();
         return ImmutableMap.<String,String>builder()
-                .put(PathSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
-                .put(PathSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
-                .put(PathSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
-                .put(PathSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
-                .put(PathSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
-                .put(PathSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.VOLTDBROOT_PATH_KEY, paths.getVoltdbroot().getPath())
+                .put(NodeSettings.CL_PATH_KEY, paths.getCommandlog().getPath())
+                .put(NodeSettings.CL_SNAPSHOT_PATH_KEY, paths.getCommandlogsnapshot().getPath())
+                .put(NodeSettings.SNAPTHOT_PATH_KEY, paths.getSnapshots().getPath())
+                .put(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, paths.getExportoverflow().getPath())
+                .put(NodeSettings.DR_OVERFLOW_PATH_KEY, paths.getDroverflow().getPath())
+                .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(depl.getCluster().getSitesperhost()))
                 .build();
     }
 
-    public final static ClusterSettings asClusterSettings(String deploymentURL) {
-        return asClusterSettings(parseDeployment(deploymentURL));
+    public final static DbSettings asDbSettings(String deploymentURL) {
+        return asDbSettings(parseDeployment(deploymentURL));
     }
 
-    public final static ClusterSettings asClusterSettings(DeploymentType depl) {
-        return ClusterSettings.create(asClusterSettingsMap(depl));
+    public final static DbSettings asDbSettings(DeploymentType depl) {
+        return new DbSettings(depl);
     }
 
     /**
@@ -1096,13 +1098,11 @@ public abstract class CatalogUtil {
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
-        int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
         Cluster catCluster = catalog.getClusters().get("cluster");
         // copy the deployment info that is currently not recorded anywhere else
         Deployment catDeploy = catCluster.getDeployment().get("deployment");
-        catDeploy.setSitesperhost(sitesPerHost);
         catDeploy.setKfactor(kFactor);
         // copy partition detection configuration from xml to catalog
         String defaultPPDPrefix = "partition_detection";
@@ -2499,7 +2499,7 @@ public abstract class CatalogUtil {
             // outdir
             PropertyType outdir = new PropertyType();
             outdir.setName("outdir");
-            outdir.setValue(VoltDB.instance().getVoltDBRootPath() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            outdir.setValue(DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
             // k-safe file export

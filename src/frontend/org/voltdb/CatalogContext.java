@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -36,11 +37,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-
-import com.google_voltpatches.common.base.Supplier;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -90,14 +91,14 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
-    // cluster settings
-    private final Supplier<ClusterSettings> m_clusterSettings;
+    // database settings. contains both cluster and path settings
+    private final DbSettings m_dbSettings;
 
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
-            Supplier<ClusterSettings> settings,
+            DbSettings settings,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
@@ -146,7 +147,7 @@ public class CatalogContext {
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
 
-        this.m_clusterSettings = settings;
+        this.m_dbSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
@@ -174,7 +175,11 @@ public class CatalogContext {
     }
 
     public ClusterSettings getClusterSettings() {
-        return m_clusterSettings.get();
+        return m_dbSettings.getCluster();
+    }
+
+    public NodeSettings getNodeSettings() {
+        return m_dbSettings.getNodeSetting();
     }
 
     public CatalogContext update(
@@ -210,7 +215,7 @@ public class CatalogContext {
                     txnId,
                     uniqueId,
                     newCatalog,
-                    this.m_clusterSettings,
+                    this.m_dbSettings,
                     bytes,
                     catalogBytesHash,
                     depbytes,
@@ -309,15 +314,20 @@ public class CatalogContext {
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
-        int hostCount = m_clusterSettings.get().hostcount();
-        int sitesPerHost = deployment.getSitesperhost();
+        int hostCount = m_dbSettings.getCluster().hostcount();
+        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
+        int totalSitesCount = 0;
+        for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+            totalSitesCount += e.getValue();
+        }
+        int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
         int kFactor = deployment.getKfactor();
         logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d sites per host. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, sitesPerHost, kFactor));
+                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
         int replicas = kFactor + 1;
-        int partitionCount = sitesPerHost * hostCount / replicas;
+        int partitionCount = totalSitesCount / replicas;
         logLines.put("deployment2",
                 String.format("The entire cluster has %d %s of%s %d logical partition%s.",
                 replicas,

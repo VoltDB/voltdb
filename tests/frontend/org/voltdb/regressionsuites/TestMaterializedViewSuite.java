@@ -29,8 +29,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -54,6 +52,8 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
+
+import junit.framework.Test;
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
@@ -330,8 +330,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("AggAges", 1).getResults();
         assertEquals(1, results.length);
         assertEquals(2, results[0].getRowCount());
-
-}
+    }
 
     private void subtestDeleteSinglePartition() throws IOException, ProcCallException
     {
@@ -1471,6 +1470,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1L, results[0].asScalarLong());
     }
 
+    private void insertRowAdHoc(Client client, String stmt) throws IOException, ProcCallException
+    {
+        VoltTable[] results = null;
+        results = client.callProcedure("@AdHoc", stmt).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1L, results[0].asScalarLong());
+    }
+
     private void deleteRow(Client client, Object... parameters) throws IOException, ProcCallException
     {
         VoltTable[] results = null;
@@ -1678,6 +1685,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         // -- 4 -- Test defining view after the data is loaded.
+        //         The test is crafted to include only safe operations.
         if (! isHSQL()) {
             System.out.println("Now testing view data catching-up.");
             try {
@@ -1688,15 +1696,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             }
             try {
                 client.callProcedure("@AdHoc",
-                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, SUMAMT, MINUNIT, MAXUNIT, ITEMCOUNT) AS " +
+                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, MINUNIT, MAXUNIT) AS " +
                     "SELECT " +
                         "CUSTOMERS.NAME, " +
                         "ORDERS.ORDER_ID, " +
                         "COUNT(*), " +
-                        "SUM(PRODUCTS.PRICE * ORDERITEMS.QTY), " +
                         "MIN(PRODUCTS.PRICE), " +
-                        "MAX(PRODUCTS.PRICE), " +
-                        "COUNT(ORDERITEMS.PID) " +
+                        "MAX(PRODUCTS.PRICE) " +
                     "FROM CUSTOMERS JOIN ORDERS ON CUSTOMERS.CUSTOMER_ID = ORDERS.CUSTOMER_ID " +
                                    "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
                                    "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
@@ -1749,7 +1755,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     private void truncateSourceTables(Client client, int rollback,
             int truncateTable1, int truncateTable2, int truncateTable3,
-            int truncateTable4) {
+            int truncateTable4)
+    {
         try {
             try {
                 VoltTable vt = client.callProcedure("TruncateTables", rollback,
@@ -2118,6 +2125,115 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
 
         assertEquals(numExc, 2);
+    }
+
+    public void testCreateViewWithParams() throws Exception {
+        Client client = getClient();
+
+        String expectedMsg = "Materialized view \"V\" contains placeholders \\(\\?\\), "
+                + "which are not allowed in the SELECT query for a view.";
+        verifyStmtFails(client,
+                "create view v as "
+                + "select t3.f5, count(*) "
+                + "FROM t3_eng_11119 as t3 INNER JOIN T1_eng_11119 as t1 "
+                + "ON T1.f1 = T3.f4 "
+                + "WHERE T3.f4 = ? "
+                + "group by t3.f5;",
+                expectedMsg);
+
+        verifyStmtFails(client,
+                "create view v as "
+                + "select t3.f5, count(*) "
+                + "FROM t3_eng_11119 as t3 "
+                + "WHERE T3.f4 = ? "
+                + "group by t3.f5;",
+                expectedMsg);
+    }
+
+    public void testEng11203() throws Exception {
+        // This test case has AdHoc DDL, so it cannot be ran in the HSQL backend.
+        if (! isHSQL()) {
+            Client client = getClient();
+            Object[][] initialRows = {{"ENG_11203_A", 1, 2, 4}, {"ENG_11203_B", 1, 2, 4}};
+            Object[][] secondRows = {{"ENG_11203_A", 6, 2, 4}, {"ENG_11203_B", 6, 2, 4}};
+            // This test case tests ENG-11203, verifying that on single table views,
+            // if a new index was created on the view target table, this new index
+            // will be properly tracked by the MaterializedViewTriggerForInsert.
+
+            // - 1 - Insert the initial data into the view source table.
+            insertRow(client, initialRows[0]);
+            insertRow(client, initialRows[1]);
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 1, 1}}, vt);
+            vt = client.callProcedure("@AdHoc",
+                    "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 1, 1}}, vt);
+
+            // - 2 - Now add a new index on the view target table.
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE INDEX I_ENG_11203_SINGLE ON V_ENG_11203_SINGLE(a, b);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on the single table view V_ENG_11203_SINGLE.");
+            }
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE INDEX I_ENG_11203_JOIN ON V_ENG_11203_JOIN(a, b);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create an index on the joined table view V_ENG_11203_JOIN.");
+            }
+
+            // - 3 - Insert another row of data.
+            insertRow(client, secondRows[0]);
+            insertRow(client, secondRows[1]);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 2, 6}}, vt);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {{2, 4, 6}}, vt);
+
+            // - 4 - Start to delete rows.
+            // If the new index was not tracked properly, the server will start to crash
+            // because the newly-inserted row was not inserted into the index.
+            deleteRow(client, initialRows[0]);
+            deleteRow(client, initialRows[1]);
+            deleteRow(client, secondRows[0]);
+            deleteRow(client, secondRows[1]);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_SINGLE").getResults()[0];
+            assertContentOfTable(new Object[][] {}, vt);
+            vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V_ENG_11203_JOIN").getResults()[0];
+            assertContentOfTable(new Object[][] {}, vt);
+        }
+    }
+
+    public void testEng11314() throws Exception {
+        Client client = getClient();
+        String[] insertT1 = {
+            "INSERT INTO T1_ENG_11314 (G1, C2, C3) VALUES (1, 1024, 64);",
+            "INSERT INTO T1_ENG_11314 (G1, C2, C3) VALUES (2, 2048, 32);"
+        };
+        String insertT2 = "INSERT INTO T2_ENG_11314 (G0) VALUES (0);";
+        String bugTrigger = "UPDATE T1_ENG_11314 SET C2=64, C3=1024 WHERE G1=2;";
+        Object[][] viewContent = { {0, 2, 0, 0, 1024, 64, 0, 0, 0, 0, 0, 0, "abc", "def"} };
+        // -1- Insert data
+        insertRowAdHoc(client, insertT1[0]);
+        insertRowAdHoc(client, insertT1[1]);
+        insertRowAdHoc(client, insertT2);
+        // -2- Test if the UPDATE statement will trigger an error on single table view V1:
+        client.callProcedure("@AdHoc", bugTrigger);
+        // -3- Verify view contents
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V1_ENG_11314").getResults()[0];
+            assertContentOfTable(viewContent, vt);
+        vt = client.callProcedure("@AdHoc",
+                "SELECT * FROM V2_ENG_11314").getResults()[0];
+            assertContentOfTable(viewContent, vt);
     }
 
     /**

@@ -33,21 +33,23 @@ public class AdHocAcceptancePolicy extends InvocationValidationPolicy {
             StoredProcedureInvocation invocation,
             Procedure sysProc) {
 
-        if ( ! invocation.getProcName().equals("@AdHoc") &&
-             ! invocation.getProcName().equals("@AdHocSpForTest")) {
+        final String procName = invocation.getProcName();
+        if ( ! procName.equals("@AdHoc") &&
+             ! procName.equals("@AdHocSpForTest")) {
             return null;
         }
 
         ParameterSet params = invocation.getParams();
+        final Object [] paramsArray = params.toArray();
         // Make sure there is at least 1 parameter!  ENG-4921
-        if (params.toArray().length < 1) {
+        if (paramsArray.length < 1) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Adhoc system procedure requires at least the query parameter.",
                     invocation.clientHandle);
         }
 
         // check the types are both strings
-        if ((params.toArray()[0] instanceof String) == false) {
+        if ((paramsArray[0] instanceof String) == false) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0],
                     "Adhoc system procedure requires the query parameter to be of String type.",

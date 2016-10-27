@@ -130,12 +130,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
+    public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
+    public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
+
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
     private static long setBaseValue(int offset) { return offset << 14; }
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + setBaseValue(1);
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
+    public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -1068,12 +1072,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context,
             ReplicationRole replicationRole,
             Cartographer cartographer,
-            int partitionCount,
             InetAddress clientIntf,
             int clientPort,
             InetAddress adminIntf,
-            int adminPort,
-            long timestampTestingSalt) throws Exception {
+            int adminPort) throws Exception {
 
         /*
          * Construct the runnables so they have access to the list of connections
@@ -1358,7 +1360,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

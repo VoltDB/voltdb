@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.TestCSVFormatterSuiteBase;
 import org.voltdb.VoltDB;
@@ -36,7 +37,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.VoltFile;
 
 public class TestPrepareShutdown extends RegressionSuite
 {
@@ -45,7 +45,6 @@ public class TestPrepareShutdown extends RegressionSuite
     }
 
     public void testPrepareShutdown() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         final Client client2 = this.getClient();
         for (int i = 0; i < 50; i++) {
             client2.callProcedure(new Callback(), "ArbitraryDurationProc", 6000);

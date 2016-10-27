@@ -34,8 +34,6 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.Test;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs;
@@ -52,6 +50,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.InsertNewOrder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
@@ -62,6 +61,8 @@ import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -139,8 +140,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         public void clientCallback(ClientResponse clientResponse) {
             m_outstandingCalls.decrementAndGet();
             if (m_expectedStatus != clientResponse.getStatus()) {
-                if (clientResponse.getStatusString() != null)
+                if (clientResponse.getStatusString() != null) {
                     System.err.println(clientResponse.getStatusString());
+                }
                 callbackSuccess = false;
             }
         }
@@ -153,15 +155,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         CatTestCallback callback;
 
         loadSomeData(client, 0, 25);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         negativeTests(client);
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // asynchronously call some random inserts
         loadSomeData(client, 25, 25);
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
@@ -181,8 +182,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         cb.waitForResponse();
 
         // make sure the previous catalog change has completed
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // now calling the new proc better work
         x = 2;
@@ -192,6 +192,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                 new double[] {x}, new String[] {"a"});
 
         loadSomeData(client, 50, 5);
+        assertCallbackSuccess(client);
+    }
+
+    private void assertCallbackSuccess(Client client) throws NoConnectionsException, InterruptedException {
+        client.drain();
         assertTrue(callbackSuccess);
     }
 
@@ -385,15 +390,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         CatTestCallback callback;
 
         loadSomeData(client, 0, 25);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         negativeTests(client);
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // asynchronously call some random inserts
         loadSomeData(client, 25, 25);
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // add a procedure "InsertOrderLineBatched"
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
@@ -414,8 +418,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         cb.waitForResponse();
 
         // make sure the previous catalog change has completed
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // now calling the new proc better work
         x = 2;
@@ -425,15 +428,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
                 new double[] {x}, new String[] {"a"});
 
         loadSomeData(client, 50, 5);
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // this is a do nothing change... shouldn't affect anything
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // now calling the new proc better work
         x = 4;
@@ -461,8 +463,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         cb.waitForResponse();
 
         // make sure the previous catalog change has completed
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // now calling the new proc better fail
         x = 5;
@@ -525,8 +526,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         //Expect success
         client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
 
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
         assertTrue(true);
     }
 
@@ -536,8 +536,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("\n\n-----\n testEnabledSecurity \n-----\n\n");
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.jar");
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml");
@@ -559,15 +558,19 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         Client client3 = getClient();
         loadSomeData(client3, 50, 10);
         client3.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client3);
 
         // the old client should not work because the user has been removed.
         loadSomeData(client, 100, 10);
-        client.drain();
-        assertFalse(callbackSuccess);
+        assertCallbackFailure(client);
         callbackSuccess = true;
 
         checkDeploymentPropertyValue(client3, "heartbeattimeout", "6000");
+    }
+
+    private void assertCallbackFailure(Client client) throws NoConnectionsException, InterruptedException {
+        client.drain();
+        assertFalse(callbackSuccess);
     }
 
     private void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
@@ -614,8 +617,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // check that no index was used by checking the plan itself
         callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where NO_O_ID = 5;");
@@ -654,8 +656,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // tables can still be accessed
         loadSomeData(client, 20, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // check table for the right number of tuples
         callProcedure = client.callProcedure("@AdHoc", "select count(*) from NEW_ORDER;");
@@ -687,8 +688,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // and loading still succeeds
         loadSomeData(client, 30, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
     }
 
     public void testAddDropExpressionIndex() throws Exception
@@ -699,8 +699,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // check that no index was used by checking the plan itself
         callProcedure = client.callProcedure("@Explain", "select * from NEW_ORDER where (NO_O_ID+NO_O_ID)-NO_O_ID = 5;");
@@ -739,8 +738,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // tables can still be accessed
         loadSomeData(client, 20, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
 
         // check table for the right number of tuples
@@ -773,16 +771,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // and loading still succeeds
         loadSomeData(client, 30, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
     }
 
     public void testAddDropTable() throws IOException, ProcCallException, InterruptedException
     {
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // verify that an insert w/o a table fails.
         try {
@@ -822,8 +818,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // old tables can still be accessed
         loadSomeData(client, 20, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // and this new procedure is happy like clams
         callProcedure = client.callProcedure("InsertO1", new Integer(100), new Integer(200), "foo", "bar");
@@ -853,15 +848,13 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // and other requests still succeed
         loadSomeData(client, 30, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
     }
 
     public void testAddTableWithMatView() throws IOException, ProcCallException, InterruptedException {
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         // add new tables and materialized view
         String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.jar");
@@ -899,8 +892,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     public void testAddDropTableRepeat() throws Exception {
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         /*
          * Reduced from 100 to 30 so that it doesn't take quite as long
@@ -934,8 +926,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         long t = System.currentTimeMillis();
         Client client = getClient();
         loadSomeData(client, 0, 10);
-        client.drain();
-        assertTrue(callbackSuccess);
+        assertCallbackSuccess(client);
 
         try {
             VoltTable[] results = client.updateApplicationCatalog(new File(hugeCatalogJarPath), new File(hugeCatalogXMLPath)).getResults();

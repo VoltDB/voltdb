@@ -61,16 +61,15 @@ import org.voltdb.types.SortDirectionType;
 
 public class TestWindowedFunctions extends PlannerTestCase {
     public void testOrderByAndPartitionByExpressions() throws Exception {
-        AbstractPlanNode node;
         try {
-            node = compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) * 2 FROM AAA;");
+            compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) * 2 FROM AAA;");
         } catch (Exception ex) {
-            assertFalse("PartitionBy expressions in windowed expressions don't compile", true);
+            fail("PartitionBy expressions in windowed expressions don't compile");
         }
         try {
-            node = compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA order by B*B;");
+            compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA order by B*B;");
         } catch (Exception ex) {
-            assertFalse("OrderBy expressions in windowed expressions don't compile", true);
+            fail("OrderBy expressions in windowed expressions don't compile");
         }
     }
 
@@ -163,10 +162,11 @@ public class TestWindowedFunctions extends PlannerTestCase {
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
         assertEquals(numPartitionExprs, pbPlanNode.getGroupByExpressionsSize());
-        validateTVEs(input_schema, pbPlanNode);
+        validateTVEs(input_schema, pbPlanNode, false);
     }
 
-    public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
+    public void validateTVEs(NodeSchema input_schema,
+            PartitionByPlanNode pbPlanNode, boolean waiveAliasMatch) {
         List<AbstractExpression> tves = new ArrayList<>();
         for (AbstractExpression ae : pbPlanNode.getGroupByExpressions()) {
             tves.addAll(ae.findAllTupleValueSubexpressions());
@@ -182,7 +182,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
             assertEquals(msg, col.getTableName(), tve.getTableName());
             assertEquals(msg, col.getTableAlias(), tve.getTableAlias());
             assertEquals(msg, col.getColumnName(), tve.getColumnName());
-            assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
+            if ( ! waiveAliasMatch) {
+                assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
+            }
         }
     }
 
@@ -207,13 +209,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // At one point in development, this would only work by disabling ALPHA.A as a possible resolution.
         // It got a mysterious "Mismatched columns A in subquery" error.
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, true);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
 
         // Test with windowed aggregates in the subquery itself.
 
@@ -267,7 +269,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
      * produces a similar plan
      * @param windowedQuery a variant of a test query of a known basic format
      **/
-    private void validateQueryWithSubquery(String windowedQuery) {
+    private void validateQueryWithSubquery(String windowedQuery,
+            boolean waiveAliasMatch) {
         AbstractPlanNode node = compile(windowedQuery);
         // Dissect the plan.
         assertTrue(node instanceof SendPlanNode);
@@ -288,7 +291,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
 
-        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode,
+                waiveAliasMatch);
     }
 
     public void testRankWithPartitions() {
@@ -352,19 +356,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
-                      "Use of both windowed RANK() and GROUP BY in a single query is not supported.");
+                      "Use of both a windowed function call and GROUP BY in a single query is not supported.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
-                      "Only one windowed RANK() expression may appear in a selection list.");
+                      "Only one windowed function call may appear in a selection list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Windowed RANK() expressions can have only one ORDER BY expression in their window.");
+                      "Windowed function call expressions can have only one ORDER BY expression in their window.");
 
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
-                      "Windowed RANK() expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                      "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
         // Windowed expressions can only appear in the selection list.
         failToCompile("SELECT A, B, C FROM AAA WHERE RANK() OVER (PARTITION BY A ORDER BY B) < 3;",
-                      "Windowed RANK() expressions can only appear in the selection list of a query or subquery.");
+                      "Windowed function call expressions can only appear in the selection list of a query or subquery.");
 
         // Detect that PARTITION BY A is ambiguous when A names multiple columns.
         // Queries like this passed at one point in development, ignoring the subquery
@@ -373,6 +377,16 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
                       "WHERE ALPHA.C <> BBB.C;",
                       "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
+        failToCompile("SELECT RANK() OVER () AS ARANK " +
+                      "FROM AAA;",
+                      "Windowed RANK function call expressions require an ORDER BY specification.");
+        failToCompile("SELECT DENSE_RANK() OVER () AS ARANK " +
+                      "FROM AAA;",
+                      "Windowed DENSE_RANK function call expressions require an ORDER BY specification.");
+        failToCompile("SELECT RANK(DISTINCT) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
+        failToCompile("SELECT DENSE_RANK(ALL) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "Expected a right parenthesis (')') here.");
     }
 
     public void testExplainPlanText() {

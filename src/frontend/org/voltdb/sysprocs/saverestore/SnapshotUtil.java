@@ -25,12 +25,14 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -81,6 +83,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -104,7 +107,10 @@ public class SnapshotUtil {
     public static final String JSON_DATA = "data";
     public static final String JSON_URIPATH = "uripath";
     public static final String JSON_SERVICE = "service";
-
+    /**
+     * milestone used to mark a shutdown save snapshot
+     */
+    public static final String JSON_TERMINUS = "terminus";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -203,7 +209,7 @@ public class SnapshotUtil {
 
             sw.append(stringer.toString());
 
-            final byte tableListBytes[] = sw.getBuffer().toString().getBytes("UTF-8");
+            final byte tableListBytes[] = sw.getBuffer().toString().getBytes(StandardCharsets.UTF_8);
             final PureJavaCrc32 crc = new PureJavaCrc32();
             crc.update(tableListBytes);
             ByteBuffer fileBuffer = ByteBuffer.allocate(tableListBytes.length + 4);
@@ -456,6 +462,23 @@ public class SnapshotUtil {
     }
 
     /**
+     * Write the shutdown save snapshot terminus marker
+     */
+    public static Runnable writeTerminusMarker(final String nonce, final NodeSettings paths, final VoltLogger logger) {
+        final File f = new File(paths.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
+        return new Runnable() {
+            @Override
+            public void run() {
+                try(PrintWriter pw = new PrintWriter(new FileWriter(f), true)) {
+                    pw.println(nonce);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
+    }
+
+    /**
      *
      * This isn't just a CRC check. It also loads the file and returns it as
      * a JSON object.
@@ -481,7 +504,7 @@ public class SnapshotUtil {
                 return null;
             }
             final int crc = crcBuffer.getInt();
-            final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
+            final InputStreamReader isr = new InputStreamReader(bis, StandardCharsets.UTF_8);
             CharArrayWriter caw = new CharArrayWriter();
             while (true) {
                 int nextChar = isr.read();
@@ -516,10 +539,10 @@ public class SnapshotUtil {
              */
             if (obj == null) {
                 String tableList = caw.toString();
-                byte tableListBytes[] = tableList.getBytes("UTF-8");
+                byte tableListBytes[] = tableList.getBytes(StandardCharsets.UTF_8);
                 PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
-                tableListCRC.update("\n".getBytes("UTF-8"));
+                tableListCRC.update("\n".getBytes(StandardCharsets.UTF_8));
                 final int calculatedValue = (int)tableListCRC.getValue();
                 if (crc != calculatedValue) {
                     logger.warn("CRC of snapshot digest " + f + " did not match digest contents");
@@ -546,7 +569,7 @@ public class SnapshotUtil {
                  * Verify the CRC and then return the data as a JSON object.
                  */
                 String tableList = caw.toString();
-                byte tableListBytes[] = tableList.getBytes("UTF-8");
+                byte tableListBytes[] = tableList.getBytes(StandardCharsets.UTF_8);
                 PureJavaCrc32 tableListCRC = new PureJavaCrc32();
                 tableListCRC.update(tableListBytes);
                 final int calculatedValue = (int)tableListCRC.getValue();
@@ -1620,5 +1643,13 @@ public class SnapshotUtil {
             return VoltDB.instance().getSnapshotPath();
         }
         return path;
+    }
+
+    public static String getShutdownSaveNonce(final long zkTxnId) {
+        SimpleDateFormat dfmt = new SimpleDateFormat("'SHUTDOWN_'yyyyMMdd'T'HHmmss'_'");
+        dfmt.setTimeZone(VoltDB.REAL_DEFAULT_TIMEZONE);
+        StringBuilder sb = new StringBuilder(64).append(dfmt.format(new Date()))
+                .append(Long.toString(zkTxnId, Character.MAX_RADIX));
+        return sb.toString();
     }
 }

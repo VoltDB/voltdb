@@ -22,6 +22,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,8 +50,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.catalog.Procedure;
+import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
@@ -120,6 +120,7 @@ SnapshotCompletionInterest, Promotable
         new SimpleClientResponseAdapter(ClientInterface.RESTORE_AGENT_CID, "RestoreAgentAdapter");
 
     private final ZooKeeper m_zk;
+    private final HostMessenger m_hostMessenger;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final Integer m_hostId;
@@ -146,6 +147,11 @@ SnapshotCompletionInterest, Promotable
 
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
+
+    /**
+     * Startup snapshot nonce (taken on shutdown save)
+     */
+    private final String m_terminusNonce;
 
     // A string builder to hold all snapshot validation errors, gets printed when no viable snapshot is found
     private final StringBuilder m_snapshotErrLogStr =
@@ -181,8 +187,10 @@ SnapshotCompletionInterest, Promotable
                     sendSnapshotTxnId(m_snapshotToRestore);
 
                     if (m_snapshotToRestore != null) {
-                        LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
-                                " in " + m_snapshotToRestore.path);
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                                    " in " + m_snapshotToRestore.path);
+                        }
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.pathType);
@@ -456,13 +464,14 @@ SnapshotCompletionInterest, Promotable
                         Callback callback, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        String voltdbrootPath)
+                        String voltdbrootPath, String terminusNonce)
     throws IOException {
         m_hostId = hostMessenger.getHostId();
         m_initiator = null;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
+        m_hostMessenger = hostMessenger;
         m_zk = hostMessenger.getZK();
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
@@ -470,11 +479,12 @@ SnapshotCompletionInterest, Promotable
         m_snapshotPath = snapshotPath;
         m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
+        m_terminusNonce = terminusNonce;
 
-        initialize(hostMessenger);
+        initialize(action);
     }
 
-    private void initialize(HostMessenger hostMessenger) {
+    private void initialize(StartAction startAction) {
         // Load command log reinitiator
         try {
             Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
@@ -489,8 +499,8 @@ SnapshotCompletionInterest, Promotable
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
-                                                                    m_action,
-                                                                    hostMessenger,
+                                                                    startAction,
+                                                                    m_hostMessenger,
                                                                     m_clPath,
                                                                     m_liveHosts);
             }
@@ -685,11 +695,19 @@ SnapshotCompletionInterest, Promotable
                 snapshotInfos.add(info);
             }
         }
-        LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
+        }
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
+        if (infoWithMinHostId != null && infoWithMinHostId.nonce.equals(m_terminusNonce)) {
+            m_replayAgent.returnAllSegments();
+            initialize(StartAction.CREATE);
+            m_planned = true;
+            return infoWithMinHostId;
+        }
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
@@ -763,7 +781,6 @@ SnapshotCompletionInterest, Promotable
 
             if (digest_detail.has("partitionTransactionIds")) {
                 JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
-                @SuppressWarnings("unchecked")
                 Iterator<String> it = pidToTxnId.keys();
                 while (it.hasNext()) {
                     String pidkey = it.next();
@@ -950,7 +967,7 @@ SnapshotCompletionInterest, Promotable
         String jsonData = serializeRestoreInformation(max, snapshots);
         String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
-            m_zk.create(zkNode, jsonData.getBytes(Constants.UTF8ENCODING),
+            m_zk.create(zkNode, jsonData.getBytes(StandardCharsets.UTF_8),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Zookeeper node: " +
@@ -1009,8 +1026,9 @@ SnapshotCompletionInterest, Promotable
         if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE) {
             snapshotFragments.clear();
         }
-
-        LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
+        }
 
         // Find the last complete snapshot and use it
         HashMap<String, Map<String, Set<Integer>>> snapshotTablePartitions =
@@ -1032,8 +1050,10 @@ SnapshotCompletionInterest, Promotable
             boolean inconsistent = false;
             Set<SnapshotInfo> fragments = e.getValue();
             for (SnapshotInfo s : fragments) {
-                LOG.debug("SnapshotInfo " + s.nonce + " claims digest tables: " + s.digestTables);
-                LOG.debug("SnapshotInfo " + s.nonce + " claims files for tables: " + s.fileTables);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("SnapshotInfo " + s.nonce + " claims digest tables: " + s.digestTables);
+                    LOG.debug("SnapshotInfo " + s.nonce + " claims files for tables: " + s.fileTables);
+                }
                 if (digestTables == null) {
                     digestTables = new HashSet<String>(s.digestTables);
                 }
@@ -1219,8 +1239,6 @@ SnapshotCompletionInterest, Promotable
      */
     private void initSnapshotWork(final Object[] procParams) {
         final String procedureName = "@SnapshotRestore";
-        Config restore = SystemProcedureCatalog.listing.get(procedureName);
-        Procedure restoreProc = restore.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName(procedureName);
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
@@ -1231,14 +1249,11 @@ SnapshotCompletionInterest, Promotable
             }
         });
         spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
-
-        m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
-                                      restoreProc.getReadonly(),
-                                      restoreProc.getSinglepartition(),
-                                      restoreProc.getEverysite(),
-                                      0,//Can provide anything for multi-part
-                                      0,
-                                      System.nanoTime());
+        // admin mode invocation as per third parameter
+        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true, OverrideCheck.INVOCATION);
+        if (cr != null) {
+            m_clientAdapterCallback.handleResponse(cr);
+        }
     }
 
     /**
@@ -1387,5 +1402,11 @@ SnapshotCompletionInterest, Promotable
     public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
     {
         m_isLeader = true;
+    }
+
+    public boolean willRestoreShutdownSnaphot() {
+        return m_terminusNonce != null
+            && m_snapshotToRestore != null
+            && m_terminusNonce.equals(m_snapshotToRestore.nonce);
     }
 }

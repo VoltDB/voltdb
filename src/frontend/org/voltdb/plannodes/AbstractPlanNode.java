@@ -43,6 +43,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -207,7 +208,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // default behavior: just copy the input schema
         // to the output schema
         assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.generateOutputSchema(db);
         // Replace the expressions in our children's columns with TVEs.  When
         // we resolve the indexes in these TVEs they will point back at the
         // correct input column, which we are assuming that the child node
@@ -217,8 +219,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // resolveColumnIndexes/generateOutputSchema/getOutputSchema protocol
         // until it can be fixed up  -- see the FIXME comment on generateOutputSchema.
         m_hasSignificantOutputSchema = false;
-        m_outputSchema =
-            m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
+        m_outputSchema = childNode.getOutputSchema().copyAndReplaceWithTVE();
     }
 
     /**
@@ -765,15 +766,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Collect a unique list of expressions of a given type that this node has including its inlined nodes
-     * @param type expression type to search for
-     * @return a collection(set) of expressions that this node has
+     * @param aeClass AbstractExpression class to search for
+     * @param collection set to populate with expressions that this node has
      */
-    final private Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
-        findAllExpressionsOfClass(aeClass, collected);
-        return collected;
-    }
-
     protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
             Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
@@ -1116,15 +1111,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         collected.add(this);
     }
 
-    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+    abstract protected void loadFromJSONObject(JSONObject obj, Database db)
+            throws JSONException;
 
-    protected final void helpLoadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        assert( jobj != null );
-        m_id = jobj.getInt( Members.ID.name() );
+    protected static NodeSchema loadSchemaFromJSONObject(JSONObject jobj,
+            String jsonKey) throws JSONException {
+        NodeSchema nodeSchema = new NodeSchema();
+        JSONArray jarray = jobj.getJSONArray(jsonKey);
+        int size = jarray.length();
+        for (int i = 0; i < size; ++i) {
+            nodeSchema.addColumn(SchemaColumn.fromJSONObject(
+                    jarray.getJSONObject(i)) );
+        }
+        return nodeSchema;
+    }
+
+    protected final void helpLoadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
+        assert(jobj != null);
+        m_id = jobj.getInt(Members.ID.name());
 
         JSONArray jarray = null;
         //load inline nodes
-        if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
+        if ( ! jobj.isNull(Members.INLINE_NODES.name())) {
             jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadPlanNodesFromJSONArrays(jarray, db);
@@ -1136,14 +1145,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray
 
         // load the output schema if it was marked significant.
-        if ( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ) {
-            m_outputSchema = new NodeSchema();
+        if ( ! jobj.isNull(Members.OUTPUT_SCHEMA.name())) {
             m_hasSignificantOutputSchema = true;
-            jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
-            }
+            m_outputSchema = loadSchemaFromJSONObject(jobj,
+                    Members.OUTPUT_SCHEMA.name());
         }
     }
 
@@ -1171,8 +1176,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param  existing differentiator field of a TVE
      * @return new differentiator value
      */
-    public int adjustDifferentiatorField(int differentiator) {
+    public void adjustDifferentiatorField(TupleValueExpression tve) {
         assert (m_children.size() == 1);
-        return m_children.get(0).adjustDifferentiatorField(differentiator);
+        m_children.get(0).adjustDifferentiatorField(tve);
     }
 }

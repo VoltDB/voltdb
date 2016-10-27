@@ -82,13 +82,6 @@ public class ComparisonExpression extends AbstractExpression {
     }
 
     @Override
-    public Object clone() {
-        ComparisonExpression clone = (ComparisonExpression) super.clone();
-        clone.m_quantifier = m_quantifier;
-        return clone;
-    }
-
-    @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         super.loadFromJSONObject(obj);
        if (obj.has(Members.QUANTIFIER.name())) {

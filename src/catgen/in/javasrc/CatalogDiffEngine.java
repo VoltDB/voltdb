@@ -22,27 +22,86 @@
 package org.voltdb.catalog;
 
 import java.io.UnsupportedEncodingException;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.Arrays;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
+import org.voltdb.compiler.MaterializedViewProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class CatalogDiffEngine {
+
+    /**
+     * If all of the tables in the m_tableNames list are
+     * populated, this represents an error with the given
+     * error message.  If one of the tables is empty, this
+     * object represents a non-error.
+     */
+    public class TablePopulationRequirements {
+        /**
+         * This is the most common case.  We have one table which
+         * needs to be empty, and one error message if the table
+         * is not empty.
+         */
+        public TablePopulationRequirements(String objectName, String tableName, String errMessage) {
+            m_objectName = objectName;
+            m_tableNames.add(tableName);
+            m_errorMessage = errMessage;
+        }
+        /**
+         * This is a more nuanced case.  Nothing happens, and the
+         * user must add all table names and just one error message.
+         * But we still know the name of the object we want to
+         * add.
+         */
+        public TablePopulationRequirements(String objectName) {
+            m_objectName = objectName;
+        }
+        public final List<String> getTableNames() {
+            return m_tableNames;
+        }
+        public final void addTableName(String name) {
+            m_tableNames.add(name);
+        }
+        public final String getErrorMessage() {
+            return m_errorMessage;
+        }
+        public final void setErrorMessage(String errorMessage) {
+            // The final error message wants a space at the beginning.
+            // Don't ask why.
+            m_errorMessage = " " + errorMessage;
+        }
+        public final String getObjectName() {
+            return m_objectName;
+        }
+        @Override
+        public String toString() {
+            StringBuffer sb = new StringBuffer();
+            sb.append("{")
+              .append(m_objectName != null ? m_objectName : "<<NULL>>")
+              .append(", Names: \"" + String.join(", ", m_tableNames) + "\"")
+              .append(", Msg: \"" + (m_errorMessage != null ? m_errorMessage : "<<NULL>>") + "\"")
+              .append("}");
+            return sb.toString();
+        }
+        private String       m_objectName     = null;
+        private List<String> m_tableNames     = new ArrayList<>();
+        private String       m_errorMessage   = null;
+    }
 
     //*  //IF-LINE-VS-BLOCK-STYLE-COMMENT
     /// A flag that controls output for debugging.
@@ -70,8 +129,14 @@ public class CatalogDiffEngine {
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
 
-    private final SortedMap<String,String> m_tablesThatMustBeEmpty = new TreeMap<>();
+    private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();
 
+    // Track all new tables.  We use this to know which
+    // tables do not need to be checked for emptiness.
+    // This may be redundant with m_newTablesForExport,
+    // at least in use.  That is to say, we might be able
+    // to keep only one of them.
+    private final SortedSet<String> m_newTables = new TreeSet<>();
     //Track new tables to help determine which export table is new or
     //modified
     private final SortedSet<String> m_newTablesForExport = new TreeSet<>();
@@ -86,8 +151,8 @@ public class CatalogDiffEngine {
     private final StringBuilder m_errors = new StringBuilder();
 
     // original and new indexes kept to check whether a new/modified unique index is possible
-    private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<String, CatalogMap<Index>>();
-    private final Map<String, CatalogMap<Index>> m_newIndexesByTable = new HashMap<String, CatalogMap<Index>>();
+    private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<>();
+    private final Map<String, CatalogMap<Index>> m_newIndexesByTable = new HashMap<>();
 
     /**
      * Instantiate a new diff. The resulting object can return the text
@@ -150,14 +215,33 @@ public class CatalogDiffEngine {
         return m_requiresSnapshotIsolation;
     }
 
-    public String[] tablesThatMustBeEmpty() {
-        // this lines up with reasonsWhyTablesMustBeEmpty because SortedMap/TreeMap has order
-        return m_tablesThatMustBeEmpty.keySet().toArray(new String[0]);
-    }
+    public String[][] tablesThatMustBeEmpty() {
+        ArrayList<String> tableSetNames = new ArrayList<>();
+        ArrayList<String> errorMessages = new ArrayList<>();
+        for (Map.Entry<String, TablePopulationRequirements> entry : m_tablesThatMustBeEmpty.entrySet()) {
+            List<String> tableNames = entry.getValue().getTableNames();
+            if (tableNames.size() > 0) {
+                // It's unfortunate that we can't use String.join here.
+                StringBuffer sb = new StringBuffer();
+                String sep = "";
+                for (String name : tableNames) {
+                    if (! m_newTables.contains(name.toUpperCase())) {
+                        sb.append(sep)
+                          .append(name);
+                        sep = "+";
+                    }
+                }
+                if (sb.length() > 0) {
+                    tableSetNames.add(sb.toString());
+                    errorMessages.add(entry.getValue().getErrorMessage());
+                }
+            }
+        }
+        String answer[][] = new String[2][];
+        answer[0] = tableSetNames.toArray(new String[0]);
+        answer[1] = errorMessages.toArray(new String[0]);
 
-    public String[] reasonsWhyTablesMustBeEmpty() {
-        // this lines up with tablesThatMustBeEmpty because SortedMap/TreeMap has order
-        return m_tablesThatMustBeEmpty.values().toArray(new String[0]);
+        return answer;
     }
 
     public boolean worksWithElastic() {
@@ -344,15 +428,20 @@ public class CatalogDiffEngine {
                     "Unable to change table %s to an export table because the table is not empty",
                     tName
                     );
-            m_tablesThatMustBeEmpty.put(tName, errorMessage);
+            m_tablesThatMustBeEmpty.put(tName, new TablePopulationRequirements(tName, tName, errorMessage));
         }
     }
 
     /**
-     * @return null if the CatalogType can be dynamically added or removed
-     * from a running system. Return an error string if it can't be changed on
-     * a non-empty table. There will be a subsequent check for empty table
-     * feasability.
+     * Check if an addition or deletion can be safely completed
+     * in any database state.
+     *
+     * @return Return null if the CatalogType can be dynamically added or removed
+     *         from any running system. Return an error message string if it can't be changed
+     *         in an arbitrary running system.  The change might still be possible,
+     *         and we check subsequently for database states in which the change is
+     *         allowed.  Typically these states require a particular
+     *         table, or one of a set of tables be empty.
      */
     protected String checkAddDropWhitelist(final CatalogType suspect, final ChangeType changeType)
     {
@@ -382,12 +471,43 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             Table tbl = (Table)suspect;
-            if (   ChangeType.ADDITION == changeType
-                && CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)
-            ) {
-                m_newTablesForExport.add(tbl.getTypeName());
+            String tableName = tbl.getTypeName();
+            if (   ChangeType.ADDITION == changeType ) {
+                // Remember the name of the new table.
+                m_newTables.add(tableName.toUpperCase());
+                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                    // Remember that it's a new export table.
+                    m_newTablesForExport.add(tbl.getTypeName());
+                }
             }
-            // Support add/drop of the top level object.
+            String viewName = null;
+            String sourceTableName = null;
+            // If this is a materialized view, and it's not safe for non-empty
+            // tables, then we need to note this.  In this conditional, we set
+            // viewName to nonNull if the view has unsafe operations.  Otherwise
+            // we leave it as null.
+            if (tbl.getMvhandlerinfo().size() > 0) {
+                MaterializedViewHandlerInfo mvhInfo = tbl.getMvhandlerinfo().get("mvhandlerinfo");
+                if ( mvhInfo != null ) {
+                    if ( ! mvhInfo.getIssafewithnonemptysources()) {
+                        // Set viewName, but don't set sourceTableName
+                        // because this is a multi-table view.
+                        viewName = tbl.getTypeName();
+                    }
+                }
+            } else if (tbl.getMaterializer() != null) {
+                MaterializedViewInfo mvInfo = MaterializedViewProcessor.getMaterializedViewInfo(tbl);
+                if (mvInfo != null && ( ! mvInfo.getIssafewithnonemptysources() ) ) {
+                    // Set both names, as this is a single table view.
+                    // We know getMaterializer() will return non-null.
+                    viewName = tbl.getTypeName();
+                    sourceTableName = tbl.getMaterializer().getTypeName();
+                }
+            }
+            if (viewName != null) {
+                return createViewDisallowedMessage(viewName, sourceTableName);
+            }
+            // Otherwise, support add/drop of the top level object.
             return null;
         }
 
@@ -511,23 +631,35 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return null if the change is not possible under any circumstances.
-     * Return two strings if it is possible if the table is empty.
-     * String 1 is name of a table if the change could be made if the table of that name had no tuples.
-     * String 2 is the error message to show the user if that table isn't empty.
+     * Check if an addition or deletion can be made depending on the
+     * database state.
+     *
+     * @return Return null if the change is not possible under any circumstances.
+     *         Otherwise, return a TablePopulationRequirements which encodes
+     *         the required database state.  For example, when creating a
+     *         materialized view, if the view's query uses unsafe operations,
+     *         one of the source tables must be empty.  So, the TablePopulationRequirements
+     *         object which we return would have a set of table names.   The returned
+     *         TablePopulationRequirements object will have an error message.
      */
-    protected String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
-        String[] retval = new String[2];
+    protected TablePopulationRequirements checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect,
+                                                                               final ChangeType changeType) {
+        TablePopulationRequirements retval = null;
 
         // handle adding an index - presumably unique
         if (suspect instanceof Index) {
             Index idx = (Index) suspect;
             assert(idx.getUnique());
 
-            retval[0] = idx.getParent().getTypeName();
-            retval[1] = String.format(
-                    "Unable to add unique index %s because table %s is not empty.",
-                    idx.getTypeName(), retval[0]);
+            String indexName = idx.getTypeName();
+            retval = new TablePopulationRequirements(indexName);
+            String tableName = idx.getParent().getTypeName();
+            retval.addTableName(tableName);
+            retval.setErrorMessage(
+                    String.format(
+                            "Unable to add unique index %s because table %s is not empty.",
+                            indexName,
+                            tableName));
             return retval;
         }
 
@@ -540,10 +672,16 @@ public class CatalogDiffEngine {
             assert(changeType == ChangeType.DELETION);
             Table table = (Table) idx.getParent();
 
-            retval[0] = table.getTypeName();
-            retval[1] = String.format(
-                    "Unable to remove column %s from unique index %s because table %s is not empty.",
-                    suspect.getTypeName(), idx.getTypeName(), retval[0]);
+            String indexName = idx.getTypeName();
+            String tableName = table.getTypeName();
+            String errorMessage =
+                    String.format(
+                            "Unable to remove column %s from unique index %s because table %s is not empty.",
+                            suspect.getTypeName(),
+                            indexName,
+                            tableName);
+            retval = new TablePopulationRequirements(indexName, tableName, errorMessage);
+            retval.addTableName(tableName);
             return retval;
         }
 
@@ -553,13 +691,108 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return null;
             }
-            retval[0] = parent.getTypeName();
-            retval[1] = String.format(
-                    "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
-                    suspect.getTypeName(), retval[0]);
+            String tableName = parent.getTypeName();
+            retval = new TablePopulationRequirements(tableName);
+            retval.addTableName(tableName);
+            retval.setErrorMessage(
+                    String.format(
+                            "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
+                            suspect.getTypeName(), tableName));
             return retval;
         }
 
+        // Check to see if a table is a materialized view.  If
+        // so, we want to check if the table is safe for non-empty
+        // source tables, and leave the correct error message if so.
+        if (suspect instanceof Table) {
+            Table tbl = (Table)suspect;
+            if (tbl.getMvhandlerinfo().size() > 0) {
+                MaterializedViewHandlerInfo mvhInfo = tbl.getMvhandlerinfo().get("mvhandlerinfo");
+                if ( mvhInfo != null && ( ! mvhInfo.getIssafewithnonemptysources()) ) {
+                    retval = getMVHandlerInfoMessage(mvhInfo);
+                    if (retval != null) {
+                        return retval;
+                    }
+                }
+            } else {
+                MaterializedViewInfo mvInfo = MaterializedViewProcessor.getMaterializedViewInfo(tbl);
+                if (mvInfo != null && ( ! mvInfo.getIssafewithnonemptysources())) {
+                    retval = getMVInfoMessage(tbl, mvInfo);
+                    if (retval != null) {
+                        return retval;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Return an error message asserting that we cannot create a view
+     * with a given name.
+     *
+     * @param viewName The name of the view we are refusing to create.
+     * @param singleTableName The name of the source table if there is
+     *                        one source table.  If there are multiple
+     *                        tables this should be null.  This only
+     *                        affects the wording of the error message.
+     * @return
+     */
+    private String createViewDisallowedMessage(String viewName, String singleTableName) {
+        boolean singleTable = (singleTableName != null);
+        return String.format(
+                "Unable to create %sview %s %sbecause the view definition uses operations that cannot always be applied if %s.",
+                (singleTable
+                        ? "single table "
+                        : "multi-table "),
+                viewName,
+                (singleTable
+                        ? String.format("on table %s ", singleTableName)
+                        : ""),
+                (singleTable
+                        ? "the table already contains data"
+                        : "all of the tables already contain data"));
+    }
+
+    /**
+     * Check a MaterializedViewHandlerInfo object for safety.  Return
+     * an object with table population requirements on the table for it to be
+     * allowed.  The return object, if it is non-null, will have a set of names
+     * of tables one of which must be empty if the view can be created.  It will
+     * also have an error message.
+     *
+     * @param mvh A MaterializedViewHandlerInfo object describing the view part
+     *            of a table.
+     * @return A TablePopulationRequirements object describing a set of tables
+     *         and an error message.
+     */
+    private TablePopulationRequirements getMVHandlerInfoMessage(MaterializedViewHandlerInfo mvh) {
+        if ( ! mvh.getIssafewithnonemptysources()) {
+            TablePopulationRequirements retval;
+            String viewName = mvh.getDesttable().getTypeName();
+            String errorMessage = createViewDisallowedMessage(viewName, null);
+            retval = new TablePopulationRequirements(viewName);
+            retval.setErrorMessage(errorMessage);
+            for (TableRef tref : mvh.getSourcetables()) {
+                String tableName = tref.getTable().getTypeName();
+                retval.addTableName(tableName);
+            }
+            return retval;
+        }
+        return null;
+    }
+
+    private TablePopulationRequirements getMVInfoMessage(Table table, MaterializedViewInfo mv) {
+        if (! mv.getIssafewithnonemptysources()) {
+            TablePopulationRequirements retval;
+            String viewName = mv.getTypeName();
+            String sourceName = mv.getParent().getTypeName();
+            String errorMessage = createViewDisallowedMessage(viewName, sourceName);
+            retval = new TablePopulationRequirements(viewName);
+            retval.setErrorMessage(errorMessage);
+            retval.addTableName(sourceName);
+            return retval;
+        }
         return null;
     }
 
@@ -593,10 +826,14 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return null if CatalogType can be dynamically modified
-     * in a running system. Otherwise return an error message that
-     * can be given if it turns out we really can't make the change.
-     * Return "" if the error has already been handled.
+     * Check to see if a CatalogType can be dynamically
+     * modified in any running system, regardless of the
+     * system's state.
+     *
+     * @return Return null if the change can be made.  Otherwise return
+     *         an error message.  The change may be possible in
+     *         particular database states, but this routine just
+     *         decides of the modification is possible in any state.
      */
     protected String checkModifyWhitelist(final CatalogType suspect,
                                         final CatalogType prevType,
@@ -820,26 +1057,34 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return null if the change is not possible under any circumstances.
-     * Return a {@link java.util.List} of string arrays if it is possible if the table is empty.
-     * The list may be empty, otherwise each string array contains exactly two strings.
-     * String 1 is name of a table if the change could be made if the table of that name had no tuples.
-     * String 2 is the error message to show the user if that table isn't empty.
+     * Return an indication of whether a catalog change may be when the
+     * legality of the change depends on the state of the database.  Generally
+     * this means some set of tables must be empty, or else one of a set of
+     * tables must be empty.  For example, when changing the isActiveDRed
+     * state, all DR'd tables must be empty.  See checkAddDropIfTableIsEmptyWhitelist
+     * for a more complex example, adding materialized views.
+     *
+     * @return Null or a list of TablePopulationRequirement objects describe the required
+     *         database state.  The list may be empty.
      */
-    public List<String[]> checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
-                                                             final CatalogType prevType,
-                                                             final String field)
+    public List<TablePopulationRequirements> checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
+                                                                                final CatalogType prevType,
+                                                                                final String field)
     {
         if (prevType instanceof Database) {
             if(field.equalsIgnoreCase("isActiveActiveDRed")) {
-                List<String[]> retval = new ArrayList<>();
+                List<TablePopulationRequirements> retval = new ArrayList<>();
                 for (Table t : ((Database) prevType).getTables()) {
                     if (t.getIsdred()) {
-                        String[] entry = new String[2];
-                        entry[0] = t.getTypeName();
-                        entry[1] = String.format(
-                                "Unable to change DR mode of table %s because it is not empty.",
-                                entry[0]);
+                        String tableName = t.getTypeName();
+                        String errorMessage =
+                                String.format(
+                                        "Unable to change DR mode of table %s because it is not empty.",
+                                        tableName);
+                        TablePopulationRequirements entry =
+                            new TablePopulationRequirements(tableName,
+                                                            tableName,
+                                                            errorMessage);
                         retval.add(entry);
                     }
                 }
@@ -850,13 +1095,14 @@ public class CatalogDiffEngine {
         }
 
         if (prevType instanceof Table) {
-            String[] entry = new String[2];
+            String objectName = suspect.getTypeName();
+            TablePopulationRequirements entry = new TablePopulationRequirements(objectName);
 
             Table prevTable = (Table) prevType; // safe because of enclosing if-block
             Database db = (Database) prevType.getParent();
 
             // table name
-            entry[0] = suspect.getTypeName();
+            entry.addTableName(suspect.getTypeName());
 
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, prevTable)) {
@@ -866,33 +1112,30 @@ public class CatalogDiffEngine {
             // allowed changes to a table
             if (field.equalsIgnoreCase("isreplicated")) {
                 // error message
-                entry[1] = String.format(
-                        "Unable to change whether table %s is replicated because it is not empty.",
-                        entry[0]);
-                return Arrays.<String[]>asList(entry);
+                entry.setErrorMessage(String.format(
+                            "Unable to change whether table %s is replicated because it is not empty.",
+                            objectName));
+                return Collections.singletonList(entry);
             }
             if (field.equalsIgnoreCase("partitioncolumn")) {
                 // error message
-                entry[1] = String.format(
-                        "Unable to change the partition column of table %s because it is not empty.",
-                        entry[0]);
-                return Arrays.<String[]>asList(entry);
+                entry.setErrorMessage(String.format(
+                                            "Unable to change the partition column of table %s because it is not empty.",
+                                            objectName));
+                return Collections.singletonList(entry);
             }
             if (field.equalsIgnoreCase("isdred")) {
                 // error message
-                entry[1] = String.format(
-                        "Unable to enable DR on table %s because it is not empty.",
-                        entry[0]);
-                return Arrays.<String[]>asList(entry);
+                entry.setErrorMessage(String.format(
+                                        "Unable to enable DR on table %s because it is not empty.",
+                                        objectName));
+                return Collections.singletonList(entry);
             }
         }
 
         // handle narrowing columns and some modifications on empty tables
         if (prevType instanceof Column) {
-            String[] entry = new String[2];
-
             Table table = (Table) prevType.getParent();
-            Column column = (Column)prevType;
             Database db = (Database) table.getParent();
 
             // for now, no changes to export tables
@@ -900,50 +1143,60 @@ public class CatalogDiffEngine {
                 return null;
             }
 
+            String tableName = table.getTypeName();
+            Column column = (Column)prevType;
+            String columnName = column.getTypeName();
+
+            // This is just used as a key in a map which helps us keep
+            // track of error messages.
+            String objectName = table.getTypeName() + "." + column.getName();
+            TablePopulationRequirements entry = new TablePopulationRequirements(objectName);
+
             // capture the table name
-            entry[0] = table.getTypeName();
+            entry.addTableName(tableName);
 
             if (field.equalsIgnoreCase("type")) {
                 // error message
-                entry[1] = String.format(
+                entry.setErrorMessage(String.format(
                         "Unable to make a possibly-lossy type change to column %s in table %s because it is not empty.",
-                        prevType.getTypeName(), entry[0]);
-                return Arrays.<String[]>asList(entry);
+                        columnName, tableName));
+                return Collections.singletonList(entry);
             }
 
             if (field.equalsIgnoreCase("size")) {
                 // error message
-                entry[1] = String.format(
+                entry.setErrorMessage(String.format(
                         "Unable to narrow the width of column %s in table %s because it is not empty.",
-                        prevType.getTypeName(), entry[0]);
-                return Arrays.<String[]>asList(entry);
+                        columnName, tableName));
+                return Collections.singletonList(entry);
             }
 
             // Nullability changes are allowed on empty tables.
             if (field.equalsIgnoreCase("nullable")) {
                 // Would be flipping the nullability, so invert the state for the message.
                 String alteredNullness = column.getNullable() ? "NOT NULL" : "NULL";
-                entry[1] = String.format(
-                        "Unable to change column %s null constraint to %s in table %s because it is not empty.",
-                        prevType.getTypeName(), alteredNullness, entry[0]);
-                return Arrays.<String[]>asList(entry);
+                entry.setErrorMessage(String.format(
+                                        "Unable to change column %s null constraint to %s in table %s because it is not empty.",
+                                        columnName, alteredNullness, tableName));
+                return Collections.singletonList(entry);
             }
         }
 
         if (prevType instanceof Index) {
-            String[] entry = new String[2];
-
             Table table = (Table) prevType.getParent();
+            String tableName = table.getTypeName();
             Index index = (Index)prevType;
+            String indexName = index.getTypeName();
 
             // capture the table name
-            entry[0] = table.getTypeName();
+            TablePopulationRequirements entry = new TablePopulationRequirements(indexName);
+            entry.addTableName(tableName);
             if (field.equalsIgnoreCase("expressionsjson")) {
                 // error message
-                entry[1] = String.format(
+                entry.setErrorMessage(String.format(
                         "Unable to alter table %s with expression-based index %s becase table %s is not empty.",
-                        entry[0], index.getTypeName(), entry[0]);
-                return Arrays.<String[]>asList(entry);
+                        tableName, indexName, tableName));
+                return Collections.singletonList(entry);
             }
 
         }
@@ -966,7 +1219,7 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            List<String[]> responseList = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
+            List<TablePopulationRequirements> responseList = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
             // handle all the error messages and state from the modify check
             processModifyResponses(errorMessage, responseList);
         }
@@ -997,10 +1250,10 @@ public class CatalogDiffEngine {
      * is no element in the responseList, it means no tables must be empty, which is
      * totally fine.
      */
-    private void processModifyResponses(String errorMessage, List<String[]> responseList) {
+    private void processModifyResponses(String errorMessage, List<TablePopulationRequirements> responseList) {
         assert(errorMessage != null);
 
-        // if no tablename, then it's just not possible
+        // if no requirements, then it's just not possible
         if (responseList == null) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
@@ -1008,23 +1261,19 @@ public class CatalogDiffEngine {
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC
         else {
-            for (String[] response : responseList) {
-                assert (response.length == 2);
-                String tableName = response[0];
-                assert (tableName != null);
-                String nonEmptyErrorMessage = response[1];
+            for (TablePopulationRequirements response : responseList) {
+                String objectName = response.getObjectName();
+                List<String> tableNames = response.getTableNames();
+                String nonEmptyErrorMessage = response.getErrorMessage();
                 assert (nonEmptyErrorMessage != null);
 
-                String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
-                if (nonEmptyErrorMessage.length() == 0) {
-                    // the empty string presumes there is already an error for this table
-                    assert (existingErrorMessagesForNonEmptyTable != null);
+                TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
+                if (popreq == null) {
+                    popreq = response;
+                    m_tablesThatMustBeEmpty.put(objectName, popreq);
                 } else {
-                    if (existingErrorMessagesForNonEmptyTable != null) {
-                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
-                    }
-                    // add indentation here so the formatting comes out right for the user #gianthack
-                    m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
+                    String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
+                    popreq.setErrorMessage(newErrorMessage);
                 }
             }
         }
@@ -1045,11 +1294,10 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String[] response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
-            // handle all the error messages and state from the modify check
-            List<String[]> responseList = null;
+            TablePopulationRequirements response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
+            List<TablePopulationRequirements> responseList = null;
             if (response != null) {
-                responseList = Arrays.<String[]>asList(response);
+                responseList = Collections.singletonList(response);
             }
             processModifyResponses(errorMessage, responseList);
         }
@@ -1077,11 +1325,11 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String[] response = checkAddDropIfTableIsEmptyWhitelist(newType, ChangeType.ADDITION);
+            TablePopulationRequirements response = checkAddDropIfTableIsEmptyWhitelist(newType, ChangeType.ADDITION);
             // handle all the error messages and state from the modify check
-            List<String[]> responseList = null;
+            List<TablePopulationRequirements> responseList = null;
             if (response != null) {
-                responseList = Arrays.<String[]>asList(response);
+                responseList = Collections.singletonList(response);
             }
             processModifyResponses(errorMessage, responseList);
         }
@@ -1112,7 +1360,7 @@ public class CatalogDiffEngine {
         Object materializerValue = null;
         // Consider shifting into the strict more required within materialized view definitions.
         if (prevType instanceof Table) {
-            // Under normal circumstances, it's highly unpossible that another (nested?) table will
+            // Under normal circumstances, it's highly unlikely that another (nested?) table will
             // appear in the details of a materialized view table. So, when it does (!?), be sure to
             // complain -- and don't let it throw off the accounting of the strict diff mode.
             // That is, don't set the local "materializerValue".
@@ -1368,7 +1616,7 @@ public class CatalogDiffEngine {
     }
 
     // track adds/drops/modifies in a secondary structure to make human readable descriptions
-    private final Map<DiffClass, CatalogChangeGroup> m_changes = new TreeMap<DiffClass, CatalogChangeGroup>();
+    private final Map<DiffClass, CatalogChangeGroup> m_changes = new TreeMap<>();
 
     /**
      * Get a human readable list of changes between two catalogs.
@@ -1478,4 +1726,5 @@ public class CatalogDiffEngine {
 
         return sb.toString();
     }
+
 }

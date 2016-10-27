@@ -62,9 +62,9 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
@@ -288,7 +288,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        Supplier<ClusterSettings> settings = Suppliers.ofInstance(ClusterSettings.create());
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
         m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
             @Override

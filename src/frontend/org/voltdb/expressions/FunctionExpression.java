@@ -52,7 +52,7 @@ public class FunctionExpression extends AbstractExpression {
 
     /// An optional implied keyword argument, always upper case,
     /// normally null -- except for functions that had an initial keyword
-    /// argumment which got optimized out of its argument list prior to export
+    /// argument which got optimized out of its argument list prior to export
     /// from the HSQL front-end.
     /// For example:
     /// SQL invocation  |  m_impliedArgument
@@ -178,16 +178,6 @@ public class FunctionExpression extends AbstractExpression {
             }
         }
 
-    }
-
-    @Override
-    public Object clone() {
-        FunctionExpression clone = (FunctionExpression)super.clone();
-        clone.m_name = m_name;
-        clone.m_impliedArgument = m_impliedArgument;
-        clone.m_functionId = m_functionId;
-        clone.m_resultTypeParameterIndex = m_resultTypeParameterIndex;
-        return clone;
     }
 
     @Override
@@ -377,4 +367,8 @@ public class FunctionExpression extends AbstractExpression {
         return true;
     }
 
+    @Override
+    public void findNonemptyMVSafeOperations(MVUnsafeOperators ops) {
+        ops.add(explain("Be Explicit"));
+    }
 }

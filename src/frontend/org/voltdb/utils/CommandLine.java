@@ -653,7 +653,7 @@ public class CommandLine extends VoltDB.Configuration
 
         cmdline.add("host");
         if (!m_coordinators.isEmpty()) {
-            cmdline.add(m_coordinators.first());
+            cmdline.add(Joiner.on(',').skipNulls().join(m_coordinators));
         } else {
             cmdline.add(m_leader);
         }
@@ -757,6 +757,11 @@ public class CommandLine extends VoltDB.Configuration
         }
         if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
+        }
+
+        if (m_sitesperhost != VoltDB.UNDEFINED) {
+            cmdline.add("sitesperhost");
+            cmdline.add(Integer.toString(m_sitesperhost));
         }
 
         //Add mesh and hostcount for probe only.
