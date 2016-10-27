@@ -913,11 +913,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public ByteBuffer serialize(ByteBuffer buf) throws IOException
+        public void serialize(ByteBuffer buf) throws IOException
         {
-            buf.putInt(clientResponse.getSerializedSize());
+            buf.putInt(buf.capacity() - 4);
             clientResponse.flattenToBuffer(buf);
-            return null;
         }
 
         @Override
@@ -1500,9 +1499,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
-                        public ByteBuffer serialize(ByteBuffer outbuf) throws IOException {
+                        public void serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
-                            return null;
                         }
                         @Override
                         public void cancel() {}

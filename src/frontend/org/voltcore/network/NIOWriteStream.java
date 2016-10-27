@@ -22,15 +22,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.ssl.SSLDeferredSerializationIterator;
-import org.voltcore.utils.ssl.Serializer;
+import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 
 /**
 *
@@ -81,8 +83,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
-    private final boolean m_isSSLConfigured;
     private final SSLEngine m_sslEngine;
+    private ByteBuffer m_sslDst;
+    private final List<ByteBuffer> m_buffsToWrite;
+    private int m_sizeOfBuffToWrite;
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null, null);
@@ -99,8 +103,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
-        m_isSSLConfigured = sslEngine == null ? false : true;
         m_sslEngine = sslEngine;
+        m_sslDst = ByteBuffer.allocate(Constants.SSL_CHUNK_SIZE << 1);
+        m_buffsToWrite = new ArrayList<>();
     }
 
     /*
@@ -199,14 +204,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 return;
             }
             updateLastPendingWriteTimeAndQueueBackpressure();
-            if (m_isSSLConfigured) {
-                Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
-                while (dsIter.hasNext()) {
-                    m_queuedWrites.offer(dsIter.next());
-                }
-            } else {
-                m_queuedWrites.offer(ds);
-            }
+            m_queuedWrites.offer(ds);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
     }
@@ -218,61 +216,16 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        if (m_isSSLConfigured) {
-            m_port.queueTask(new Runnable() {
-                @Override
-                public void run() {
-                    Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, ds);
-                    synchronized (NIOWriteStream.this) {
-                        updateLastPendingWriteTimeAndQueueBackpressure();
-                        while (dsIter.hasNext()) {
-                            m_queuedWrites.offer(dsIter.next());
-                        }
-                        m_port.setInterests( SelectionKey.OP_WRITE, 0);
-                    }
+        m_port.queueTask(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (NIOWriteStream.this) {
+                    updateLastPendingWriteTimeAndQueueBackpressure();
+                    m_queuedWrites.offer(ds);
+                    m_port.setInterests( SelectionKey.OP_WRITE, 0);
                 }
-            });
-        } else {
-            m_port.queueTask(new Runnable() {
-                @Override
-                public void run() {
-                    synchronized (NIOWriteStream.this) {
-                        updateLastPendingWriteTimeAndQueueBackpressure();
-                        try {
-                            final int serializedSize = ds.getSerializedSize();
-                            if (!(serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH)) {
-                                m_queuedWrites.offer(new DeferredSerialization() {
-                                    @Override
-                                    public ByteBuffer serialize(ByteBuffer outbuf) throws IOException {
-                                        if (outbuf.remaining() >= serializedSize) {
-                                            ds.serialize(outbuf);
-                                            return null;
-                                        } else {
-                                            ByteBuffer allocated = ByteBuffer.allocate(serializedSize);
-                                            ds.serialize(allocated);
-                                            allocated.flip();
-                                            return allocated;
-                                        }
-                                    }
-
-                                    @Override
-                                    public void cancel() {
-                                    }
-
-                                    @Override
-                                    public int getSerializedSize() throws IOException {
-                                        throw new UnsupportedOperationException("getSerializedSize not supported");
-                                    }
-                                });
-                            }
-                        } catch(IOException e){
-                            throw new RuntimeException("Failed to get serialized size for ds " + e.getMessage());
-                        }
-                        m_port.setInterests( SelectionKey.OP_WRITE, 0);
-                    }
-                }
-            });
-        }
+            }
+        });
     }
 
     @Override
@@ -305,42 +258,27 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             updateLastPendingWriteTimeAndQueueBackpressure();
 
-            for (final ByteBuffer buf : b) {
-                if (m_isSSLConfigured) {
-                    Iterator<DeferredSerialization> dsIter = new SSLDeferredSerializationIterator(m_sslEngine, new Serializer() {
-                        @Override
-                        public ByteBuffer serialize() {
-                            return buf;
-                        }
-                    });
-                    while (dsIter.hasNext()) {
-                        m_queuedWrites.offer(dsIter.next());
+            m_queuedWrites.offer(new DeferredSerialization() {
+                @Override
+                public void serialize(ByteBuffer outbuf) {
+                    for (ByteBuffer buf : b) {
+                        outbuf.put(buf);
                     }
-                } else {
-                    m_queuedWrites.offer(new DeferredSerialization() {
-                        @Override
-                        public ByteBuffer serialize(ByteBuffer outbuf) {
-                            if (outbuf.remaining() >= buf.remaining()) {
-                                outbuf.put(buf);
-                                return null;
-                            } else {
-                                ByteBuffer allocated = ByteBuffer.allocate(buf.remaining());
-                                allocated.put(buf);
-                                allocated.flip();
-                                return allocated;
-                            }
-                        }
-
-                        @Override
-                        public void cancel() {}
-
-                        @Override
-                        public int getSerializedSize() {
-                             return buf.remaining();
-                        }
-                    });
                 }
-            }
+
+                @Override
+                public void cancel() {}
+
+                @Override
+                public int getSerializedSize() {
+                    int sum = 0;
+                    for (ByteBuffer buf : b) {
+                        buf.position(0);
+                        sum += buf.remaining();
+                    }
+                    return sum;
+                }
+            });
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
     }
@@ -402,33 +340,45 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         try {
             long rc = 0;
             do {
-                /*
-                 * Nothing to write
-                 */
-                if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                    return bytesWritten;
-                }
-
-                ByteBuffer buffer = null;
-                if (m_currentWriteBuffer == null) {
-                    m_currentWriteBuffer = m_queuedBuffers.poll();
-                    buffer = m_currentWriteBuffer.b();
-                    buffer.flip();
-                } else {
-                    buffer = m_currentWriteBuffer.b();
-                }
-
-                rc = channel.write(buffer);
-
-                //Discard the buffer back to a pool if no data remains
-                if (buffer.hasRemaining()) {
-                    if (!m_hadBackPressure) {
-                        backpressureStarted();
+                // if more buffers need to be encrypted
+                if (m_buffsToWrite.isEmpty()) {
+                    // but there's no more data to encrypt
+                    if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                        return bytesWritten;
                     }
-                } else {
+                    // get the next buffer to encrypt
+                    ByteBuffer buffer;
+                    if (m_currentWriteBuffer == null) {
+                        m_currentWriteBuffer = m_queuedBuffers.poll();
+                        buffer = m_currentWriteBuffer.b();
+                        buffer.flip();
+                    } else {
+                        buffer = m_currentWriteBuffer.b();
+                    }
+                    // wrap the buffer, the results go into m_buffsToWrite
+                    m_sizeOfBuffToWrite = buffer.remaining();
+                    wrap(buffer);
                     m_currentWriteBuffer.discard();
                     m_currentWriteBuffer = null;
+                }
+
+                Iterator<ByteBuffer> buffsIter = m_buffsToWrite.iterator();
+                while (buffsIter.hasNext()) {
+                    ByteBuffer buffToWrite = buffsIter.next();
+                    rc = channel.write(buffToWrite);
+                    bytesWritten += rc;
+                    if (buffToWrite.hasRemaining()) {
+                        if (!m_hadBackPressure) {
+                            backpressureStarted();
+                        }
+                        break;
+                    } else {
+                        buffsIter.remove();
+                    }
+                }
+                if (!buffsIter.hasNext()) {
                     m_messagesWritten++;
+                    bytesWritten += m_sizeOfBuffToWrite;
                 }
                 bytesWritten += rc;
 
@@ -436,11 +386,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         } finally {
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
-            if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+            if (m_buffsToWrite.isEmpty() && m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
                 backpressureEnded();
             }
             //Same here I dont know if we do need to do this housekeeping??
-            if (!isEmpty()) {
+            if (!m_buffsToWrite.isEmpty() || !isEmpty()) {
                 if (bytesWritten > 0) {
                     m_lastPendingWriteTime = EstTime.currentTimeMillis();
                 }
@@ -453,5 +403,54 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             }
         }
         return bytesWritten;
+    }
+
+    private void wrap(ByteBuffer src) throws IOException {
+        while (src.remaining() > 0) {
+            if (src.remaining() < Constants.SSL_CHUNK_SIZE) {
+                ByteBuffer chunk = src.slice();
+                encrypt(chunk);
+                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
+                encyptedChunk.putInt(m_sslDst.remaining());
+                encyptedChunk.put(m_sslDst);
+                encyptedChunk.flip();
+                m_buffsToWrite.add(encyptedChunk);
+                src.position(src.limit());
+            } else {
+                int oldLimit = src.limit();
+                int nextPosition = src.position() + Constants.SSL_CHUNK_SIZE;
+                src.limit(nextPosition);
+                ByteBuffer chunk = src.slice();
+                encrypt(chunk);
+                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
+                encyptedChunk.putInt(m_sslDst.remaining());
+                encyptedChunk.put(m_sslDst);
+                encyptedChunk.flip();
+                m_buffsToWrite.add(encyptedChunk);
+                src.position(nextPosition);
+                src.limit(oldLimit);
+            }
+        }
+    }
+
+    private void encrypt(ByteBuffer src) throws IOException {
+        m_sslDst.clear();
+        while (true) {
+            SSLEngineResult result = m_sslEngine.wrap(src, m_sslDst);
+            switch (result.getStatus()) {
+                case OK:
+                    m_sslDst.flip();
+                    return;
+                case BUFFER_OVERFLOW:
+                    m_sslDst = ByteBuffer.allocate(m_sslDst.capacity() << 1);
+                    break;
+                case BUFFER_UNDERFLOW:
+                    throw new IOException("Underflow on ssl wrap of buffer.");
+                case CLOSED:
+                    throw new IOException("SSL engine is closed on ssl wrap of buffer.");
+                default:
+                    throw new IOException("Unexpected SSLEngineResult.Status");
+            }
+        }
     }
 }

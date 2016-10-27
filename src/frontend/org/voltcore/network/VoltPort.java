@@ -23,6 +23,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -90,7 +91,6 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
-    private final boolean m_isSSLConfigured;
     private final SSLMessageDecrypter m_sslMessageDecrypter;
 
     /** Wrap a socket with a VoltPort */
@@ -108,7 +108,6 @@ public class VoltPort implements Connection
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         m_sslEngine = sslEngine;
-        m_isSSLConfigured = m_sslEngine == null ? false : true;
         m_sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
     }
 
@@ -187,14 +186,10 @@ public class VoltPort implements Connection
                      */
                     try {
                         while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            if (m_isSSLConfigured) {
-                                if (m_sslMessageDecrypter.needsChunk()) {
-                                    m_sslMessageDecrypter.addChunk(message);
-                                } else {
-                                    m_sslMessageDecrypter.initialize(message);
-                                }
-                                if (!m_sslMessageDecrypter.needsChunk()) {
-                                    m_handler.handleMessage(m_sslMessageDecrypter.getMessage(), this);
+                            if (m_sslEngine != null) {
+                                List<ByteBuffer> messages = m_sslMessageDecrypter.decryptMessages(message);
+                                for (ByteBuffer mess : messages) {
+                                    m_handler.handleMessage(mess, this);
                                     m_messagesRead++;
                                 }
                             } else {

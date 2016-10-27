@@ -58,9 +58,8 @@ public class TestRateLimitedClientNotifier {
             public DeferredSerialization get() {
                  return new DeferredSerialization() {
                     @Override
-                    public ByteBuffer serialize(final ByteBuffer outbuf) throws IOException {
+                    public void serialize(final ByteBuffer outbuf) throws IOException {
                         outbuf.put(buf);
-                        return null;
                     }
                     @Override
                     public void cancel() {}

@@ -133,9 +133,8 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
         m_queuedWrites.offer(new DeferredSerialization() {
 
             @Override
-            public ByteBuffer serialize(final ByteBuffer outbuf) throws IOException {
+            public void serialize(final ByteBuffer outbuf) throws IOException {
                 outbuf.put(buf);
-                return null;
             }
 
             @Override

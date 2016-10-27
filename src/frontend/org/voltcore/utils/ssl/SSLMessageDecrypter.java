@@ -22,45 +22,109 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.voltdb.common.Constants.SSL_CHUNK_SIZE;
 
 public class SSLMessageDecrypter {
 
-    private final SSLEngine sslEngine;
-    private ByteBuffer decryptionBuffer;
-    private boolean needsChunk;  // true when a message is partially processed
-    private int fullMessageSize;
-    private ByteBuffer fullMessage;
+    private final SSLEngine m_sslEngine;
+    private ByteBuffer m_decBuffer;
+    private ByteBuffer m_partialMessage;
 
     public SSLMessageDecrypter(SSLEngine sslEngine) {
-        this.sslEngine = sslEngine;
-        this.decryptionBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
-        this.needsChunk = false;
+        this.m_sslEngine = sslEngine;
+        this.m_decBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
     }
 
-    public void initialize(ByteBuffer initialChunk) throws IOException {
-        decryptionBuffer.clear();
+    public List<ByteBuffer> decryptMessages(ByteBuffer chunk) throws IOException {
+        unwrap(chunk);
+        List<ByteBuffer> decryptedMessages = new ArrayList<>();
+        while (m_decBuffer.remaining() > 0) {
+            if (m_partialMessage != null) {
+                int bytesRemainingInPartial = m_partialMessage.capacity() - m_partialMessage.position();
+                if (m_decBuffer.remaining() >= bytesRemainingInPartial) {
+                    int oldLimit = m_decBuffer.limit();
+                    m_decBuffer.limit(m_decBuffer.position() + bytesRemainingInPartial);
+                    ByteBuffer restOfPartial = m_decBuffer.slice();
+                    m_partialMessage.put(restOfPartial);
+                    m_partialMessage.flip();
+                    decryptedMessages.add(m_partialMessage);
+                    m_partialMessage = null;
+                    m_decBuffer.position(m_decBuffer.limit());
+                    m_decBuffer.limit(oldLimit);
+                } else {
+                    m_partialMessage.put(m_decBuffer);
+                    // there's nothing left in the dec buffer.
+                    m_decBuffer.clear();
+                    return decryptedMessages;
+                }
+            }
+
+            // in this case there are leftover bytes in the decryption buffer, but not enough
+            // to know the size of the next message.  Save these leftover bytes in the decryption
+            // buffer itself.
+            if (m_decBuffer.remaining() > 0 && m_decBuffer.remaining() < 4) {
+                ByteBuffer leftover = m_decBuffer.slice();
+                m_decBuffer.clear();
+                m_decBuffer.put(leftover);
+                return decryptedMessages;
+            }
+            if (m_decBuffer.remaining() >= 4) {
+                int messageSize = m_decBuffer.getInt();
+                m_partialMessage = ByteBuffer.allocate(messageSize);
+                if (m_decBuffer.remaining() >= messageSize) {
+                    int oldLimit = m_decBuffer.limit();
+                    m_decBuffer.limit(m_decBuffer.position() + messageSize);
+                    m_partialMessage.put(m_decBuffer.slice());
+                    m_partialMessage.flip();
+                    decryptedMessages.add(m_partialMessage);
+                    m_partialMessage = null;
+                    m_decBuffer.position(m_decBuffer.limit());
+                    m_decBuffer.limit(oldLimit);
+                } else {
+                    m_partialMessage.put(m_decBuffer);
+                }
+            }
+        }
+        // all the bytes in the decryption buffer were processed.
+        m_decBuffer.clear();
+        return decryptedMessages;
+    }
+
+    private void unwrap(ByteBuffer chunk) throws IOException {
         while (true) {
+            ByteBuffer decBuffer;
+            boolean hadLeftover = false;
+            if (m_decBuffer.position() > 0) {
+                decBuffer = m_decBuffer.slice();
+                hadLeftover = true;
+            } else {
+                decBuffer = m_decBuffer;
+            }
             SSLEngineResult result;
-            synchronized (sslEngine) {
-                result = sslEngine.unwrap(initialChunk, decryptionBuffer);
+            synchronized (m_sslEngine) {
+                result = m_sslEngine.unwrap(chunk, decBuffer);
             }
             switch (result.getStatus()) {
                 case OK:
-                    decryptionBuffer.flip();
-                    fullMessageSize = decryptionBuffer.getInt();
-                    fullMessage = ByteBuffer.allocate(fullMessageSize);
-                    fullMessage.put(decryptionBuffer);
-                    if (fullMessage.position() == fullMessageSize) {
-                        fullMessage.flip();
-                        needsChunk = false;
+                    if (hadLeftover) {
+                        m_decBuffer.limit(m_decBuffer.position() + decBuffer.position());
+                        m_decBuffer.position(0);
                     } else {
-                        needsChunk = true;
+                        m_decBuffer.flip();
                     }
                     return;
                 case BUFFER_OVERFLOW:
-                    decryptionBuffer = ByteBuffer.allocate(decryptionBuffer.capacity() * 2);
+                    if (m_decBuffer.position() > 0) {
+                        System.err.println("LEFTOVER ON RESIZE " + m_decBuffer.position());
+                        ByteBuffer bigger = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
+                        m_decBuffer.flip();
+                        bigger.put(m_decBuffer);
+                        m_decBuffer = bigger;
+                    }
+                    m_decBuffer = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
                     break;  // try again
                 case BUFFER_UNDERFLOW:
                     throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
@@ -68,43 +132,5 @@ public class SSLMessageDecrypter {
                     throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
             }
         }
-    }
-
-    public void addChunk(ByteBuffer chunk) throws IOException {
-        decryptionBuffer.clear();
-        while (true) {
-            SSLEngineResult result;
-            synchronized (sslEngine) {
-                result = sslEngine.unwrap(chunk, decryptionBuffer);
-            }
-            switch (result.getStatus()) {
-                case OK:
-                    decryptionBuffer.flip();
-                    fullMessage.put(decryptionBuffer);
-                    if (fullMessage.position() == fullMessageSize) {
-                        fullMessage.flip();
-                        needsChunk = false;
-                    }
-                    return;
-                case BUFFER_OVERFLOW:
-                    decryptionBuffer = ByteBuffer.allocate(decryptionBuffer.capacity() * 2);
-                    break;  // try again
-                case BUFFER_UNDERFLOW:
-                    throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
-                case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
-            }
-        }
-    }
-
-    public boolean needsChunk() {
-        return needsChunk;
-    }
-
-    public ByteBuffer getMessage() throws IOException {
-        if (needsChunk) {
-            throw new IOException("message not fully decrypted");
-        }
-        return fullMessage;
     }
 }
