@@ -215,7 +215,9 @@ public class LoadedProcedureSet {
                 }
 
                 runner = m_runnerFactory.create(procedure, proc, m_csp);
-                procedure.initSysProc(m_site, this, proc, catalogContext.cluster, catalogContext.getClusterSettings());
+                procedure.initSysProc(m_site, this, proc, catalogContext.cluster,
+                        catalogContext.getClusterSettings(),
+                        catalogContext.getNodeSettings());
                 builder.put(entry.getKey().intern(), runner);
             }
         }

@@ -18,6 +18,8 @@
 package org.voltdb.dtxn;
 
 import org.voltcore.network.Connection;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -49,6 +51,11 @@ public interface TransactionCreator
             int messageSize,
             long nowNanos);
 
+    // dispatched invocation through invocation dispatcher
+    public ClientResponseImpl dispatch(
+            StoredProcedureInvocation invocation,
+            Connection connection,
+            boolean isAdmin, OverrideCheck bypass);
     /*
      * Only used in IV2. Send a marker for the position of a multi-part transaction in
      * a single part transaction stream for a partition. The sentinel is blocks

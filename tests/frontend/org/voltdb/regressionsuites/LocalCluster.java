@@ -45,8 +45,8 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
-import com.google.common.collect.Maps;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -1442,6 +1442,8 @@ public class LocalCluster implements VoltServerConfig {
         }
 
         m_eeProcs.clear();
+
+        m_running = false;
 
     }
 

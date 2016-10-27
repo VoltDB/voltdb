@@ -193,7 +193,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
                     m_callbacks.put(handle, cb);
 
-                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user);
+                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
                     boolean bval = r == null || r.getStatus() == ClientResponse.SUCCESS;
                     if (r != null) {
                         try {
