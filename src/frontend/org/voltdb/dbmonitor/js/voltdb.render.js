@@ -3080,10 +3080,10 @@ function alertNodeClicked(obj) {
             VoltDBService.PrepareShutdownCluster(function (connection) {
                 var prepare_status = {}
                 var status = -1;
-                var zk_pause_txn_id = 0
+                var zk_pause_txn_id = '0'
                 var data = connection.Metadata['@PrepareShutdown_data']
                 if(data != undefined){
-                    zk_pause_txn_id = parseInt(connection.Metadata['@PrepareShutdown_data']['data'][0][0])
+                    zk_pause_txn_id = connection.Metadata['@PrepareShutdown_data']['data'][0][0]
                     status = parseInt(connection.Metadata['@PrepareShutdown_status'])
                 }
                 prepare_status.zk_pause_txn_id = zk_pause_txn_id;

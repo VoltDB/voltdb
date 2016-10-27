@@ -536,6 +536,8 @@ function loadAdminPage() {
     }
 
     var serverShutdown = function(popup){
+        showHideShutdownErrMsg(true);
+        displayShutdownStatus("liPrepareShutdown", "load")
         voltDbRenderer.prepareShutdownCluster(function (prepare_status) {
             console.log("Preparing for shutdown.");
             displayShutdownStatus("liPrepareShutdown", "load");
