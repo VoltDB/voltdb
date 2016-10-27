@@ -61,16 +61,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
         m_correlatedExpr = expr;
     }
 
-    @Override
-    public Object clone() {
-        ParameterValueExpression clone = (ParameterValueExpression)super.clone();
-        clone.m_paramIndex = m_paramIndex;
-        clone.m_paramIsVector = m_paramIsVector;
-        clone.m_originalValue = m_originalValue;
-        clone.m_correlatedExpr = m_correlatedExpr;
-        return clone;
-    }
-
     /**
      * @return the param
      */

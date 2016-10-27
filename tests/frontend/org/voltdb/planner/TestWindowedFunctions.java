@@ -61,16 +61,15 @@ import org.voltdb.types.SortDirectionType;
 
 public class TestWindowedFunctions extends PlannerTestCase {
     public void testOrderByAndPartitionByExpressions() throws Exception {
-        AbstractPlanNode node;
         try {
-            node = compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) * 2 FROM AAA;");
+            compile("SELECT RANK() OVER (PARTITION BY A*A ORDER BY B) * 2 FROM AAA;");
         } catch (Exception ex) {
-            assertFalse("PartitionBy expressions in windowed expressions don't compile", true);
+            fail("PartitionBy expressions in windowed expressions don't compile");
         }
         try {
-            node = compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA order by B*B;");
+            compile("SELECT RANK() OVER (PARTITION BY A ORDER BY B*B) FROM AAA order by B*B;");
         } catch (Exception ex) {
-            assertFalse("OrderBy expressions in windowed expressions don't compile", true);
+            fail("OrderBy expressions in windowed expressions don't compile");
         }
     }
 
@@ -163,10 +162,11 @@ public class TestWindowedFunctions extends PlannerTestCase {
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
         assertEquals(numPartitionExprs, pbPlanNode.getGroupByExpressionsSize());
-        validateTVEs(input_schema, pbPlanNode);
+        validateTVEs(input_schema, pbPlanNode, false);
     }
 
-    public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
+    public void validateTVEs(NodeSchema input_schema,
+            PartitionByPlanNode pbPlanNode, boolean waiveAliasMatch) {
         List<AbstractExpression> tves = new ArrayList<>();
         for (AbstractExpression ae : pbPlanNode.getGroupByExpressions()) {
             tves.addAll(ae.findAllTupleValueSubexpressions());
@@ -182,7 +182,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
             assertEquals(msg, col.getTableName(), tve.getTableName());
             assertEquals(msg, col.getTableAlias(), tve.getTableAlias());
             assertEquals(msg, col.getColumnName(), tve.getColumnName());
-            assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
+            if ( ! waiveAliasMatch) {
+                assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
+            }
         }
     }
 
@@ -207,13 +209,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // At one point in development, this would only work by disabling ALPHA.A as a possible resolution.
         // It got a mysterious "Mismatched columns A in subquery" error.
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, true);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
         windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateQueryWithSubquery(windowedQuery);
+        validateQueryWithSubquery(windowedQuery, false);
 
         // Test with windowed aggregates in the subquery itself.
 
@@ -267,7 +269,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
      * produces a similar plan
      * @param windowedQuery a variant of a test query of a known basic format
      **/
-    private void validateQueryWithSubquery(String windowedQuery) {
+    private void validateQueryWithSubquery(String windowedQuery,
+            boolean waiveAliasMatch) {
         AbstractPlanNode node = compile(windowedQuery);
         // Dissect the plan.
         assertTrue(node instanceof SendPlanNode);
@@ -288,7 +291,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
 
-        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode,
+                waiveAliasMatch);
     }
 
     public void testRankWithPartitions() {

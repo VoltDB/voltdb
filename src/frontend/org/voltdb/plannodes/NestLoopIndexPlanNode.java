@@ -82,44 +82,49 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
-        IndexScanPlanNode inline_scan =
+    public void resolveColumnIndexes() {
+        IndexScanPlanNode inlineScan =
             (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-        assert (m_children.size() == 1 && inline_scan != null);
-        for (AbstractPlanNode child : m_children)
-        {
+        assert (m_children.size() == 1 && inlineScan != null);
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
-        if (limit != null)
-        {
+        if (limit != null) {
             // output schema of limit node has not been used
             limit.m_outputSchema = m_outputSchemaPreInlineAgg;
             limit.m_hasSignificantOutputSchema = false;
         }
 
         // We need the schema from the target table from the inlined index
-        final NodeSchema complete_schema_of_inner_table = inline_scan.getTableSchema();
+        final NodeSchema completeInnerTableSchema = inlineScan.getTableSchema();
         // We need the output schema from the child node
-        final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
+        final NodeSchema outerSchema = m_children.get(0).getOutputSchema();
 
         // pull every expression out of the inlined index scan
         // and resolve all of the TVEs against our two input schema from above.
         //
-        // Tickets ENG-9389, ENG-9533: we use the complete schema for the inner table
-        // (rather than the smaller schema from the inlined index scan's inlined project node)
-        // because the inlined scan has no temp table, so predicates will be accessing the
-        // scanned table directly.
-        resolvePredicate(inline_scan.getPredicate(), outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(inline_scan.getEndExpression(), outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(inline_scan.getInitialExpression(), outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(m_preJoinPredicate, outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(m_joinPredicate, outer_schema, complete_schema_of_inner_table);
-        resolvePredicate(m_wherePredicate, outer_schema, complete_schema_of_inner_table);
+        // Tickets ENG-9389, ENG-9533: we use the complete schema for the inner
+        // table (rather than the smaller schema from the inlined index scan's
+        // inlined project node) because the inlined scan has no temp table,
+        // so predicates will be accessing the index-scanned table directly.
+        resolvePredicate(inlineScan.getPredicate(),
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getEndExpression(),
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getInitialExpression(),
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getSkipNullPredicate(),
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(inlineScan.getSearchKeyExpressions(),
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_preJoinPredicate,
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_joinPredicate,
+                outerSchema, completeInnerTableSchema);
+        resolvePredicate(m_wherePredicate,
+                outerSchema, completeInnerTableSchema);
 
         // Resolve subquery expression indexes
         resolveSubqueryColumnIndexes();
@@ -134,13 +139,16 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
             int index;
             int tableIdx;
-            if (i < outer_schema.size()) {
-                index = outer_schema.getIndexOfTve(tve);
+            if (i < outerSchema.size()) {
                 tableIdx = 0; // 0 for outer table
+                index = outerSchema.getIndexOfTve(tve);
+                if (index >= 0) {
+                    tve.setColumnIndex(index);
+                }
             }
             else {
-                index = tve.resolveColumnIndexesUsingSchema(complete_schema_of_inner_table);
                 tableIdx = 1;   // 1 for inner table
+                index = tve.setColumnIndexUsingSchema(completeInnerTableSchema);
             }
 
             if (index == -1) {
@@ -148,7 +156,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                                            col.toString());
             }
 
-            tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
         }
 
@@ -156,8 +163,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // and further ordered by TVE index within the left- and righthand sides.
         // generateOutputSchema already places outer columns on the left and inner on the right,
         // so we just need to order the left- and righthand sides by TVE index separately.
-        m_outputSchemaPreInlineAgg.sortByTveIndex(0, outer_schema.size());
-        m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
+        m_outputSchemaPreInlineAgg.sortByTveIndex(0, outerSchema.size());
+        m_outputSchemaPreInlineAgg.sortByTveIndex(outerSchema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
 
         resolveRealOutputSchema();

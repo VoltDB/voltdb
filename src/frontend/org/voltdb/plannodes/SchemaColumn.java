@@ -29,11 +29,10 @@ import org.voltdb.expressions.TupleValueExpression;
  * in the planner.
  *
  */
-public class SchemaColumn
-{
-    public enum Members {
-        COLUMN_NAME,
-        EXPRESSION,
+public class SchemaColumn {
+    private static class Members {
+        public static final String COLUMN_NAME = "COLUMN_NAME";
+        public static final String EXPRESSION = "EXPRESSION";
     }
 
     private String m_tableName;
@@ -60,25 +59,26 @@ public class SchemaColumn
      * Some callers seem to provide an empty string instead of a null.  We change the
      * empty string to null to simplify the comparison functions.
      */
-    SchemaColumn(String tableName, String tableAlias, String columnName, String columnAlias) {
+    SchemaColumn(String tableName, String tableAlias,
+            String columnName, String columnAlias) {
         m_tableName = tableName == null || tableName.equals("") ? null : tableName;
         m_tableAlias = tableAlias == null || tableAlias.equals("") ? null : tableAlias;
         m_columnName = columnName == null || columnName.equals("") ? null : columnName;
         m_columnAlias = columnAlias == null || columnAlias.equals("") ? null : columnAlias;
     }
 
-    public SchemaColumn(String tableName, String tableAlias, String columnName,
-                        String columnAlias, AbstractExpression expression)
-    {
+    public SchemaColumn(String tableName, String tableAlias,
+            String columnName, String columnAlias,
+            AbstractExpression expression) {
         this(tableName, tableAlias, columnName, columnAlias);
         if (expression != null) {
-            m_expression = (AbstractExpression) expression.clone();
+            m_expression = expression.clone();
         }
     }
 
-    public SchemaColumn(String tableName, String tableAlias, String columnName,
-            String columnAlias, AbstractExpression expression, int differentiator)
-    {
+    public SchemaColumn(String tableName, String tableAlias,
+            String columnName, String columnAlias,
+            AbstractExpression expression, int differentiator) {
         this(tableName, tableAlias, columnName, columnAlias, expression);
         m_differentiator = differentiator;
     }
@@ -87,10 +87,10 @@ public class SchemaColumn
      * Clone a schema column
      */
     @Override
-    protected SchemaColumn clone()
-    {
-        return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                m_expression, m_differentiator);
+    protected SchemaColumn clone() {
+        return new SchemaColumn(m_tableName, m_tableAlias,
+                m_columnName, m_columnAlias,
+                m_expression, m_differentiator);
     }
 
     /**
@@ -178,10 +178,13 @@ public class SchemaColumn
     @Override
     public int hashCode () {
         // based on implementation of equals
-        int result = m_tableAlias != null ? m_tableAlias.hashCode() : m_tableName.hashCode();
+        int result = m_tableAlias != null ?
+                m_tableAlias.hashCode() :
+                m_tableName.hashCode();
         if (m_columnName != null && !m_columnName.equals("")) {
             result += m_columnName.hashCode();
-        } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
+        }
+        else if (m_columnAlias != null && !m_columnAlias.equals("")) {
             result += m_columnAlias.hashCode();
         }
 
@@ -193,46 +196,34 @@ public class SchemaColumn
     /**
      * Return a copy of this SchemaColumn, but with the input expression
      * replaced by an appropriate TupleValueExpression.
+     * @param colIndex
      */
-    public SchemaColumn copyAndReplaceWithTVE()
-    {
-        TupleValueExpression new_exp = null;
-        if (m_expression instanceof TupleValueExpression)
-        {
-            new_exp = (TupleValueExpression) m_expression.clone();
+    public SchemaColumn copyAndReplaceWithTVE(int colIndex) {
+        TupleValueExpression newTve;
+        if (m_expression instanceof TupleValueExpression) {
+            newTve = (TupleValueExpression) m_expression.clone();
+            newTve.setColumnIndex(colIndex);
         }
-        else
-        {
-            new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
-            // XXX not sure this is right
-            new_exp.setTypeSizeBytes(m_expression.getValueType(), m_expression.getValueSize(),
-                    m_expression.getInBytes());
+        else {
+            newTve = new TupleValueExpression(m_tableName, m_tableAlias,
+                    m_columnName, m_columnAlias,
+                    m_expression, colIndex);
         }
-        return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                new_exp, m_differentiator);
+        return new SchemaColumn(m_tableName, m_tableAlias,
+                m_columnName, m_columnAlias,
+                newTve, m_differentiator);
     }
 
-    public String getTableName()
-    {
-        return m_tableName;
-    }
+    public String getTableName() { return m_tableName; }
 
-    public String getTableAlias()
-    {
-        return m_tableAlias;
-    }
+    public String getTableAlias() { return m_tableAlias; }
 
-    public String getColumnName()
-    {
-        return m_columnName;
-    }
+    public String getColumnName() { return m_columnName; }
 
-    public String getColumnAlias()
-    {
-        return m_columnAlias;
-    }
+    public String getColumnAlias() { return m_columnAlias; }
 
-    public void reset(String tbName, String tbAlias, String colName, String colAlias) {
+    public void reset(String tbName, String tbAlias,
+            String colName, String colAlias) {
         m_tableName = tbName;
         m_tableAlias = tbAlias;
         m_columnName = colName;
@@ -247,29 +238,18 @@ public class SchemaColumn
         }
     }
 
-    public AbstractExpression getExpression()
-    {
-        return m_expression;
-    }
+    public AbstractExpression getExpression() { return m_expression; }
 
-    public VoltType getType()
-    {
-        return m_expression.getValueType();
-    }
+    public VoltType getType() { return m_expression.getValueType(); }
 
-    public int getSize()
-    {
-        return m_expression.getValueSize();
-    }
+    public int getSize() { return m_expression.getValueSize(); }
 
     /**
      * Return the differentiator that can distinguish columns with the same name.
      * This value is just the ordinal position of the SchemaColumn within its NodeSchema.
      * @return  differentiator for this schema column
      */
-    public int getDifferentiator() {
-        return m_differentiator;
-    }
+    public int getDifferentiator() { return m_differentiator; }
 
     /**
      * Set the differentiator value for this SchemaColumn.
@@ -279,24 +259,8 @@ public class SchemaColumn
         m_differentiator = differentiator;
     }
 
-    @Override
-    public String toString()
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("SchemaColumn:\n");
-        sb.append("\tTable Name: ").append(m_tableName).append("\n");
-        sb.append("\tTable Alias: ").append(m_tableAlias).append("\n");
-        sb.append("\tColumn Name: ").append(m_columnName).append("\n");
-        sb.append("\tColumn Alias: ").append(m_columnAlias).append("\n");
-        sb.append("\tColumn Type: ").append(getType()).append("\n");
-        sb.append("\tColumn Size: ").append(getSize()).append("\n");
-        sb.append("\tDifferentiator: ").append(getDifferentiator()).append("\n");
-        sb.append("\tExpression: ").append(m_expression.toString()).append("\n");
-        return sb.toString();
-    }
-
-    public void toJSONString(JSONStringer stringer, boolean finalOutput) throws JSONException
-    {
+    public void toJSONString(JSONStringer stringer, boolean finalOutput)
+            throws JSONException {
         stringer.object();
         // Tell the EE that the column name is either a valid column
         // alias or the original column name if no alias exists.  This is a
@@ -304,17 +268,16 @@ public class SchemaColumn
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
         if (finalOutput) {
-            if (getColumnAlias() != null && !getColumnAlias().equals(""))
-            {
-                stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
+            if (getColumnAlias() != null && !getColumnAlias().equals("")) {
+                stringer.key(Members.COLUMN_NAME).value(getColumnAlias());
             }
             else if (getColumnName() != null) {
-                stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
+                stringer.key(Members.COLUMN_NAME).value(getColumnName());
             }
         }
 
         if (m_expression != null) {
-            stringer.key(Members.EXPRESSION.name());
+            stringer.key(Members.EXPRESSION);
             stringer.object();
             m_expression.toJSONString(stringer);
             stringer.endObject();
@@ -323,18 +286,19 @@ public class SchemaColumn
         stringer.endObject();
     }
 
-    public static SchemaColumn fromJSONObject(JSONObject jobj) throws JSONException
-    {
+    public static SchemaColumn fromJSONObject(JSONObject jobj)
+            throws JSONException {
         String tableName = null;
         String tableAlias = null;
         String columnName = null;
         String columnAlias = null;
         AbstractExpression expression = null;
-        if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
-            columnName = jobj.getString( Members.COLUMN_NAME.name() );
+        if( ! jobj.isNull(Members.COLUMN_NAME)){
+            columnName = jobj.getString(Members.COLUMN_NAME);
         }
-        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION.name());
-        return new SchemaColumn( tableName, tableAlias, columnName, columnAlias, expression );
+        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION);
+        return new SchemaColumn(tableName, tableAlias,
+                columnName, columnAlias, expression);
     }
 
     /**
@@ -342,16 +306,14 @@ public class SchemaColumn
      * when detailed debug output is enabled.
      * @return a string that represents this SchemaColumn
      */
-    public String toExplainPlanString() {
+    @Override
+    public String toString() {
         String str = "";
-        String table;
-        if (getTableAlias() != null) {
-            table = getTableAlias();
-        }
-        else if (getTableName() != null) {
+        String table = getTableAlias();
+        if (table == null) {
             table = getTableName();
         }
-        else {
+        if (table == null) {
             table = "<null>";
         }
         str += table;

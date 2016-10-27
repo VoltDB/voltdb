@@ -26,8 +26,8 @@ import org.voltdb.expressions.TupleValueExpression;
 
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
-    public enum Members {
-        TARGET_TABLE_NAME;
+    private static class Members {
+        static final String TARGET_TABLE_NAME = "TARGET_TABLE_NAME";
     }
 
     // The target table is the table that the plannode wants to perform some operation on.
@@ -38,8 +38,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public String getUpdatedTable()
-    {
+    public String getUpdatedTable() {
         assert(m_targetTableName.length() > 0);
         return m_targetTableName;
     }
@@ -81,8 +80,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // Operation nodes (Insert/update/delete) have an output schema
         // of one column, which is the number of modified tuples
         // Delete nodes have a special case with no child node when they
@@ -90,42 +88,37 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1 ||
                ((this instanceof DeletePlanNode) &&
                 (((DeletePlanNode)this).m_truncate)));
-        if (m_children.size() == 1)
-        {
+        if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
         }
         // Our output schema isn't ever going to change, only generate this once
-        if (m_outputSchema == null)
-        {
+        if (m_outputSchema == null) {
             m_outputSchema = new NodeSchema();
             // If there is a child node, its output schema will depend on that.
             // If not, mark this flag true to get initialized in EE.
-            m_hasSignificantOutputSchema = m_children.size() == 0 ? true : false;
+            m_hasSignificantOutputSchema = (m_children.size() == 0);
 
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "modified_tuples", "modified_tuples", 0);
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
-                                                "VOLT_TEMP_TABLE",
-                                                "modified_tuples",
-                                                "modified_tuples",
-                                                tve);
-            m_outputSchema.addColumn(col);
+            m_outputSchema.addColumn(
+                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    "modified_tuples", "modified_tuples",
+                    tve);
         }
         return;
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         assert(m_children.size() == 1 ||
                ((this instanceof DeletePlanNode) &&
                 (((DeletePlanNode)this).m_truncate)));
-        if (m_children.size() == 1)
-        {
+        if (m_children.size() == 1) {
             m_children.get(0).resolveColumnIndexes();
         }
         // No operation plan node (INSERT/UPDATE/DELETE) currently
@@ -138,12 +131,13 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
+        stringer.key(Members.TARGET_TABLE_NAME).value(m_targetTableName);
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+        m_targetTableName = jobj.getString(Members.TARGET_TABLE_NAME);
     }
 }

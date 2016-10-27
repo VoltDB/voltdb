@@ -584,7 +584,7 @@ public class MaterializedViewProcessor {
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
-        if (stmt.m_having != null) {
+        if (stmt.getHavingPredicate() != null) {
             msg.append("with HAVING clause is not supported.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
@@ -786,7 +786,7 @@ public class MaterializedViewProcessor {
     private static Index findBestMatchIndexForMatviewMinOrMax(MaterializedViewInfo matviewinfo,
             Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr) {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+        StmtTableScan tableScan = new StmtTargetTableScan(srcTable);
 
         // Candidate index. If we can find an index covering both group-by columns and aggExpr (optimal) then we will
         // return immediately.

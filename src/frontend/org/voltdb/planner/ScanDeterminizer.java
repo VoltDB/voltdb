@@ -116,18 +116,12 @@ public class ScanDeterminizer {
                 continue;
             }
             // skip partial indexes
-            else if (!index.getPredicatejson().isEmpty()) {
+            else if ( ! index.getPredicatejson().isEmpty()) {
                 continue;
             }
-            else {
-                if (indexToScan == null) {
-                    indexToScan = index;
-                }
-                else {
-                    if (CatalogUtil.getCatalogIndexSize(indexToScan) > CatalogUtil.getCatalogIndexSize(index)) {
-                        indexToScan = index;
-                    }
-                }
+            else if (indexToScan == null ||
+                    CatalogUtil.getCatalogIndexSize(indexToScan) > CatalogUtil.getCatalogIndexSize(index)) {
+                indexToScan = index;
             }
         }
 
@@ -136,9 +130,9 @@ public class ScanDeterminizer {
         }
 
         // make an index node from the scan node
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
+        IndexScanPlanNode indexScanNode =
+                new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
         indexScanNode.setForDeterminismOnly();
-
         return indexScanNode;
     }
 
