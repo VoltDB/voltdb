@@ -55,7 +55,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_limitParameterId = limit.m_limitParameterId;
         m_offsetParameterId = limit.m_offsetParameterId;
         if (limit.getLimitExpression() != null) {
-            m_limitExpression = (AbstractExpression)limit.getLimitExpression().clone();
+            m_limitExpression = limit.getLimitExpression().clone();
         }
     }
 
@@ -132,19 +132,18 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.resolveColumnIndexes();
+        NodeSchema inputSchema = childNode.getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            assert(colExpr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) colExpr;
+            tve.setColumnIndexUsingSchema(inputSchema);
         }
         m_outputSchema.sortByTveIndex();
     }

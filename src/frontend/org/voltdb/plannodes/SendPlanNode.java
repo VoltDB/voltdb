@@ -24,6 +24,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -39,35 +40,42 @@ public class SendPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        assert (input_schema.equalsOnlyNames(m_outputSchema));
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.resolveColumnIndexes();
+        NodeSchema inputSchema = childNode.getOutputSchema();
+        if (!(inputSchema.equalsOnlyNames(m_outputSchema))) {
+            System.out.println("ERROR: IN: " + inputSchema + " OUT: " + m_outputSchema);
+        }
+        assert(inputSchema.equalsOnlyNames(m_outputSchema));
 
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            assert(colExpr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) colExpr;
+            tve.setColumnIndexUsingSchema(inputSchema);
         }
         // output schema for SendPlanNode should not ever be changed
     }
 
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+            Cluster cluster, Database db, DatabaseEstimates estimates,
+            ScalarValueHints[] paramHints) {
         assert(estimates != null);
-
-        // Recursively compute and collect stats from the child node, but don't add any costs for this Send node.
-        // Let the parent "RecievePlanNode" account for any (theoretical) cost differences due to how much data
+        // Recursively compute and collect stats from the child node,
+        // but don't add any costs for this Send node.
+        // Let the parent "RecievePlanNode" account for any (theoretical)
+        // cost differences due to how much data
         // different plans must distribute as intermediate results.
-        // Don't bother accounting for how much data is sent as the FINAL result -- when there is no RecivePlanNode --
-        // that cost is constant for a given query, so it would be a wash when comparing any two plans for that query.
+        // Don't bother accounting for how much data is sent as the FINAL
+        // result -- when there is no ReceivePlanNode --
+        // that cost is constant for a given query, so it would be a wash
+        // when comparing any two plans for that query.
         m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
         m_estimatedProcessedTupleCount = 0;
     }
@@ -88,7 +96,8 @@ public class SendPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
         helpLoadFromJSONObject(jobj, db);
     }
 

@@ -195,7 +195,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}});
 
-        // decending
+        // descending
         vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 5}, {20, 4}, {30, 3}, {40, 2}, {50, 1}});
 

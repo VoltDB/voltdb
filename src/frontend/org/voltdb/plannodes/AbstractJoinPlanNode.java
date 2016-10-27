@@ -21,7 +21,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -116,7 +115,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setWherePredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_wherePredicate = (AbstractExpression) predicate.clone();
+            m_wherePredicate = predicate.clone();
         } else {
             m_wherePredicate = null;
         }
@@ -128,7 +127,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setPreJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_preJoinPredicate = (AbstractExpression) predicate.clone();
+            m_preJoinPredicate = predicate.clone();
         } else {
             m_preJoinPredicate = null;
         }
@@ -140,7 +139,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_joinPredicate = (AbstractExpression) predicate.clone();
+            m_joinPredicate = predicate.clone();
         } else {
             m_joinPredicate = null;
         }
@@ -222,10 +221,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index;
             if (i < outer_schema.size()) {
-                index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+                index = tve.setColumnIndexUsingSchema(outer_schema);
             }
             else {
-                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
+                index = tve.setColumnIndexUsingSchema(inner_schema);
             }
 
             if (index == -1) {
@@ -317,8 +316,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
-    {
+    public void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
         m_preJoinPredicate = AbstractExpression.fromJSONChild(jobj, Members.PRE_JOIN_PREDICATE.name());
@@ -326,14 +325,11 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
 
         if ( !jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name() ) ) {
-            m_outputSchemaPreInlineAgg = new NodeSchema();
             m_hasSignificantOutputSchema = true;
-            JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
-            }
-        } else {
+            m_outputSchemaPreInlineAgg = loadSchemaFromJSONObject(jobj,
+                    Members.OUTPUT_SCHEMA_PRE_AGG.name());
+        }
+        else {
             m_outputSchemaPreInlineAgg = m_outputSchema;
         }
     }
@@ -346,29 +342,27 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      * @param inner_schema
      */
     protected static void resolvePredicate(AbstractExpression expression,
-            NodeSchema outer_schema, NodeSchema inner_schema)
-    {
+            NodeSchema outer_schema, NodeSchema inner_schema) {
         List<TupleValueExpression> predicate_tves =
                 ExpressionUtil.getTupleValueExpressions(expression);
         for (TupleValueExpression tve : predicate_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+            int index = tve.setColumnIndexUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
             if (index == -1) {
-                index = tve.resolveColumnIndexesUsingSchema(inner_schema);
+                index = tve.setColumnIndexUsingSchema(inner_schema);
                 if (index == -1) {
-                    throw new RuntimeException("Unable to resolve column index for join TVE: " +
-                                               tve.toString());
+                    throw new RuntimeException(
+                            "Unable to resolve column index for join TVE: " +
+                            tve.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
             }
-            tve.setColumnIndex(index);
             tve.setTableIndex(tableIdx);
         }
     }
 
     protected static void resolvePredicate(List<AbstractExpression> expressions,
-            NodeSchema outer_schema, NodeSchema inner_schema)
-    {
+            NodeSchema outer_schema, NodeSchema inner_schema) {
         for (AbstractExpression expr : expressions) {
             resolvePredicate(expr, outer_schema, inner_schema);
         }
@@ -453,20 +447,20 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     /**
      * When a project node is added to the top of the plan, we need to adjust
      * the differentiator field of TVEs to reflect differences in the scan
-     * schema vs the storage schema of a table, so that fields with duplicate names
-     * produced by expanding "SELECT *" can resolve correctly.
+     * schema vs the storage schema of a table, so that fields with duplicate
+     * names produced by expanding "SELECT *" can resolve correctly.
      *
      * We recurse until we find either a join node or a scan node.
      *
-     * Resolution of columns produced by "SELECT *" is not a problem for joins because
-     * there is always a sequential scan at the top of plans that have this problem,
-     * so just return the passed-in differentiator here.
+     * Resolution of columns produced by "SELECT *" is not a problem for
+     * joins because there is always a sequential scan at the top of plans
+     * that have this problem, so just use the tve's coluymn index as its
+     * differentiator here.
      *
-     * @param  existing differentiator field of a TVE
-     * @return new differentiator value
+     * @param  tve
      */
     @Override
-    public int adjustDifferentiatorField(int differentiator) {
-        return differentiator;
+    public void adjustDifferentiatorField(TupleValueExpression tve) {
+        tve.setDifferentiator(tve.getColumnIndex());
     }
 }
