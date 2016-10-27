@@ -23,16 +23,14 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltdb.common.Constants;
+import org.voltcore.utils.ssl.SSLMessageEncrypter;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 
 /**
 *
@@ -83,10 +81,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
-    private final SSLEngine m_sslEngine;
-    private ByteBuffer m_sslDst;
-    private final List<ByteBuffer> m_buffsToWrite;
-    private int m_sizeOfBuffToWrite;
+    private final SSLMessageEncrypter m_sslMessageEncrypter;
+    private final List<ByteBuffer> m_encryptedBuffers;
+    private final WriteBuffers m_writeBuffers;
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null, null);
@@ -103,9 +100,15 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
-        m_sslEngine = sslEngine;
-        m_sslDst = ByteBuffer.allocate(Constants.SSL_CHUNK_SIZE << 1);
-        m_buffsToWrite = new ArrayList<>();
+        if (sslEngine != null) {
+            m_sslMessageEncrypter = new SSLMessageEncrypter(sslEngine);
+            m_encryptedBuffers = new ArrayList<>();
+            m_writeBuffers = new SSLWriteBuffers();
+        } else {
+            m_sslMessageEncrypter = null;
+            m_encryptedBuffers = null;
+            m_writeBuffers = new ClearWriteBuffers();
+        }
     }
 
     /*
@@ -120,7 +123,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     @Override
     synchronized public boolean isEmpty()
     {
-        return super.isEmpty() && m_queuedWrites.isEmpty();
+        return super.isEmpty() && m_writeBuffers.isEmpty();
     }
 
     /**
@@ -340,21 +343,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         try {
             long rc = 0;
             do {
-                // TODO needs cleanup
-                if (m_sslEngine == null) {
-                    if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                    ByteBuffer buffer = m_writeBuffers.getBuffer();
+                    if (buffer == null) {
                         return bytesWritten;
                     }
-
-                    ByteBuffer buffer = null;
-                    if (m_currentWriteBuffer == null) {
-                        m_currentWriteBuffer = m_queuedBuffers.poll();
-                        buffer = m_currentWriteBuffer.b();
-                        buffer.flip();
-                    } else {
-                        buffer = m_currentWriteBuffer.b();
-                    }
-
                     rc = channel.write(buffer);
 
                     //Discard the buffer back to a pool if no data remains
@@ -363,66 +355,21 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                             backpressureStarted();
                         }
                     } else {
-                        m_currentWriteBuffer.discard();
-                        m_currentWriteBuffer = null;
+                        int discarded = m_writeBuffers.discardBuffer();
+                        updateQueued(-discarded, false);
                         m_messagesWritten++;
                     }
                     bytesWritten += rc;
 
-                } else {
-
-                    // if more buffers need to be encrypted
-                    if (m_buffsToWrite.isEmpty()) {
-                        // but there's no more data to encrypt
-                        if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                            return bytesWritten;
-                        }
-                        // get the next buffer to encrypt
-                        ByteBuffer buffer;
-                        if (m_currentWriteBuffer == null) {
-                            m_currentWriteBuffer = m_queuedBuffers.poll();
-                            buffer = m_currentWriteBuffer.b();
-                            buffer.flip();
-                        } else {
-                            buffer = m_currentWriteBuffer.b();
-                        }
-                        // wrap the buffer, the results go into m_buffsToWrite
-                        m_sizeOfBuffToWrite = buffer.remaining();
-                        wrap(buffer);
-                        m_currentWriteBuffer.discard();
-                        m_currentWriteBuffer = null;
-                    }
-
-                    Iterator<ByteBuffer> buffsIter = m_buffsToWrite.iterator();
-                    while (buffsIter.hasNext()) {
-                        ByteBuffer buffToWrite = buffsIter.next();
-                        rc = channel.write(buffToWrite);
-                        bytesWritten += rc;
-                        if (buffToWrite.hasRemaining()) {
-                            if (!m_hadBackPressure) {
-                                backpressureStarted();
-                            }
-                            break;
-                        } else {
-                            buffsIter.remove();
-                        }
-                    }
-                    if (!buffsIter.hasNext()) {
-                        m_messagesWritten++;
-                        bytesWritten += m_sizeOfBuffToWrite;
-                    }
-                    bytesWritten += rc;
-                }
-
-            } while (rc > 0);
+             } while (rc > 0);
         } finally {
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
-            if (m_buffsToWrite.isEmpty() && m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+            if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
                 backpressureEnded();
             }
             //Same here I dont know if we do need to do this housekeeping??
-            if (!m_buffsToWrite.isEmpty() || !isEmpty()) {
+            if (!isEmpty()) {
                 if (bytesWritten > 0) {
                     m_lastPendingWriteTime = EstTime.currentTimeMillis();
                 }
@@ -430,59 +377,88 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 m_lastPendingWriteTime = -1;
             }
             if (bytesWritten > 0) {
-                updateQueued(-bytesWritten, false);
                 m_bytesWritten += bytesWritten;
             }
         }
         return bytesWritten;
     }
 
-    private void wrap(ByteBuffer src) throws IOException {
-        while (src.remaining() > 0) {
-            if (src.remaining() < Constants.SSL_CHUNK_SIZE) {
-                ByteBuffer chunk = src.slice();
-                encrypt(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
-                encyptedChunk.putInt(m_sslDst.remaining());
-                encyptedChunk.put(m_sslDst);
-                encyptedChunk.flip();
-                m_buffsToWrite.add(encyptedChunk);
-                src.position(src.limit());
-            } else {
-                int oldLimit = src.limit();
-                int nextPosition = src.position() + Constants.SSL_CHUNK_SIZE;
-                src.limit(nextPosition);
-                ByteBuffer chunk = src.slice();
-                encrypt(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
-                encyptedChunk.putInt(m_sslDst.remaining());
-                encyptedChunk.put(m_sslDst);
-                encyptedChunk.flip();
-                m_buffsToWrite.add(encyptedChunk);
-                src.position(nextPosition);
-                src.limit(oldLimit);
+    private interface WriteBuffers {
+        ByteBuffer getBuffer() throws IOException;
+        int discardBuffer();
+        boolean isEmpty();
+    }
+    private class ClearWriteBuffers implements WriteBuffers {
+
+        private int currentBuffSize = 0;
+
+        // get the buffer that is currently being written.
+        // returns null if no buffer to write.
+        public ByteBuffer getBuffer() {
+            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                return null;
             }
+            if (m_currentWriteBuffer == null) {
+                m_currentWriteBuffer = m_queuedBuffers.poll();
+                ByteBuffer buffer = m_currentWriteBuffer.b();
+                buffer.flip();
+                currentBuffSize = buffer.remaining();
+                return buffer;
+            } else {
+                return m_currentWriteBuffer.b();
+            }
+        }
+
+        // no more bytes to write in the current buffer.
+        public int discardBuffer() {
+            m_currentWriteBuffer.discard();
+            m_currentWriteBuffer = null;
+            return currentBuffSize;
+        }
+
+        public boolean isEmpty() {
+            return m_queuedWrites.isEmpty();
         }
     }
 
-    private void encrypt(ByteBuffer src) throws IOException {
-        m_sslDst.clear();
-        while (true) {
-            SSLEngineResult result = m_sslEngine.wrap(src, m_sslDst);
-            switch (result.getStatus()) {
-                case OK:
-                    m_sslDst.flip();
-                    return;
-                case BUFFER_OVERFLOW:
-                    m_sslDst = ByteBuffer.allocate(m_sslDst.capacity() << 1);
-                    break;
-                case BUFFER_UNDERFLOW:
-                    throw new IOException("Underflow on ssl wrap of buffer.");
-                case CLOSED:
-                    throw new IOException("SSL engine is closed on ssl wrap of buffer.");
-                default:
-                    throw new IOException("Unexpected SSLEngineResult.Status");
+    private class SSLWriteBuffers implements WriteBuffers {
+
+        private int currentBuffSize = 0;
+
+        public ByteBuffer getBuffer() throws IOException {
+            if (!m_encryptedBuffers.isEmpty()) {
+                return m_encryptedBuffers.get(0);
             }
+            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                return null;
+            }
+            ByteBuffer buffer;
+            if (m_currentWriteBuffer == null) {
+                m_currentWriteBuffer = m_queuedBuffers.poll();
+                buffer = m_currentWriteBuffer.b();
+                buffer.flip();
+                currentBuffSize = buffer.remaining();
+            } else {
+                buffer = m_currentWriteBuffer.b();
+            }
+            m_encryptedBuffers.addAll(m_sslMessageEncrypter.encryptBuffer(buffer));
+            m_currentWriteBuffer.discard();
+            m_currentWriteBuffer = null;
+            return m_encryptedBuffers.get(0);
+        }
+
+        public int discardBuffer() {
+            m_encryptedBuffers.remove(0);
+            if (m_encryptedBuffers.isEmpty()) {
+                return currentBuffSize;
+            } else {
+                return 0;
+            }
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return m_encryptedBuffers.isEmpty() && m_queuedWrites.isEmpty();
         }
     }
 }
