@@ -557,7 +557,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 m_bufferPushPermits.release();
             }
-            exportLog.warn("Push export buffer called before the generation is active.");
             return;
         }
 
@@ -899,8 +898,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
-        } else {
-            exportLog.info("Ack with 0 for source ");
         }
     }
 
@@ -983,7 +980,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             builder.append(queuedR.getTaskName() + "\t");
                          }
 
-                        exportLog.error(builder.toString());
+                        exportLog.warn(builder.toString());
 
                         return Futures.immediateFuture(null);
                     }

@@ -1255,6 +1255,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                             oldspecs, nspecs, stat.getVersion()
                             );
                     for (ImporterChannelAssignment cassigns: assignment.getImporterChannelAssignments()) {
+                        if (m_done.get()) break;
                         m_eb.post(cassigns);
                     }
                     if (!assignment.getRemoved().isEmpty()) {
