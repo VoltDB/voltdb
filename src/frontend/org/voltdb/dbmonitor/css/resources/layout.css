@@ -1873,6 +1873,7 @@ ul.topRightList li a {
 .blockWrapper {
     margin-bottom: 20px;
     margin-top:3px;
+
 }
 
 .objectExplorer {
@@ -1896,10 +1897,11 @@ ul.topRightList li a {
 .queryInput .query textarea {
     width: 100%;
     padding: 1%;
-    resize: none !important;
+    /*resize: none !important;*/
     height: 215px;
     border: 1px solid #CCCCCC;
-    line-height: 25px;
+    /*line-height: 25px;*/
+    resize:vertical;
     font-size: 18px;
 }
 
@@ -1927,11 +1929,7 @@ ul.topRightList li a {
     margin: 0 0 1.5px 0 !important;
     padding: 17px 20px 17px 45px;
     background-color: #FFFFFF;
-    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
-    -moz-box-shadow: 0px 6px 7px -5px #ccc;
-    box-shadow: 0px 6px 7px -5px #ccc;
-}
-
+    }
 .blockWrapper h1.theHeadingQuery {
     margin: 0 0 1.5px 0 !important;
     padding: 0px 0px 8px 2px;
@@ -1946,6 +1944,7 @@ ul.topRightList li a {
     background: #f2f2f2;
     border-bottom: 1px solid #ccc;
     color: #333;
+    margin-top:10px;
 }
 
 .ui-accordion {
@@ -2042,7 +2041,7 @@ border:1px solid #FFF;
 #worktabs .ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active {background:#76BD1D;}
 #worktabs .ui-tabs-nav { padding:1px 0 0px 3px !important; border-radius:0;}
 #worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
-#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-3px; }
+#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-1px; }
 #worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
 #worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
@@ -2066,8 +2065,9 @@ border:1px solid #FFF;
 
 .resultHtml, .resultCsv, .resultMonospace {
     width: 100%;
+    height: 240px;
     overflow: auto;
-    height: 200px;
+
 }
 
 .queryResult pre {
@@ -3893,6 +3893,74 @@ fieldset { border:1px solid #ccc; padding:20px;}
     color: #fff;
 }
 
+/****split css****/
+
+.split {
+   -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+           box-sizing: border-box;
+
+   overflow-y: hidden;
+   overflow-x: auto;
+ }
+
+ .content {
+   border: 1px solid #C0C0C0;
+   box-shadow: inset 0 1px 2px #e4e4e4;
+   background-color: #fff;
+ }
+
+ .gutter {
+   background-color: transparent;
+
+   background-repeat: no-repeat;
+   background-position: 50%;
+ }
+
+ .gutter.gutter-horizontal {
+   cursor: col-resize;
+   background-image: url(images/vertical.png);
+   background-color:#eee;
+ }
+
+ .gutter.gutter-vertical {
+   cursor: row-resize;
+   background-image: url(images/horizontal.png);
+   background-color:#eee;
+   margin-top:15px;
+ }
+
+ .split.split-horizontal, .gutter.gutter-horizontal {
+   height:96.5%;
+   float: left;
+ }
+
+
+ .querybox {
+    -moz-appearance: textfield-multiline;
+    -webkit-appearance: textarea;
+    border: 1px solid #ccc;
+    font: medium -moz-fixed;
+    font: -webkit-small-control;
+    height: 170px;
+    overflow: auto;
+    padding: 2px;
+    resize: vertical;
+    outline:none;
+    white-space: pre;
+    font-size: 18px;
+    font-family: Arial,Helvetica,sans-serif;
+
+}
+.workspace .ui-widget-content {border:none;}
+.queryWrapper {border:1px solid #ccc;}
+
+.verticalWrapper{
+height:650px;
+}
+
+
+
 /**********************Shutdown ******************************/
 ul#shutdownMsg{ margin:0; padding:0;}
 ul#shutdownMsg li{ font-size:13px; line-height:20px; }
@@ -4040,6 +4108,17 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 	.btnStudio { width:100%;margin-top:2px;}
 	.queryHeadName { float:none;}
 	.queryTimeOutLabel { width:86%; margin-right:2px;}
+
+}
+@media (max-width: 480px) {
+        .split {
+        -webkit-box-sizing:content-box;
+        -moz-box-sizing: content-box;
+        box-sizing: content-box;
+        overflow-x: hidden;
+        overflow-y: auto;}
+    }
+
 
 }
 
@@ -4774,3 +4853,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
     }
 }
 
+@media (max-width:768px) {
+.split.split-horizontal, .gutter.gutter-horizontal{height:75%;}
+
+}
