@@ -181,16 +181,6 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public Object clone() {
-        FunctionExpression clone = (FunctionExpression)super.clone();
-        clone.m_name = m_name;
-        clone.m_impliedArgument = m_impliedArgument;
-        clone.m_functionId = m_functionId;
-        clone.m_resultTypeParameterIndex = m_resultTypeParameterIndex;
-        return clone;
-    }
-
-    @Override
     public boolean hasEqualAttributes(AbstractExpression obj) {
         if (obj instanceof FunctionExpression == false) {
             return false;

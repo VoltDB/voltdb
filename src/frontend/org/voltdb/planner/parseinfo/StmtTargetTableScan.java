@@ -23,6 +23,8 @@ import java.util.List;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
@@ -36,6 +38,10 @@ public class StmtTargetTableScan extends StmtTableScan {
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
+    // An original subquery scan that was optimized out and replaced by this table scan
+    // It's required for the column indexes resolution
+    private StmtSubqueryScan m_origSubqueryScan = null;
+
     public StmtTargetTableScan(Table table, String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
         assert (table != null);
@@ -44,8 +50,8 @@ public class StmtTargetTableScan extends StmtTableScan {
         findPartitioningColumns();
     }
 
-    public StmtTargetTableScan(Table table, String tableAlias) {
-        this(table, tableAlias, 0);
+    public StmtTargetTableScan(Table table) {
+        this(table, table.getTypeName(), 0);
     }
 
     @Override
@@ -83,13 +89,13 @@ public class StmtTargetTableScan extends StmtTableScan {
         }
 
         String tbName = m_table.getTypeName();
-        String colName = partitionCol.getTypeName();
 
         TupleValueExpression tve = new TupleValueExpression(
-                tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
-        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
+                tbName, m_tableAlias, partitionCol, partitionCol.getIndex());
 
-        SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
+        String colName = partitionCol.getTypeName();
+        SchemaColumn scol =
+                new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
         m_partitioningColumns = new ArrayList<SchemaColumn>();
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;
@@ -115,9 +121,44 @@ public class StmtTargetTableScan extends StmtTableScan {
     }
 
     @Override
-    public void processTVE(TupleValueExpression expr, String columnName) {
-        expr.resolveForTable(m_table);
+    public AbstractExpression processTVE(TupleValueExpression tve, String columnName) {
+        if (m_origSubqueryScan == null) {
+            tve.resolveForTable(m_table);
+            return tve;
+        }
+
+        // Example:
+        // SELECT TA1.CA CA1 FROM (SELECT T.C CA FROM T TA) TA1;
+        // gets simplified into
+        // SELECT TA1.C CA1 FROM T TA1;
+        // The TA1(TA1).(CA)CA1 TVE needs to be adjusted to be T(TA1).C(CA)
+        // since the original SELECT T.C CA FROM T TA subquery was optimized out.
+        // Table name TA1 is replaced with the original table name T
+        // Column name CA is replaced with the original column name C
+        // Expression differentiator to be replaced with the differentiator
+        // from the original column (T.C)
+        Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName,
+                tve.getDifferentiator());
+        assert(columnIndex != null);
+        SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
+        assert(origColumnSchema != null);
+        String origColumnName = origColumnSchema.getColumnName();
+        // Get the original column expression and adjust its aliases
+        AbstractExpression colExpr = origColumnSchema.getExpression();
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(colExpr);
+        for (TupleValueExpression subqTve : tves) {
+            if (subqTve == colExpr) {
+                subqTve.setTableName(getTableName());
+                subqTve.setColumnName(origColumnName);
+                subqTve.setColumnAlias(tve.getColumnAlias());
+            }
+            subqTve.setTableAlias(tve.getTableAlias());
+            subqTve.resolveForTable(m_table);
+        }
+        return colExpr;
     }
 
-
+    public void setOriginalSubqueryScan(StmtSubqueryScan origSubqueryScan) {
+        m_origSubqueryScan = origSubqueryScan;
+    }
 }

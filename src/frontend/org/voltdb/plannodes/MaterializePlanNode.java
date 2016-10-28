@@ -35,6 +35,12 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         super();
     }
 
+    public MaterializePlanNode(NodeSchema schema) {
+        super();
+        m_outputSchema = schema;
+        m_hasSignificantOutputSchema = true;
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.MATERIALIZE;

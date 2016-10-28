@@ -246,8 +246,8 @@ public class ExpressionWindowed extends Expression {
                 assert(e instanceof ExpressionOrderBy);
                 ExpressionOrderBy expr = (ExpressionOrderBy)e;
                 VoltXMLElement orderby = expr.voltGetXML(context, null);
-                boolean isDecending = expr.isDescending();
-                orderby.attributes.put("decending", isDecending ? "true": "false");
+                boolean isDescending = expr.isDescending();
+                orderby.attributes.put("descending", isDescending ? "true": "false");
                 rxe.children.add(orderby);
             }
         }

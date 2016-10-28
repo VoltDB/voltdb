@@ -70,10 +70,10 @@ public class BranchNode extends JoinNode {
         BranchNode newNode = new BranchNode(m_id, m_joinType, leftNode, rightNode);
 
         if (m_joinExpr != null) {
-            newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
+            newNode.m_joinExpr = m_joinExpr.clone();
         }
         if (m_whereExpr != null) {
-            newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
+            newNode.m_whereExpr = m_whereExpr.clone();
         }
         return newNode;
     }

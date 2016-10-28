@@ -51,7 +51,7 @@ public abstract class ExpressionUtil {
                 continue;
             }
             for (AbstractExpression expr : exps) {
-                stack.add((AbstractExpression)expr.clone());
+                stack.add(expr.clone());
             }
         }
         if (stack.isEmpty()) {
@@ -457,7 +457,8 @@ public abstract class ExpressionUtil {
      * @return true is expression contains an aggregate subexpression
      */
     public static boolean containsAggregateExpression(AbstractExpression expr) {
-        AbstractExpression.SubexprFinderPredicate pred = new AbstractExpression.SubexprFinderPredicate() {
+        AbstractExpression.SubexprFinderPredicate pred =
+                new AbstractExpression.SubexprFinderPredicate() {
             @Override
             public boolean matches(AbstractExpression expr) {
                 return expr.getExpressionType().isAggregateExpression();
@@ -466,15 +467,12 @@ public abstract class ExpressionUtil {
         return expr.hasAnySubexpressionWithPredicate(pred);
     }
 
-    private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
+    private static boolean containsMatchingTVE(AbstractExpression expr,
+            String tableAlias) {
         assert(expr != null);
         List<TupleValueExpression> tves = getTupleValueExpressions(expr);
         for (TupleValueExpression tve : tves) {
-            if (tve.m_tableAlias != null) {
-                if (tve.m_tableAlias.equals(tableAlias)) {
-                    return true;
-                }
-            } else if (tve.m_tableName.equals(tableAlias)) {
+            if (tve.matchesTableAlias(tableAlias)) {
                 return true;
             }
         }

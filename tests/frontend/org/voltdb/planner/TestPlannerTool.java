@@ -34,7 +34,7 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
@@ -63,7 +63,7 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),PathSettings.create());
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),NodeSettings.create());
         CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
@@ -159,7 +159,7 @@ public class TestPlannerTool extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), PathSettings.create());
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
         CatalogContext context = new CatalogContext(0, 0, c, settings, bytes, null, new byte[] {}, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
