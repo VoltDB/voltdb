@@ -135,7 +135,7 @@ public final class ClientImpl implements Client {
             username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
-        m_distributer.setTopologyChangeAware((config.m_topologyChangeAware && config.m_useClientAffinity));
+        m_distributer.setTopologyChangeAware((config.m_topologyChangeAware));
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -679,6 +679,7 @@ public final class ClientImpl implements Client {
         String m_ipAddress;
         String m_hostName;
         int m_clientPort;
+        int m_adminPort;
         void setValue(String param, String value) {
             if ("IPADDRESS".equalsIgnoreCase(param)) {
                 m_ipAddress = value;
@@ -686,12 +687,20 @@ public final class ClientImpl implements Client {
                 m_hostName = value;
             } else if ("CLIENTPORT".equalsIgnoreCase(param)) {
                 m_clientPort = Integer.parseInt(value);
+            } else if ("ADMINPORT".equalsIgnoreCase(param)) {
+                m_adminPort = Integer.parseInt(value);
             }
+        }
+
+        int getPort(boolean isAdmin) {
+            return isAdmin ? m_adminPort : m_clientPort;
         }
     }
 
     class CSL extends ClientStatusListenerExt {
 
+        boolean m_useAdminPort = false;
+        boolean m_adminPortChecked = false;
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -717,19 +726,42 @@ public final class ClientImpl implements Client {
             }
         }
 
-        Map<Integer, HostConfig> buildHostNetworkInfo(VoltTable vt) {
+        Map<Integer, HostConfig> buildUnconnectedHostConfigMap(VoltTable vt) {
             Map<Integer, HostConfig> info = new HashMap<Integer, HostConfig>();
+            Map<Integer, HostConfig> connected = new HashMap<Integer, HostConfig>();
             while (vt.advanceRow()) {
                 Integer hid = (int)vt.getLong("HOST_ID");
+                HostConfig config = null;
                 if (!m_distributer.isHostConnected(hid)) {
-                    HostConfig config = info.get(hid);
-                    if(config == null) {
+                    config = info.get(hid);
+                    if (config == null) {
                         config = new HostConfig();
                         info.put(hid, config);
                     }
+                } else if (!m_adminPortChecked) {
+                    config = connected.get(hid);
+                    if (config == null) {
+                        config = new HostConfig();
+                        connected.put(hid, config);
+                    }
+                }
+                if (config != null) {
                     config.setValue(vt.getString("KEY"), vt.getString("VALUE"));
                 }
             }
+
+            //if all existing connections use admin port, use admin port for connections to the newly discovered nodes
+            if (!m_adminPortChecked) {
+                Map<String, Integer> connectedIpPortPairs = m_distributer.getConnectedHostIPAndPort();
+                int admintPortCount = 0;
+                for (HostConfig config : connected.values()){
+                    if (config.m_adminPort == connectedIpPortPairs.get(config.m_ipAddress)) {
+                        admintPortCount++;
+                    }
+                }
+                m_useAdminPort = (admintPortCount == connected.values().size());
+            }
+            m_adminPortChecked = true;
             return info;
         }
 
@@ -748,11 +780,11 @@ public final class ClientImpl implements Client {
                     try{
                         ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
                         if (resp.getStatus() == ClientResponse.SUCCESS) {
-                            Map<Integer, HostConfig> hosts = buildHostNetworkInfo(resp.getResults()[0]);
+                            Map<Integer, HostConfig> hosts = buildUnconnectedHostConfigMap(resp.getResults()[0]);
                             for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
                                 HostConfig config = entry.getValue();
                                 try {
-                                    createConnection(config.m_ipAddress,config.m_clientPort);
+                                    createConnection(config.m_ipAddress,config.getPort(m_useAdminPort));
                                     nofifyClientConnectionCreation(config, ClientResponse.SUCCESS, null);
                                 } catch (IOException e) {
                                     nofifyClientConnectionCreation(config, ClientResponse.SERVER_UNAVAILABLE, e);

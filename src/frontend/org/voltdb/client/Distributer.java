@@ -67,9 +67,11 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
+
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -1331,6 +1333,14 @@ class Distributer {
             addressList.add(conn.getSocketAddress());
         }
         return Collections.unmodifiableList(addressList);
+    }
+
+    public Map<String, Integer> getConnectedHostIPAndPort() {
+        Map<String, Integer> map = Maps.newHashMap();
+        for (NodeConnection conn : m_connections) {
+            map.put(conn.getSocketAddress().getAddress().getHostAddress(), (conn.getSocketAddress().getPort()));
+        }
+        return Collections.unmodifiableMap(map);
     }
 
     private void updateAffinityTopology(VoltTable tables[]) {
