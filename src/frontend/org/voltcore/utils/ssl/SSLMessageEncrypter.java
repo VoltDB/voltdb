@@ -33,7 +33,7 @@ public class SSLMessageEncrypter {
 
     public SSLMessageEncrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-        this.m_sslDst = ByteBuffer.allocate(Constants.SSL_CHUNK_SIZE << 1);
+        this.m_sslDst = ByteBuffer.allocate(Constants.SSL_CHUNK_SIZE + 128);
     }
 
     public List<ByteBuffer> encryptBuffer(ByteBuffer src) throws IOException {

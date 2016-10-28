@@ -35,7 +35,7 @@ public class SSLMessageDecrypter {
 
     public SSLMessageDecrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-        this.m_decBuffer = ByteBuffer.allocate((int) (SSL_CHUNK_SIZE * 1.2));
+        this.m_decBuffer = ByteBuffer.allocate(SSL_CHUNK_SIZE + 128);
     }
 
     public List<ByteBuffer> decryptMessages(ByteBuffer chunk) throws IOException {
