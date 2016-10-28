@@ -943,7 +943,7 @@ class Distributer {
     {
         SSLEngine sslEngine = null;
         if (sslContext != null) {
-            sslEngine = sslContext.createSSLEngine("client", 5432);
+            sslEngine = sslContext.createSSLEngine("client", port);
             sslEngine.setUseClientMode(true);
         }
 
