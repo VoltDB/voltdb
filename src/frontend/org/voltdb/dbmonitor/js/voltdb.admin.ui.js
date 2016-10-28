@@ -455,7 +455,7 @@ function loadAdminPage() {
 
                 htmlResult += '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
                     '<p id="shutdownWarningMsg" style="display:none">Any data not saved to a ' +
-                    '<span id="shutdownIntMsg" style="display:none"></span> will be lost.</p>' +
+                    'snapshot will be lost.</p>' +
                     '<p id="continueShutdownMsg" style="display:none">Continue with the shutdown?</p>';
 
                 $('#divSaveSnapshot').html(htmlResult);
@@ -463,11 +463,6 @@ function loadAdminPage() {
                 $('#chkSaveSnaps').iCheck({
                     checkboxClass: 'icheckbox_square-aero customCheckbox',
                     increaseArea: '20%'
-                });
-
-                $("#chkSaveSnaps").unbind("ifChanged");
-                $('#chkSaveSnaps').on('ifChanged', function () {
-                    showHideIntSnapshotMsg()
                 });
 
                 voltDbRenderer.GetCommandLogStatus(function (commandLogStatus) {
@@ -4434,32 +4429,13 @@ function loadAdminPage() {
     );
 
     showHideIntSnapshotMsg = function(){
-        var result = $('#chkSaveSnaps').is(":checked");
-        if(result && $('#chkSaveSnaps').is(':visible')){
-            if(!VoltDbAdminConfig.isCommandLogEnabled){
-                $('#shutdownIntMsg').html('command log');
-                $('#continueShutdownMsg').show()
-                $('#shutdownWarningMsg').show()
-                $('#shutdownIntMsg').show()
-            }else{
-                $('#shutdownWarningMsg').hide()
-                $('#continueShutdownMsg').hide()
-                $('#shutdownIntMsg').hide()
-            }
-        } else {
-            if(!VoltDbAdminConfig.isCommandLogEnabled){
-                $('#shutdownIntMsg').html('snapshot and command log');
-                $('#continueShutdownMsg').show()
-                $('#shutdownWarningMsg').show()
-                $('#shutdownIntMsg').show()
-            }else{
-                $('#shutdownIntMsg').html('snapshot');
-                $('#continueShutdownMsg').show()
-                $('#shutdownWarningMsg').show()
-                $('#shutdownIntMsg').show()
-            }
+        if(!VoltDbAdminConfig.isCommandLogEnabled){
+            $('#continueShutdownMsg').show()
+            $('#shutdownWarningMsg').show()
+        }else{
+            $('#shutdownWarningMsg').hide()
+            $('#continueShutdownMsg').hide()
         }
-
     }
 
 }
