@@ -499,11 +499,11 @@ public class Inits {
             String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true);
             sslContextFactory.setKeyStorePassword(keyStorePassword);
             value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
-            if (value!=null) {
+            if (value != null) {
                 sslContextFactory.setTrustStorePath(value);
             }
             value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
-            if (value!=null) {
+            if (value != null) {
                 sslContextFactory.setTrustStorePassword(value);
             }
             // exclude weak ciphers
@@ -518,20 +518,27 @@ public class Inits {
         }
 
         private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
-            String sysProp = System.getProperty(sysPropName);
-            if (StringUtils.isNotBlank(sysProp)) {
-                return sysProp.trim();
-            } else {
-                String value = null;
-                if (store!=null) {
-                    value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-                }
-                if (StringUtils.isBlank(value) && throwForNull) {
-                    throw new IllegalArgumentException(
-                            "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+            String sysProp = System.getProperty(sysPropName, "");
+
+            // allow leading/trailing blanks for password, not otherwise
+            if (!sysProp.isEmpty()) {
+                if ("password".equals(valueType)) {
+                    return sysProp;
                 } else {
-                    return value;
+                    if (!sysProp.trim().isEmpty()) {
+                        return sysProp.trim();
+                    }
                 }
+            }
+            String value = null;
+            if (store != null) {
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            }
+            if ((value == null || value.trim().isEmpty()) && throwForNull) {
+                throw new IllegalArgumentException(
+                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+            } else {
+                return value;
             }
         }
     }

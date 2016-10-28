@@ -148,17 +148,17 @@ public class ConnectionUtil {
 
     public static Object[] getAuthenticatedConnection(String host, String username,
                                                       byte[] hashedPassword, int port,
-                                                      final Subject subject, ClientAuthScheme scheme, SSLContext sslContext) throws IOException {
+                                                      final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslContext);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslEngine);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslContext);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslEngine);
     }
 
     private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
@@ -179,9 +179,9 @@ public class ConnectionUtil {
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
-        Object returnArray[] = new Object[4];
+        Object returnArray[] = new Object[3];
         boolean success = false;
         if (addr.isUnresolved()) {
             throw new java.net.UnknownHostException(addr.getHostName());
@@ -196,10 +196,7 @@ public class ConnectionUtil {
 
         aChannel.configureBlocking(false);
 
-        SSLEngine sslEngine = null;
-        if (sslContext != null) {
-            sslEngine = sslContext.createSSLEngine("client", 5432);
-            sslEngine.setUseClientMode(true);
+        if (sslEngine != null) {
             SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
             if (!handshaker.handshake()) {
                 throw new IOException("SSL handshake failed");
@@ -327,7 +324,6 @@ public class ConnectionUtil {
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
-            returnArray[3] = sslEngine;
 
             aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);

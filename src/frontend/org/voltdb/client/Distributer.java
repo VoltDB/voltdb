@@ -941,12 +941,17 @@ class Distributer {
     void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme, SSLContext sslContext)
     throws UnknownHostException, IOException
     {
+        SSLEngine sslEngine = null;
+        if (sslContext != null) {
+            sslEngine = sslContext.createSSLEngine("client", 5432);
+            sslEngine.setUseClientMode(true);
+        }
+
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslContext);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
-        final SSLEngine sslEngine = (SSLEngine)socketChannelAndInstanceIdAndBuildString[3];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
         Connection c = m_network.registerChannel( aChannel, cxn, sslEngine);
