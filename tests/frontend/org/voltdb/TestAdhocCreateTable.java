@@ -23,6 +23,11 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -32,7 +37,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
     // Add a test for partitioning a table
-
+    @Test
     public void testBasicCreateTable() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -79,6 +84,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
 
     // Test creating a table when we feed a statement containing newlines.
     // I honestly didn't expect this to work yet --izzy
+    @Test
     public void testMultiLineCreateTable() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -122,6 +128,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCreatePartitionedTable() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -197,6 +204,7 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCreateDRTable() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
