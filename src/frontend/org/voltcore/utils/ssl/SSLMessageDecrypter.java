@@ -103,10 +103,7 @@ public class SSLMessageDecrypter {
             } else {
                 decBuffer = m_decBuffer;
             }
-            SSLEngineResult result;
-            synchronized (m_sslEngine) {
-                result = m_sslEngine.unwrap(chunk, decBuffer);
-            }
+            SSLEngineResult result = m_sslEngine.unwrap(chunk, decBuffer);
             switch (result.getStatus()) {
                 case OK:
                     if (hadLeftover) {
@@ -118,7 +115,6 @@ public class SSLMessageDecrypter {
                     return;
                 case BUFFER_OVERFLOW:
                     if (m_decBuffer.position() > 0) {
-                        System.err.println("LEFTOVER ON RESIZE " + m_decBuffer.position());
                         ByteBuffer bigger = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
                         m_decBuffer.flip();
                         bigger.put(m_decBuffer);
