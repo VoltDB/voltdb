@@ -34,7 +34,6 @@ import org.voltdb.plannodes.SchemaColumn;
  * up.
  */
 public class ParsedColInfo implements Cloneable {
-
     /* Schema information: table may be "VOLT_TEMP_TABLE" */
     public String alias = null;
     public String columnName = null;
@@ -70,7 +69,8 @@ public class ParsedColInfo implements Cloneable {
     }
 
     /** Construct a ParsedColInfo from Volt XML. */
-    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt, VoltXMLElement orderByXml) {
+    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt,
+            VoltXMLElement orderByXml) {
         // A generic adjuster that just calls finalizeValueTypes
         ExpressionAdjuster adjuster = new ExpressionAdjuster() {
             @Override
@@ -83,8 +83,11 @@ public class ParsedColInfo implements Cloneable {
         return fromOrderByXml(parsedStmt, orderByXml, adjuster);
     }
 
-    /** Construct a ParsedColInfo from Volt XML.  Allow caller to specify actions to finalize the parsed expression. */
-    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt, VoltXMLElement orderByXml, ExpressionAdjuster adjuster) {
+    /** Construct a ParsedColInfo from Volt XML.
+     *  Allow caller to specify actions to finalize the parsed expression.
+     */
+    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt,
+            VoltXMLElement orderByXml, ExpressionAdjuster adjuster) {
 
         // make sure everything is kosher
         assert(orderByXml.name.equalsIgnoreCase("orderby"));
@@ -106,10 +109,13 @@ public class ParsedColInfo implements Cloneable {
         orderCol.expression = adjuster.adjust(orderExpr);
 
         // Cases:
-        // child could be columnref, in which case it's just a normal column.
-        // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        if (child.name.equals("columnref")) {
-            assert(orderExpr instanceof TupleValueExpression);
+        // child could be columnref, in which case it's either a normal column
+        // or an expression.
+        // The latter could be a case if this column came from a subquery that
+        // was optimized out.
+        // Just make a ParsedColInfo object for it and the planner will do the
+        // right thing later.
+        if (orderExpr instanceof TupleValueExpression) {
             TupleValueExpression tve = (TupleValueExpression) orderExpr;
             orderCol.columnName = tve.getColumnName();
             orderCol.tableName = tve.getTableName();
@@ -119,7 +125,8 @@ public class ParsedColInfo implements Cloneable {
             }
 
             orderCol.alias = tve.getColumnAlias();
-        } else {
+        }
+        else {
             String alias = child.attributes.get("alias");
             orderCol.alias = alias;
             orderCol.tableName = "VOLT_TEMP_TABLE";
@@ -131,9 +138,12 @@ public class ParsedColInfo implements Cloneable {
                     (child.name.equals("aggregation") == false) &&
                     (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
-                    (child.name.equals("rank") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
+                    (child.name.equals("rank") == false) &&
+                    (child.name.equals("columnref") == false)) {
+               throw new RuntimeException(
+                       "ORDER BY parsed with strange child node type: " +
+                       child.name);
+            }
         }
 
         return orderCol;
@@ -141,19 +151,33 @@ public class ParsedColInfo implements Cloneable {
 
     /** Return this as an instance of SchemaColumn */
     public SchemaColumn asSchemaColumn() {
-        return new SchemaColumn(tableName, tableAlias, columnName, alias, expression, differentiator);
+        return new SchemaColumn(tableName, tableAlias,
+                columnName, alias,
+                expression, differentiator);
+    }
+
+    @Override
+    public String toString() {
+        return "ParsedColInfo: " + tableName + "(" + tableAlias + ")." +
+            columnName + "(" + alias + ") diff'tor:" + differentiator +
+            " expr:(" + expression + ")";
     }
 
     @Override
     public boolean equals (Object obj) {
-        if (obj == null) return false;
-        if (obj instanceof ParsedColInfo == false) return false;
+        if (obj == null) {
+            return false;
+        }
+        if (obj instanceof ParsedColInfo == false) {
+            return false;
+        }
         ParsedColInfo col = (ParsedColInfo) obj;
-        if ( columnName != null && columnName.equals(col.columnName) &&
+        if (columnName != null && columnName.equals(col.columnName) &&
                 tableName != null && tableName.equals(col.tableName) &&
                 tableAlias != null && tableAlias.equals(col.tableAlias) &&
-                expression != null && expression.equals(col.expression) )
+                expression != null && expression.equals(col.expression) ) {
             return true;
+        }
         return false;
     }
 
@@ -174,10 +198,11 @@ public class ParsedColInfo implements Cloneable {
         ParsedColInfo col = null;
         try {
             col = (ParsedColInfo) super.clone();
-        } catch (CloneNotSupportedException e) {
+        }
+        catch (CloneNotSupportedException e) {
             e.printStackTrace();
         }
-        col.expression = (AbstractExpression) expression.clone();
+        col.expression = expression.clone();
         return col;
     }
 }

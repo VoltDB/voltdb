@@ -194,6 +194,8 @@ public class TestExpressionUtil extends TestCase {
                 TupleValueExpression in_tuple_exp = (TupleValueExpression)in_exp;
                 assertEquals(out_tuple_exp.getColumnIndex(), in_tuple_exp.getColumnIndex());
                 break;
+            default:
+                break;
         } // SWITCH
         return;
     }
@@ -209,7 +211,7 @@ public class TestExpressionUtil extends TestCase {
         AbstractExpression cloned_exp = null;
         try {
             if (ROOT_EXP != null) {
-                cloned_exp = (AbstractExpression) ROOT_EXP.clone();
+                cloned_exp = ROOT_EXP.clone();
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -571,27 +573,27 @@ public class TestExpressionUtil extends TestCase {
         //
         // Each of A through E should match an identical "cloned" expression,
         // with no "parameter binding" caveat.
-        AbstractExpression likeA = (AbstractExpression) exprA.clone();
+        AbstractExpression likeA = exprA.clone();
         result = likeA.bindingToIndexedExpression(exprA);
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
-        AbstractExpression likeB = (AbstractExpression) exprB.clone();
+        AbstractExpression likeB = exprB.clone();
         result = likeB.bindingToIndexedExpression(exprB);
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
-        AbstractExpression likeC = (AbstractExpression) exprC.clone();
+        AbstractExpression likeC = exprC.clone();
         result = likeC.bindingToIndexedExpression(exprC);
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
-        AbstractExpression likeD = (AbstractExpression) exprD.clone();
+        AbstractExpression likeD = exprD.clone();
         result = likeD.bindingToIndexedExpression(exprD);
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
-        AbstractExpression likeE = (AbstractExpression) exprE.clone();
+        AbstractExpression likeE = exprE.clone();
         result = likeE.bindingToIndexedExpression(exprE);
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -608,7 +610,7 @@ public class TestExpressionUtil extends TestCase {
         otherParamifiedConstant.setOriginalValue(otherConstant);
 
         // D) math with a column and a constant ( 42 * T1.A ) works for ( ? * T1.A ) w/ ? == 42
-        AbstractExpression paramifiedD = (AbstractExpression) exprD.clone();
+        AbstractExpression paramifiedD = exprD.clone();
         paramifiedD.setLeft(paramifiedConstant);
         result = paramifiedD.bindingToIndexedExpression(exprD);
         assertNotNull(result);
@@ -721,13 +723,13 @@ public class TestExpressionUtil extends TestCase {
         // compiled statement.
 
         // D) math with a column and a constant ( 42 * T1.A ) for ( ? * T1.A ) w/ ? == 86
-        AbstractExpression crossParamifiedD = (AbstractExpression) exprD.clone();
+        AbstractExpression crossParamifiedD = exprD.clone();
         crossParamifiedD.setLeft(paramifiedNeitherConstant);
         result = crossParamifiedD.bindingToIndexedExpression(exprD);
         assertNull(result);
 
         // D) math with a column and a constant ( 42 * T1.A ) for ( ? * T1.A ) w/ ? == ???!
-        AbstractExpression userParamifiedD = (AbstractExpression) exprD.clone();
+        AbstractExpression userParamifiedD = exprD.clone();
         userParamifiedD.setLeft(actualUserProvidedParameter);
         result = userParamifiedD.bindingToIndexedExpression(exprD);
         assertNull(result);
@@ -1110,7 +1112,7 @@ public class TestExpressionUtil extends TestCase {
 
             // expr or expr => no change
             expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, comp, comp);
-            AbstractExpression origExpr = (AbstractExpression) expr.clone();
+            AbstractExpression origExpr = expr.clone();
             expr = ExpressionUtil.evaluateExpression(expr);
             assertEquals(origExpr, expr);
 

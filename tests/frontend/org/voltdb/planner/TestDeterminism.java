@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import org.voltdb.compiler.DeterminismMode;
 
 public class TestDeterminism extends PlannerTestCase {
-
     @Override
     protected void setUp() throws Exception {
         final boolean planForSinglePartitionFalse = false;
@@ -55,7 +54,8 @@ public class TestDeterminism extends PlannerTestCase {
                                            boolean order,
                                            boolean orderLimitContent,
                                            DeterminismMode detMode) {
-        assertPlanDeterminismFullCore(sql, order, orderLimitContent, true, detMode);
+        assertPlanDeterminismFullCore(sql, order, orderLimitContent,
+                true, detMode);
     }
 
     /**
@@ -73,8 +73,7 @@ public class TestDeterminism extends PlannerTestCase {
                                                boolean order,
                                                boolean orderLimitContent,
                                                boolean inherentContent,
-                                               DeterminismMode detMode)
-    {
+                                               DeterminismMode detMode) {
         CompiledPlan cp = compileAdHocPlan(sql, detMode);
         if (order != cp.isOrderDeterministic()) {
             System.out.println((order ? "EXPECTED ORDER: " : "UNEXPECTED ORDER: ") + sql);
@@ -107,11 +106,10 @@ public class TestDeterminism extends PlannerTestCase {
         assertEquals(cp.isContentDeterministic(), inherentContent);
     }
 
-    // This is a weakened version of assertPlanDeterminismCore that only complains to the system output
-    // instead of failing asserts.
-    private void ascertainPlanDeterminismCore(String sql, boolean order, boolean content,
-            DeterminismMode detMode)
-    {
+    // This is a weakened version of assertPlanDeterminismCore that only
+    // complains to the system output instead of failing asserts.
+    private void ascertainPlanDeterminismCore(String sql,
+            boolean order, boolean content, DeterminismMode detMode) {
         CompiledPlan cp = compileAdHocPlan(sql, detMode);
         if (order != cp.isOrderDeterministic()) {
             System.out.println("WEAKENED ASSERT WOULD HAVE FAILED ON " +
@@ -131,31 +129,44 @@ public class TestDeterminism extends PlannerTestCase {
         }
     }
 
-    // Check a number of variants of a core query for expected determinism effects.
-    // The variants include the original query, the query with added sorting, the query with a row limit added,
-    // the query nested within a trivial "select * " parent query, and various permutations of these changes.
-    // The provided "order by" strings are expected to be sufficient to make the original query deterministic.
-    private void assertPlanDeterminismCombo(String sql, boolean order, boolean content,
-            String tryOrderBy, String tryPostSubOrderBy, DeterminismMode detMode)
-    {
+    // Check variants of a core query for expected determinism effects.
+    // The variants include the original query, the query with added sorting,
+    // the query with a row limit added, the query nested within a trivial
+    // "select * " parent query, and various permutations of these changes.
+    // The provided "order by" strings are expected to be sufficient to make
+    // the original query deterministic.
+    private void assertPlanDeterminismCombo(String sql, boolean order,
+            boolean content, boolean trySubqueryOrderBy, String tryOrderBy,
+            String tryPostSubOrderBy, DeterminismMode detMode) {
         assertPlanDeterminismCore(sql, order, content, detMode);
-        assertPlanDeterminismCore("select * from (" + sql + ") sqy", order, content, detMode);
+        String wrappedSql;
+        wrappedSql = "select * from (" + sql + ") sqy";
+        assertPlanDeterminismCore(wrappedSql, order, content, detMode);
         if (tryOrderBy != null) {
             String orderedStmt = sql + " " + tryOrderBy;
             assertPlanDeterminismCore(orderedStmt, true, true, detMode);
-            assertPlanDeterminismCore("select * from (" + orderedStmt + ") sqy", true, true, detMode);
+            if (trySubqueryOrderBy) {
+                wrappedSql = "select * from (" + orderedStmt + ") sqy";
+                assertPlanDeterminismCore(wrappedSql, true, true, detMode);
+            }
 
             String limitedOrderStatement = orderedStmt + " LIMIT 2";
             assertPlanDeterminismCore(limitedOrderStatement, true, true, detMode);
-            assertPlanDeterminismCore("select * from (" + limitedOrderStatement + ") sqy", true, true, detMode);
-            assertPlanDeterminismCore("select * from (" + orderedStmt + ") sqy LIMIT 2", true, true, detMode);
+            wrappedSql = "select * from (" + limitedOrderStatement + ") sqy";
+            assertPlanDeterminismCore(wrappedSql, true, true, detMode);
+            if (trySubqueryOrderBy) {
+                wrappedSql = "select * from (" + orderedStmt + ") sqy LIMIT 2";
+                assertPlanDeterminismCore(wrappedSql, true, true, detMode);
+            }
 
             if (tryPostSubOrderBy != null) {
-                String postOrderedParent = "select * from (" + sql + ") sqy " + tryPostSubOrderBy;
+                String postOrderedParent =
+                        "select * from (" + sql + ") sqy " + tryPostSubOrderBy;
                 ascertainPlanDeterminismCore(postOrderedParent, true, true, detMode);
 
                 String limitedPostOrderStmt =
-                        "select * from (" + orderedStmt + " LIMIT 2) sqy " + tryPostSubOrderBy;
+                        "select * from (" + orderedStmt + " LIMIT 2) sqy " +
+                        tryPostSubOrderBy;
                 assertPlanDeterminismCore(limitedPostOrderStmt, true, true, detMode);
                 String postLimitedPostOrdered = postOrderedParent + " LIMIT 2";
                 ascertainPlanDeterminismCore(postLimitedPostOrdered, true, true, detMode);
@@ -164,21 +175,23 @@ public class TestDeterminism extends PlannerTestCase {
 
         String limitedStatement = sql + " LIMIT 2";
         assertPlanDeterminismCore(limitedStatement, order, order, detMode);
-        assertPlanDeterminismCore("select * from (" + limitedStatement + ") sqy", order, order, detMode);
+        wrappedSql = "select * from (" + limitedStatement + ") sqy";
+        assertPlanDeterminismCore(wrappedSql, order, order, detMode);
     }
 
-    private void assertPlanNeedsSaferDeterminismCombo(String sql)
-    {
+    private void assertPlanNeedsSaferDeterminismCombo(String sql) {
         assertPlanDeterminismCore(sql, UNORDERED, CONSISTENT, DeterminismMode.FASTER);
         String limitedStatement = sql + " LIMIT 2";
-        assertPlanDeterminismCore(limitedStatement, UNORDERED, INCONSISTENT, DeterminismMode.FASTER);
+        assertPlanDeterminismCore(limitedStatement, UNORDERED, INCONSISTENT,
+                DeterminismMode.FASTER);
         // These cases should be deterministic in the safer mode.
         assertPlanDeterminism(sql, null);
     }
 
-    private void assertPlanNeedsSaferDeterminismOrOrderCombo(String sql, String tryOrderBy) {
+    private void assertPlanNeedsSaferDeterminismOrOrderCombo(String sql,
+            String tryOrderBy, boolean trySubqueryWithOrderBy) {
         assertPlanNeedsSaferDeterminismCombo(sql);
-        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, trySubqueryWithOrderBy);
     }
 
     private void assertPlanDeterminismNeedsOrdering(String sql, String tryOrderBy)
@@ -186,170 +199,345 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, tryOrderBy, tryOrderBy, DeterminismMode.FASTER);
     }
 
-    private void assertPlanDeterminismNeedsOrdering(String sql, String tryOrderBy, String tryPostSubOrderBy)
-    {
-        assertPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, tryOrderBy, tryPostSubOrderBy, DeterminismMode.FASTER);
+    private void assertPlanDeterminismNeedsOrdering(String sql,
+            String tryOrderBy, boolean trySubqueryWithOrderBy) {
+        assertPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, trySubqueryWithOrderBy, tryOrderBy, tryOrderBy, DeterminismMode.FASTER);
+    }
+
+    private void assertPlanDeterminismNeedsOrdering(String sql, String tryOrderBy,
+            String tryPostSubOrderBy, boolean trySubqueryWithOrderBy) {
+        assertPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, trySubqueryWithOrderBy, tryOrderBy, tryPostSubOrderBy, DeterminismMode.FASTER);
+    }
+
+    private void assertPlanDeterminismNeedsOrdering(String sql, String tryOrderBy,
+            String tryPostSubOrderBy) {
+        assertPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, true, tryOrderBy, tryPostSubOrderBy, DeterminismMode.FASTER);
+    }
+
+    private void assertPlanDeterminismCombo(String sql, boolean order, boolean content,
+            String tryOrderBy, String tryPostSubOrderBy, DeterminismMode detMode) {
+        assertPlanDeterminismCombo(sql, order, content, true, tryOrderBy, tryPostSubOrderBy, detMode);
     }
 
     /**
      * Checks determinism of statement against expected results, with or without factoring in order effects
      * @param sql
      */
-    private void assertPlanDeterminism(String sql, String tryOrderBy)
-    {
+    private void assertPlanDeterminism(String sql, String tryOrderBy) {
         assertPlanDeterminismCombo(sql, ORDERED, CONSISTENT, tryOrderBy, null, DeterminismMode.SAFER);
     }
 
-    static final boolean UNORDERED = false;
-    static final boolean ORDERED = true;
-    static final boolean LATER_TO_BE_ORDERED = UNORDERED;
-    static final boolean INCONSISTENT = false;
-    static final boolean CONSISTENT = true;
+    private static final boolean UNORDERED = false;
+    private static final boolean ORDERED = true;
+    private static final boolean INCONSISTENT = false;
+    private static final boolean CONSISTENT = true;
 
     public void testDeterminismOfSelectStar() {
-        assertPlanDeterminismNeedsOrdering("select * from ttree", "order by 1, 2, 3, 4");
-        // if a table has a unique index... it can be used to scan in a r/w transaction
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
+        sql = "select * from ttree";
+        tryOrderBy = "order by 1, 2, 3, 4";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        // if a table has a unique index...
+        // it can be used to scan in a r/w transaction
         // even without ordering when planned in "safe" determinism mode.
-        assertPlanNeedsSaferDeterminismOrOrderCombo("select * from tunique",    "order by a");
-        assertPlanNeedsSaferDeterminismOrOrderCombo("select * from tuniqcombo", "order by b, c, a");
-        assertPlanNeedsSaferDeterminismOrOrderCombo("select * from tpk",        "order by a");
+        sql = "select * from tunique";
+        tryOrderBy = "order by a";
+        assertPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy, false);
+
+        sql = "select * from tuniqcombo";
+        tryOrderBy = "order by b, c, a";
+        assertPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy, false);
+
+        sql = "select * from tpk";
+        tryOrderBy = "order by a";
+        assertPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy, false);
 
         // test sufficiency of minimal orderings
-        assertPlanDeterminismNeedsOrdering("select * from ttree order by a",
-                ", b, c, z", "order by a, b, c, z");
-        assertPlanDeterminismNeedsOrdering("select * from ttree where a > 1 order by a",
-                ", b, z, c", "order by a, b, z, c");
-        assertPlanDeterminismNeedsOrdering("select * from ttree where a > 1 order by a, b",
-                ", c, z", "order by a, b, c, z");
-        assertPlanDeterminism("select * from tunique where a > 1", "order by a");
-        assertPlanDeterminism("select * from tpk where a > 1", "order by a");
+        sql = "select * from ttree order by a";
+        tryOrderBy = ", b, c, z";
+        tryPostSubOrderBy = "order by a, b, c, z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy, false);
 
+        sql = "select * from ttree where a > 1 order by a";
+        tryOrderBy = ", b, z, c";
+        tryPostSubOrderBy = "order by a, b, z, c";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy, false);
+
+        sql = "select * from ttree where a > 1 order by a, b";
+        tryOrderBy = ", c, z";
+        tryPostSubOrderBy = "order by a, b, c, z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy, false);
+
+        sql = "select * from tunique where a > 1";
+        tryOrderBy = "order by a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select * from tpk where a > 1";
+        tryOrderBy = "order by a";
+        assertPlanDeterminism(sql, tryOrderBy);
 
         // test effects of sufficient but overly crowded or redundant order by
-        assertPlanDeterminism("select * from tunique", "order by z, a, c");
-        assertPlanDeterminism("select * from tpk", "order by z, a");
-        assertPlanDeterminismNeedsOrdering("select * from ttree where a > 1 order by a, a+z",
-                ", z, c, b", "order by a, a+z, z, c, b");
-        assertPlanDeterminism("select * from tunique where a > 1", "order by a");
-        assertPlanDeterminism("select * from tpk where a > 1", "order by a");
+        sql = "select * from tunique";
+        tryOrderBy = "order by z, a, c";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select * from tpk";
+        tryOrderBy = "order by z, a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select * from ttree where a > 1 order by a, a+z";
+        tryOrderBy = ", z, c, b";
+        tryPostSubOrderBy = "order by a, a+z, z, c, b";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy, false);
+
+        sql = "select * from tunique where a > 1";
+        tryOrderBy = "order by a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select * from tpk where a > 1";
+        tryOrderBy = "order by a";
+        assertPlanDeterminism(sql, tryOrderBy);
     }
 
     public void testDeterminismOfJoin() {
-        assertPlanDeterminism(
-                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
-                "order by X.a, X.c, X.b, Y.a");
-        assertPlanDeterminism(
-                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
-                "order by X.b, X.a, Y.a, X.c");
-        assertPlanDeterminism(
-                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
-                "order by X.z, X.a, X.c, X.b, Y.a");
-        assertPlanDeterminism(
-                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from tuniqcombo X, tunique Y",
-                "order by 4, X.z, X.a, X.c, X.b, Y.a");
-        assertPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.a, X.c, X.b, Y.a",
-                ", X.z, Y.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.b, X.a, Y.a, X.c",
-                ", X.z, Y.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.z, X.a, X.c, X.b, Y.a",
-                ", X.z, Y.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering(
-                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a",
-                ", Y.z", "order by 1, 2, 3, 4");
-        assertPlanNeedsSaferDeterminismCombo(
-                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y where X.a = Y.a");
-        assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.b, Y.a");
-        assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y";
+        tryOrderBy = "order by X.a, X.c, X.b, Y.a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y";
+        tryOrderBy = "order by X.b, X.a, Y.a, X.c";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y";
+        tryOrderBy = "order by X.z, X.a, X.c, X.b, Y.a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from tuniqcombo X, tunique Y";
+        tryOrderBy = "order by 4, X.z, X.a, X.c, X.b, Y.a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.b, X.a, Y.a, X.c";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.z, X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", Y.z";
+        tryPostSubOrderBy = "order by 1, 2, 3, 4";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y where X.a = Y.a";
+        assertPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.b, Y.a";
+        assertPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a";
+        assertPlanNeedsSaferDeterminismCombo(sql);
     }
 
     public void testDeterminismOfSelectOrderGroupKeys() {
-        assertPlanDeterminismNeedsOrdering("select z, max(a)    from ttree group by z   ",
-                "order by z   ");
-        assertPlanDeterminismNeedsOrdering("select    max(a)    from ttree group by z   ",
-                "order by z   ", "order by 1");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
 
-        assertPlanDeterminismNeedsOrdering("select z, max(a), b from ttree group by z, b",
-                "order by z, b");
-        assertPlanDeterminismNeedsOrdering("select z, max(a)    from ttree group by z, b",
-                "order by z, b", "order by 1, 2");
-        assertPlanDeterminismNeedsOrdering("select    max(a)    from ttree group by z, b",
-                "order by z, b", "order by 1");
+        sql = "select z, max(a)    from ttree group by z   ";
+        tryOrderBy = "order by z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy);
 
-        assertPlanDeterminismNeedsOrdering(
-                "select z, max(a)      , b from ttree group by z, b order by z   ",
-                ", b", "order by 1, 3");
-        assertPlanDeterminismNeedsOrdering(
-                "select z, max(a) max_a, b from ttree group by z, b order by z   ",
-                ", b", "order by 1, 2");
-        assertPlanDeterminismNeedsOrdering(
-                "select    max(a)    from ttree group by z, b order by z   ",
-                ", b", "order by 1");
+        sql = "select    max(a)    from ttree group by z   ";
+        tryOrderBy = "order by z";
+        tryPostSubOrderBy = "order by 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
 
+        sql = "select z, max(a), b from ttree group by z, b";
+        tryOrderBy = "order by z, b";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy);
 
+        sql = "select z, max(a)    from ttree group by z, b";
+        tryOrderBy = "order by z, b";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
 
+        sql = "select    max(a)    from ttree group by z, b";
+        tryOrderBy = "order by z, b";
+        tryPostSubOrderBy = "order by 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a)      , b from ttree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1, 3";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a) max_a, b from ttree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a)    from ttree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
 
         // Odd edge cases of needlessly long ORDER BY clause
-        assertPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ttree group by z",
-                "order by z, max(b)", "order by z, 3");
-        assertPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ttree group by z",
-                "order by z, 3     ", "order by z, 3");
-        assertPlanDeterminismNeedsOrdering("select    max(a), max(b) from ttree group by z",
-                "order by z, max(b)", "order by 1, 2");
-        assertPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ttree group by z order by max(b)",
-                ", z", "order by 3, 1");
-        assertPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ttree group by z",
-                "order by z, max(a)", "order by 1, 3");
-        // not yet supported by planner */ assertPlanDeterminismNeedsOrdering("select z, max(a) from ttree group by z",
-        // not yet supported by planner */         "order by z, max(b)", "order by 1, 2");
-        // not yet supported by planner */ assertPlanDeterminismNeedsOrdering("select    max(a) from ttree group by z",
-        // not yet supported by planner */         "order by z, max(b)", "order by 1");
+        sql = "select z, max(a), max(b) from ttree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by z, 3";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b) from ttree group by z";
+        tryOrderBy = "order by z, 3     ";
+        tryPostSubOrderBy = "order by z, 3";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a), max(b) from ttree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b) from ttree group by z order by max(b)";
+        tryOrderBy = ", z";
+        tryPostSubOrderBy = "order by 3, 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b) from ttree group by z";
+        tryOrderBy = "order by z, max(a)";
+        tryPostSubOrderBy = "order by 1, 2";
+        /* not yet supported by planner? */ assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a) from ttree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1, 2";
+        //* not yet supported by planner? */ assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a) from ttree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1, 3";
+        //* not yet supported by planner? */ assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
     }
 
     public void testDeterminismOfSelectOrderAll() {
-        assertPlanDeterminismNeedsOrdering("select z from ttree",       "order by z");
-        assertPlanDeterminismNeedsOrdering("select a, b, z from ttree", "order by 1, 2, 3");
-        assertPlanDeterminismNeedsOrdering("select a, b, z from ttree", "order by b, a, z");
-        assertPlanDeterminismNeedsOrdering("select a, b, z from ttree", "order by 3, 2, 1");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select z from ttree";
+        tryOrderBy = "order by z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, b, z from ttree";
+        tryOrderBy = "order by 1, 2, 3";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, b, z from ttree";
+        tryOrderBy = "order by b, a, z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, b, z from ttree";
+        tryOrderBy = "order by 3, 2, 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
     }
 
     public void testDeterminismOfJoinOrderAll() {
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
-                "order by 1, 2, 3");
-        assertPlanDeterminismNeedsOrdering("select X.a l, X.z m, Y.z n from ttree X, tunique Y where X.a = Y.a",
-                "order by Y.z, X.a, X.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
-                "order by 3, 2, 1");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
+        sql = "select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a";
+        tryOrderBy = "order by 1, 2, 3";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ttree X, tunique Y where X.a = Y.a";
+        tryOrderBy = "order by Y.z, X.a, X.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a";
+        tryOrderBy = "order by 3, 2, 1";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
     public void testDeterminismOfSelectIndexKeysOnly() {
-        assertPlanDeterminismNeedsOrdering("select a, b from ttree", "order by a, b");
-        assertPlanDeterminismNeedsOrdering("select a, b, c from ttree", "order by a, b, c");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select a, b from ttree";
+        tryOrderBy = "order by a, b";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, b, c from ttree";
+        tryOrderBy = "order by a, b, c";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
         // non-prefix keys don't help
-        assertPlanDeterminismNeedsOrdering("select b, c from ttree", "order by b, c");
+        sql = "select b, c from ttree";
+        tryOrderBy = "order by b, c";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
         // if a table has a unique index... it can be used to scan in a r/w transaction
-        assertPlanNeedsSaferDeterminismCombo("select a from tunique");
-        assertPlanNeedsSaferDeterminismCombo("select a from tpk");
+        sql = "select a from tunique";
+        assertPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select a from tpk";
+        assertPlanNeedsSaferDeterminismCombo(sql);
+
         // hashes don't help, here
-        assertPlanDeterminismNeedsOrdering("select a, b from thash", "order by a, b");
-        assertPlanDeterminismNeedsOrdering("select a, b, c from thash", "order by a, b, c");
+        sql = "select a, b from thash";
+        tryOrderBy = "order by a, b";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, b, c from thash";
+        tryOrderBy = "order by a, b, c";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
     }
 
     public void testDeterminismOfSelectOneKeyValue() {
-        assertPlanDeterminismNeedsOrdering("select a, z from ttree where a = 1", "order by a, z");
-        assertPlanDeterminismNeedsOrdering("select a, z from ttree where a = 1 and b < 10", "order by a, z");
-        assertPlanDeterminism("select a, z from tunique where a = 1", "order by z, a");
-        assertPlanDeterminism("select a, z from tunique where a = 1 and b < 10", "order by z, a");
-        assertPlanDeterminism("select a, z from tpk where a = 1", "order by z, a");
-        assertPlanDeterminism("select a, z from tpk where a = 1 and b < 10", "order by z, a");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select a, z from ttree where a = 1";
+        tryOrderBy = "order by a, z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, z from ttree where a = 1 and b < 10";
+        tryOrderBy = "order by a, z";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, false);
+
+        sql = "select a, z from tunique where a = 1";
+        tryOrderBy = "order by z, a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from tunique where a = 1 and b < 10";
+        tryOrderBy = "order by z, a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from tpk where a = 1";
+        tryOrderBy = "order by z, a";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from tpk where a = 1 and b < 10";
+        tryOrderBy = "order by z, a";
+        assertPlanDeterminism(sql, tryOrderBy);
     }
 
-    private void assertDMLPlanDeterminism(String sql)
-    {
+    private void assertDMLPlanDeterminism(String sql) {
         assertPlanDeterminismCore(sql, ORDERED, CONSISTENT, DeterminismMode.SAFER);
     }
 
@@ -367,191 +555,370 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testOrderByWithoutIndex() {
-        assertPlanDeterminism("SELECT * FROM eng4155", "order by ts DESC, id");
-        assertPlanDeterminismNeedsOrdering("SELECT * FROM eng4155 ORDER BY ts DESC",
-                ", id", "order by ts DESC, id");
-        assertPlanDeterminism("SELECT ts FROM eng4155", "order by ts DESC");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
+        sql = "SELECT * FROM eng4155";
+        tryOrderBy = "order by ts DESC, id";
+        assertPlanDeterminism(sql, tryOrderBy);
+
+        sql = "SELECT * FROM eng4155 ORDER BY ts DESC";
+        tryOrderBy = ", id";
+        tryPostSubOrderBy = "order by ts DESC, id";
+        assertPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy, false);
+
+        sql = "SELECT ts FROM eng4155";
+        tryOrderBy = "order by ts DESC";
+        assertPlanDeterminism(sql, tryOrderBy);
     }
 
     // MP section repeats tests on partitioned tables -- need to bypass subquerification for now.
     public void testMPDeterminismOfSelectStar() {
-        assertMPPlanDeterminismNeedsOrdering("select * from ptree", "order by 1, 2, 3, 4");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
         // if a table has a unique index... it can be used to scan in a r/w transaction
         // even without ordering when planned in "safe" determinism mode.
-        assertMPPlanNeedsSaferDeterminismOrOrderCombo("select * from punique",    "order by a");
-        assertMPPlanNeedsSaferDeterminismOrOrderCombo("select * from puniqcombo", "order by b, c, a");
-        assertMPPlanNeedsSaferDeterminismOrOrderCombo("select * from ppk",        "order by a");
+        sql = "select * from ptree";
+        tryOrderBy = "order by 1, 2, 3, 4";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from punique";
+        tryOrderBy = "order by a";
+        assertMPPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy);
+
+        sql = "select * from puniqcombo";
+        tryOrderBy = "order by b, c, a";
+        assertMPPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy);
+
+        sql = "select * from ppk";
+        tryOrderBy = "order by a";
+        assertMPPlanNeedsSaferDeterminismOrOrderCombo(sql, tryOrderBy);
 
         // test sufficiency of minimal orderings
-        assertMPPlanDeterminismNeedsOrdering("select * from ptree order by a",
-                ", b, c, z", "order by a, b, c, z");
-        assertMPPlanDeterminismNeedsOrdering("select * from ptree where a > 1 order by a",
-                ", b, z, c", "order by a, b, z, c");
-        assertMPPlanDeterminismNeedsOrdering("select * from ptree where a > 1 order by a, b",
-                ", c, z", "order by a, b, c, z");
-        assertMPPlanDeterminismNeedsOrdering("select * from punique where a > 1", "order by a");
-        assertMPPlanDeterminismNeedsOrdering("select * from ppk where a > 1", "order by a");
+        sql = "select * from ptree order by a";
+        tryOrderBy = ", b, c, z";
+        tryPostSubOrderBy = "order by a, b, c, z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from ptree where a > 1 order by a";
+        tryOrderBy = ", b, z, c";
+        tryPostSubOrderBy = "order by a, b, z, c";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select * from ptree where a > 1 order by a, b";
+        tryOrderBy = ", c, z";
+        tryPostSubOrderBy = "order by a, b, c, z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select * from punique where a > 1";
+        tryOrderBy = "order by a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from ppk where a > 1";
+        tryOrderBy = "order by a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
 
 
         // test effects of sufficient but overly crowded or redundant order by
-        assertMPPlanDeterminismNeedsOrdering("select * from punique", "order by z, a, c");
-        assertMPPlanDeterminismNeedsOrdering("select * from ppk", "order by z, a");
-        assertMPPlanDeterminismNeedsOrdering("select * from ptree where a > 1 order by a, a+z",
-                ", z, c, b", "order by a, a+z, z, c, b");
-        assertMPPlanDeterminismNeedsOrdering("select * from punique where a > 1", "order by a");
-        assertMPPlanDeterminismNeedsOrdering("select * from ppk where a > 1", "order by a");
+        sql = "select * from punique";
+        tryOrderBy = "order by z, a, c";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from ppk";
+        tryOrderBy = "order by z, a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from ptree where a > 1 order by a, a+z";
+        tryOrderBy = ", z, c, b";
+        tryPostSubOrderBy = "order by a, a+z, z, c, b";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select * from punique where a > 1";
+        tryOrderBy = "order by a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select * from ppk where a > 1";
+        tryOrderBy = "order by a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
     public void testMPDeterminismOfJoin() {
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a",
-                "order by X.a, X.c, X.b, Y.a");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a",
-                "order by X.b, X.a, Y.a, X.c");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a",
-                "order by X.z, X.a, X.c, X.b, Y.a");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z, X.z + Y.z from puniqcombo X, punique Y where X.a = Y.a",
-                "order by 4, X.z, X.a, X.c, X.b, Y.a");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.a, X.c, X.b, Y.a",
-                ", X.z, Y.z", "order by l, m, n");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.b, X.a, Y.a, X.c",
-                ", X.z, Y.z", "order by l, m, n");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.z, X.a, X.c, X.b, Y.a",
-                ", X.z, Y.z", "order by l, m, n");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z, X.z + Y.z from ptree X, punique Y where X.a = Y.a order by 4, X.z, X.a, X.c, X.b, Y.a",
-                ", Y.z", "order by 1, 2, 3, 4");
-        assertMPPlanNeedsSaferDeterminismCombo(
-                "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a");
-        assertMPPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a order by X.a, X.b, Y.a");
-        assertMPPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a order by X.a, X.c + X.b, X.b, Y.a");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
+
+        sql = "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by X.a, X.c, X.b, Y.a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by X.b, X.a, Y.a, X.c";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a, X.z, Y.z from puniqcombo X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by X.z, X.a, X.c, X.b, Y.a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a, X.z, Y.z, X.z + Y.z from puniqcombo X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by 4, X.z, X.a, X.c, X.b, Y.a";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.b, X.a, Y.a, X.c";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a order by X.z, X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", X.z, Y.z";
+        tryPostSubOrderBy = "order by l, m, n";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a, X.z, Y.z, X.z + Y.z from ptree X, punique Y where X.a = Y.a order by 4, X.z, X.a, X.c, X.b, Y.a";
+        tryOrderBy = ", Y.z";
+        tryPostSubOrderBy = "order by 1, 2, 3, 4";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select X.a, X.z, Y.z " +
+                "from puniqcombo X, punique Y where X.a = Y.a";
+        assertMPPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select X.a, X.z, Y.z " +
+                "from puniqcombo X, punique Y where X.a = Y.a " +
+                "order by X.a, X.b, Y.a";
+        assertMPPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select X.a, X.z, Y.z " +
+                "from puniqcombo X, punique Y where X.a = Y.a " +
+                "order by X.a, X.c + X.b, X.b, Y.a";
+        assertMPPlanNeedsSaferDeterminismCombo(sql);
     }
 
     public void testMPDeterminismOfSelectOrderGroupKeys() {
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a)    from ptree group by z   ",
-                "order by z   ");
-        assertMPPlanDeterminismNeedsOrdering("select    max(a)    from ptree group by z   ",
-                "order by z   ", "order by 1");
+        String sql;
+        String tryOrderBy;
+        String tryPostSubOrderBy;
 
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a), b from ptree group by z, b",
-                "order by z, b");
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a)    from ptree group by z, b",
-                "order by z, b", "order by 1, 2");
-        assertMPPlanDeterminismNeedsOrdering("select    max(a)    from ptree group by z, b",
-                "order by z, b", "order by 1");
+        sql = "select z, max(a)    from ptree group by z   ";
+        tryOrderBy = "order by z   ";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
 
-        assertMPPlanDeterminismNeedsOrdering(
-                "select z, max(a)      , b from ptree group by z, b order by z   ",
-                ", b", "order by 1, 3");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select z, max(a) max_a, b from ptree group by z, b order by z   ",
-                ", b", "order by 1, 2");
-        assertMPPlanDeterminismNeedsOrdering(
-                "select    max(a)    from ptree group by z, b order by z   ",
-                ", b", "order by 1");
+        sql = "select    max(a)    from ptree group by z   ";
+        tryOrderBy = "order by z   ";
+        tryPostSubOrderBy = "order by 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), b from ptree group by z, b";
+        tryOrderBy = "order by z, b";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select z, max(a)    from ptree group by z, b";
+        tryOrderBy = "order by z, b";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a)    from ptree group by z, b";
+        tryOrderBy = "order by z, b";
+        tryPostSubOrderBy = "order by 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a)      , b from ptree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1, 3";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a) max_a, b from ptree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
 
         // Odd edge cases of needlessly long ORDER BY clause
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z",
-                "order by z, max(b)", "order by z, 3");
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z",
-                "order by z, 3     ", "order by z, 3");
-        assertMPPlanDeterminismNeedsOrdering("select    max(a), max(b) from ptree group by z",
-                "order by z, max(b)", "order by 1, 2");
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z order by max(b)",
-                ", z", "order by 3, 1");
-        assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z",
-                "order by z, max(a)", "order by 1, 3");
-        // not yet supported by planner */ assertMPPlanDeterminismNeedsOrdering("select z, max(a) from ptree group by z",
-        // not yet supported by planner */         "order by z, max(b)", "order by 1, 2");
-        // not yet supported by planner */ assertMPPlanDeterminismNeedsOrdering("select    max(a) from ptree group by z",
-        // not yet supported by planner */         "order by z, max(b)", "order by 1");
+        sql = "select    max(a)          from ptree group by z, b order by z   ";
+        tryOrderBy = ", b";
+        tryPostSubOrderBy = "order by 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b)  from ptree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by z, 3";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b)  from ptree group by z";
+        tryOrderBy = "order by z, 3     ";
+        tryPostSubOrderBy = "order by z, 3";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a), max(b)  from ptree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b)  from ptree group by z order by max(b)";
+        tryOrderBy = ", z";
+        tryPostSubOrderBy = "order by 3, 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a), max(b)  from ptree group by z";
+        tryOrderBy = "order by z, max(a)";
+        tryPostSubOrderBy = "order by 1, 2";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select z, max(a)          from ptree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1";
+        // not yet supported by planner */ assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
+
+        sql = "select    max(a)          from ptree group by z";
+        tryOrderBy = "order by z, max(b)";
+        tryPostSubOrderBy = "order by 1";
+        // not yet supported by planner */ assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy, tryPostSubOrderBy);
     }
 
     public void testMPDeterminismOfSelectOrderAll() {
-        assertMPPlanDeterminismNeedsOrdering("select z from ptree",       "order by z");
-        assertMPPlanDeterminismNeedsOrdering("select a, b, z from ptree", "order by 1, 2, 3");
-        assertMPPlanDeterminismNeedsOrdering("select a, b, z from ptree", "order by b, a, z");
-        assertMPPlanDeterminismNeedsOrdering("select a, b, z from ptree", "order by 3, 2, 1");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select z from ptree";
+        tryOrderBy = "order by z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, b, z from ptree";
+        tryOrderBy = "order by 1, 2, 3";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, b, z from ptree";
+        tryOrderBy = "order by b, a, z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, b, z from ptree";
+        tryOrderBy = "order by 3, 2, 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
     public void testMPDeterminismOfJoinOrderAll() {
-        assertMPPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ptree X, punique Y where X.a = Y.a",
-                "order by 1, 2, 3");
-        assertMPPlanDeterminismNeedsOrdering("select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a",
-                "order by Y.z, X.a, X.z", "order by l, m, n");
-        assertMPPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ptree X, punique Y where X.a = Y.a",
-                "order by 3, 2, 1");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select X.a, X.z, Y.z from ptree X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by 1, 2, 3";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a l, X.z m, Y.z n from ptree X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by Y.z, X.a, X.z";
+        tryOrderBy = "order by l, m, n";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select X.a, X.z, Y.z from ptree X, punique Y where X.a = Y.a";
+        tryOrderBy = "order by 3, 2, 1";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
     public void testMPDeterminismOfSelectIndexKeysOnly() {
-        assertMPPlanDeterminismNeedsOrdering("select a, b from ptree", "order by a, b");
-        assertMPPlanDeterminismNeedsOrdering("select a, b, c from ptree", "order by a, b, c");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select a, b from ptree";
+        tryOrderBy = "order by a, b";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, b, c from ptree";
+        tryOrderBy = "order by a, b, c";
         // non-prefix keys don't help
-        assertMPPlanDeterminismNeedsOrdering("select b, c from ptree", "order by b, c");
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select b, c from ptree";
+        tryOrderBy = "order by b, c";
         // if a table has a unique index... it can be used to scan in a r/w transaction
-        assertMPPlanNeedsSaferDeterminismCombo("select a from punique");
-        assertMPPlanNeedsSaferDeterminismCombo("select a from ppk");
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a from punique";
+        assertMPPlanNeedsSaferDeterminismCombo(sql);
+
+        sql = "select a from ppk";
+        assertMPPlanNeedsSaferDeterminismCombo(sql);
+
         // hashes don't help, here
-        assertMPPlanDeterminismNeedsOrdering("select a, b from phash", "order by a, b");
-        assertMPPlanDeterminismNeedsOrdering("select a, b, c from phash", "order by a, b, c");
+        sql = "select a, b from phash";
+        tryOrderBy = "order by a, b";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, b, c from phash";
+        tryOrderBy = "order by a, b, c";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
     public void testMPDeterminismOfSelectOneKeyValue() {
-        assertMPPlanDeterminismNeedsOrdering("select a, z from ptree where a = 1", "order by a, z");
-        assertMPPlanDeterminismNeedsOrdering("select a, z from ptree where a = 1 and b < 10", "order by a, z");
-        assertMPPlanDeterminism("select a, z from punique where a = 1", "order by z, a");
-        assertMPPlanDeterminism("select a, z from punique where a = 1 and b < 10", "order by z, a");
-        assertMPPlanDeterminism("select a, z from ppk where a = 1", "order by z, a");
-        assertMPPlanDeterminism("select a, z from ppk where a = 1 and b < 10", "order by z, a");
+        String sql;
+        String tryOrderBy;
+
+        sql = "select a, z from ptree where a = 1";
+        tryOrderBy = "order by a, z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, z from ptree where a = 1 and b < 10";
+        tryOrderBy = "order by a, z";
+        assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
+
+        sql = "select a, z from punique where a = 1";
+        tryOrderBy = "order by z, a";
+        assertMPPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from punique where a = 1 and b < 10";
+        tryOrderBy = "order by z, a";
+        assertMPPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from ppk where a = 1";
+        tryOrderBy = "order by z, a";
+        assertMPPlanDeterminism(sql, tryOrderBy);
+
+        sql = "select a, z from ppk where a = 1 and b < 10";
+        tryOrderBy = "order by z, a";
+        assertMPPlanDeterminism(sql, tryOrderBy);
     }
 
     public void testMPDeterminismImpliedByParameter() {
-        assertPlanDeterminismCore("select * from ttree_with_key where b = ? order by a, c limit 1;",
-                                  true,
-                                  true,
-                                  DeterminismMode.FASTER);
-        assertPlanDeterminismCore("select d, e, id from ttree_with_key order by a, b, c limit 1;",
-                                  true,
-                                  true,
-                                  DeterminismMode.FASTER);
+        String sql;
+
+        sql = "select * from ttree_with_key where b = ? order by a, c limit 1;";
+        assertPlanDeterminismCore(sql, true, true, DeterminismMode.FASTER);
+
+        sql = "select d, e, id from ttree_with_key order by a, b, c limit 1;";
+        assertPlanDeterminismCore(sql, true, true, DeterminismMode.FASTER);
+
         // We could have ? = 1, ttree_with_key = [(1, 1, 1, 2, 3), (1, -1, 1, 2, 3)].
         // Then the order evaluation has the single value [(1, 1)] and all rows are
         // selected by the where clause.  This means both rows are listed, but
         // we don't know in which order they will be listed.  The limit makes it
         // not content deterministic as well.
-        assertPlanDeterminismCore("select * from ttree_with_key where abs(b) = ? order by a, c limit 1;",
-                                  false,
-                                  false,
-                                  DeterminismMode.FASTER);
+        sql = "select * from ttree_with_key where abs(b) = ? order by a, c limit 1;";
+        assertPlanDeterminismCore(sql, false, false, DeterminismMode.FASTER);
+
         // If ENG-8677 and follow on tickets are closed,
         // we can reenable these tests.
         final boolean ENG8677IsFixed = false;
+
         // Two tables.  Actually, this is a self join as well.  That
         // may be a reason to not allow it here.
-        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where tleft.b = ? order by tleft.a, tleft.c limit 1;",
-                                  ENG8677IsFixed,
-                                  ENG8677IsFixed,
-                                  DeterminismMode.FASTER);
+        sql = "select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where tleft.b = ? order by tleft.a, tleft.c limit 1;";
+        assertPlanDeterminismCore(sql, ENG8677IsFixed, ENG8677IsFixed, DeterminismMode.FASTER);
+
         // Functions of order by expressions should be ok, whether they.
         // are deterministic or not.
-        assertPlanDeterminismCore("select abs(a) + abs(b) from ttree_with_key order by a+1, b+1, c+2 limit 1;",
-                                  ENG8677IsFixed,
-                                  ENG8677IsFixed,
-                                  DeterminismMode.FASTER);
+        sql = "select abs(a) + abs(b) from ttree_with_key order by a+1, b+1, c+2 limit 1;";
+        assertPlanDeterminismCore(sql, ENG8677IsFixed, ENG8677IsFixed, DeterminismMode.FASTER);
+
         // Since these functions (x->x + 1 and x->x + 2) are one-to-one, these
         // functions are ok.
-        assertPlanDeterminismCore("select * from ttree_with_key order by a+1, b+1, c+2 limit 1;",
-                                  ENG8677IsFixed,
-                                  ENG8677IsFixed,
-                                  DeterminismMode.FASTER);
+        sql = "select * from ttree_with_key order by a+1, b+1, c+2 limit 1;";
+        assertPlanDeterminismCore(sql, ENG8677IsFixed, ENG8677IsFixed, DeterminismMode.FASTER);
+
         // It seems like this should be deterministic.  There
         // are two copies of the table ttree_with_key.  The a, b and c
         // columns of both are constrained to be equal.  These form a
@@ -575,10 +942,12 @@ public class TestDeterminism extends PlannerTestCase {
         // the selected columns are equal.
         // Note: This argument depends on the Determinism Theorem.  See the attachment to
         //       ENG-8677.
-        assertPlanDeterminismCore("select r.d, l.e, r.id from ttree_with_key as l join ttree_with_key as r on l.a = r.a and l.b = r.b and l.c = r.c order by l.a, r.b, l.c limit 1;",
-                                  ENG8677IsFixed,
-                                  ENG8677IsFixed,
-                                  DeterminismMode.FASTER);
+        sql = "select r.d, l.e, r.id " +
+                "from ttree_with_key as l join ttree_with_key as r " +
+                "on l.a = r.a and l.b = r.b and l.c = r.c " +
+                "order by l.a, r.b, l.c limit 1;";
+        assertPlanDeterminismCore(sql, ENG8677IsFixed, ENG8677IsFixed, DeterminismMode.FASTER);
+
         // This is probably not possible. Let A be the matrix
         //          | 1  1  1 |
         //     A =  | 1  1 -1 |
@@ -586,48 +955,45 @@ public class TestDeterminism extends PlannerTestCase {
         // Then det(A) = -3 != 0, and A is invertible.  If A*[a, b, c]' = A*[aa, bb, cc]', then
         // [a, b, c]' = [aa, bb, cc]'.  Since (a, b, c) is a primary key, this means
         // all the values are determined.
-        assertPlanDeterminismCore("select * from ttree_with_key order by a + b + c, a + b - c, a - b + c limit 1;",
-                                  ENG8677IsFixed,
-                                  ENG8677IsFixed,
-                                  DeterminismMode.FASTER);
+        sql = "select * from ttree_with_key order by a + b + c, a + b - c, a - b + c limit 1;";
+        assertPlanDeterminismCore(sql, ENG8677IsFixed, ENG8677IsFixed, DeterminismMode.FASTER);
     }
 
     public void testUnionDeterminism() throws Exception {
+        String sql;
 
         // LHS of union is not deterministic
-        assertPlanDeterminismCore("(select a, b, c from ttree_with_key) "
-                + "union (select a, b, c from ttree_with_key order by a, b, c limit 1);",
-                false, true, DeterminismMode.FASTER);
+        sql = "(select a, b, c from ttree_with_key) " +
+                "union (select a, b, c from ttree_with_key order by a, b, c limit 1);";
+        assertPlanDeterminismCore(sql, false, true, DeterminismMode.FASTER);
 
         // LHS of union is not deterministic,
         // but ORDER BY clause determines order of whole statement.
-        assertPlanDeterminismCore("(select a, b, c from ttree_with_key) "
-                + "union (select a, b, c from ttree_with_key order by a, b, c limit 1) "
-                + "order by a, b, c;",
-                true, true, DeterminismMode.FASTER);
+        sql = "(select a, b, c from ttree_with_key) " +
+                "union (select a, b, c from ttree_with_key order by a, b, c limit 1) " +
+                "order by a, b, c;";
+        assertPlanDeterminismCore(sql, true, true, DeterminismMode.FASTER);
 
         // RHS of union is not deterministic
-        assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c limit 1) "
-                + "union (select a, b, c from ttree_with_key);",
-                false, true, DeterminismMode.FASTER);
+        sql = "(select a, b, c from ttree_with_key order by a, b, c limit 1) " +
+                "union (select a, b, c from ttree_with_key);";
+        assertPlanDeterminismCore(sql, false, true, DeterminismMode.FASTER);
 
-        assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c limit 1) "
-                + "union (select a, b, c from ttree_with_key) "
-                + "union (select a, b, c from ttree_with_key);",
-                false, true, DeterminismMode.FASTER);
+        sql = "(select a, b, c from ttree_with_key order by a, b, c limit 1) " +
+                "union (select a, b, c from ttree_with_key) " +
+                "union (select a, b, c from ttree_with_key);";
+        assertPlanDeterminismCore(sql, false, true, DeterminismMode.FASTER);
 
         // Both sides are deterministic; whole statement is deterministic
-        assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c) "
-                + "union (select a, b, c from ttree_with_key order by a, b, c limit 1);",
-                true, true, DeterminismMode.FASTER);
+        sql = "(select a, b, c from ttree_with_key order by a, b, c) " +
+                  "union (select a, b, c from ttree_with_key order by a, b, c limit 1);";
+        assertPlanDeterminismCore(sql, true, true, DeterminismMode.FASTER);
     }
 
     public void testFloatingAggs() throws Exception {
-        assertPlanDeterminismFullCore("select sum(alpha + beta + gamma) as fsum from floataggs order by fsum;",
-                                      true,
-                                      true,
-                                      false,
-                                      DeterminismMode.FASTER);
+        String sql = "select sum(alpha + beta + gamma) as fsum " +
+                "from floataggs order by fsum;";
+        assertPlanDeterminismFullCore(sql, true, true, false, DeterminismMode.FASTER);
     }
 
     public void testDeterminismForUniqueConstraintEquivalence() {
@@ -751,9 +1117,12 @@ public class TestDeterminism extends PlannerTestCase {
     // The variants include the original query, the query with added sorting, the query with a row limit added,
     // the query nested within a trivial "select * " parent query, and various permutations of these changes.
     // The provided "order by" strings are expected to be sufficient to make the original query deterministic.
-    private void assertMPPlanDeterminismCombo(String sql, boolean order, boolean content,
-            String tryOrderBy, String tryPostSubOrderBy, DeterminismMode detMode)
-    {
+    private void assertMPPlanDeterminismCombo(String sql,
+            boolean order,
+            boolean content,
+            String tryOrderBy,
+            String tryPostSubOrderBy,
+            DeterminismMode detMode) {
         assertMPPlanDeterminismCore(sql, order, content, detMode);
         if (tryOrderBy != null) {
             String orderedStmt = sql + " " + tryOrderBy;
@@ -766,8 +1135,7 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminismCore(limitedStatement, order, order, detMode);
     }
 
-    private void assertMPPlanNeedsSaferDeterminismCombo(String sql)
-    {
+    private void assertMPPlanNeedsSaferDeterminismCombo(String sql) {
         assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, DeterminismMode.FASTER);
         String limitedStatement = sql + " LIMIT 2";
         assertMPPlanDeterminismCore(limitedStatement, UNORDERED, INCONSISTENT, DeterminismMode.FASTER);
@@ -776,18 +1144,19 @@ public class TestDeterminism extends PlannerTestCase {
         assertMPPlanDeterminismCore(limitedStatement, UNORDERED, INCONSISTENT, DeterminismMode.SAFER);
     }
 
-    private void assertMPPlanNeedsSaferDeterminismOrOrderCombo(String sql, String tryOrderBy) {
+    private void assertMPPlanNeedsSaferDeterminismOrOrderCombo(String sql,
+            String tryOrderBy) {
         assertMPPlanNeedsSaferDeterminismCombo(sql);
         assertMPPlanDeterminismNeedsOrdering(sql, tryOrderBy);
     }
 
-    private void assertMPPlanDeterminismNeedsOrdering(String sql, String tryOrderBy)
-    {
+    private void assertMPPlanDeterminismNeedsOrdering(String sql, String tryOrderBy) {
         assertMPPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, tryOrderBy, tryOrderBy, DeterminismMode.FASTER);
     }
 
-    private void assertMPPlanDeterminismNeedsOrdering(String sql, String tryOrderBy, String tryPostSubOrderBy)
-    {
+    private void assertMPPlanDeterminismNeedsOrdering(String sql,
+            String tryOrderBy,
+            String tryPostSubOrderBy) {
         assertMPPlanDeterminismCombo(sql, UNORDERED, CONSISTENT, tryOrderBy, tryPostSubOrderBy, DeterminismMode.FASTER);
     }
 
@@ -795,10 +1164,8 @@ public class TestDeterminism extends PlannerTestCase {
      * Checks determinism of statement against expected results, with or without factoring in order effects
      * @param sql
      */
-    private void assertMPPlanDeterminism(String sql, String tryOrderBy)
-    {
+    private void assertMPPlanDeterminism(String sql, String tryOrderBy) {
         assertMPPlanDeterminismCombo(sql, ORDERED, CONSISTENT, tryOrderBy, null, DeterminismMode.SAFER);
     }
-
 
 }

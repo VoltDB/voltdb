@@ -184,7 +184,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         List<JoinNode> treePermutations = new ArrayList<>();
         for (JoinNode newTree : newTrees) {
             if (combinedWhereExpr != null) {
-                newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
+                newTree.setWhereExpression(combinedWhereExpr.clone());
             }
             // The new tree root node id must match the original one to be able to reconnect the
             // subtrees
@@ -240,12 +240,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 JoinNode resultTwo = new BranchNode(branchNode.getId(), branchNode.getJoinType(),
                         (JoinNode) rightNode.clone(), (JoinNode) leftNode.clone());
                 if (branchNode.getJoinExpression() != null) {
-                    resultOne.setJoinExpression((AbstractExpression) branchNode.getJoinExpression().clone());
-                    resultTwo.setJoinExpression((AbstractExpression) branchNode.getJoinExpression().clone());
+                    resultOne.setJoinExpression(branchNode.getJoinExpression().clone());
+                    resultTwo.setJoinExpression(branchNode.getJoinExpression().clone());
                 }
                 if (branchNode.getWhereExpression() != null) {
-                    resultOne.setWhereExpression((AbstractExpression) branchNode.getWhereExpression().clone());
-                    resultTwo.setWhereExpression((AbstractExpression) branchNode.getWhereExpression().clone());
+                    resultOne.setWhereExpression(branchNode.getWhereExpression().clone());
+                    resultTwo.setWhereExpression(branchNode.getWhereExpression().clone());
                 }
                 joinOrders.add(resultOne);
                 joinOrders.add(resultTwo);

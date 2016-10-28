@@ -96,13 +96,13 @@ public class StmtSubqueryScan extends StmtTableScan {
      */
     public void promoteSinglePartitionInfo(
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
-            Set< Set<AbstractExpression> > eqSets)
-    {
+            Set< Set<AbstractExpression> > eqSets) {
         assert(m_subqueriesPartitioning != null);
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0 ||
                 m_subqueriesPartitioning.requiresTwoFragments()) {
             return;
         }
+
         // This subquery is a single partitioned query on partitioned tables
         // promoting the single partition expression up to its parent level.
         AbstractExpression spExpr = m_subqueriesPartitioning.singlePartitioningExpression();
@@ -113,12 +113,14 @@ public class StmtSubqueryScan extends StmtTableScan {
             Set<AbstractExpression> values = null;
             if (valueEquivalence.containsKey(tveKey)) {
                 values = valueEquivalence.get(tveKey);
-            } else if (valueEquivalence.containsKey(spExpr)) {
+            }
+            else if (valueEquivalence.containsKey(spExpr)) {
                 values = valueEquivalence.get(spExpr);
-            } else {
+            }
+            else {
                 for (SchemaColumn otherCol: m_partitioningColumns) {
-                    if (col == otherCol) continue;
-                    if (valueEquivalence.containsKey(otherCol.getExpression())) {
+                    if (col != otherCol &&
+                        valueEquivalence.containsKey(otherCol.getExpression())) {
                         values = valueEquivalence.get(otherCol.getExpression());
                         break;
                     }
@@ -137,8 +139,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     private void updateEqualSets(Set<AbstractExpression> values,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets,
-            AbstractExpression tveKey, AbstractExpression spExpr)
-    {
+            AbstractExpression tveKey, AbstractExpression spExpr) {
         boolean hasLegacyValues = false;
         if (eqSets.contains(values)) {
             eqSets.remove(values);
@@ -155,8 +156,9 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     // exported subquery partitioning column(s)
     private List<SchemaColumn> findPartitioningColumns() {
-        if (m_partitioningColumns != null)
+        if (m_partitioningColumns != null) {
             return m_partitioningColumns;
+        }
 
         m_partitioningColumns = new ArrayList<>();
         assert(m_subqueriesPartitioning != null);
@@ -164,51 +166,55 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
             for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
                 List<SchemaColumn> scols = tableScan.getPartitioningColumns();
-                addPartitioningColumns(scols);
+                if (scols != null) {
+                    addPartitioningColumns(scols);
+                }
             }
         }
         return m_partitioningColumns;
     }
 
     private void addPartitioningColumns(List<SchemaColumn> scols) {
-        if (scols == null) return;
-
         // The partitioning columns have to be in its output column list
         // in order to be referenced on parent level.
         for (SchemaColumn partitionCol: scols) {
-            boolean existsInDisplayList = false;
+            SchemaColumn matchedCol = null;
             // Find whether the partition column is in output column list
             for (SchemaColumn outputCol: m_outputColumnList) {
-                if (outputCol.getExpression() instanceof TupleValueExpression)
-                {
-                    TupleValueExpression tve = (TupleValueExpression) outputCol.getExpression();
-                    if (tve.getTableName().equals(partitionCol.getTableName()) &&
-                        tve.getColumnName().equals(partitionCol.getColumnName()))
-                    {
-                        existsInDisplayList = true;
-
-                        String colNameForParentQuery = outputCol.getColumnAlias();
-                        partitionCol.reset(m_tableAlias, m_tableAlias,
-                                colNameForParentQuery, colNameForParentQuery);
-                        m_partitioningColumns.add(partitionCol);
-                        break;
-                    }
+                AbstractExpression outputExpr = outputCol.getExpression();
+                if ( ! (outputExpr instanceof TupleValueExpression)) {
+                    continue;
                 }
+
+                TupleValueExpression tve = (TupleValueExpression)outputExpr;
+                if (tve.getTableName().equals(partitionCol.getTableName()) &&
+                        tve.getColumnName().equals(partitionCol.getColumnName())) {
+                    matchedCol = outputCol;
+                    break;
+                }
+            }
+
+            String colNameForParentQuery;
+            if (matchedCol != null) {
+                colNameForParentQuery = matchedCol.getColumnAlias();
             }
             // single partition sub-query case can be single partition without
             // including partition column in its display column list
-            if (! existsInDisplayList && ! m_subqueriesPartitioning.requiresTwoFragments()) {
-                String colNameForParentQuery = partitionCol.getColumnName();
-                partitionCol.reset(m_tableAlias, m_tableAlias,
-                        colNameForParentQuery, colNameForParentQuery);
-                m_partitioningColumns.add(partitionCol);
+            else if ( ! m_subqueriesPartitioning.requiresTwoFragments()) {
+                colNameForParentQuery = partitionCol.getColumnName();
             }
+            else {
+                continue;
+            }
+            partitionCol.reset(m_tableAlias, m_tableAlias,
+                    colNameForParentQuery, colNameForParentQuery);
+            m_partitioningColumns.add(partitionCol);
         }
     }
 
     @Override
     public String getTableName() {
-        // Because derived table must have specify an alias, use its alias instead.
+        // Because a derived table must have an alias, use its alias instead.
         return m_tableAlias;
     }
 
@@ -232,7 +238,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
-            } else {
+            }
+            else {
                 assert(tableScan instanceof StmtSubqueryScan);
                 StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
                 stmtTables.addAll(subScan.getAllTargetTables());
@@ -261,12 +268,20 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public String getColumnName(int m_columnIndex) {
-        return m_outputColumnList.get(m_columnIndex).getColumnName();
+    public String getColumnName(int columnIndex) {
+        return getSchemaColumn(columnIndex).getColumnName();
+    }
+
+    public SchemaColumn getSchemaColumn(int columnIndex) {
+        return m_outputColumnList.get(columnIndex);
+    }
+
+    public Integer getColumnIndex(String columnAlias, int differentiator) {
+        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
     }
 
     @Override
-    public void processTVE(TupleValueExpression expr, String columnName) {
+    public AbstractExpression processTVE(TupleValueExpression expr, String columnName) {
         Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
@@ -274,9 +289,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         SchemaColumn schemaCol = m_outputColumnList.get(idx.intValue());
 
         expr.setColumnIndex(idx.intValue());
-        expr.setTypeSizeBytes(schemaCol.getType(), schemaCol.getSize(),
-                schemaCol.getExpression().getInBytes());
-
+        expr.setTypeSizeAndInBytes(schemaCol);
+        return expr;
     }
 
     /**
@@ -314,7 +328,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         if ( ! (m_subqueryStmt instanceof ParsedSelectStmt)) {
-            throw new PlanningErrorException("Unsupported subquery found in FROM clause:" + m_subqueryStmt.toString());
+            throw new PlanningErrorException("Unsupported subquery found in FROM clause:" +
+                    m_subqueryStmt);
         }
 
         ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
@@ -339,18 +354,20 @@ public class StmtSubqueryScan extends StmtTableScan {
                 m_tableAggregateSubquery = true;
                 return false;
             }
+
             // For group by queries, there are two cases on group by columns.
             // (1) Does not contain a partition column:
             // If joined with a partitioned table in the parent query, it will
             // violate the partitioned table join criteria.
             // Detect case (1) to mark receive node.
-            if (! selectStmt.hasPartitionColumnInGroupby()) {
+            if ( ! selectStmt.hasPartitionColumnInGroupby()) {
                 return false;
             }
         }
         if ( ! selectStmt.hasPartitionColumnInWindowedExpression()) {
             return false;
         }
+
         // Now. If this sub-query joins with a partitioned table in the parent statement,
         // push the join down by removing the send/receive plan node pair.
         m_failedSingleFragmentTest = false;
@@ -361,6 +378,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (m_failedSingleFragmentTest) {
             return true;
         }
+
         for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;

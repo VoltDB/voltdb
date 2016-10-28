@@ -35,15 +35,15 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
-        TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
+        TABLE_IDX,  // for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
-    protected int m_columnIndex = -1;
-    protected String m_tableName = null;
-    protected String m_tableAlias = null;
-    protected String m_columnName = null;
-    protected String m_columnAlias = null;
-    protected int m_tableIdx = 0;
+    private int m_columnIndex = -1;
+    private String m_tableName = null;
+    private String m_tableAlias = null;
+    private String m_columnName = null;
+    private String m_columnAlias = null;
+    private int m_tableIdx = 0;
 
     // Tables that are not persistent tables, but those produced internally,
     // (by subqueries for example) may contains columns whose names are the same.
@@ -86,10 +86,30 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public TupleValueExpression(String tableName,
             String tableAlias,
+            Column catalogCol,
+            int columnIndex) {
+        this(tableName, tableAlias,
+                catalogCol.getName(), catalogCol.getName(),
+                columnIndex, -1);
+        setTypeSizeAndInBytes(catalogCol);
+    }
+
+    public TupleValueExpression(String tableName,
+            String tableAlias,
             String columnName,
             String columnAlias,
             int columnIndex) {
         this(tableName, tableAlias, columnName, columnAlias, columnIndex, -1);
+    }
+
+    public TupleValueExpression(String tableName,
+            String tableAlias,
+            String columnName,
+            String columnAlias,
+            AbstractExpression typeSource,
+            int columnIndex) {
+        this(tableName, tableAlias, columnName, columnAlias, columnIndex, -1);
+        setTypeSizeAndInBytes(typeSource);
     }
 
     public TupleValueExpression(String tableName,
@@ -109,27 +129,17 @@ public class TupleValueExpression extends AbstractValueExpression {
         super(ExpressionType.VALUE_TUPLE);
     }
 
-    /// Only set for the special case of an aggregate function result used in an "ORDER BY" clause.
-    /// This TupleValueExpression represents the corresponding "column" in the aggregate's generated output TEMP table.
+    /*
+     *  Only set for the special case of an aggregate function result used in
+     *  an "ORDER BY" clause. This TupleValueExpression represents the
+     *  corresponding "column" in the aggregate's generated output TEMP table.
+     */
     public boolean hasAggregate() {
         return m_hasAggregate;
     }
 
-    public void setHasAggregate(boolean m_hasAggregate) {
-        this.m_hasAggregate = m_hasAggregate;
-    }
-
-    @Override
-    public Object clone() {
-        TupleValueExpression clone = (TupleValueExpression)super.clone();
-        clone.m_columnIndex = m_columnIndex;
-        clone.m_tableName = m_tableName;
-        clone.m_tableAlias = m_tableAlias;
-        clone.m_columnName = m_columnName;
-        clone.m_columnAlias = m_columnAlias;
-        clone.m_origStmtId = m_origStmtId;
-        clone.m_differentiator = m_differentiator;
-        return clone;
+    public void setHasAggregate(boolean hasAggregate) {
+        m_hasAggregate = hasAggregate;
     }
 
     @Override
@@ -137,11 +147,15 @@ public class TupleValueExpression extends AbstractValueExpression {
         super.validate();
 
         if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A value expression has child expressions for '" + this + "'");
+            throw new Exception(
+                    "ERROR: A value expression has child expressions for '" +
+                    this + "'");
 
         // Column Index
         if (m_columnIndex < 0) {
-            throw new Exception("ERROR: Invalid column index '" + m_columnIndex + "' for '" + this + "'");
+            throw new Exception(
+                    "ERROR: Invalid column index '" + m_columnIndex +
+                    "' for '" + this + "'");
         }
     }
 
@@ -212,6 +226,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableAlias = alias;
     }
 
+    boolean matchesTableAlias(String tableAlias) {
+        if (m_tableAlias == null) {
+            return m_tableName.equals(tableAlias);
+        }
+
+        return m_tableAlias.equals(tableAlias);
+    }
+
     public int getTableIndex() {
         return m_tableIdx;
     }
@@ -236,6 +258,14 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_differentiator = val;
     }
 
+    public final boolean needsDifferentiation() {
+        return m_needsDifferentiation;
+    }
+
+    public final void setNeedsNoDifferentiation() {
+        m_needsDifferentiation = false;
+    }
+
     /**
      *  Set the parent TVE indicator
      * @param parentTve
@@ -251,14 +281,22 @@ public class TupleValueExpression extends AbstractValueExpression {
         return m_origStmtId;
     }
 
-    public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
-        setValueType(SchemaColumnType);
-        setValueSize(size);
-        m_inBytes = bytes;
+    public void setTypeSizeAndInBytes(AbstractExpression typeSource) {
+        setValueType(typeSource.getValueType());
+        setValueSize(typeSource.getValueSize());
+        m_inBytes = typeSource.getInBytes();
     }
 
-    public void setTypeSizeBytes(int columnType, int size, boolean bytes) {
-        setTypeSizeBytes(VoltType.get((byte)columnType), size, bytes);
+    public void setTypeSizeAndInBytes(SchemaColumn typeSource) {
+        setValueType(typeSource.getType());
+        setValueSize(typeSource.getSize());
+        m_inBytes = typeSource.getExpression().getInBytes();
+    }
+
+    private void setTypeSizeAndInBytes(Column typeSource) {
+        setValueType(VoltType.get((byte)typeSource.getType()));
+        setValueSize(typeSource.getSize());
+        m_inBytes = typeSource.getInbytes();
     }
 
     @Override
@@ -327,8 +365,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
-    {
+    protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan)
+            throws JSONException {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
@@ -351,30 +389,35 @@ public class TupleValueExpression extends AbstractValueExpression {
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
-
-        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
+        setTypeSizeAndInBytes(column);
     }
 
     /**
-     * Given an input schema, resolve the TVE
-     * expressions.
+     * Given an input schema, resolve this TVE expression.
      */
-    public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
+    public int setColumnIndexUsingSchema(NodeSchema inputSchema) {
         int index = inputSchema.getIndexOfTve(this);
-        if (getValueType() == null && index != -1) {
-            // In case of sub-queries the TVE may not have its value type and size
-            // resolved yet. Try to resolve it now
+        if (index < 0) {
+            //* enable to debug*/ System.out.println("DEBUG: setColumnIndex miss: " + this);
+            //* enable to debug*/ System.out.println("DEBUG: setColumnIndex candidates: " + inputSchema);
+            return index;
+        }
+
+        setColumnIndex(index);
+        if (getValueType() == null) {
+            // In case of sub-queries the TVE may not have its
+            // value type and size resolved yet. Try to resolve it now
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
-            setTypeSizeBytes(inputColumn.getType(), inputColumn.getSize(),
-                    inputColumn.getExpression().getInBytes());
+            setTypeSizeAndInBytes(inputColumn);
         }
         return index;
     }
 
-    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
-    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
-    // depend on tables.
-    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableAlias) {
+    // Even though this function applies generally to expressions and tables
+    // and not just to TVEs as such, it is somewhat TVE-related because TVEs
+    // represent the points where expression trees depend on tables.
+    public static AbstractExpression getOtherTableExpression(
+            AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         AbstractExpression retval = expr.getLeft();
         if (isOperandDependentOnTable(retval, tableAlias)) {
@@ -384,16 +427,15 @@ public class TupleValueExpression extends AbstractValueExpression {
         return retval;
     }
 
-    // Even though this function applies generally to expressions and tables and not just to TVEs as such,
-    // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
-    // depend on tables.
-    public static boolean isOperandDependentOnTable(AbstractExpression expr, String tableAlias) {
+    // Even though this function applies generally to expressions and tables
+    // and not just to TVEs as such, it is somewhat TVE-related because TVEs
+    // represent the points where expression trees depend on tables.
+    public static boolean isOperandDependentOnTable(AbstractExpression expr,
+            String tableAlias) {
         assert(tableAlias != null);
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (tableAlias.equals(tve.getTableAlias()))
-            {
+        for (TupleValueExpression tve :
+            ExpressionUtil.getTupleValueExpressions(expr)) {
+            if (tableAlias.equals(tve.getTableAlias())) {
                 return true;
             }
         }
@@ -410,20 +452,19 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (m_verboseExplainForDebugging) {
             columnName += " (as JSON: ";
             JSONStringer stringer = new JSONStringer();
-            try
-            {
+            try {
                 stringer.object();
                 toJSONString(stringer);
                 stringer.endObject();
                 columnName += stringer.toString();
             }
-            catch (Exception e)
-            {
+            catch (Exception e) {
                 columnName += "CORRUPTED beyond the ability to format? " + e;
                 e.printStackTrace();
             }
             columnName += ")";
         }
+
         if (tableName == null) {
             if (m_tableIdx != 0) {
                 assert(m_tableIdx == 1);
@@ -433,41 +474,37 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
         else if ( ! tableName.equals(impliedTableName)) {
             return tableName + "." + columnName;
-        } else if (m_verboseExplainForDebugging) {
+        }
+        else if (m_verboseExplainForDebugging) {
             // In verbose mode, always show an "implied' tableName that would normally be left off.
             return "{" + tableName + "}." + columnName;
         }
         return columnName;
     }
 
-    private String chooseTwoNames(String name, String alias) {
-        if (name != null) {
-            if (alias != null && !name.equals(alias)) {
-                return String.format("%s(%s)", name, alias);
-            } else {
-                return name;
+    private String chooseFromTwoNames(String name, String alias) {
+        if (name == null) {
+            if (alias == null) {
+                return "<none>";
             }
-        } else if (alias != null) {
-            return String.format ("(%s)", alias);
-        } else {
-            return "<none>";
+
+            return "(" + alias + ")";
         }
-    }
 
-    public final boolean needsDifferentiation() {
-        return m_needsDifferentiation;
-    }
+        if (alias == null || name.equals(alias)) {
+            return name;
+        }
 
-    public final void setNeedsNoDifferentiation() {
-        m_needsDifferentiation = false;
+        return name + "(" + alias + ")";
     }
 
     @Override
     protected String getExpressionNodeNameForToString() {
         return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
                              super.getExpressionNodeNameForToString(),
-                             chooseTwoNames(m_tableName, m_tableAlias),
-                             chooseTwoNames(m_columnName, m_columnAlias),
+                             chooseFromTwoNames(m_tableName, m_tableAlias),
+                             chooseFromTwoNames(m_columnName, m_columnAlias),
                              m_columnIndex, m_differentiator);
     }
+
 }

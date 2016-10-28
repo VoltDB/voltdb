@@ -36,17 +36,13 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 
 public class TestComparisonOperatorsSuite  extends RegressionSuite {
-    //
-    // JUnit / RegressionSuite boilerplate
-    //
     public TestComparisonOperatorsSuite(String name) {
         super(name);
     }
 
-    static private void setUpSchema(VoltProjectBuilder project) throws IOException
-    {
-
-        final String literalSchema =
+    static private void setUpSchema(VoltProjectBuilder project)
+            throws IOException {
+        String literalSchema =
                 "CREATE TABLE S1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER, " +
@@ -67,14 +63,16 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "PAST TIMESTAMP, " +
                 "PRIMARY KEY (ID) ); " +
 
-                // Test unique generalized index on a function of an already indexed column.
+                // Test unique generalized index on
+                // a function of an already indexed column.
                 "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
 
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
 
                 //Test generalized expression index with case when.
-                "CREATE INDEX R1_CASEWHEN ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
+                "CREATE INDEX R1_CASEWHEN " +
+                " ON R1 (CASE WHEN num < 3 THEN num/2 ELSE num + 10 END); " +
 
                 "CREATE TABLE INLINED_VC_VB_TABLE (" +
                 "ID INTEGER DEFAULT 0 NOT NULL," +
@@ -83,29 +81,27 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "VB1 VARBINARY(6)," +   // inlined
                 "VB2 VARBINARY(64));" + // not inlined
                 "";
-
-            project.addLiteralSchema(literalSchema);
+        project.addLiteralSchema(literalSchema);
     }
 
-    public void testIsDistinctFrom() throws Exception
-    {
-        // is Distinct from operator does not work on HSQL-backend based. It results
-        // in run time exception with message "unsupported internal operation: Expression"
-        // So do not run "is distinct from" against HSQL backend
-        if(!isHSQL()) {
-            System.out.println("\nSTARTING test is Distinct from ...");
-            Client client = getClient();
-            populateTableForIsDistinctFromTests(client);
-            subTestIsDistinctFrom(client);
-            subTestIsDistinctFromUsingSubqueries(client);
-            subTestIsDistinctFromInCompatibleTypes(client);
+    public void testIsDistinctFrom() throws Exception {
+        // The IS DISTINCT FROM operator does not work in the HSQL-backend.
+        // It results in a run time exception with the message
+        // "unsupported internal operation: Expression".
+        if (isHSQL()) {
+            return;
         }
+        System.out.println("\nSTARTING test is Distinct from ...");
+        Client client = getClient();
+        populateTableForIsDistinctFromTests(client);
+        subTestIsDistinctFrom(client);
+        subTestIsDistinctFromUsingSubqueries(client);
+        subTestIsDistinctFromInCompatibleTypes(client);
     }
 
     private void populateTableForIsDistinctFromTests(Client client)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
-                                //       id, wage, dept
+            throws IOException, NoConnectionsException, ProcCallException {
+                                //        id,   wage, dept
         client.callProcedure("S1.insert", 1,    1000, 1);
         client.callProcedure("S1.insert", 3,    3000, 1);
         client.callProcedure("S1.insert", 5,    2553, 3);
@@ -119,144 +115,179 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
     }
 
     private void subTestIsDistinctFrom(Client client)
-            throws Exception
-    {
-        // 'is Distinct from' operator does not work on HSQL-backend - it's missing end-to-end
-        // support. It results in runt time exception "unsupported internal operation: Expression"
-        // So assert in case if these test cases are executed on HSQL backend
-        // Once support for 'is distinct from' is available on HSQL-backend, remove the assert below.
-        // results for HSQL backend below are HSQL 2.3.2/3 version and also verified against postgresql.
-        // so it come handy and have left them in there.
-        assert(!isHSQL());
+            throws Exception {
+        // Once support for 'is distinct from' is available on HSQL-backend,
+        // remove the assert below.
+        // The expected results below were validated against official HSQL
+        // (version 2.3.2/2.3.3) and against postgres.
+        assert( ! isHSQL());
 
         String sql;
+        long[][] expected;
 
         //ENG-8946: NULL constant in runtime exception when trying to resolve in HSQL
         // NULL constant - results in non-parameterized plan
         //sql = "SELECT * FROM S2 A WHERE  A.WAGE is not distinct from NULL;";
-        //validateTableOfLongs(client, sql, new long[][] {{4,     Long.MIN_VALUE,     2}});
+        //expected = new long[][] {{4,     Long.MIN_VALUE,     2}};
+        //validateTableOfLongs(client, sql, expected);
 
         // Non-Null constant results in parameterized plan
-        sql = "SELECT * FROM S2 A WHERE  A.WAGE is  distinct from 1000.01 order by A.ID;";
-        validateTableOfLongs(client, sql, new long[][] {{1,     1000,               2},
-                                                        {4,     Long.MIN_VALUE,     2},
-                                                        {5,     5253,               3}});
+        sql = "SELECT * FROM S2 A " +
+                "WHERE  A.WAGE is distinct from 1000.01 " +
+                "ORDER BY A.ID;";
+        expected = new long[][] {
+            {1,     1000,               2},
+            {4,     Long.MIN_VALUE,     2},
+            {5,     5253,               3}};
+        validateTableOfLongs(client, sql, expected);
 
         // Join operation
         // case 1: on column that can't have null values
         sql = "Select S1.ID ID," +
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
-                "from S1, S2 where S1.ID is not distinct from S2.ID order by S1.ID;";
-        //vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        //System.out.println("\n\nsql: " + sql + "\nResult: " + (vt.toString()) + " row Count: "+ vt.getRowCount() + "\n\n");
-        validateTableOfLongs(client, sql, new long[][] {{1, 1000, 1, 1000, 2},
-                                                        {5, 2553, 3, 5253, 3}});
+                "from S1, S2 " +
+                "where S1.ID is not distinct from S2.ID order by S1.ID;";
+        expected = new long[][] {
+            {1, 1000, 1, 1000, 2},
+            {5, 2553, 3, 5253, 3}};
+        validateTableOfLongs(client, sql, expected);
 
-        // case 2.1: on column that can have null values; result set does not has null values
+        // case 2.1: on column that can have null values;
+        // result set does not have null values
         sql = "Select S1.Wage," +
                 "S1.ID, S1.Dept, " +
                 "S2.ID, S2.Dept " +
-                "from S1, S2 where S1.WAGE is not distinct from S2.WAGE order by S1.ID;";
-        validateTableOfLongs(client, sql, new long[][] {{1000,              1,  1,  1,  2},
-                                                        {Long.MIN_VALUE,    10, 2,  4,  2}});
+                "from S1, S2 " +
+                "where S1.WAGE is not distinct from S2.WAGE order by S1.ID;";
+        expected = new long[][] {
+            {1000,              1,  1,  1,  2},
+            {Long.MIN_VALUE,    10, 2,  4,  2}};
+        validateTableOfLongs(client, sql, expected);
 
 
-        // case 2.2: on column that can have null values; result set has null values
+        // case 2.2: on column that can have null values;
+        // result set has null values
         sql = "Select S1.ID ID," +
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
-                "from S1, S2 where S1.WAGE is distinct from S2.WAGE order by S1.ID, S2.WAGE ASC;";
-
-        validateTableOfLongs(client, sql, new long[][] {{1, 1000,           1,  Long.MIN_VALUE, 2},
-                                                        {1, 1000,           1,  5253,           3},
-                                                        {3,  3000,          1,  Long.MIN_VALUE, 2},
-                                                        {3,  3000,          1,  1000,           2},
-                                                        {3,  3000,          1,  5253,           3},
-                                                        {5,  2553,          3,  Long.MIN_VALUE, 2},
-                                                        {5,  2553,          3,  1000,           2},
-                                                        {5,  2553,          3,  5253,           3},
-                                                        {7,  4552,          2,  Long.MIN_VALUE, 2},
-                                                        {7,  4552,          2,  1000,           2},
-                                                        {7,  4552,          2,  5253,           3},
-                                                        {9,  5152,          2,  Long.MIN_VALUE, 2},
-                                                        {9,  5152,          2,  1000,           2},
-                                                        {9,  5152,          2,  5253,           3},
-                                                        {10, Long.MIN_VALUE,2,  1000,           2},
-                                                        {10, Long.MIN_VALUE,2,  5253,           3}});
+                "from S1, S2 " +
+                "where S1.WAGE is distinct from S2.WAGE " +
+                "order by S1.ID, S2.WAGE ASC;";
+        expected = new long[][]{
+            {1,  1000,          1,  Long.MIN_VALUE, 2},
+            {1,  1000,          1,  5253,           3},
+            {3,  3000,          1,  Long.MIN_VALUE, 2},
+            {3,  3000,          1,  1000,           2},
+            {3,  3000,          1,  5253,           3},
+            {5,  2553,          3,  Long.MIN_VALUE, 2},
+            {5,  2553,          3,  1000,           2},
+            {5,  2553,          3,  5253,           3},
+            {7,  4552,          2,  Long.MIN_VALUE, 2},
+            {7,  4552,          2,  1000,           2},
+            {7,  4552,          2,  5253,           3},
+            {9,  5152,          2,  Long.MIN_VALUE, 2},
+            {9,  5152,          2,  1000,           2},
+            {9,  5152,          2,  5253,           3},
+            {10, Long.MIN_VALUE,2,  1000,           2},
+            {10, Long.MIN_VALUE,2,  5253,           3}};
+        validateTableOfLongs(client, sql, expected);
 
 
         // left join on column that has null values
-        sql = "Select S2.wage, S2.ID, count (*) from S1 left Join S2 On " +
-                "S2.WAGE is not distinct from S2.wage group by S2.wage, S2.ID order by s2.wage;";
-        validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    4,   6},
-                                                        {1000,              1,   6},
-                                                        {5253,              5,   6}});
+        sql = "Select S2.wage, S2.ID, count (*) " +
+                "from S1 left Join S2 " +
+                "on S2.WAGE is not distinct from S2.wage " +
+                "group by S2.wage, S2.ID " +
+                "order by s2.wage;";
+        expected = new long[][] {
+            {Long.MIN_VALUE,    4,   6},
+            {1000,              1,   6},
+            {5253,              5,   6}};
+        validateTableOfLongs(client, sql, expected);
     }
 
-    private void subTestIsDistinctFromUsingSubqueries(Client client) throws Exception
-    {
-        // 'is Distinct from' operator does not work on HSQL-backend - it's missing end-to-end
-        // support. It results in runt time exception "unsupported internal operation: Expression"
-        // So assert in case if these test cases are executed on HSQL backend
-        // Once support for 'is distinct from' is available on HSQL-backend, remove the assert below.
-        // results for HSQL backend below are HSQL 2.3.2/3 version and also verified against postgresql.
-        // so it come handy and have left them in there.
-        assert(!isHSQL());
+    private void subTestIsDistinctFromUsingSubqueries(Client client)
+            throws Exception {
+        // Once support for 'is distinct from' is available on HSQL-backend,
+        // remove the assert below.
+        // The expected results below were validated against official HSQL
+        // (version 2.3.2/2.3.3) and against postgres.
+        assert( ! isHSQL());
 
         String sql;
+        long[][] expected;
 
-        // test cases below test different subquery condition paths in EE like LHS NULL, RHS NOT NULL and so forth
+        // test cases below test different subquery condition paths in EE like
+        // LHS NULL, RHS NOT NULL and so forth
         sql = "SELECT wage salary, count(*) from S2 "+
-                "WHERE wage is distinct from  " +
+                "WHERE wage is distinct from " +
                 "(SELECT MIN(wage) FROM S1 where wage is distinct from 2553) " +
                 "GROUP BY wage " +
                 "HAVING COUNT(*) is distinct from 7 " +
                 "ORDER BY wage";
-        validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE,    1},
-                                                        {5253,              1}});
+        expected = new long[][] {
+            {Long.MIN_VALUE,    1},
+            {5253,              1}};
+        validateTableOfLongs(client, sql, expected);
 
         sql = "SELECT id, wage, count(*) from S1 "+
-                "WHERE wage is distinct from  " +
+                "WHERE wage is distinct from " +
                 "(SELECT wage FROM S2 where id is not distinct from 4) " +
-                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY id;";
-        validateTableOfLongs(client, sql, new long[][] {{1, 1000,   1},
-                                                        {3, 3000,   1},
-                                                        {5, 2553,   1},
-                                                        {7, 4552,   1},
-                                                        {9, 5152,   1}});
+                "GROUP BY wage, id " +
+                "HAVING COUNT(*) is distinct from 7 " +
+                "ORDER BY id;";
+        expected = new long[][] {
+            {1, 1000,   1},
+            {3, 3000,   1},
+            {5, 2553,   1},
+            {7, 4552,   1},
+            {9, 5152,   1}};
+        validateTableOfLongs(client, sql, expected);
 
         sql = "SELECT id, wage salary, count(*)  from S1 " +
-                "WHERE  (select S2.wage from S2 where S2.ID<>1 and S2.id<>5) is not distinct from wage "+
-                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 ORDER BY wage;";
-        validateTableOfLongs(client, sql, new long[][] {{10,    Long.MIN_VALUE,    1}});
-
-
+                "WHERE  (select S2.wage from S2 " +
+                "where S2.ID<>1 and S2.id<>5) is not distinct from wage " +
+                "GROUP BY wage, id HAVING COUNT(*) is distinct from 7 " +
+                "ORDER BY wage;";
+        expected = new long[][] {{10, Long.MIN_VALUE, 1}};
+        validateTableOfLongs(client, sql, expected);
 
         sql = "select S1.wage, count(*) from S1 Right Join S2 "+
-                "On S2.wage is distinct from  " +
-                "(SELECT MIN(wage) FROM S1 where wage is  distinct from 1000) " +
-                "GROUP BY S1.wage  having COUNT(*) is not distinct from 1;";
+                "on S2.wage is distinct from " +
+                "(SELECT MIN(wage) FROM S1 where wage is distinct from 1000) " +
+                "GROUP BY S1.wage " +
+                "HAVING COUNT(*) is not distinct from 1;";
         validateTableOfLongs(client, sql, new long[][] {});
 
         sql = "select * from S1 where S1.wage = ANY " +
-                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.wage is not distinct from  1000);";
-        validateTableOfLongs(client, sql, new long[][] {{1,     1000,      1}});
+                "(select S2.wage from S2 " +
+                "where S2.wage is distinct from 5253 " +
+                "or S2.wage is not distinct from 1000);";
+        expected = new long[][] {{1, 1000, 1}};
+        validateTableOfLongs(client, sql, expected);
 
-        // currently ANY/ALL operator is not supported with "is distinct from" comparison operator
+        // currently ANY/ALL operator is not supported with "is distinct from"
+        // comparison operator
         sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
-                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  1000);";
+                "(select S2.wage " +
+                "from S2 " +
+                "where S2.wage is distinct from 5253 " +
+                "or S2.Wage is not distinct from 1000);";
         verifyStmtFails(client, sql, "unexpected token: SELECT");
 
         sql = "select * from S1 where S1.WAGE is not distinct from ANY " +
-                "(select S2.wage from S2 where S2.wage is distinct from  5253 or S2.Wage is not distinct from  Null);";
+                "(select S2.wage " +
+                "from S2 " +
+                "where S2.wage is distinct from 5253 " +
+                "or S2.Wage is not distinct from Null);";
         verifyStmtFails(client, sql, "unexpected token: SELECT");
     }
 
-    private void subTestIsDistinctFromInCompatibleTypes(Client client) throws Exception
-    {
+    private void subTestIsDistinctFromInCompatibleTypes(Client client)
+            throws Exception {
         String sql;
-        sql = "SELECT * FROM S1 A WHERE  A.WAGE is distinct from \'Z\';";
+        sql = "SELECT * FROM S1 A WHERE A.WAGE is distinct from \'Z\';";
         verifyStmtFails(client, sql, "incompatible data types in combination");
     }
 
@@ -265,67 +296,82 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         Client cl = getClient();
         VoltTable vt;
         String sql;
+        long[][] expected;
 
         //                           ID, DESC,   NUM, FLOAT, TIMESTAMP
         cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         cl.callProcedure("R1.insert", 2, "Memsql",  5, 5.0, new Timestamp(1000000000000L));
 
-        sql = "SELECT ID, CASE WHEN num < 3 THEN 0 ELSE 8 END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 8}});
+        sql = "SELECT ID, CASE WHEN num < 3 THEN 0 ELSE 8 END " +
+                "FROM R1 ORDER BY 1;";
+        expected = new long[][] {{1, 0},{2, 8}};
+        validateTableOfLongs(cl, sql, expected);
 
-        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 15}});
+        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END " +
+                "FROM R1 ORDER BY 1;";
+        expected = new long[][] {{1, 0},{2, 15}};
+        validateTableOfLongs(cl, sql, expected);
 
         sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN num * 5 " +
-                "WHEN num >=5 THEN num * 10  ELSE num END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 5},{2, 50}});
+                "WHEN num >=5 THEN num * 10 ELSE num END FROM R1 ORDER BY 1;";
+        expected = new long[][] {{1, 5},{2, 50}};
+        validateTableOfLongs(cl, sql, expected);
 
 
         // (2) Test case when Types.
         sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                "WHEN num >=5 THEN num * 10  ELSE num END FROM R1 ORDER BY 1;";
+                "WHEN num >=5 THEN num * 10 ELSE num END " +
+                "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.BIGINT, vt.getColumnType(1));
-        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, 50}});
+        expected = new long[][] {{1, Long.MIN_VALUE},{2, 50}};
+        validateTableOfLongs(vt, expected);
 
         sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                "WHEN num >=5 THEN NULL  ELSE num END FROM R1 ORDER BY 1;";
+                "WHEN num >=5 THEN NULL ELSE num END " +
+                "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2, Long.MIN_VALUE}});
+        expected = new long[][] {{1, Long.MIN_VALUE},{2, Long.MIN_VALUE}};
+        validateTableOfLongs(vt, expected);
 
         // Expected failed type cases:
         try {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                    "WHEN num >=5 THEN NULL ELSE NULL END FROM R1 ORDER BY 1;";
+                    "WHEN num >=5 THEN NULL ELSE NULL END " +
+                    "FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
             fail();
-        } catch (Exception ex) {
-            assertNotNull(ex);
+        }
+        catch (Exception ex) {
             assertTrue(ex.getMessage().contains("data type cast needed for parameter or null literal"));
         }
 
         try {
             // Use String as the casted type
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                    "WHEN num >=5 THEN NULL ELSE 'NULL' END FROM R1 ORDER BY 1;";
+                    "WHEN num >=5 THEN NULL ELSE 'NULL' END " +
+                    "FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             fail();
         }
 
         try {
             sql = "SELECT ID, CASE WHEN num > 0 AND num < 5 THEN NULL " +
-                    "WHEN num >=5 THEN 'I am null'  ELSE num END FROM R1 ORDER BY 1;";
+                    "WHEN num >=5 THEN 'I am null' ELSE num END " +
+                    "FROM R1 ORDER BY 1;";
             vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
             // hsql232 ENG-8586 CASE WHEN having no incompatibility problem with this: fail();
-        } catch (Exception ex) {
-            assertNotNull(ex);
+        }
+        catch (Exception ex) {
             assertTrue(ex.getMessage().contains("incompatible data types in combination"));
         }
 
         // Test string types
-        sql = "SELECT ID, CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END FROM R1 ORDER BY 1;";
+        sql = "SELECT ID, CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END " +
+                "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(2, vt.getRowCount());
         vt.advanceRow();
@@ -342,7 +388,9 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
 
         // Test string concatenation
-        sql = "SELECT ID, desc || ':' ||  CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END FROM R1 ORDER BY 1;";
+        sql = "SELECT ID, desc || ':' ||  " +
+                "CASE WHEN desc > 'Volt' THEN 'Good' ELSE 'Bad' END " +
+                "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(2, vt.getRowCount());
         vt.advanceRow();
@@ -360,24 +408,35 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         // Test inlined varchar/varbinary value produced by CASE WHEN.
         // This is regression coverage for ENG-6666.
         sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
-            "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+                "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
         cl.callProcedure("@AdHoc", sql);
-        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END " +
+                "FROM INLINED_VC_VB_TABLE " +
+                "WHERE ID = 72;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
         assertEquals("FOO", vt.getString(0));
 
-        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END " +
+                "FROM INLINED_VC_VB_TABLE " +
+                "WHERE ID = 72;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
-        assertTrue(VoltTable.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
+        assertTrue(VoltTable.varbinaryToPrintableString(
+                vt.getVarbinary(0)).contains("DEADBEEF"));
 
-        cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
+        cl.callProcedure("R1.insert", 3, "ORACLE", 8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
         sql = "SELECT ID, CASE WHEN num < 5 THEN num * 5 " +
-                "WHEN num < 10 THEN CASE WHEN num > 7 THEN num * 10 ELSE num * 8 END " +
-                "END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 5},{2, 40}, {3, 80}});
+                "WHEN num < 10 THEN " +
+                "CASE WHEN num > 7 THEN num * 10 ELSE num * 8 END " +
+                "END " +
+                "FROM R1 ORDER BY 1;";
+        expected = new long[][] {
+            {1, 5},
+            {2, 40},
+            {3, 80}};
+        validateTableOfLongs(cl, sql, expected);
 
 
         // Test case when without ELSE clause
@@ -385,74 +444,85 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "WHEN num >=5 THEN num END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,5}, {3, 8}});
+        expected = new long[][] {
+            {1, Long.MIN_VALUE},
+            {2, 5},
+            {3, 8}};
+        validateTableOfLongs(vt, expected);
 
         sql = "SELECT ID, CASE WHEN num > 3 AND num < 5 THEN 4 " +
                 "WHEN num >=5 THEN num*10 END FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.BIGINT, vt.getColumnType(1));
-        validateTableOfLongs(vt, new long[][] {{1, Long.MIN_VALUE},{2,50}, {3, 80}});
+        expected = new long[][] {
+            {1, Long.MIN_VALUE},
+            {2, 50},
+            {3, 80}};
+        validateTableOfLongs(vt, expected);
 
         // Test NULL
-        cl.callProcedure("R1.insert", 4, "DB2",  null, null, new Timestamp(1000000000000L));
-        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END FROM R1 ORDER BY 1;";
+        cl.callProcedure("R1.insert", 4, "DB2", null, null, new Timestamp(1000000000000L));
+        sql = "SELECT ID, CASE WHEN num < 3 THEN num/2 ELSE num + 10 END " +
+                "FROM R1 ORDER BY 1;";
         vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
-        validateTableOfLongs(vt, new long[][] {{1, 0},{2, 15}, {3, 18}, {4, Long.MIN_VALUE}});
-
+        expected = new long[][] {
+            {1, 0},
+            {2, 15},
+            {3, 18},
+            {4, Long.MIN_VALUE}};
+        validateTableOfLongs(vt, expected);
     }
 
     public void testCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
         String sql;
+        long[][] expected;
 
         //      ID, DESC,   NUM, FLOAT, TIMESTAMP
         cl.callProcedure("R1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         cl.callProcedure("R1.insert", 2, "MySQL",  5, 5.0, new Timestamp(1000000000000L));
 
         sql = "SELECT ID, CASE num WHEN 3 THEN 3*2 WHEN 1 THEN 0 ELSE 10 END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 0},{2, 10}});
+        expected = new long[][] {{1, 0},{2, 10}};
+        validateTableOfLongs(cl, sql, expected);
 
         // No ELSE clause
         sql = "SELECT ID, CASE num WHEN 1 THEN 10 WHEN 2 THEN 1 END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 10},{2, Long.MIN_VALUE}});
+        expected = new long[][] {{1, 10},{2, Long.MIN_VALUE}};
+        validateTableOfLongs(cl, sql, expected);
 
         // Test NULL
         cl.callProcedure("R1.insert", 3, "Oracle",  null, null, new Timestamp(1000000000000L));
         sql = "SELECT ID, CASE num WHEN 5 THEN 50 ELSE num + 10 END FROM R1 ORDER BY 1;";
-        validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
+        expected = new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}};
+        validateTableOfLongs(cl, sql, expected);
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestComparisonOperatorsSuite.class);
-        boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         try {
             setUpSchema(project);
-            // CONFIG #1: Local Site/Partitions running on JNI backend
-            config = new LocalCluster("try-voltdbBackend.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
-            success = config.compile(project);
-            assertTrue(success);
-            builder.addServerConfig(config);
-
-            // CONFIG #2: HSQL
-            config = new LocalCluster("try-hsqlBackend.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-            success = config.compile(project);
-            assertTrue(success);
-            builder.addServerConfig(config);
-
         }
         catch(IOException excp) {
-            assertFalse(true);
+            fail();
         }
+        LocalCluster config = null;
         // no clustering tests for functions
+        // CONFIG #1: Local Site/Partitions running on JNI backend
+        config = new LocalCluster("try-voltdbBackend.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
 
+        // CONFIG #2: HSQL
+        config = new LocalCluster("try-hsqlBackend.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
         return builder;
     }
 }
