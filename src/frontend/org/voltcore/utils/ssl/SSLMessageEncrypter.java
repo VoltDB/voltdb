@@ -33,7 +33,9 @@ public class SSLMessageEncrypter {
 
     public SSLMessageEncrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-        this.m_sslDst = ByteBuffer.allocate(Constants.SSL_CHUNK_SIZE + 128);
+        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+        // wrap will overflow until the encryption buffer is this size.
+        this.m_sslDst = ByteBuffer.allocate(packetBufferSize);
     }
 
     public List<ByteBuffer> encryptBuffer(ByteBuffer src) throws IOException {
