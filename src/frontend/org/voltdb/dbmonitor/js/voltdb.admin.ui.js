@@ -467,7 +467,7 @@ function loadAdminPage() {
 
                 voltDbRenderer.GetCommandLogStatus(function (commandLogStatus) {
                     VoltDbAdminConfig.isCommandLogEnabled = commandLogStatus;
-                    showHideIntSnapshotMsg()
+                    showHideIntSnapshotMsg(isProVersion)
                 });
 
             });
@@ -4428,8 +4428,8 @@ function loadAdminPage() {
         "Username already exists."
     );
 
-    showHideIntSnapshotMsg = function(){
-        if(!VoltDbAdminConfig.isCommandLogEnabled){
+    showHideIntSnapshotMsg = function(isProVersion){
+        if(!VoltDbAdminConfig.isCommandLogEnabled && isProVersion){
             $('#continueShutdownMsg').show()
             $('#shutdownWarningMsg').show()
         }else{
