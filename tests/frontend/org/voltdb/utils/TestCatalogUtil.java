@@ -1969,6 +1969,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
                 + "        <configuration target='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "            <property name=\"outdir\">/tmp/" + System.getProperty("user.name") + "</property>"
                 + "            <property name=\"type\">csv</property>"
                 + "            <property name=\"nonce\">newNonce</property>"
                 + "        </configuration>"
