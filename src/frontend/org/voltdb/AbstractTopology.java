@@ -289,6 +289,14 @@ public class AbstractTopology {
     public static AbstractTopology mutateAddHosts(AbstractTopology currentTopology,
                                                   HostDescription[] hostDescriptions)
     {
+        // validate input
+        assert(currentTopology != null);
+        Arrays.stream(hostDescriptions).forEach(hd -> {
+            assert(hd != null);
+            assert(hd.targetSiteCount >= 0);
+            assert(hd.haGroupToken != null);
+        });
+
         // validate no duplicate host ids
         Set<Integer> hostIds = new HashSet<>(currentTopology.hostsById.keySet());
         for (HostDescription hostDescription : hostDescriptions) {
@@ -331,6 +339,13 @@ public class AbstractTopology {
     public static AbstractTopology mutateAddPartitionsToEmptyHosts(AbstractTopology currentTopology,
                                                                    PartitionDescription[] partitionDescriptions)
     {
+        // validate input
+        assert(currentTopology != null);
+        Arrays.stream(partitionDescriptions).forEach(pd -> {
+            assert(pd != null);
+            assert(pd.k >= 0);
+        });
+
         /////////////////////////////////
         // convert all hosts to mutable hosts to add partitions and sites
         /////////////////////////////////
