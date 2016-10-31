@@ -186,7 +186,6 @@ public class TestAbstractTopology extends TestCase {
         metrics.avgReplicationPerHAGroup = sumOfReplicaCounts / (double) metrics.haGroupCount;
 
         return metrics;
-
     }
 
     private static void collectConnectedPartitions(Partition starterPartition, Set<Host> unseenHosts, Set<Partition> unseenPartitions, Map<Integer, Host> hostsById) {
@@ -225,6 +224,88 @@ public class TestAbstractTopology extends TestCase {
     public void testFiveNodeK1TwoRacks() throws JSONException {
         TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
         subTestDescription(td, false);
+    }
+
+    public void testTooManyPartitions() {
+        TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
+        td.partitions[0] = new PartitionDescription(td.partitions[0].k + 1);
+        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
+        try {
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("Hosts have inadequate space"));
+        }
+    }
+
+    public void testKTooLarge() {
+        HostDescription[] hds = new HostDescription[3];
+        hds[0] = new HostDescription(0, 2, "0");
+        hds[1] = new HostDescription(1, 2, "0");
+        hds[2] = new HostDescription(2, 2, "0");
+        PartitionDescription[] pds = new PartitionDescription[2];
+        pds[0] = new PartitionDescription(3);
+        pds[1] = new PartitionDescription(1);
+
+        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
+        try {
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("Partition requesting more replicas"));
+        }
+    }
+
+    public void testSubtleKTooLarge() {
+        HostDescription[] hds = new HostDescription[3];
+        hds[0] = new HostDescription(0, 4, "0");
+        hds[1] = new HostDescription(1, 1, "0");
+        hds[2] = new HostDescription(2, 1, "0");
+        PartitionDescription[] pds = new PartitionDescription[2];
+        pds[0] = new PartitionDescription(2);
+        pds[1] = new PartitionDescription(2);
+
+        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
+        try {
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, pds);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("Topology request invalid"));
+        }
+    }
+
+    public void testNonUniqueHostIds() {
+        HostDescription[] hds = new HostDescription[3];
+        hds[0] = new HostDescription(201, 1, "0");
+        hds[1] = new HostDescription(202, 1, "0");
+        hds[2] = new HostDescription(201, 1, "0");
+        PartitionDescription[] pds = new PartitionDescription[2];
+        pds[0] = new PartitionDescription(0);
+        pds[1] = new PartitionDescription(1);
+
+        try {
+            AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("must contain unique and unused hostid"));
+        }
+
+        // now try adding on from existing topo
+        TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
+        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
+        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td.partitions);
+
+        try {
+            AbstractTopology.mutateAddHosts(topo, hds);
+            fail();
+        }
+        catch (Exception e) {
+            assertTrue(e.getMessage().contains("must contain unique and unused hostid"));
+        }
     }
 
     private List<String> getHAGroupTagTree(int treeWidth, int leafCount) {
