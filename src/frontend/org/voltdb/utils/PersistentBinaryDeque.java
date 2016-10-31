@@ -16,11 +16,9 @@
  */
 package org.voltdb.utils;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -844,12 +842,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return numOpen;
     }
 
-    public boolean isAwaitingTruncation()
+    public synchronized boolean isAwaitingTruncation()
     {
         return m_awaitingTruncation;
     }
 
-    public void setAwaitingTruncation(boolean m_awaitingTruncation)
+    public synchronized void setAwaitingTruncation(boolean m_awaitingTruncation)
     {
         this.m_awaitingTruncation = m_awaitingTruncation;
     }
