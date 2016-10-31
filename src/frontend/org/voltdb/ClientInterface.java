@@ -68,6 +68,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLBufferDecrypter;
+import org.voltcore.utils.ssl.SSLBufferEncrypter;
+import org.voltcore.utils.ssl.SSLMessageDecrypter;
+import org.voltcore.utils.ssl.SSLMessageEncrypter;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -340,6 +344,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
                         SSLEngine sslEngine = null;
+                        SSLMessageEncrypter sslMessageEncrypter = null;
+                        SSLMessageDecrypter sslMessageDecrypter = null;
                         if (m_sslContext != null) {
                             sslEngine = m_sslContext.createSSLEngine();
                             sslEngine.setUseClientMode(false);
@@ -350,9 +356,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             if (!handshaker.handshake()) {
                                 throw new IOException("SSL handshake failed");
                             }
+                            sslMessageEncrypter = new SSLMessageEncrypter(sslEngine);
+                            sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
                         }
 
-                        final InputHandler handler = authenticate(m_socket, sslEngine, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, sslEngine, sslMessageEncrypter, sslMessageDecrypter, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -499,8 +507,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
+        // TODO: remove sslEngine, fix javadoc just above.
         private InputHandler
-        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, SSLEngine sslEngine, SSLMessageEncrypter sslMessageEncrypter, SSLMessageDecrypter sslMessageDecrypter, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -557,6 +566,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                               "): wire protocol violation (timeout reading message length).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -567,9 +577,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (messageLength < 0) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is negative).");
+                        "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -577,15 +588,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (messageLength > ((1024 * 1024) * 2)) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is too large).");
+                        "): wire protocol violation (message length " + messageLength + " is too large).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
-              }
+            }
 
-            final ByteBuffer message = ByteBuffer.allocate(messageLength);
+            ByteBuffer message = ByteBuffer.allocate(messageLength);
 
             try {
                 while (message.hasRemaining()) {
@@ -602,9 +614,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (message.hasRemaining()) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading authentication strings).");
+                        "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -619,6 +632,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             message.flip();
+            message = sslMessageDecrypter == null ? message : sslMessageDecrypter.decryptMessage(message);
             int aversion = message.get(); //Get version
             ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
@@ -629,6 +643,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
                     //Send negative response
                     responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                    responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                     socket.write(responseBuffer);
                     socket.close();
                     return null;
@@ -645,6 +660,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         + "): user " + username + " failed authentication.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -663,6 +679,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (ap == null) {
                 //Send negative response
                 responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 authLog.warn("Rejected user " + username +
@@ -706,6 +723,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                        responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                         socket.write(responseBuffer);
                     }
                     socket.close();
@@ -716,6 +734,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         "): user " + username + " because this node is rejoining.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE_DUE_TO_REJOIN).flip();
+                responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
                 socket.write(responseBuffer);
                 socket.close();
                 return null;
@@ -739,6 +758,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
             responseBuffer.putInt(buildString.length);
             responseBuffer.put(buildString).flip();
+            responseBuffer = sslMessageEncrypter == null ? responseBuffer : sslMessageEncrypter.encryptMessage(responseBuffer);
             socket.write(responseBuffer);
             return handler;
         }

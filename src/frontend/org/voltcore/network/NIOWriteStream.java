@@ -28,7 +28,7 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.ssl.SSLMessageEncrypter;
+import org.voltcore.utils.ssl.SSLBufferEncrypter;
 
 import javax.net.ssl.SSLEngine;
 
@@ -81,7 +81,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
-    private final SSLMessageEncrypter m_sslMessageEncrypter;
+    private final SSLBufferEncrypter m_sslBufferEncrypter;
     private final List<ByteBuffer> m_encryptedBuffers;
     private final WriteBuffers m_writeBuffers;
 
@@ -101,11 +101,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
         if (sslEngine != null) {
-            m_sslMessageEncrypter = new SSLMessageEncrypter(sslEngine);
+            m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine);
             m_encryptedBuffers = new ArrayList<>();
             m_writeBuffers = new SSLWriteBuffers();
         } else {
-            m_sslMessageEncrypter = null;
+            m_sslBufferEncrypter = null;
             m_encryptedBuffers = null;
             m_writeBuffers = new ClearWriteBuffers();
         }
@@ -441,7 +441,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             } else {
                 buffer = m_currentWriteBuffer.b();
             }
-            m_encryptedBuffers.addAll(m_sslMessageEncrypter.encryptBuffer(buffer));
+            m_encryptedBuffers.addAll(m_sslBufferEncrypter.encryptBuffer(buffer));
             m_currentWriteBuffer.discard();
             m_currentWriteBuffer = null;
             return m_encryptedBuffers.get(0);

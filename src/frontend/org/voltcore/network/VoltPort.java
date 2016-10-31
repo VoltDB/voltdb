@@ -28,7 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.ssl.SSLMessageDecrypter;
+import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import javax.net.ssl.SSLEngine;
 
@@ -91,7 +91,7 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
-    private final SSLMessageDecrypter m_sslMessageDecrypter;
+    private final SSLBufferDecrypter m_sslBufferDecrypter;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
@@ -108,7 +108,7 @@ public class VoltPort implements Connection
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         m_sslEngine = sslEngine;
-        m_sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
+        m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
     }
 
     /**
@@ -187,7 +187,7 @@ public class VoltPort implements Connection
                     try {
                         while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
                             if (m_sslEngine != null) {
-                                List<ByteBuffer> messages = m_sslMessageDecrypter.decryptMessages(message);
+                                List<ByteBuffer> messages = m_sslBufferDecrypter.decryptBuffer(message);
                                 for (ByteBuffer mess : messages) {
                                     m_handler.handleMessage(mess, this);
                                     m_messagesRead++;

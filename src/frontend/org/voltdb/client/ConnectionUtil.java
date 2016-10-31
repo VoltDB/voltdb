@@ -46,6 +46,8 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.ssl.SSLMessageDecrypter;
+import org.voltcore.utils.ssl.SSLMessageEncrypter;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
@@ -196,11 +198,15 @@ public class ConnectionUtil {
 
         aChannel.configureBlocking(false);
 
+        SSLMessageEncrypter sslMessageEncrypter = null;
+        SSLMessageDecrypter sslMessageDecrypter = null;
         if (sslEngine != null) {
             SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
             if (!handshaker.handshake()) {
                 throw new IOException("SSL handshake failed");
             }
+            sslMessageEncrypter = new SSLMessageEncrypter(sslEngine);
+            sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
         }
 
         final long retvals[] = new long[4];
@@ -233,6 +239,7 @@ public class ConnectionUtil {
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);
             b.flip();
+            b = sslMessageEncrypter == null ? b : sslMessageEncrypter.encryptMessage(b);
 
             boolean successfulWrite = false;
             IOException writeException = null;
@@ -280,6 +287,7 @@ public class ConnectionUtil {
                 }
             }
             loginResponse.flip();
+            loginResponse = sslMessageDecrypter == null ? loginResponse : sslMessageDecrypter.decryptMessage(loginResponse);
             byte version = loginResponse.get();
             byte loginResponseCode = loginResponse.get();
 

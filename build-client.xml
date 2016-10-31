@@ -114,6 +114,8 @@
                   org/voltcore/utils/LatencyWatchdog.java
                   org/voltcore/utils/CompressionStrategy.java
                   org/voltcore/utils/VoltTypeUtil.java
+                  org/voltcore/utils/ssl/SSLBufferDecrypter.java
+                  org/voltcore/utils/ssl/SSLBufferEncrypter.java
                   org/voltcore/utils/ssl/SSLConfiguration.java
                   org/voltcore/utils/ssl/SSLMessageDecrypter.java
                   org/voltcore/utils/ssl/SSLMessageEncrypter.java
