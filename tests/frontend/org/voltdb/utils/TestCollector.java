@@ -48,6 +48,7 @@ import java.util.zip.ZipFile;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
@@ -56,13 +57,14 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class TestCollector {
+public class TestCollector extends JUnit4LocalClusterTest {
     private static final int STARTUP_DELAY = 3000;
     VoltProjectBuilder builder;
     LocalCluster cluster;
@@ -104,6 +106,12 @@ public class TestCollector {
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        client.close();
+        cluster.shutDown();
     }
 
     private ZipFile collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {

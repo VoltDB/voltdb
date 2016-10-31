@@ -23,6 +23,11 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -30,6 +35,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateDropView extends AdhocDDLTestBase {
 
+    @Test
     public void testBasicCreateView() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

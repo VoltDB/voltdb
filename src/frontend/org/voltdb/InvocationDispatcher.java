@@ -543,7 +543,7 @@ public final class InvocationDispatcher {
 
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
             return serverUnavailableResponse(
-                    "Server is shutding down.",
+                    "Server is shutting down.",
                     task.clientHandle);
         }
 
@@ -1234,6 +1234,22 @@ public final class InvocationDispatcher {
         return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user, bypass);
     }
 
+    private final File getSnapshotCatalogFile(JSONObject snapJo) throws JSONException {
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
+        String catFN = snapJo.getString(SnapshotUtil.JSON_NONCE) + ".jar";
+        SnapshotPathType pathType = SnapshotPathType.valueOf(
+                snapJo.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.name()));
+        switch(pathType) {
+        case SNAP_AUTO:
+            return new File(paths.resolve(paths.getSnapshoth()), catFN);
+        case SNAP_CL:
+            return new File(paths.resolve(paths.getCommandLogSnapshot()), catFN);
+        default:
+            File snapDH = new VoltFile(snapJo.getString(SnapshotUtil.JSON_PATH));
+            return new File(snapDH, catFN);
+        }
+    }
+
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
@@ -1249,9 +1265,7 @@ public final class InvocationDispatcher {
         log.info("No schema found. Restoring schema and procedures from snapshot.");
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-            final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
-            final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new VoltFile(path, nonce + ".jar");
+            final File catalogFH = getSnapshotCatalogFile(jsObj);
 
             final byte[] catalog;
             try {

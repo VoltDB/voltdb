@@ -919,18 +919,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
 
         if (m_inlineNodes.size() > 0) {
-            stringer.key(Members.INLINE_NODES.name()).array();
-
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
             int i = 0;
             for (PlanNodeType type : m_inlineNodes.keySet()) {
                 types[i++] = type;
             }
             Arrays.sort(types);
+
+            stringer.key(Members.INLINE_NODES.name()).array();
             for (PlanNodeType type : types) {
                 AbstractPlanNode node = m_inlineNodes.get(type);
                 assert(node != null);
-                assert(node instanceof JSONString);
                 stringer.value(node);
             }
             stringer.endArray();

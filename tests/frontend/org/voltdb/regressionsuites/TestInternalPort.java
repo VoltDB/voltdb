@@ -23,32 +23,36 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import junit.framework.TestCase;
-
-public class TestInternalPort extends TestCase {
+public class TestInternalPort extends JUnit4LocalClusterTest {
 
     PortListener ncprocess;
     PipeToFile pf;
     int rport;
 
-    public TestInternalPort(String name) {
-        super(name);
+    public TestInternalPort() {
     }
 
     /**
      * JUnit special method called to setup the test. This instance will start
      * the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @Before
     public void setUp() throws Exception {
         rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         System.out.println("Random Internal port is: " + rport);
@@ -84,7 +88,7 @@ public class TestInternalPort extends TestCase {
      * JUnit special method called to shutdown the test. This instance will
      * stop the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @After
     public void tearDown() throws Exception {
         if (ncprocess != null) {
             ncprocess.close();
@@ -94,6 +98,7 @@ public class TestInternalPort extends TestCase {
     /*
      *
      */
+    @Test
     public void testInternalPort() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
