@@ -23,6 +23,12 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -31,6 +37,8 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
+
+    @Test
     public void testAlterAddColumn() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -131,6 +139,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterDropColumn() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -320,6 +329,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterColumnOther() throws Exception
     {
         System.out.println("----------------\n\n TestAlterColumnOther \n\n--------------");
@@ -496,6 +506,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterRename() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -571,6 +582,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterLimitPartitionRows() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -641,6 +653,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterPartitionColumn() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -804,6 +817,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterConstraintAssumeUnique() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -853,6 +867,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAddNotNullColumnToEmptyTable() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -902,6 +917,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAddNotNullColumnToNonEmptyTable() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -960,6 +976,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     // Check that assumeunique constraints and rowlimit constraints are preserved
     // across ALTER TABLE
+    @Test
     public void testAlterTableENG7242NoExpressions() throws Exception
     {
         System.out.println("----------------\n\n TestAlterTableENG7242 \n\n--------------");
@@ -1049,6 +1066,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     // Will also test the constraint with expression part of ENG-7242
     // Currently commented out because it fails, just wanted to write it while I was here --izzy
+    @Test
     public void testAlterTableENG7304ENG7305() throws Exception
     {
         System.out.println("----------------\n\n TestAlterTableENG7304ENG7305 \n\n--------------");
@@ -1131,6 +1149,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testAlterTableWithSimpleMatViews() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -1285,6 +1304,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
     }
 
 
+    @Test
     public void testAlterTableWithMinMatViews() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

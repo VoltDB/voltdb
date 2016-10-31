@@ -23,34 +23,37 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertTrue;
-import junit.framework.TestCase;
-
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestClientPortListener extends TestCase {
+public class TestClientPortListener extends JUnit4LocalClusterTest {
 
     PortListener ncprocess;
     PipeToFile pf;
     int rport;
 
-    public TestClientPortListener(String name) {
-        super(name);
+    public TestClientPortListener() {
     }
 
     /**
      * JUnit special method called to setup the test. This instance will start
      * the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @Before
     public void setUp() throws Exception {
         rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         System.out.println("Random Client port is: " + rport);
@@ -87,13 +90,14 @@ public class TestClientPortListener extends TestCase {
      * JUnit special method called to shutdown the test. This instance will
      * stop the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @After
     public void tearDown() throws Exception {
         if (ncprocess != null) {
             ncprocess.close();
         }
     }
 
+    @Test
     public void testClientPort() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;

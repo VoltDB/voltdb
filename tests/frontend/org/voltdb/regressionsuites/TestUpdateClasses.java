@@ -23,9 +23,15 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
@@ -61,6 +67,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     static Class<?>[] COLLIDING_CLASSES = { org.voltdb_testprocs.fullddlfeatures.testImportProc.class,
         org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc.class };
 
+    @Test
     public void testBasic() throws Exception {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
 
@@ -169,6 +176,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testRoleControl() throws Exception {
         System.out.println("\n\n-----\n testRoleControl \n-----\n\n");
 
@@ -274,6 +282,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCollidingClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
 
@@ -365,6 +374,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testNonJarInput() throws Exception {
         System.out.println("\n\n-----\n testNonJarInput \n-----\n\n");
 
@@ -403,6 +413,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testInnerClasses() throws Exception {
         System.out.println("\n\n-----\n testInnerClasses \n-----\n\n");
 
@@ -455,6 +466,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testBadInitializerClasses() throws Exception {
         System.out.println("\n\n-----\n testBadInitializerClasses \n-----\n\n");
 
@@ -514,6 +526,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     // comma-separated matches
     // combine new jarfile with deleted stuff
     // deleting inner classes
+    @Test
     public void testDeleteClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
 

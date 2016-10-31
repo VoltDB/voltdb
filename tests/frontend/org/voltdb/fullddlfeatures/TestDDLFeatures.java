@@ -23,9 +23,15 @@
 
 package org.voltdb.fullddlfeatures;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import java.net.URL;
 import java.net.URLDecoder;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
@@ -45,7 +51,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
     VoltProjectBuilder builder = new VoltProjectBuilder();
 
-    @Override
+    @Before
     public void setUp() throws Exception
     {
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
@@ -63,7 +69,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         startSystem(config);
     }
 
-    @Override
+    @After
     public void tearDown() throws Exception
     {
         teardownSystem();
