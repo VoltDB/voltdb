@@ -40,7 +40,7 @@ public class SSLMessageDecrypter {
 
     public ByteBuffer decryptMessage(ByteBuffer message) throws IOException {
         m_decBuffer.clear();
-        unwrap(message);
+        unwrapMessage(message);
         int messageLength = m_decBuffer.getInt();
         if (messageLength != m_decBuffer.remaining()) {
             throw new IOException("malformed ssl message, failed to decrypt");
@@ -51,9 +51,9 @@ public class SSLMessageDecrypter {
         return clearMessage;
     }
 
-    private void unwrap(ByteBuffer chunk) throws IOException {
+    private void unwrapMessage(ByteBuffer message) throws IOException {
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(chunk, m_decBuffer);
+            SSLEngineResult result = m_sslEngine.unwrap(message, m_decBuffer);
             switch (result.getStatus()) {
                 case OK:
                     m_decBuffer.flip();
@@ -62,9 +62,9 @@ public class SSLMessageDecrypter {
                     m_decBuffer = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
                     break;  // try again
                 case BUFFER_UNDERFLOW:
-                    throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
+                    throw new SSLException("SSL engine should never underflow on ssl unwrapMessage of buffer.");
                 case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
+                    throw new SSLException("SSL engine is closed on ssl unwrapMessage of buffer.");
             }
         }
     }

@@ -39,7 +39,7 @@ public class SSLBufferDecrypter {
     }
 
     public List<ByteBuffer> decryptBuffer(ByteBuffer chunk) throws IOException {
-        unwrap(chunk);
+        unwrapBuffer(chunk);
         List<ByteBuffer> decryptedMessages = new ArrayList<>();
         while (m_decBuffer.remaining() > 0) {
             if (m_partialMessage != null) {
@@ -93,7 +93,7 @@ public class SSLBufferDecrypter {
         return decryptedMessages;
     }
 
-    private void unwrap(ByteBuffer chunk) throws IOException {
+    private void unwrapBuffer(ByteBuffer chunk) throws IOException {
         while (true) {
             ByteBuffer decBuffer;
             boolean hadLeftover = false;
@@ -123,9 +123,9 @@ public class SSLBufferDecrypter {
                     m_decBuffer = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
                     break;  // try again
                 case BUFFER_UNDERFLOW:
-                    throw new SSLException("SSL engine should never underflow on ssl unwrap of buffer.");
+                    throw new SSLException("SSL engine should never underflow on ssl unwrapBuffer of buffer.");
                 case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
+                    throw new SSLException("SSL engine is closed on ssl unwrapBuffer of buffer.");
             }
         }
     }

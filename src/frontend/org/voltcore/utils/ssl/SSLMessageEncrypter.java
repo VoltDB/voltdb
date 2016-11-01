@@ -36,7 +36,6 @@ public class SSLMessageEncrypter {
     }
 
     public ByteBuffer encryptMessage(ByteBuffer message) throws IOException {
-        m_encBuffer.clear();
         wrap(message);
         ByteBuffer encMessage = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
         encMessage.putInt(m_encBuffer.remaining());
@@ -46,6 +45,7 @@ public class SSLMessageEncrypter {
     }
 
     private void wrap(ByteBuffer chunk) throws IOException {
+        m_encBuffer.clear();
         while (true) {
             SSLEngineResult result = m_sslEngine.wrap(chunk, m_encBuffer);
             switch (result.getStatus()) {

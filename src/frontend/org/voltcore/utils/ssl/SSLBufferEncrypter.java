@@ -29,14 +29,15 @@ import java.util.List;
 public class SSLBufferEncrypter {
 
     private final SSLEngine m_sslEngine;
-    private ByteBuffer m_sslDst;
+    private ByteBuffer m_encBuffer;
 
     public SSLBufferEncrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
         int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
         // wrap will overflow until the encryption buffer is this size.
-        this.m_sslDst = ByteBuffer.allocate(packetBufferSize);
+        this.m_encBuffer = ByteBuffer.allocate(packetBufferSize);
     }
+
 
     public List<ByteBuffer> encryptBuffer(ByteBuffer src) throws IOException {
 
@@ -45,9 +46,9 @@ public class SSLBufferEncrypter {
             if (src.remaining() < Constants.SSL_CHUNK_SIZE) {
                 ByteBuffer chunk = src.slice();
                 wrap(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
-                encyptedChunk.putInt(m_sslDst.remaining());
-                encyptedChunk.put(m_sslDst);
+                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
+                encyptedChunk.putInt(m_encBuffer.remaining());
+                encyptedChunk.put(m_encBuffer);
                 encyptedChunk.flip();
                 encryptedBuffers.add(encyptedChunk);
                 src.position(src.limit());
@@ -57,9 +58,9 @@ public class SSLBufferEncrypter {
                 src.limit(nextPosition);
                 ByteBuffer chunk = src.slice();
                 wrap(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_sslDst.remaining() + 4);
-                encyptedChunk.putInt(m_sslDst.remaining());
-                encyptedChunk.put(m_sslDst);
+                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
+                encyptedChunk.putInt(m_encBuffer.remaining());
+                encyptedChunk.put(m_encBuffer);
                 encyptedChunk.flip();
                 encryptedBuffers.add(encyptedChunk);
                 src.position(nextPosition);
@@ -70,15 +71,15 @@ public class SSLBufferEncrypter {
     }
 
     private void wrap(ByteBuffer src) throws IOException {
-        m_sslDst.clear();
+        m_encBuffer.clear();
         while (true) {
-            SSLEngineResult result = m_sslEngine.wrap(src, m_sslDst);
+            SSLEngineResult result = m_sslEngine.wrap(src, m_encBuffer);
             switch (result.getStatus()) {
                 case OK:
-                    m_sslDst.flip();
+                    m_encBuffer.flip();
                     return;
                 case BUFFER_OVERFLOW:
-                    m_sslDst = ByteBuffer.allocate(m_sslDst.capacity() << 1);
+                    m_encBuffer = ByteBuffer.allocate(m_encBuffer.capacity() << 1);
                     break;
                 case BUFFER_UNDERFLOW:
                     throw new IOException("Underflow on ssl wrap of buffer.");

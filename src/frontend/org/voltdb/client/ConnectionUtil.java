@@ -35,7 +35,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
@@ -46,8 +45,7 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
-import org.voltcore.utils.ssl.SSLMessageDecrypter;
-import org.voltcore.utils.ssl.SSLMessageEncrypter;
+import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
@@ -198,15 +196,11 @@ public class ConnectionUtil {
 
         aChannel.configureBlocking(false);
 
-        SSLMessageEncrypter sslMessageEncrypter = null;
-        SSLMessageDecrypter sslMessageDecrypter = null;
         if (sslEngine != null) {
             SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
             if (!handshaker.handshake()) {
                 throw new IOException("SSL handshake failed");
             }
-            sslMessageEncrypter = new SSLMessageEncrypter(sslEngine);
-            sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
         }
 
         final long retvals[] = new long[4];
@@ -217,6 +211,7 @@ public class ConnectionUtil {
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
+            MessagingChannel messagingChannel = new MessagingChannel(aChannel, sslEngine);
 
             // encode strings
             byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
@@ -239,55 +234,19 @@ public class ConnectionUtil {
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);
             b.flip();
-            b = sslMessageEncrypter == null ? b : sslMessageEncrypter.encryptMessage(b);
-
-            boolean successfulWrite = false;
-            IOException writeException = null;
             try {
-                for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                    aChannel.write(b);
-                }
-                if (!b.hasRemaining()) {
-                    successfulWrite = true;
-                }
+                messagingChannel.writeMessage(b);
             } catch (IOException e) {
-                writeException = e;
+                throw new IOException("Failed to write authentication message to server.");
             }
 
-            int read = 0;
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                read = aChannel.read(lengthBuffer);
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
+            ByteBuffer loginResponse;
+            try {
+                loginResponse = messagingChannel.readMessage();
+            } catch (IOException e) {
+                throw new IOException("Authentication rejected");
             }
-            lengthBuffer.flip();
 
-            int len = lengthBuffer.getInt();
-            ByteBuffer loginResponse = ByteBuffer.allocate(len);//Read version and length etc.
-
-            while (loginResponse.hasRemaining()) {
-                read = aChannel.read(loginResponse);
-
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
-            }
-            loginResponse.flip();
-            loginResponse = sslMessageDecrypter == null ? loginResponse : sslMessageDecrypter.decryptMessage(loginResponse);
             byte version = loginResponse.get();
             byte loginResponseCode = loginResponse.get();
 
