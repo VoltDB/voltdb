@@ -120,7 +120,6 @@
                   org/voltcore/utils/ssl/SSLConfiguration.java
                   org/voltcore/utils/ssl/SSLMessageDecrypter.java
                   org/voltcore/utils/ssl/SSLMessageEncrypter.java
-                  org/voltcore/utils/ssl/SSLSocketChannel.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java
