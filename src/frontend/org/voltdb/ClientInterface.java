@@ -69,8 +69,6 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.MessagingChannel;
-import org.voltcore.utils.ssl.SSLMessageDecrypter;
-import org.voltcore.utils.ssl.SSLMessageEncrypter;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -421,14 +419,28 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     SSLEngine sslEngine = null;
                     if (m_sslContext != null) {
-                        sslEngine = m_sslContext.createSSLEngine();
+                        try {
+                            sslEngine = m_sslContext.createSSLEngine();
+                        } catch (Exception e) {
+                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
+                                    "indicates problem with SSL configuration: " + e.getMessage());
+                            return;
+                        }
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
                         // blocking needs to be false for handshaking.
                         socket.configureBlocking(false);
                         SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
-                        if (!handshaker.handshake()) {
-                            throw new IOException("SSL handshake failed");
+                        boolean handshakeStatus;
+                        try {
+                            handshakeStatus = handshaker.handshake();
+                        } catch (IOException e) {
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
+                            return;
+                        }
+                        if (!handshakeStatus) {
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
+                            return;
                         }
                     }
                     MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);

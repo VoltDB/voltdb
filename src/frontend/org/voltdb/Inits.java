@@ -494,18 +494,41 @@ public class Inits {
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
             SslContextFactory sslContextFactory = new SslContextFactory();
-            String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path", true);
-            sslContextFactory.setKeyStorePath(value);
-            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true);
+            String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
+            if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
+                hostLog.fatal("A path for the SSL keystore file was not specified.");
+                System.exit(-1);
+            }
+            if (! new File(keyStorePath).exists()) {
+                hostLog.fatal("The specified SSL keystore file was not found.");
+                System.exit(-1);
+            }
+            sslContextFactory.setKeyStorePath(keyStorePath);
+
+            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
+            if (keyStorePassword == null) {
+                hostLog.fatal("An SSL keystore password was not specified.");
+                System.exit(-1);
+            }
             sslContextFactory.setKeyStorePassword(keyStorePassword);
-            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
-            if (value != null) {
-                sslContextFactory.setTrustStorePath(value);
+
+            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                hostLog.fatal("A path for the SSL truststore file was not specified.");
+                System.exit(-1);
             }
-            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
-            if (value != null) {
-                sslContextFactory.setTrustStorePassword(value);
+            if (! new File(trustStorePath).exists()) {
+                hostLog.fatal("The specified SSL truststore file was not found.");
+                System.exit(-1);
             }
+
+            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+            if (trustStorePassword == null) {
+                hostLog.fatal("An SSL truststore password was not specified.");
+                System.exit(-1);
+            }
+            sslContextFactory.setTrustStorePassword(trustStorePassword);
+
             // exclude weak ciphers
             sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                     "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
@@ -517,7 +540,7 @@ public class Inits {
             return sslContextFactory;
         }
 
-        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
+        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
             String sysProp = System.getProperty(sysPropName, "");
 
             // allow leading/trailing blanks for password, not otherwise
@@ -534,12 +557,7 @@ public class Inits {
             if (store != null) {
                 value = "path".equals(valueType) ? store.getPath() : store.getPassword();
             }
-            if ((value == null || value.trim().isEmpty()) && throwForNull) {
-                throw new IllegalArgumentException(
-                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
-            } else {
-                return value;
-            }
+            return value;
         }
     }
 
