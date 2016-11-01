@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, os, sys, shutil, datetime
+import argparse, datetime, os, sys, shutil, traceback
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 from fabric.context_managers import shell_env
@@ -86,12 +86,30 @@ def buildCommunity():
 # BUILD THE ENTERPRISE VERSION
 ################################################
 
-def buildPro():
+def buildEnterprise():
     with cd(builddir + "/pro"):
         run("pwd")
         run("git status")
         run("git describe --dirty")
         run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=%s %s clean dist.pro" % (defaultlicensedays, "true" if build_mac else "false", build_args))
+
+################################################
+# BUILD THE PRO VERSION
+################################################
+
+#
+def packagePro(version):
+    print "Making license"
+    makeTrialLicense(days=45, dr_and_xdcr=False, nodes=3)
+    print "Repacking pro kit"
+    with cd(builddir + "/pro/obj/pro"):
+        run("mkdir pro_kit_staging")
+    with cd(builddir + "/pro/obj/pro/pro_kit_staging"):
+        run("tar xf ../voltdb-ent-%s.tar.gz" % version)
+        run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
+        run("cp %s/pro/trial_*.xml voltdb-pro-%s/voltdb/license.xml" % (builddir, version))
+        run("tar cvf ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
+
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -116,10 +134,10 @@ def buildRabbitMQExport(version):
 # MAKE AN ENTERPRISE TRIAL LICENSE
 ################################################
 
-# Must be called after buildPro has been done
-def makeTrialLicense(days=30):
+# Must be called after buildEnterprise has been done
+def makeTrialLicense(days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro/tools"):
-        run("./make_trial_licenses.pl -t %d -W" % (days))
+        run("./make_trial_licenses.pl -t %d -H %d -W %s" % (days, nodes, dr_and_xdcr ))
 
 ################################################
 # MAKE AN ENTERPRISE ZIP FILE FOR SOME PARTNER UPLOAD SITES
@@ -141,6 +159,15 @@ def makeMavenJars():
 # COPY FILES
 ################################################
 
+def copytgzFilesToReleaseDir(releaseDir, version, type=None):
+    print "Copying files to releaseDir"
+    if type:
+        typeString="-" + type
+    else:
+        typeString=""
+    get("%s/pro/obj/pro/voltdb%s-%s.tar.gz" % (builddir, typeString, version),
+        "%s/voltdb%s-%s.tar.gz" % (releaseDir, typeString, version))
+
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
         "%s/voltdb-%s.tar.gz" % (releaseDir, version))
@@ -154,10 +181,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         os.makedirs(releaseDir + "/other")
         get("%s/voltdb/obj/release/voltdb-%s.sym" % (builddir, version),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
-
-def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/pro/obj/pro/voltdb-ent-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-ent-%s.tar.gz" % (releaseDir, version))
 
 def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
@@ -236,6 +259,8 @@ def rmNativeLibs():
     # local("ls -l ~" + username + nativelibdir)
     local("rm -rf ~" + username + nativelibdir)
 
+
+
 ################################################
 # GET THE GIT TAGS OR SHAS TO BUILD FROM
 ################################################
@@ -294,6 +319,7 @@ if build_mac and build_community:
             versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
             buildCommunity()
     except Exception as e:
+        print traceback.format_exc()
         print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
         build_errors=True
 
@@ -303,6 +329,7 @@ try:
         versionCentos = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
         if build_mac:
             assert versionCentos == versionMac
+
         if oneOff:
             releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
                 (os.getenv('HOME'), versionCentos, voltdbTreeish, proTreeish)
@@ -313,9 +340,12 @@ try:
         if build_community:
             buildCommunity()
             copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
-        buildPro()
+        buildEnterprise()
         buildRabbitMQExport(versionCentos)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
+        copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
+
+        packagePro(versionCentos)
+        copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
         makeTrialLicense()
         copyTrialLicenseToReleaseDir(releaseDir)
         if versionHasZipTarget():
@@ -325,6 +355,7 @@ try:
         copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
 except Exception as e:
+    print traceback.format_exc()
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
@@ -351,6 +382,7 @@ if build_packages:
                 run ("sudo python voltdb-install.py -D " + entbld)
                 get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
     except Exception as e:
+        print traceback.format_exc()
         print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
         build_errors=True
 
@@ -376,6 +408,7 @@ if build_packages:
                 get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
 
     except Exception as e:
+        print traceback.format_exc()
         print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
         build_errors=True
 
