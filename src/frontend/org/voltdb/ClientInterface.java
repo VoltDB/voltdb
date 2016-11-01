@@ -513,7 +513,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
-        // TODO: remove sslEngine, fix javadoc just above.
         private InputHandler
         authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
         {
@@ -583,7 +582,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (messageLength < 0) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (message length " + messageLength + " is negative).");
+                             "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 messagingChannel.writeMessage(responseBuffer);
@@ -593,7 +592,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (messageLength > ((1024 * 1024) * 2)) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (message length " + messageLength + " is too large).");
+                             "): wire protocol violation (message length " + messageLength + " is too large).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 messagingChannel.writeMessage(responseBuffer);
@@ -618,7 +617,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (message.hasRemaining()) {
                 timeoutFuture.cancel(false);
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (timeout reading authentication strings).");
+                             "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 messagingChannel.writeMessage(responseBuffer);
