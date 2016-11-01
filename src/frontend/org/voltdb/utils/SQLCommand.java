@@ -990,7 +990,7 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
-                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
                 connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
