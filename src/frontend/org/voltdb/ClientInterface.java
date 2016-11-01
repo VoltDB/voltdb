@@ -326,13 +326,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Thread for Running authentication of client.
         class AuthRunnable implements Runnable {
             final SocketChannel m_socket;
-            final MessagingChannel m_messagingChannel;
             final SSLEngine m_sslEngine;
 
-            AuthRunnable(SocketChannel socket, SSLEngine sslEngine, MessagingChannel messagingChannel) {
+            AuthRunnable(SocketChannel socket, SSLEngine sslEngine) {
                 this.m_socket = socket;
                 this.m_sslEngine = sslEngine;
-                this.m_messagingChannel = messagingChannel;
             }
 
             @Override
@@ -342,7 +340,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, m_sslEngine, m_messagingChannel, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -443,8 +441,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             return;
                         }
                     }
-                    MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);
-
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
@@ -475,7 +471,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine, messagingChannel);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -519,7 +515,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         // TODO: remove sslEngine, fix javadoc just above.
         private InputHandler
-        authenticate(final SocketChannel socket, SSLEngine sslEngine, MessagingChannel messagingChannel, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -532,6 +528,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             socket.configureBlocking(true);
             socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
+            MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);
             final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
 
             /*
