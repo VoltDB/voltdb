@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 
 /**
  * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain
@@ -78,6 +79,12 @@ public interface BinaryDeque {
      */
     public BinaryDequeReader openForRead(String cursorId) throws IOException;
 
+    /**
+     * Close a BinaryDequeReader for reader, also close the SegmentReader for the segment if it is reading one
+     * @param cursorId a String identifying the cursor.
+     * @throws IOException on any errors trying to close the SegmentReader if it is the last one for the segment
+     */
+    public void closeCursor(String cursorId);
 
     /**
      * Persist all objects in the queue to the backing store
@@ -96,8 +103,7 @@ public interface BinaryDeque {
 
     public boolean initializedFromExistingFiles();
 
-    public long sizeInBytes() throws IOException;
-    public int getNumObjects() throws IOException;
+    public Pair<Integer, Long> getBufferCountAndSize() throws IOException;
 
     public void closeAndDelete() throws IOException;
 
