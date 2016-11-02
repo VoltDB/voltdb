@@ -58,6 +58,8 @@ public class WindowedExpression extends AbstractExpression {
 
     private int m_xmlID = -1;
 
+    private boolean m_isDistinct = false;
+
     public WindowedExpression() {
         //
         // This is needed for serialization
@@ -218,6 +220,11 @@ public class WindowedExpression extends AbstractExpression {
      */
     public final int getXMLID() {
         return m_xmlID;
+    }
+
+    public boolean getIsDistinct() {
+        // TODO Auto-generated method stub
+        return m_isDistinct;
     }
 }
 

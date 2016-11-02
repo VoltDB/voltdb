@@ -67,9 +67,8 @@
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
-#include "plannodes/partitionbynode.h"
-
 #include <sstream>
+#include "windowfunctionnode.h"
 
 namespace plannodeutil {
 
@@ -204,10 +203,10 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::MergeReceivePlanNode();
             break;
         // ------------------------------------------------------------------
-        // PartitionBy
+        // Window Function
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_PARTITIONBY):
-            ret = new voltdb::PartitionByPlanNode();
+        case (voltdb::PLAN_NODE_TYPE_WINDOWFUNCTION):
+            ret = new voltdb::WindowFunctionPlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

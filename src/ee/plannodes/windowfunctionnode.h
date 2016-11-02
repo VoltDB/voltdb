@@ -14,17 +14,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_PLANNODES_PARTITIONBYNODE_H_
-#define SRC_EE_PLANNODES_PARTITIONBYNODE_H_
+#ifndef SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
+#define SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
 #include "aggregatenode.h"
 
 namespace voltdb {
-class PartitionByPlanNode : public AggregatePlanNode {
+class WindowFunctionPlanNode : public AbstractPlanNode {
+    std::vector<ExpressionType> m_aggregates;
+    std::vector<bool> m_distinctAggregates;
+    std::vector<int> m_aggregateOutputColumns;
+    OwningExpressionVector m_aggregateInputExpressions;
+    //
+    // What columns to group by on
+    //
+    OwningExpressionVector m_partitionByExpressions;
 public:
-    PartitionByPlanNode()
+    WindowFunctionPlanNode()
         : AggregatePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE) {
     }
-    ~PartitionByPlanNode();
+    ~WindowFunctionPlanNode();
 
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
@@ -32,4 +40,4 @@ protected:
     void loadFromJSONObject(PlannerDomValue obj);
 };
 }
-#endif /* SRC_EE_PLANNODES_PARTITIONBYNODE_H_ */
+#endif /* SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_ */

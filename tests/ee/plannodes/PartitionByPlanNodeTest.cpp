@@ -46,7 +46,7 @@
  * Test the PartitionByPlanNode.  There is not much semantics here,
  * so we just test the json reading.
  */
-#include "plannodes/partitionbynode.h"
+#include "plannodes/windowfunctionnode.h"
 #include "common/PlannerDomValue.h"
 #include "expressions/tuplevalueexpression.h"
 
@@ -143,7 +143,7 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         PlannerDomValue obj(root.rootObject());
         // If the json string is busted this will be true.
         EXPECT_FALSE(root.isNull());
-        boost::shared_ptr<voltdb::PartitionByPlanNode> pn(dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
+        boost::shared_ptr<voltdb::WindowFunctionPlanNode> pn(dynamic_cast<WindowFunctionPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
         EXPECT_TRUE(pn.get() != NULL);
         EXPECT_EQ(1, pn->getAggregates().size());
         EXPECT_EQ(EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, pn->getAggregates()[0]);

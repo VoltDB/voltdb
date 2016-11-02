@@ -68,7 +68,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.PartitionByPlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -2213,7 +2213,7 @@ public class PlanAssembler {
         // This will set the output schema to contain the
         // windowed schema column only.  In generateOutputSchema
         // we will add the input columns.
-        PartitionByPlanNode pnode = new PartitionByPlanNode();
+        WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowedExpression(winExpr);
         OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.

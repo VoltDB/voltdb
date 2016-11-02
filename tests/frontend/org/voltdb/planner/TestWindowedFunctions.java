@@ -51,12 +51,12 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.SortDirectionType;
 
 public class TestWindowedFunctions extends PlannerTestCase {
@@ -127,7 +127,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         assertTrue(projPlanNode instanceof ProjectionPlanNode);
 
         AbstractPlanNode partitionByPlanNode = projPlanNode.getChild(0);
-        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+        assertTrue(partitionByPlanNode instanceof WindowFunctionPlanNode);
 
         AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
         assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
@@ -138,7 +138,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         AbstractPlanNode seqScanNode = orderByNode.getChild(0);
         assertTrue(seqScanNode instanceof SeqScanPlanNode || seqScanNode instanceof NestLoopPlanNode);
 
-        PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
+        WindowFunctionPlanNode pbPlanNode = (WindowFunctionPlanNode)partitionByPlanNode;
         NodeSchema  schema = pbPlanNode.getOutputSchema();
 
         //
@@ -161,15 +161,19 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
-        assertEquals(numPartitionExprs, pbPlanNode.getGroupByExpressionsSize());
+        assertEquals(numPartitionExprs, pbPlanNode.getPartitionByExpressions().size());
         validateTVEs(input_schema, pbPlanNode, false);
     }
 
-    public void validateTVEs(NodeSchema input_schema,
-            PartitionByPlanNode pbPlanNode, boolean waiveAliasMatch) {
+    public void validateTVEs(
+            NodeSchema input_schema,
+            WindowFunctionPlanNode pbPlanNode,
+            boolean waiveAliasMatch) {
         List<AbstractExpression> tves = new ArrayList<>();
-        for (AbstractExpression ae : pbPlanNode.getGroupByExpressions()) {
-            tves.addAll(ae.findAllTupleValueSubexpressions());
+        for (List<AbstractExpression> aes : pbPlanNode.getPartitionByExpressions()) {
+            for (AbstractExpression ae : aes) {
+                tves.addAll(ae.findAllTupleValueSubexpressions());
+            }
         }
         List<SchemaColumn> columns = input_schema.getColumns();
         for (AbstractExpression ae : tves) {
@@ -256,7 +260,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
     private int countPBNodes(AbstractPlanNode node) {
         int answer = 0;
         while (node.getChildCount() > 0) {
-            if (node instanceof PartitionByPlanNode) {
+            if (node instanceof WindowFunctionPlanNode) {
                 answer += 1;
             }
             node = node.getChild(0);
@@ -278,7 +282,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         assertTrue(projectionPlanNode instanceof ProjectionPlanNode);
 
         AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
-        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+        assertTrue(partitionByPlanNode instanceof WindowFunctionPlanNode);
 
         AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
         assertTrue(orderByPlanNode instanceof OrderByPlanNode);
@@ -291,7 +295,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
 
-        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode,
+        validateTVEs(input_schema, (WindowFunctionPlanNode)partitionByPlanNode,
                 waiveAliasMatch);
     }
 
@@ -339,7 +343,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
             assertTrue(child instanceof OrderByPlanNode);
         }
         child = child.getChild(0);
-        assertTrue(child instanceof PartitionByPlanNode);
+        assertTrue(child instanceof WindowFunctionPlanNode);
         child = child.getChild(0);
         assertTrue(child instanceof OrderByPlanNode);
         child = child.getChild(0);
