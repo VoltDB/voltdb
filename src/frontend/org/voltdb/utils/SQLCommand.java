@@ -982,6 +982,7 @@ public class SQLCommand
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
+        String connectionErrorMessages = "";
 
         for (String server : servers) {
             try {
@@ -989,14 +990,15 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
-
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
             }
         }
 
         if (!connectedAnyServer) {
-            throw new IOException("Unable to connect to VoltDB cluster");
+            throw new IOException("Unable to connect to VoltDB cluster" + connectionErrorMessages);
         }
         return client;
     }
