@@ -52,7 +52,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get("EXEcution_PlaN", VoltType.STRING);
+            String plan = vt.getString("EXEcution_PlaN");
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
             // Validate bypass of no-op sort on single-row result.
             assertFalse( plan.contains( "ORDER BY (SORT)"));
@@ -63,7 +63,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3 where I3 < 100" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
+            String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX COUNT") );
         }
 
@@ -71,7 +71,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", "SELECT * FROM t3 where I3 + I4 < 100" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
+            String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX SCAN") );
         }
 }
@@ -83,11 +83,111 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@ExplainProc", "T1.insert" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String sql = (String) vt.get(0, VoltType.STRING );
-            String plan = (String) vt.get(1, VoltType.STRING );
+            String sql = vt.getString(0);
+            String plan = vt.getString(1);
             assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
             assertTrue( plan.contains( "INSERT into \"T1\"" ));
             assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
+        }
+    }
+
+    public void testExplainSingleTableView() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test if the error checking is working properly.
+        verifyProcFails(client, "Materialized view t does not exist.", "@ExplainView", "t");
+        verifyProcFails(client, "Table t1 is not a materialized view.", "@ExplainView", "t1");
+
+        String[] aggTypes = {"MAX", "MIN"};
+        int aggTypeSwitch = 0;
+
+        // -1- At this point there is no auxiliary indices at all,
+        //     all min/max view columns should use built-in sequential scan to refresh.
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(12, vt.getRowCount());
+        for (int i = 0; i < 12; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String resolution = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Use built-in sequential scan.", resolution);
+            aggTypeSwitch = 1 - aggTypeSwitch;
+        }
+
+        // -2- Create an index on TSRC1(G1), then all columns will use built-in index scan now.
+        try {
+            client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1 ON TSRC1(G1);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Failed to create index IDX_TSRC1_G1 on TSRC1(G1).");
+        }
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(12, vt.getRowCount());
+        for (int i = 0; i < 12; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String resolution = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
+            aggTypeSwitch = 1 - aggTypeSwitch;
+        }
+
+        // -3- Create an index on TSRC1(G1, C1), C1 will pick up the new index.
+        try {
+            client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1C1 ON TSRC1(G1, C1);");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Failed to create index IDX_TSRC1_G1C1 on TSRC1(G1, C1).");
+        }
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(12, vt.getRowCount());
+        for (int i = 0; i < 12; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String resolution = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            if (i != 1) {
+                assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
+            }
+            else {
+                assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
+            }
+            aggTypeSwitch = 1 - aggTypeSwitch;
+        }
+
+        // -4- Remove index IDX_TSRC1_G1.
+        //     C1 will continue to use IDX_TSRC1_G1C1,
+        //     The rest columns will start to use query plans.
+        //     The query plans are index scans on IDX_TSRC1_G1C1 with range-scan setting.
+        try {
+            client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1;");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Failed to remove index IDX_TSRC1_G1 on TSRC1(G1).");
+        }
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(12, vt.getRowCount());
+        for (int i = 0; i < 12; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String resolution = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            if (i != 1) {
+                assertTrue(resolution.contains("Use the following execution plan:"));
+                assertTrue(resolution.contains("INDEX SCAN of \"TSRC1\" using \"IDX_TSRC1_G1C1\""));
+                assertTrue(resolution.contains("range-scan on 1 of 2 cols from (G1 >= ?0) while (G1 = ?0)"));
+            }
+            else {
+                assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
+            }
+            aggTypeSwitch = 1 - aggTypeSwitch;
+        }
+        try {
+            client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1C1;");
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            fail("Failed to remove index IDX_TSRC1_G1C1 on TSRC1(G1, C1).");
         }
     }
 
@@ -111,6 +211,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         project.addPartitionInfo("t1", "PKEY");
         project.addPartitionInfo("t2", "PKEY");
         project.addPartitionInfo("t3", "PKEY");
+        project.setUseDDLSchema(true);
 
         boolean success;
 
