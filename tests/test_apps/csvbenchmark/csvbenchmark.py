@@ -157,15 +157,15 @@ def run_csvloader(schema, data_file):
     elapsed_results = []
     parsing_results = []
     loading_results = []
+    home = os.getenv("VOLTDB_HOME")
+    cmd = "%s --servers=%s" % (os.path.join(home, CSVLOADER), ','.join(options.servers))
+    if options.csvoptions:
+        cmd += " -o " + ",".join(options.csvoptions)
+    cmd += " %s -f %s" % (schema, data_file)
+    if options.VERBOSE:
+        print "starting csvloader with command: " + cmd
     for I in range(0, options.TRIES):
-        home = os.getenv("VOLTDB_HOME")
         before_row_count = get_table_row_count(schema)
-        cmd = "%s --servers=%s" % (os.path.join(home, CSVLOADER), ','.join(options.servers))
-        if options.csvoptions:
-            cmd += " -o " + ",".join(options.csvoptions)
-        cmd += " %s -f %s" % (schema, data_file)
-        if options.VERBOSE:
-            print "starting csvloader with command: " + cmd
         start_time = time.time()
         p = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
         (stdout, stderr) = p.communicate()
@@ -189,6 +189,9 @@ def run_csvloader(schema, data_file):
         if int(before_row_count) + rowcount != int(actual_row_count):
             raise RuntimeError ("Actual table row count was not as expected exp:%d act:%d" % (rowcount,actual_row_count))
         elapsed_results.append(float(run_time))
+        # done with loop, clear table for next iteration, if any
+        print str(I) + ". Clearing table " + schema
+        clear_table(schema)
 
     def analyze_results(perf_results):
         #print "raw perf_results: %s" % perf_results
@@ -218,6 +221,15 @@ def get_table_row_count(table_name):
     result = __tuples[0]
     print "count query returned: %s" % result
     return result
+
+def clear_table(table_name):
+    host = random.choice(options.servers)
+    pyclient = FastSerializer(host=host, port=21212)
+    handle = VoltProcedure(pyclient, '@AdHoc', [FastSerializer.VOLTTYPE_STRING])
+    resp = handle.call(['truncate table %s' % table_name], timeout=360)
+    if resp.status != 1 or len(resp.tables[0].tuples) != 1:
+        print "Unexpected response to count query from host %s: %s" % (host, resp)
+        raise RuntimeError()
 
 def get_datafile_path(case):
     return os.path.join(DATA_DIR, "csvbench_%s_%d.dat" % (case, options.ROW_COUNT))
@@ -264,7 +276,7 @@ def parse_cmdline():
                             type = "int",
                             dest = "TRIES",
                             default = 1,
-                            help ="number of time to run the test case and average the performance results")
+                            help ="number of times to run the test case and average the performance results")
 
     parser.add_option ("-o", "--csvoptions",
                             type = "string",
