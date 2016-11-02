@@ -169,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.6.11.1";
+    static final String m_defaultVersionString = "4.6.11.2";
     // Allow V4.6.11.1 to hot upgrade V4.6.11
-    static final String m_defaultHotfixableRegexPattern = "^4.6.11(\\.1)?$";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6.11.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
