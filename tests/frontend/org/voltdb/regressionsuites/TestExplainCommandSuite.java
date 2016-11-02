@@ -100,7 +100,6 @@ public class TestExplainCommandSuite extends RegressionSuite {
         verifyProcFails(client, "Table t1 is not a materialized view.", "@ExplainView", "t1");
 
         String[] aggTypes = {"MAX", "MIN"};
-        int aggTypeSwitch = 0;
 
         // -1- At this point there is no auxiliary indices at all,
         //     all min/max view columns should use built-in sequential scan to refresh.
@@ -110,69 +109,51 @@ public class TestExplainCommandSuite extends RegressionSuite {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
-            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             assertEquals("Use built-in sequential scan.", resolution);
-            aggTypeSwitch = 1 - aggTypeSwitch;
         }
 
         // -2- Create an index on TSRC1(G1), then all columns will use built-in index scan now.
-        try {
-            client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1 ON TSRC1(G1);");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Failed to create index IDX_TSRC1_G1 on TSRC1(G1).");
-        }
+        client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1 ON TSRC1(G1);");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
         assertEquals(12, vt.getRowCount());
         for (int i = 0; i < 12; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
-            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
-            aggTypeSwitch = 1 - aggTypeSwitch;
         }
 
         // -3- Create an index on TSRC1(G1, C1), C1 will pick up the new index.
-        try {
-            client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1C1 ON TSRC1(G1, C1);");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Failed to create index IDX_TSRC1_G1C1 on TSRC1(G1, C1).");
-        }
+        client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1C1 ON TSRC1(G1, C1);");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
         assertEquals(12, vt.getRowCount());
         for (int i = 0; i < 12; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
-            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             if (i != 1) {
                 assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
             }
             else {
                 assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
             }
-            aggTypeSwitch = 1 - aggTypeSwitch;
         }
 
         // -4- Remove index IDX_TSRC1_G1.
         //     C1 will continue to use IDX_TSRC1_G1C1,
         //     The rest columns will start to use query plans.
         //     The query plans are index scans on IDX_TSRC1_G1C1 with range-scan setting.
-        try {
-            client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1;");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Failed to remove index IDX_TSRC1_G1 on TSRC1(G1).");
-        }
+        client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1;");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
         assertEquals(12, vt.getRowCount());
         for (int i = 0; i < 12; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
-            assertEquals("Refresh " + aggTypes[aggTypeSwitch] + " column \"C" + i + "\"", task);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             if (i != 1) {
                 assertTrue(resolution.contains("Use the following execution plan:"));
                 assertTrue(resolution.contains("INDEX SCAN of \"TSRC1\" using \"IDX_TSRC1_G1C1\""));
@@ -181,13 +162,35 @@ public class TestExplainCommandSuite extends RegressionSuite {
             else {
                 assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
             }
-            aggTypeSwitch = 1 - aggTypeSwitch;
         }
-        try {
-            client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1C1;");
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            fail("Failed to remove index IDX_TSRC1_G1C1 on TSRC1(G1, C1).");
+        client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1C1;");
+    }
+
+    public void testExplainMultiTableView() throws IOException, ProcCallException {
+        Client client = getClient();
+        String[] aggTypes = {"MAX", "MIN"};
+        VoltTable vt = client.callProcedure("@ExplainView", "V2" ).getResults()[0];
+        assertEquals(13, vt.getRowCount());
+        vt.advanceRow();
+        // -1- Check the join evaluation query plan
+        String task = vt.getString(0);
+        String resolution = vt.getString(1);
+        assertEquals("Join Evaluation", task);
+        assertTrue(resolution.contains("Use the following execution plan with built-in delta tables:"));
+        assertTrue(resolution.contains("NESTLOOP INDEX INNER JOIN"));
+        assertTrue(resolution.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
+        assertTrue(resolution.contains("SEQUENTIAL SCAN of \"TSRC2\""));
+
+        // -2- Check the query plans for refreshing MIN / MAX columns
+        for (int i = 0; i<12; i++) {
+            vt.advanceRow();
+            task = vt.getString(0);
+            resolution = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
+            assertTrue(resolution.contains("Use the following execution plan:"));
+            assertTrue(resolution.contains("NESTLOOP INDEX INNER JOIN"));
+            assertTrue(resolution.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
+            assertTrue(resolution.contains("SEQUENTIAL SCAN of \"TSRC2\""));
         }
     }
 
