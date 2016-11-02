@@ -171,23 +171,21 @@ public class TestExplainCommandSuite extends RegressionSuite {
         String[] aggTypes = {"MAX", "MIN"};
         VoltTable vt = client.callProcedure("@ExplainView", "V2" ).getResults()[0];
         assertEquals(13, vt.getRowCount());
-        vt.advanceRow();
-        // -1- Check the join evaluation query plan
-        String task = vt.getString(0);
-        String resolution = vt.getString(1);
-        assertEquals("Join Evaluation", task);
-        assertTrue(resolution.contains("Use the following execution plan with built-in delta tables:"));
-        assertTrue(resolution.contains("NESTLOOP INDEX INNER JOIN"));
-        assertTrue(resolution.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
-        assertTrue(resolution.contains("SEQUENTIAL SCAN of \"TSRC2\""));
 
+        // -1- Check the join evaluation query plan
         // -2- Check the query plans for refreshing MIN / MAX columns
-        for (int i = 0; i<12; i++) {
+        for (int i = 0; i<13; i++) {
             vt.advanceRow();
-            task = vt.getString(0);
-            resolution = vt.getString(1);
-            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
-            assertTrue(resolution.contains("Use the following execution plan:"));
+            String task = vt.getString(0);
+            String resolution = vt.getString(1);
+            if (i == 0) {
+                assertEquals("Join Evaluation", task);
+                assertTrue(resolution.contains("Use the following execution plan with built-in delta tables:"));
+            }
+            else {
+                assertEquals("Refresh " + aggTypes[(i-1) % 2] + " column \"C" + (i-1) + "\"", task);
+                assertTrue(resolution.contains("Use the following execution plan:"));
+            }
             assertTrue(resolution.contains("NESTLOOP INDEX INNER JOIN"));
             assertTrue(resolution.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
             assertTrue(resolution.contains("SEQUENTIAL SCAN of \"TSRC2\""));
