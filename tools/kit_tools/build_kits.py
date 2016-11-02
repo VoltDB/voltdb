@@ -10,7 +10,7 @@ username='test'
 builddir = "/tmp/" + username + "Kits/buildtemp"
 version = "UNKNOWN"
 nativelibdir = "/nativelibs/obj"  #  ~test/libs/... usually
-defaultlicensedays = 45 #default trial license length
+defaultlicensedays = 70 #default trial license length
 
 
 ################################################
@@ -100,7 +100,7 @@ def buildEnterprise():
 #
 def packagePro(version):
     print "Making license"
-    makeTrialLicense(days=45, dr_and_xdcr=False, nodes=3)
+    makeTrialLicense(days=defaultlicensedays, dr_and_xdcr=False, nodes=3)
     print "Repacking pro kit"
     with cd(builddir + "/pro/obj/pro"):
         run("mkdir pro_kit_staging")
@@ -159,7 +159,7 @@ def makeMavenJars():
 # COPY FILES
 ################################################
 
-def copytgzFilesToReleaseDir(releaseDir, version, type=None):
+def copyFilesToReleaseDir(releaseDir, version, type=None):
     print "Copying files to releaseDir"
     if type:
         typeString="-" + type
