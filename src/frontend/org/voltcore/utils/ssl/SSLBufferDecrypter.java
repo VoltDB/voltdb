@@ -39,7 +39,7 @@ public class SSLBufferDecrypter {
 
     public List<ByteBuffer> decryptBuffer(ByteBuffer chunk) throws IOException {
         // allocate a new dec buffer on each call, return slices of this buffer.
-        ByteBuffer decBuffer = ByteBuffer.allocate(SSL_CHUNK_SIZE + 128);
+        ByteBuffer decBuffer = ByteBuffer.allocate(chunk.remaining() + 128);
         if (m_partialLength != null) {
             decBuffer.put(m_partialLength);
             m_partialLength = null;
