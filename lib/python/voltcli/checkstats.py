@@ -208,3 +208,17 @@ def check_importer(runner):
         if outstanding == 0:
             return
         time.sleep(1)
+
+def check_dr_consumer(runner):
+     while True:
+        resp = get_stats(runner, 'DRCONSUMER')
+        outstanding = 0
+        if len(resp.table(1).tuples()) == 0:
+            return
+        for r in resp.table(1).tuples():
+            if r[7] <> r[8]:
+                outstanding += 1
+                runner.info('DR Consumer-partition %d on host %d has outstanding transactions to be applied.' %(r[4], r[1]))
+        if outstanding == 0:
+            return
+        time.sleep(2)

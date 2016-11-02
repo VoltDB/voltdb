@@ -50,6 +50,8 @@ def shutdown(runner):
             checkstats.check_clients(runner)
             runner.info('Completing outstanding importer requests.')
             checkstats.check_importer(runner)
+            runner.info('Waiting for DR consumer to apply all the transactions.')
+            checkstats.check_dr_consumer(runner)
             runner.info('Cluster is ready for shutdown')
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
