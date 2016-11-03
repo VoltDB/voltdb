@@ -215,10 +215,14 @@ def check_dr_consumer(runner):
         outstanding = 0
         if len(resp.table(1).tuples()) == 0:
             return
+        # DR consumer stats
+        # column 7: The timestamp of the last transaction received from the producer for the partition
+        # column 8: The timestamp of the last transaction successfully applied to this partition on the consumer
+        # If the two timestamps are the same, all the transactions have been applied for the partition.
         for r in resp.table(1).tuples():
             if r[7] <> r[8]:
                 outstanding += 1
                 runner.info('Partition %d on host %d has outstanding DR consumer transactions.' %(r[4], r[1]))
         if outstanding == 0:
             return
-        time.sleep(2)
+        time.sleep(1)
