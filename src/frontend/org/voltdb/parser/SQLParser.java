@@ -559,7 +559,7 @@ public class SQLParser extends SQLPatternFactory
             "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
             // Make everything that follows optional so that explainproc command
             // diagnostics can "own" any line starting with the word
-            // explainproc.
+            // explainview.
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
