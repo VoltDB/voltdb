@@ -520,6 +520,7 @@ public class Inits {
                 hostLog.fatal("The specified SSL truststore file was not found.");
                 System.exit(-1);
             }
+            sslContextFactory.setTrustStorePath(trustStorePath);
 
             String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
             if (trustStorePassword == null) {
