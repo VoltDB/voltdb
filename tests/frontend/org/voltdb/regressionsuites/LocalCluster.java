@@ -940,7 +940,7 @@ public class LocalCluster extends VoltServerConfig {
             //For new CLI dont pass deployment for probe.
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
-            cmdln.setForceVoltdbCreate(false);
+            cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
         }
 
         if (this.m_additionalProcessEnv != null) {
@@ -955,7 +955,7 @@ public class LocalCluster extends VoltServerConfig {
                 int index = m_hasLocalServer ? hostId + 1 : hostId;
                 cmdln.drAgentStartPort(m_replicationPort + index);
             } else {
-             // set the dragent port. it uses the start value and
+                // set the dragent port. it uses the start value and
                 // the next two sequential port numbers - so burn those two.
                 cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
                 portGenerator.next();
@@ -1886,5 +1886,34 @@ public class LocalCluster extends VoltServerConfig {
         else {
             valgrindOutputFile.delete();
         }
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                                  boolean isReplica) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schemaDDL);
+        builder.setDrProducerEnabled();
+        builder.setDRMasterHost("localhost:" + remoteReplicationPort);
+        LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI, false);
+        lc.setReplicationPort(replicationPort);
+        boolean success = lc.compile(builder, pathToVoltDBRoot);
+        assert(success);
+
+        System.out.println("Starting local cluster.");
+        lc.setHasLocalServer(false);
+        lc.overrideAnyRequestForValgrind();
+        if (!lc.isNewCli()) {
+            lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
+            lc.startUp(false, isReplica ? ReplicationRole.REPLICA : ReplicationRole.NONE);
+        } else {
+            lc.startUp(true, isReplica ? ReplicationRole.REPLICA : ReplicationRole.NONE);
+        }
+
+        for (int i = 0; i < hostCount; i++) {
+            System.out.printf("Local cluster node[%d] ports: %d, %d, %d, %d\n",
+                    i, lc.internalPort(i), lc.adminPort(i), lc.port(i), lc.drAgentStartPort(i));
+        }
+        return lc;
     }
 }
