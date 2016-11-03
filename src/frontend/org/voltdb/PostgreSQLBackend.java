@@ -326,7 +326,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "TINYINT", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing TINYINT, which PostgreSQL does not
     // support, and replaces it with SMALLINT, which is an equivalent that
-    // PostGIS does support
+    // PostgreSQL does support
     private static final QueryTransformer tinyintDdlTransformer
             = new QueryTransformer(tinyintDdl)
             .replacementText("SMALLINT").useWholeMatch();
@@ -336,7 +336,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "ASSUMEUNIQUE", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing ASSUMEUNIQUE, which PostgreSQL does
     // not support, and replaces it with UNIQUE, which is an equivalent that
-    // PostGIS does support
+    // PostgreSQL does support
     private static final QueryTransformer assumeUniqueDdlTransformer
             = new QueryTransformer(assumeUniqueDdl)
             .replacementText("UNIQUE").useWholeMatch();

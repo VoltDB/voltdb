@@ -331,16 +331,15 @@ public abstract class NonVoltDBBackend {
         }
 
         // Used by the toString() method.
-        @SuppressWarnings("rawtypes")
         private String getNonEmptyValue(String name, Object value) {
             if (value == null) {
                 return "";
-            } else if (value instanceof Collection && ((Collection)value).isEmpty()) {
+            } else if (value instanceof Collection && ((Collection<?>)value).isEmpty()) {
                 return "";
-            } else if (!value.toString().isEmpty()) {
+            } else if (value.toString().isEmpty()) {
                 return "";
             } else {
-                return "\n  " + name + ": " + value;
+                return "\n    " + name + ": " + value;
             }
         }
 
@@ -357,11 +356,11 @@ public abstract class NonVoltDBBackend {
                     + getNonEmptyValue("columnType", m_columnType)
                     + getNonEmptyValue("multiplier", m_multiplier)
                     + getNonEmptyValue("minimum", m_minimum)
+                    + getNonEmptyValue("exclude",  m_exclude)
                     + getNonEmptyValue("groups",  m_groups)
                     + getNonEmptyValue("groupReplacementTexts", m_groupReplacementTexts)
-                    + getNonEmptyValue("exclude",  m_exclude)
-                    + getNonEmptyValue("useWholeMatch", (m_useWholeMatch ? "true" : "false"))
-                    + getNonEmptyValue("debugPrint",    (m_debugPrint    ? "true" : "false"));
+                    + getNonEmptyValue("useWholeMatch", (m_useWholeMatch ? "true" : ""))
+                    + getNonEmptyValue("debugPrint",    (m_debugPrint    ? "true" : ""));
             return result;
         }
 
@@ -477,6 +476,13 @@ public abstract class NonVoltDBBackend {
         return isColumnType(geoColumnTypes, columnName, tableNames);
     }
 
+    /** Returns true if the <i>columnName</i> is of column type BIGINT, or
+     *  equivalents in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isBigintColumn(String columnName, List<String> tableNames) {
+        List<String> bigintColumnTypes = Arrays.asList("BIGINT");
+        return isColumnType(bigintColumnTypes, columnName, tableNames);
+    }
+
     /** Returns true if the <i>columnName</i> is an integer column (including
      *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
      *  comparison, non-VoltDB database); false otherwise. */
@@ -485,30 +491,23 @@ public abstract class NonVoltDBBackend {
         return isColumnType(intColumnTypes, columnName, tableNames);
     }
 
-    /** Returns true if the <i>columnName</i> is of column type BIGINT, or
-     *  equivalents in a comparison, non-VoltDB database; false otherwise. */
-    private boolean isBigintColumn(String columnName, List<String> tableNames) {
-        List<String> bigintColumnTypes = Arrays.asList("BIGINT");
-        return isColumnType(bigintColumnTypes, columnName, tableNames);
-    }
-
-    /** Returns true if the <i>columnName</i> is either an integer constant or
-     *  an integer column (including types TINYINT, SMALLINT, INTEGER, BIGINT,
-     *  or equivalents in a comparison, non-VoltDB database); false otherwise. */
-    private boolean isIntegerConstant(String columnName) {
+    /** Returns true if the <i>columnOrConstant</i> is an integer constant;
+     *  false otherwise. */
+    private boolean isIntegerConstant(String columnOrConstant) {
         try {
-            Integer.parseInt(columnName.trim());
+            Integer.parseInt(columnOrConstant.trim());
             return true;
         } catch (NumberFormatException e) {
             return false;
         }
     }
 
-    /** Returns true if the <i>columnName</i> is either an integer constant or
-     *  an integer column (including types TINYINT, SMALLINT, INTEGER, BIGINT,
-     *  or equivalents in a comparison, non-VoltDB database); false otherwise. */
-    private boolean isInteger(String columnName, List<String> tableNames) {
-        return isIntegerConstant(columnName) || isIntegerColumn(columnName, tableNames);
+    /** Returns true if the <i>columnOrConstant</i> is either an integer
+     *  constant or an integer column (including types TINYINT, SMALLINT,
+     *  INTEGER, BIGINT, or equivalents in a comparison, non-VoltDB database);
+     *  false otherwise. */
+    private boolean isInteger(String columnOrConstant, List<String> tableNames) {
+        return isIntegerConstant(columnOrConstant) || isIntegerColumn(columnOrConstant, tableNames);
     }
 
     /** Returns the column type name, in VoltDB, corresponding to the specified
@@ -572,15 +571,7 @@ public abstract class NonVoltDBBackend {
             if (qt.m_debugPrint) {
                 if (count < 1) {
                     System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
-                    System.out.println("  queryPattern: " + qt.m_queryPattern);
-                    System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix; "
-                            + "replacementText; groupReplacementText(s):\n    '"
-                            + qt.m_initialText + "', '" + qt.m_prefix + "', '" + qt.m_suffix + "', '"
-                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "'\n    '"
-                            + qt.m_replacementText + "'; " + qt.m_groupReplacementTexts
-                            + "\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
-                            + qt.m_useWholeMatch + ", " + qt.m_columnType + ", " + qt.m_multiplier + ", "
-                            + qt.m_minimum + ", " + qt.m_debugPrint + "\n    " + qt.m_groups);
+                    System.out.println("  QueryTransformer:\n    " + qt);
                 }
                 System.out.println("  " + ++count + ".wholeMatch: " + wholeMatch);
             }
@@ -629,15 +620,16 @@ public abstract class NonVoltDBBackend {
                     // When columnType is GEO, check whether the last, and
                     // presumably only, column is not of that type, in which
                     // case no changes are needed
-                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup, getTableNames(query))) {
+                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup, null)) {
                         noChangesNeeded = true;
                     // When columnType is BIGINT, check whether any of the columns
                     // are of BIGINT type, in which case changes *are* needed
                     } else if (qt.m_columnType == ColumnType.BIGINT) {
                         noChangesNeeded = true;
+                        List<String> tableNames = getTableNames(query);
                         for (int i=0; i < groups.size(); i++) {
                             String group = groups.get(i);
-                            if (group != null && isBigintColumn(group, getTableNames(query))) {
+                            if (group != null && isBigintColumn(group, tableNames)) {
                                 noChangesNeeded = false;
                                 break;
                             }
