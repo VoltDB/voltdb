@@ -76,22 +76,30 @@ def versionHasZipTarget():
 ################################################
 
 def buildCommunity():
+    if build_mac:
+        packageMacLib="true"
+    else:
+        packageMacLib="false"
     with cd(builddir + "/voltdb"):
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % ("true" if build_mac else "false",  build_args))
+        run("ant -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (packageMacLib,  build_args))
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
 ################################################
 
 def buildEnterprise():
+    if build_mac:
+        packageMacLib="true"
+    else:
+        packageMacLib="false"
     with cd(builddir + "/pro"):
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=%s %s clean dist.pro" % (defaultlicensedays, "true" if build_mac else "false", build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=%s %s clean dist.pro" % (defaultlicensedays, packageMacLib, build_args))
 
 ################################################
 # BUILD THE PRO VERSION
@@ -109,7 +117,6 @@ def packagePro(version):
         run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
         run("cp %s/pro/trial_*.xml voltdb-pro-%s/voltdb/license.xml" % (builddir, version))
         run("tar cvf ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
-
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -369,7 +376,6 @@ if build_packages:
 
             with cd(debbuilddir):
                 put ("tools/voltdb-install.py",".")
-
 
                 if build_community:
                     commbld = "voltdb-%s.tar.gz" % (versionCentos)
