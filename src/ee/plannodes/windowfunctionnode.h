@@ -25,7 +25,7 @@ public:
     void debugWriteAggregateExpressionList(std::ostringstream &buffer,
                                const std::string &spacer,
                                const std::string &label,
-                               const AggregateExpressionList & exprs) const;
+                               const OwningExpressionVector & exprs) const;
 private:
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;

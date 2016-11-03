@@ -490,6 +490,7 @@ if whichtests in ("${eetestsuite}", "execution"):
      add_drop_table
      engine_test
      FragmentManagerTest
+     
     """
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
@@ -497,6 +498,7 @@ if whichtests in ("${eetestsuite}", "executors"):
     MergeReceiveExecutorTest
     PartitionByExecutorTest
     TestGeneratedPlans
+    TestRank
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -547,7 +549,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     PartitionByPlanNodeTest
+     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
     """
 

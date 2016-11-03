@@ -133,7 +133,8 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
             stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
-            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
+            boolean isDistinct = m_aggregateDistinct.get(ii);
+            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(isDistinct ? 1 : 0);
             stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
             AbstractExpression.toJSONArray(stringer,
                                            Members.AGGREGATE_EXPRESSIONS.name(),

@@ -393,9 +393,11 @@ AbstractPlanNode::TableOwner::~TableOwner() { delete m_tempTable; }
 
 AbstractPlanNode::OwningExpressionVector::~OwningExpressionVector()
 {
-    size_t each = size();
-    while (each--) {
-        delete (*this)[each];
+    for (size_t each = size(); each; each--) {
+    	AbstractExpression *expr = (*this)[each];
+    	if (expr) {
+    		delete expr;
+    	}
     }
 }
 

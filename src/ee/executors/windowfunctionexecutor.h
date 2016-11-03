@@ -17,7 +17,8 @@
 #ifndef SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
 #define SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
 
-#include "aggregateexecutor.h"
+#include "abstractexecutor.h"
+#include "plannodes/windowfunctionnode.h"
 
 namespace voltdb {
 
@@ -37,37 +38,37 @@ class WindowFunctionExecutor: public AbstractExecutor {
     /**
      * The operation type of the aggregates.
      */
-    std::vector<ExpressionType> &m_aggTypes;
+    const std::vector<ExpressionType> &m_aggTypes;
     /**
      * Element j is true iff aggregate j is distinct.
      */
-    std::vector<bool> &m_distinctAggs;
+    const std::vector<bool> &m_distinctAggs;
     /**
      * Element j is the list of partition by expressions for
      * aggregate j.
      */
-    WindowFunctionPlanNode::AggregateExpressionList &m_partitionByExpressions;
+    const WindowFunctionPlanNode::AggregateExpressionList &m_partitionByExpressions;
     /**
      * Element j is the list of order by expressions for aggregate j.
      */
-    WindowFunctionPlanNode::AggregateExpressionList &m_orderByExpressions;
+    const WindowFunctionPlanNode::AggregateExpressionList &m_orderByExpressions;
     /**
      * Element j is the list of aggregate arguments for aggregate j.
      */
-    WindowFunctionPlanNode::AggregateExpressionList &m_aggregateInputExpressions;
+    const WindowFunctionPlanNode::AggregateExpressionList &m_aggregateInputExpressions;
     /**
      * All output column expressions.
      */
-    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    const std::vector<AbstractExpression*> m_outputColumnExpressions;
 
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
-        m_aggTypes(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getAggregates()),
-        m_distinctAggs(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getDistinctAggregates()),
-        m_partitionByExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
-        m_orderByExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
-        m_aggregateInputExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()) {
+        m_aggTypes(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregates()),
+        m_distinctAggs(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getDistinctAggregates()),
+        m_partitionByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
+        m_orderByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
+        m_aggregateInputExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()) {
     }
     virtual ~WindowFunctionExecutor();
 
@@ -83,7 +84,7 @@ public:
      * list.  Only one input expression per aggregate is used
      * right now, but we need room for expansion.
      */
-    const std::vector<std::vector<AbstractExpression*>>& getAggregateInputExpressions() const {
+    const WindowFunctionPlanNode::AggregateExpressionList &getAggregateInputExpressions() const {
         return m_aggregateInputExpressions;
     }
 
@@ -91,7 +92,7 @@ public:
      * Returns the list of partition by expressions for each
      * aggregate.  We will need these to partition the input.
      */
-    const std::vector<std::vector<AbstractExpression*>>& getPartitionByExpressions() const {
+    const WindowFunctionPlanNode::AggregateExpressionList& getPartitionByExpressions() const {
         return m_partitionByExpressions;
     }
 

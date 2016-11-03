@@ -37,12 +37,13 @@ void WindowFunctionPlanNode::debugWriteAggregateExpressionList(
         std::ostringstream &buffer,
         const std::string &spacer,
         const std::string &label,
-        const AggregateExpressionList& exprs) const {
-    buffer << spacer << label << "= {";
-    for (int ictr = 0; ictr < exprs.size(); ictr += 1) {
-        std::vector<AbstractExpression*> &argVec = m_aggregateInputExpressions[ictr];
-        buffer << spacer << "  "
-                << (argVec[ictr] ? argVec[ictr]->debug(spacer) : "null")
+        const OwningExpressionVector& argVec) const {
+    buffer << spacer << label
+    	   << "(" << argVec.size() << ") = {\n";
+    for (int ictr = 0; ictr < argVec.size(); ictr += 1) {
+    	buffer << spacer << "  "
+    			<< ictr << ".) "
+        		<< (argVec[ictr] ? argVec[ictr]->debug("") : "null")
                 << "\n";
     }
     buffer << spacer << "}\n";
@@ -51,18 +52,18 @@ void WindowFunctionPlanNode::debugWriteAggregateExpressionList(
 std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
-    buffer << "WindowFunctionPlanNode:\n";
-    buffer << spacer << "\nAggregates[" << (int) m_aggregates.size() << "]: {";
+    buffer << spacer << "\nAggregates[" << (int) m_aggregates.size() << "]: {\n";
+    std::string nspacer = spacer + "  |";
     for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
-        buffer << spacer << "type="
+        buffer << nspacer << "type="
                << expressionToString(m_aggregates[ctr]) << "\n";
-        buffer << spacer << "distinct="
+        buffer << nspacer << "distinct="
                << m_distinctAggregates[ctr] << "\n";
-        buffer << spacer << "outcol="
+        buffer << nspacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
-        debugWriteAggregateExpressionList(buffer, spacer, "arguments", m_aggregateInputExpressions);
-        debugWriteAggregateExpressionList(buffer, spacer, "partitionBys", m_partitionByExpressions);
-        debugWriteAggregateExpressionList(buffer, spacer, "orderBys", m_orderByExpressions);
+        debugWriteAggregateExpressionList(buffer, nspacer, "arguments", m_aggregateInputExpressions[ctr]);
+        debugWriteAggregateExpressionList(buffer, nspacer, "partitionBys", m_partitionByExpressions[ctr]);
+        debugWriteAggregateExpressionList(buffer, nspacer, "orderBys", m_orderByExpressions[ctr]);
     }
     buffer << spacer << "}";
     return buffer.str();
@@ -95,26 +96,28 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_EXPRESSIONS")) {
             containsExpressions = true;
-            OwningExpressionVector exprVec;
+            size_t nExprs = m_aggregateInputExpressions.size();
+            m_aggregateInputExpressions.push_back(OwningExpressionVector());
+            OwningExpressionVector &exprVec = m_aggregateInputExpressions[nExprs];
             exprVec.loadExpressionArrayFromJSONObject("AGGREGATE_EXPRESSIONS", aggregateColumnValue);
-            m_aggregateInputExpressions.push_back(exprVec);
         }
         if (aggregateColumnValue.hasNonNullKey("PARTITIONBY_EXPRESSIONS")) {
             containsPartitionExpressions = true;
-            OwningExpressionVector exprVec;
+            size_t nExprs = m_partitionByExpressions.size();
+            m_partitionByExpressions.push_back(OwningExpressionVector());
+            OwningExpressionVector &exprVec = m_partitionByExpressions[nExprs];
             exprVec.loadExpressionArrayFromJSONObject("PARTITIONBY_EXPRESSIONS",
                                                       aggregateColumnValue);
-            m_partitionByExpressions.push_back(exprVec);
         }
         if (aggregateColumnValue.hasNonNullKey("SORT_COLUMNS")) {
             containsOrderByExpressions = true;
-            OwningExpressionVector exprVec;
-            PlannerDomValue sortListObj = aggregateColumnValue.valueForKey("SORT_COLUMNS");
+            size_t nExprs = m_orderByExpressions.size();
+            m_orderByExpressions.push_back(OwningExpressionVector());
+            OwningExpressionVector &exprVec = m_orderByExpressions[nExprs];
             // We don't need the sort directions here.
-            loadSortListFromJSONObject(sortListObj,
+            loadSortListFromJSONObject(aggregateColumnValue,
                                        &exprVec,
                                        NULL);
-            m_orderByExpressions.push_back(exprVec);
         }
 
         if(!(containsType && containsDistinct && containsOutputColumn
