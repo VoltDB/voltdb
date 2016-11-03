@@ -218,7 +218,7 @@ def check_dr_consumer(runner):
         for r in resp.table(1).tuples():
             if r[7] <> r[8]:
                 outstanding += 1
-                runner.info('DR Consumer-partition %d on host %d has outstanding transactions to be applied.' %(r[4], r[1]))
+                runner.info('Partition %d on host %d has outstanding DR consumer transactions.' %(r[4], r[1]))
         if outstanding == 0:
             return
         time.sleep(2)

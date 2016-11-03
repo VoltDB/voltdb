@@ -44,13 +44,13 @@ def shutdown(runner):
             status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
             if status <> 0:
                 runner.abort('The cluster has failed to be quiesce with status: %d' % status)
-            runner.info('Completing outstanding export and DR transactions...')
+            runner.info('Completing outstanding export and DR producer transactions...')
             checkstats.check_export_dr(runner)
             runner.info('Completing outstanding client transactions.')
             checkstats.check_clients(runner)
             runner.info('Completing outstanding importer requests.')
             checkstats.check_importer(runner)
-            runner.info('Waiting for DR consumer to apply all the transactions.')
+            runner.info('Completing outstanding DR consumer transactions...')
             checkstats.check_dr_consumer(runner)
             runner.info('Cluster is ready for shutdown')
             if runner.opts.save:
