@@ -144,6 +144,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
             AbstractExpression.toJSONArrayFromSortList(stringer,
                                                        m_orderByExpressions.get(ii),
                                                        null);
+            stringer.endObject();
         }
         stringer.endArray();
     }
@@ -192,7 +193,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     @Override
     public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.PARTITIONBY;
+        return PlanNodeType.WINDOWFUNCTION;
     }
 
     public void resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
@@ -217,12 +218,13 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         // Aggregates also need to resolve indexes for aggregate inputs
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-
         for (List<AbstractExpression> agg_exps : m_aggregateExpressions) {
-            for (AbstractExpression agg_exp : agg_exps) {
-                allTves = ExpressionUtil.getTupleValueExpressions(agg_exp);
-                for (TupleValueExpression tve : allTves) {
-                    tve.setColumnIndexUsingSchema(inputSchema);
+            if (agg_exps != null) {
+                for (AbstractExpression agg_exp : agg_exps) {
+                    allTves = ExpressionUtil.getTupleValueExpressions(agg_exp);
+                    for (TupleValueExpression tve : allTves) {
+                        tve.setColumnIndexUsingSchema(inputSchema);
+                    }
                 }
             }
         }
@@ -268,7 +270,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return("WindowFunctionPlanNode:\n");
+        return("WindowFunctionPlanNode: ops: " + m_aggregateTypes.get(0).name() + "()");
     }
 
     public List<List<AbstractExpression>> getPartitionByExpressions() {

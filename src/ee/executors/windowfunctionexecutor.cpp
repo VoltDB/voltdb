@@ -28,17 +28,20 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
 }
 
 bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits *limits) {
+#if 0
     WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
     assert(node);
     assert(node == init_node);
 
-    m_inputExpressions = node->getAggregateInputExpressions();
     std::string spacer("");
     VOLT_DEBUG("WINDOW FUNCTION_EXECUTOR P_INIT:\n");
-    for (int i = 0; i < m_inputExpressions.size(); i++) {
+    for (int i = 0; i < m_aggregateInputExpressions.size(); i++) {
+
+    }
+    for (int i = 0; i < 0; i++) {
         VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
                    i,
-                   m_inputExpressions[i] ? m_inputExpressions[i]->debug().c_str() : "null\n");
+                   m_aggregateInputExpressions[i] ? m_aggregateInputExpressions[i]->debug().c_str() : "null\n");
     }
 
     /*
@@ -90,6 +93,17 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
     }
 
     return true;
+#else
+    return false;
+#endif
+}
+
+bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
+#if 0
+    return true;
+#else
+    return false;
+#endif
 }
 
 } /* namespace voltdb */

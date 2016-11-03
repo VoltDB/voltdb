@@ -112,7 +112,8 @@ public class VoltCompiler {
 
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
-    public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+    public final static boolean DEBUG_MODE
+      = Boolean.valueOf(System.getProperty("org.voltdb.compilerdebug", "false"));
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
@@ -125,9 +126,9 @@ public class VoltCompiler {
     private final Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
-    ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
-    ArrayList<Feedback> m_warnings = new ArrayList<Feedback>();
-    ArrayList<Feedback> m_errors = new ArrayList<Feedback>();
+    ArrayList<Feedback> m_infos = new ArrayList<>();
+    ArrayList<Feedback> m_warnings = new ArrayList<>();
+    ArrayList<Feedback> m_errors = new ArrayList<>();
 
     // set of annotations by procedure name
     private Map<String, ProcInfoData> m_procInfoOverrides = null;
@@ -145,7 +146,7 @@ public class VoltCompiler {
 
     String m_projectFileURL = null;
     private String m_currentFilename = NO_FILENAME;
-    Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    Map<String, String> m_ddlFilePaths = new HashMap<>();
     String[] m_addedClasses = null;
     Set<String> m_importLines = null;
 
@@ -472,7 +473,7 @@ public class VoltCompiler {
      */
     public boolean compileEmptyCatalog(final String jarOutputPath) {
         // Use a special DDL reader to provide the contents.
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(1);
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>(1);
         ddlReaderList.add(new VoltCompilerStringReader("ddl.sql", m_emptyDDLComment));
         // Seed it with the DDL so that a version upgrade hack in compileInternalToFile()
         // doesn't try to get the DDL file from the path.
@@ -511,7 +512,7 @@ public class VoltCompiler {
         // Make the new compiler use the original jarfile's classloader so it can
         // pull in the class files for procedures and imports
         autoGenCompiler.m_classLoader = origJarFile.getLoader();
-        List<VoltCompilerReader> autogenReaderList = new ArrayList<VoltCompilerReader>(1);
+        List<VoltCompilerReader> autogenReaderList = new ArrayList<>(1);
         autogenReaderList.add(new VoltCompilerJarFileReader(origJarFile, AUTOGEN_DDL_FILE_NAME));
         DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
@@ -754,7 +755,7 @@ public class VoltCompiler {
      * catalog to be shoved into the catalog jarfile.
      */
     HashMap<String, byte[]> getExplainPlans(Catalog catalog) {
-        HashMap<String, byte[]> retval = new HashMap<String, byte[]>();
+        HashMap<String, byte[]> retval = new HashMap<>();
         Database db = getCatalogDatabase();
         assert(db != null);
         for (Procedure proc : db.getProcedures()) {
@@ -785,7 +786,7 @@ public class VoltCompiler {
     private List<VoltCompilerReader> DDLPathsToReaderList(final String... ddlFilePaths)
             throws VoltCompilerException
     {
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>(ddlFilePaths.length);
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>(ddlFilePaths.length);
         for (int i = 0; i < ddlFilePaths.length; ++i) {
             ddlReaderList.add(createDDLFileReader(ddlFilePaths[i]));
         }
@@ -1039,7 +1040,7 @@ public class VoltCompiler {
             final InMemoryJarfile jarOutput)
                     throws VoltCompilerException
     {
-        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
+        final ArrayList<Class<?>> classDependencies = new ArrayList<>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
         Database db = initCatalogDatabase();
@@ -1262,7 +1263,7 @@ public class VoltCompiler {
      */
     private void addExtraClasses(final InMemoryJarfile jarOutput) throws VoltCompilerException {
 
-        List<String> addedClasses = new ArrayList<String>();
+        List<String> addedClasses = new ArrayList<>();
 
         for (String className : m_addedClasses) {
             /*
@@ -1362,7 +1363,7 @@ public class VoltCompiler {
 
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
     public void enableDetailedCapture() {
-        m_capturedDiagnosticDetail = new ArrayList<String>();
+        m_capturedDiagnosticDetail = new ArrayList<>();
     }
 
     /** Access recent plan output, for diagnostic purposes */
@@ -1403,7 +1404,7 @@ public class VoltCompiler {
         org.voltdb.compiler.projectfile.ProceduresType.Procedure xmlproc)
         throws VoltCompilerException
     {
-        final ArrayList<String> groups = new ArrayList<String>();
+        final ArrayList<String> groups = new ArrayList<>();
 
         // @groups
         if (xmlproc.getGroups() != null) {
@@ -1680,8 +1681,8 @@ public class VoltCompiler {
             outputStream.println();
 
             // Accumulate a summary of the summary for a briefer report
-            ArrayList<Procedure> nonDetProcs = new ArrayList<Procedure>();
-            ArrayList<Procedure> tableScans = new ArrayList<Procedure>();
+            ArrayList<Procedure> nonDetProcs = new ArrayList<>();
+            ArrayList<Procedure> tableScans = new ArrayList<>();
             int countSinglePartition = 0;
             int countMultiPartition = 0;
             int countDefaultProcs = 0;
@@ -1863,7 +1864,7 @@ public class VoltCompiler {
     }
 
     // this needs to be reset in the main compile func
-    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
+    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<>();
 
 
     public List<Class<?>> getInnerClasses(Class <?> c)
@@ -2126,7 +2127,7 @@ public class VoltCompiler {
     public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
         // Gather DDL files for recompilation
-        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
         Entry<String, byte[]> entry = jarfile.firstEntry();
         while (entry != null) {
             String path = entry.getKey();
@@ -2206,7 +2207,7 @@ public class VoltCompiler {
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
             // Gather DDL files for recompilation if not using a project file.
-            List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+            List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
             if (projectReader == null) {
                 Entry<String, byte[]> entry = outputJar.firstEntry();
                 while (entry != null) {

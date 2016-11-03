@@ -69,7 +69,7 @@
 #include "executors/tuplescanexecutor.h"
 #include "executors/unionexecutor.h"
 #include "executors/updateexecutor.h"
-#include "executors/partitionbyexecutor.h"
+#include "executors/windowfunctionexecutor.h"
 
 #include "plannodes/abstractplannode.h"
 

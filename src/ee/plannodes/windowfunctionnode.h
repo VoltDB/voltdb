@@ -20,22 +20,55 @@
 
 namespace voltdb {
 class WindowFunctionPlanNode : public AbstractPlanNode {
+public:
+    typedef std::vector<OwningExpressionVector> AggregateExpressionList;
+    void debugWriteAggregateExpressionList(std::ostringstream &buffer,
+                               const std::string &spacer,
+                               const std::string &label,
+                               const AggregateExpressionList & exprs) const;
+private:
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
-    OwningExpressionVector m_aggregateInputExpressions;
+    AggregateExpressionList m_aggregateInputExpressions;
     //
-    // What columns to group by on
+    // What columns to partition.
     //
-    OwningExpressionVector m_partitionByExpressions;
+    AggregateExpressionList m_partitionByExpressions;
+    // What columns to sort.
+    AggregateExpressionList m_orderByExpressions;
 public:
     WindowFunctionPlanNode()
-        : AggregatePlanNode(PLAN_NODE_TYPE_HASHAGGREGATE) {
-    }
-    ~WindowFunctionPlanNode();
+        : AbstractPlanNode() {}
+    virtual ~WindowFunctionPlanNode();
 
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
+
+    const std::vector<int>& getAggregateOutputColumns() const {
+        return m_aggregateOutputColumns;
+    }
+
+    const std::vector<ExpressionType>& getAggregates() const {
+        return m_aggregates;
+    }
+
+    const std::vector<bool>& getDistinctAggregates() const {
+        return m_distinctAggregates;
+    }
+
+    const AggregateExpressionList& getAggregateInputExpressions() const {
+        return m_aggregateInputExpressions;
+    }
+
+    const AggregateExpressionList& getOrderByExpressions() const {
+        return m_orderByExpressions;
+    }
+
+    const AggregateExpressionList& getPartitionByExpressions() const {
+        return m_partitionByExpressions;
+    }
+
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 };

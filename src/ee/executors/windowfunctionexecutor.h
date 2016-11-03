@@ -21,31 +21,54 @@
 
 namespace voltdb {
 
-class WindowRow {
-    // A tuple from the group of tuples being aggregated. Source of pass through columns.
-    TableTuple m_passThroughTuple;
-
-    // The aggregates for each column for this group
-    Agg* m_aggregates[0];
-};
 /**
- * This is the executor for a PartitionByPlanNode.  This is almost exactly like
- * an AggregateSerialExecutor, but the initialization is slightly different, and
- * we specify that we output one row for each input row.
+ * This is the executor for a WindowFunctionPlanNode.
  */
 class WindowFunctionExecutor: public AbstractExecutor {
+    /**
+     * Remember which columns are pass through columns.
+     */
     std::vector<int> m_passThroughColumns;
+    /**
+     * Remember which columns are aggregate output columns.
+     */
     std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
-    std::vector<ExpressionType> m_aggTypes;
-    std::vector<bool> m_distinctAggs;
-    std::vector<AbstractExpression*> m_partitionByExpressions;
-    std::vector<AbstractExpression*> m_aggregateInputExpressions;
+    /**
+     * The operation type of the aggregates.
+     */
+    std::vector<ExpressionType> &m_aggTypes;
+    /**
+     * Element j is true iff aggregate j is distinct.
+     */
+    std::vector<bool> &m_distinctAggs;
+    /**
+     * Element j is the list of partition by expressions for
+     * aggregate j.
+     */
+    WindowFunctionPlanNode::AggregateExpressionList &m_partitionByExpressions;
+    /**
+     * Element j is the list of order by expressions for aggregate j.
+     */
+    WindowFunctionPlanNode::AggregateExpressionList &m_orderByExpressions;
+    /**
+     * Element j is the list of aggregate arguments for aggregate j.
+     */
+    WindowFunctionPlanNode::AggregateExpressionList &m_aggregateInputExpressions;
+    /**
+     * All output column expressions.
+     */
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
-      : AbstractExecutor(engine, abstract_node) { }
+      : AbstractExecutor(engine, abstract_node),
+        m_aggTypes(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getAggregates()),
+        m_distinctAggs(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getDistinctAggregates()),
+        m_partitionByExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
+        m_orderByExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
+        m_aggregateInputExpressions(dynamic_cast<WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()) {
+    }
     virtual ~WindowFunctionExecutor();
 
     /**

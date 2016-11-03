@@ -161,7 +161,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
-        assertEquals(numPartitionExprs, pbPlanNode.getPartitionByExpressions().size());
+        assertEquals(1, pbPlanNode.getPartitionByExpressions().size());
+        assertEquals(numPartitionExprs, pbPlanNode.getPartitionByExpressions().get(0).size());
         validateTVEs(input_schema, pbPlanNode, false);
     }
 
@@ -397,7 +398,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";
         AbstractPlanNode plan = compile(windowedQuery);
         String explainPlanText = plan.toExplainPlanString();
-        String expected = "Windowed AGGREGATION ops: RANK()";
+        String expected = "WindowFunctionPlanNode: ops: AGGREGATE_WINDOWED_RANK()";
         assertTrue("Expected to find \"" + expected + "\" in explain plan text, but did not:\n"
                 + explainPlanText, explainPlanText.contains(expected));
     }

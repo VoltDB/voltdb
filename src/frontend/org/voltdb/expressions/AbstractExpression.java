@@ -628,7 +628,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             JSONStringer stringer,
             List<AbstractExpression> sortExpressions,
             List<SortDirectionType> sortDirections) throws JSONException {
-        stringer.key(SortMembers.SORT_COLUMNS).array();
+        stringer.key(SortMembers.SORT_COLUMNS);
+        stringer.array();
         int listSize = sortExpressions.size();
         for (int ii = 0; ii < listSize; ii++) {
             stringer.object();
@@ -1466,10 +1467,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public static void toJSONArray(JSONStringer stringer, String keyString, List<AbstractExpression> exprs) throws JSONException {
         stringer.key(keyString)
                 .array();
-        for (AbstractExpression ae : exprs) {
-            stringer.object();
-            ae.toJSONString(stringer);
-            stringer.endObject();
+        if (exprs != null) {
+            for (AbstractExpression ae : exprs) {
+                stringer.object();
+                ae.toJSONString(stringer);
+                stringer.endObject();
+            }
         }
         stringer.endArray();
     }
