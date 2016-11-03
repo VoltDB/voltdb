@@ -681,8 +681,10 @@ public class VoltProjectBuilder {
 
         if (config == null) {
             config = new Properties();
+            //If No config provided use file with outdir to user-specific tmp.
+            config.put("outdir", "/tmp/" + System.getProperty("user.name"));
             config.putAll(ImmutableMap.<String, String>of(
-                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
         exportConnector.put("elConfig", config);

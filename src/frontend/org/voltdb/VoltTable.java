@@ -1527,19 +1527,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 }
                 else {
                     if (colType == VoltType.VARBINARY) {
-                    valueStr = Encoder.hexEncode((byte[]) value);
+                        valueStr = Encoder.hexEncode((byte[]) value);
                         // crop long varbinaries
                         if (valueStr.length() > MAX_PRINTABLE_CHARS) {
                             valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
-                }
+                        }
                     }
-                else {
-                    valueStr = value.toString();
-                }
+                    else {
+                        valueStr = value.toString();
+                    }
                 }
                 sb.append(pad).append(String.format(fmt[i], valueStr));
                 pad = " ";
-                }
+            }
             sb.append("\n");
         }
 

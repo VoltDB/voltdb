@@ -966,6 +966,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@ExplainView",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
@@ -982,6 +984,7 @@ public class SQLCommand
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
+        String connectionErrorMessages = "";
 
         for (String server : servers) {
             try {
@@ -989,14 +992,15 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
-
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
             }
         }
 
         if (!connectedAnyServer) {
-            throw new IOException("Unable to connect to VoltDB cluster");
+            throw new IOException("Unable to connect to VoltDB cluster" + connectionErrorMessages);
         }
         return client;
     }
