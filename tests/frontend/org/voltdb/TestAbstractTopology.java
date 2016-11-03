@@ -41,6 +41,7 @@ import org.json_voltpatches.JSONException;
 import org.voltdb.AbstractTopology.HAGroup;
 import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.HostDescription;
+import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
 
@@ -208,7 +209,21 @@ public class TestAbstractTopology extends TestCase {
 
     public void testTwoNodesTwoRacks() throws JSONException {
         TestDescription td = getBoringDescription(2, 7, 1, 2, 2);
-        subTestDescription(td, false);
+        AbstractTopology topo = subTestDescription(td, false);
+        System.out.printf("TOPO PRE: %s\n", topo.topologyToJSON());
+
+        // kill and rejoin a host
+        HostDescription hostDescription = td.hosts[0];
+        try {
+            topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
+        } catch (KSafetyViolationException e) {
+            e.printStackTrace();
+            fail();
+        }
+        System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
+        topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
+        System.out.printf("TOPO END: %s\n", topo.topologyToJSON());
+        validate(topo);
     }
 
     public void testThreeNodeOneRack() throws JSONException {
@@ -464,7 +479,22 @@ public class TestAbstractTopology extends TestCase {
 
         for (int i = 0; i < 1000; i++) {
             TestDescription td = getRandomBoringTestDescription(rand);
-            subTestDescription(td, false);
+            AbstractTopology topo = subTestDescription(td, false);
+
+            // kill and rejoin a host
+            if (td.hosts.length == 0) {
+                continue;
+            }
+            HostDescription hostDescription = td.hosts[rand.nextInt(td.hosts.length)];
+            try {
+                topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
+            } catch (KSafetyViolationException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                return;
+            }
+            topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
+            validate(topo);
         }
     }
 
