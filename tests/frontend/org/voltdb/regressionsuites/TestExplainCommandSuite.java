@@ -99,13 +99,14 @@ public class TestExplainCommandSuite extends RegressionSuite {
         verifyProcFails(client, "Materialized view t does not exist.", "@ExplainView", "t");
         verifyProcFails(client, "Table t1 is not a materialized view.", "@ExplainView", "t1");
 
-        String[] aggTypes = {"MAX", "MIN"};
+        final String[] aggTypes = {"MAX", "MIN"};
+        final int numOfMinMaxColumns = 12;
 
         // -1- At this point there is no auxiliary indices at all,
         //     all min/max view columns should use built-in sequential scan to refresh.
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
-        assertEquals(12, vt.getRowCount());
-        for (int i = 0; i < 12; i++) {
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
@@ -116,8 +117,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // -2- Create an index on TSRC1(G1), then all columns will use built-in index scan now.
         client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1 ON TSRC1(G1);");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
-        assertEquals(12, vt.getRowCount());
-        for (int i = 0; i < 12; i++) {
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
@@ -128,8 +129,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // -3- Create an index on TSRC1(G1, C1), C1 will pick up the new index.
         client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1C1 ON TSRC1(G1, C1);");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
-        assertEquals(12, vt.getRowCount());
-        for (int i = 0; i < 12; i++) {
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
@@ -148,8 +149,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         //     The query plans are index scans on IDX_TSRC1_G1C1 with range-scan setting.
         client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1;");
         vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
-        assertEquals(12, vt.getRowCount());
-        for (int i = 0; i < 12; i++) {
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
@@ -168,13 +169,14 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
     public void testExplainMultiTableView() throws IOException, ProcCallException {
         Client client = getClient();
-        String[] aggTypes = {"MAX", "MIN"};
+        final String[] aggTypes = {"MAX", "MIN"};
+        final int numOfMinMaxColumns = 12;
         VoltTable vt = client.callProcedure("@ExplainView", "V2" ).getResults()[0];
-        assertEquals(13, vt.getRowCount());
+        assertEquals(numOfMinMaxColumns + 1, vt.getRowCount());
 
         // -1- Check the join evaluation query plan
         // -2- Check the query plans for refreshing MIN / MAX columns
-        for (int i = 0; i<13; i++) {
+        for (int i = 0; i <= numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
             String resolution = vt.getString(1);
