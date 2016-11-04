@@ -57,8 +57,10 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<List<AbstractExpression>> m_aggregateExpressions = new ArrayList<>();
+    // There is one list of partition by expressions for this WindowFunctionPlanNode.
+    // If there is more than one window we will need more than one WindowFunctionPlanNode.
     // At the moment these are guaranteed to be TVES.  This might always be true
-    protected List<List<AbstractExpression>> m_partitionByExpressions = new ArrayList<>();
+    protected List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     // This is the list of TVEs for the window functions.  There
     // will only be one of them for now.
     private List<TupleValueExpression> m_tve = new ArrayList<>();
@@ -66,8 +68,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     // List of the lists of order by expressions.  If there
     // are no order by expressions in one aggregate the list
     // is empty, not null.
-    protected List<List<AbstractExpression>> m_orderByExpressions
-        = new ArrayList<>();
+    protected List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
 
     private int getNumberAggregateFunctions() {
         return m_aggregateTypes.size();
@@ -115,8 +116,8 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         else {
             m_aggregateExpressions.add(null);
         }
-        m_partitionByExpressions.add(winExpr.getPartitionByExpressions());
-        m_orderByExpressions.add(winExpr.getOrderByExpressions());
+        m_partitionByExpressions = winExpr.getPartitionByExpressions();
+        m_orderByExpressions = winExpr.getOrderByExpressions();
         m_tve.add(winExpr.getDisplayListExpression());
     }
 
@@ -139,15 +140,15 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
             AbstractExpression.toJSONArray(stringer,
                                            Members.AGGREGATE_EXPRESSIONS.name(),
                                            m_aggregateExpressions.get(ii));
-            AbstractExpression.toJSONArray(stringer,
-                                           Members.PARTITIONBY_EXPRESSIONS.name(),
-                                           m_partitionByExpressions.get(ii));
-            AbstractExpression.toJSONArrayFromSortList(stringer,
-                                                       m_orderByExpressions.get(ii),
-                                                       null);
             stringer.endObject();
         }
         stringer.endArray();
+        AbstractExpression.toJSONArray(stringer,
+                                       Members.PARTITIONBY_EXPRESSIONS.name(),
+                                       m_partitionByExpressions);
+        AbstractExpression.toJSONArrayFromSortList(stringer,
+                                                   m_orderByExpressions,
+                                                       null);
     }
 
     /**
@@ -173,18 +174,16 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
                                                               tempObj,
                                                               Members.AGGREGATE_EXPRESSIONS.name(),
                                                               null));
-            m_partitionByExpressions.add(
-                    AbstractExpression.loadFromJSONArrayChild(null,
-                                                              tempObj,
-                                                              Members.PARTITIONBY_EXPRESSIONS.name(),
-                                                              null));
-            WindowedExpression winExpr = new WindowedExpression();
-            List<AbstractExpression> orderByExprs = winExpr.getOrderByExpressions();
-            AbstractExpression.loadSortListFromJSONArray(orderByExprs,
-                                                         null,
-                                                         tempObj);
-            m_orderByExpressions.add(orderByExprs);
         }
+        m_partitionByExpressions
+                = AbstractExpression.loadFromJSONArrayChild(null,
+                                                            jobj,
+                                                            Members.PARTITIONBY_EXPRESSIONS.name(),
+                                                            null);
+        m_orderByExpressions = new ArrayList<>();
+        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions,
+                                                     null,
+                                                     jobj);
     }
 
     @Override
@@ -231,24 +230,20 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         }
 
         // Aggregates also need to resolve indexes for partition by inputs
-        for (List<AbstractExpression> group_exps : m_partitionByExpressions) {
-            for (AbstractExpression group_exp : group_exps) {
-                allTves = ExpressionUtil.getTupleValueExpressions(group_exp);
-                for (TupleValueExpression tve : allTves) {
-                    tve.setColumnIndexUsingSchema(inputSchema);
-                }
+        for (AbstractExpression group_exp : m_partitionByExpressions) {
+            allTves = ExpressionUtil.getTupleValueExpressions(group_exp);
+            for (TupleValueExpression tve : allTves) {
+                tve.setColumnIndexUsingSchema(inputSchema);
             }
         }
 
         // Resolve column indices for the order by expressions.  We will
         // only have one of these, but we will act as if we have more than
         // one, which is the general case.
-        for (List<AbstractExpression> orderByExprs : m_orderByExpressions) {
-            for (AbstractExpression obExpr : orderByExprs) {
-                allTves = ExpressionUtil.getTupleValueExpressions(obExpr);
-                for (TupleValueExpression tve : allTves) {
-                    tve.setColumnIndexUsingSchema(inputSchema);
-                }
+        for (AbstractExpression obExpr : m_orderByExpressions) {
+            allTves = ExpressionUtil.getTupleValueExpressions(obExpr);
+            for (TupleValueExpression tve : allTves) {
+                tve.setColumnIndexUsingSchema(inputSchema);
             }
         }
         /*
@@ -274,7 +269,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         return("WindowFunctionPlanNode: ops: " + m_aggregateTypes.get(0).name() + "()");
     }
 
-    public List<List<AbstractExpression>> getPartitionByExpressions() {
+    public List<AbstractExpression> getPartitionByExpressions() {
         return m_partitionByExpressions;
     }
 }

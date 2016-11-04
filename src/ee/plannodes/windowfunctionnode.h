@@ -34,9 +34,9 @@ private:
     //
     // What columns to partition.
     //
-    AggregateExpressionList m_partitionByExpressions;
+    OwningExpressionVector m_partitionByExpressions;
     // What columns to sort.
-    AggregateExpressionList m_orderByExpressions;
+    OwningExpressionVector m_orderByExpressions;
 public:
     WindowFunctionPlanNode()
         : AbstractPlanNode() {}
@@ -61,11 +61,11 @@ public:
         return m_aggregateInputExpressions;
     }
 
-    const AggregateExpressionList& getOrderByExpressions() const {
+    const OwningExpressionVector& getOrderByExpressions() const {
         return m_orderByExpressions;
     }
 
-    const AggregateExpressionList& getPartitionByExpressions() const {
+    const OwningExpressionVector& getPartitionByExpressions() const {
         return m_partitionByExpressions;
     }
 

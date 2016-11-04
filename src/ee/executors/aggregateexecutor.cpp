@@ -554,7 +554,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     assert(node);
 
     m_inputExpressions = node->getAggregateInputExpressions();
-    std::string spacer("");
     for (int i = 0; i < m_inputExpressions.size(); i++) {
         VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
                    i,
@@ -695,9 +694,7 @@ inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow, const
 {
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        // In particular, COUNT(*) and the
-        // rank() family of aggreates accept a dummy NValue
-        // from a NULL input expression.
+        // In particular, COUNT(*) accepts a dummy NValue from a NULL input expression.
         AbstractExpression* inputExpr = m_inputExpressions[ii];
         aggs[ii]->advance(inputExpr ? inputExpr->eval(&tuple) : NValue());
     }

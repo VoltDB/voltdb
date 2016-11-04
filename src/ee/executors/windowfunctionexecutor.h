@@ -47,11 +47,11 @@ class WindowFunctionExecutor: public AbstractExecutor {
      * Element j is the list of partition by expressions for
      * aggregate j.
      */
-    const WindowFunctionPlanNode::AggregateExpressionList &m_partitionByExpressions;
+    const AbstractPlanNode::OwningExpressionVector &m_partitionByExpressions;
     /**
      * Element j is the list of order by expressions for aggregate j.
      */
-    const WindowFunctionPlanNode::AggregateExpressionList &m_orderByExpressions;
+    const AbstractPlanNode::OwningExpressionVector &m_orderByExpressions;
     /**
      * Element j is the list of aggregate arguments for aggregate j.
      */
@@ -89,11 +89,19 @@ public:
     }
 
     /**
-     * Returns the list of partition by expressions for each
-     * aggregate.  We will need these to partition the input.
+     * Returns the list of partition by expressions.  There is
+     * one, shared among all aggregates.  We will need these to partition the input.
      */
-    const WindowFunctionPlanNode::AggregateExpressionList& getPartitionByExpressions() const {
+    const AbstractPlanNode::OwningExpressionVector& getPartitionByExpressions() const {
         return m_partitionByExpressions;
+    }
+
+    /**
+     * Returns the order by expressions.  Like the partition by expressions,
+     * these are shared among all the aggregates.
+     */
+    const AbstractPlanNode::OwningExpressionVector &getOrderByExpressions() const {
+        return m_orderByExpressions;
     }
 
     /**

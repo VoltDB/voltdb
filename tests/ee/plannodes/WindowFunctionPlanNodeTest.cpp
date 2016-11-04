@@ -46,6 +46,7 @@
  * Test the WindowFunctionPlanNode.  There is not much semantics here,
  * so we just test the json reading.
  */
+#include <cstdarg>
 #include "plannodes/windowfunctionnode.h"
 #include "common/PlannerDomValue.h"
 #include "expressions/tuplevalueexpression.h"
@@ -55,64 +56,174 @@ using namespace voltdb;
 
 namespace {
 const char *jsonStrings[] = {
+    "{ \"AGGREGATE_COLUMNS\":\n"
+    "  [{ \"AGGREGATE_DISTINCT\": 0,\n"
+    "     \"AGGREGATE_EXPRESSIONS\": [],\n"
+    "     \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
+    "     \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_RANK\" }\n"
+    "  ],\n"
+    "  \"CHILDREN_IDS\": [3],\n"
+    "  \"ID\": 2,\n"
+    "  \"OUTPUT_SCHEMA\": [\n"
+    "      { \"COLUMN_NAME\": \"C1\",\n"
+    "        \"EXPRESSION\": {\n"
+    "            \"COLUMN_IDX\": 0,\n"
+    "            \"TYPE\": 32,\n"
+    "            \"VALUE_TYPE\": 6 } },\n"
+    "      { \"COLUMN_NAME\": \"A\",\n"
+    "        \"EXPRESSION\": {\n"
+    "            \"COLUMN_IDX\": 0,\n"
+    "            \"TYPE\": 32,\n"
+    "            \"VALUE_TYPE\":5 } },\n"
+    "      { \"COLUMN_NAME\": \"B\",\n"
+    "        \"EXPRESSION\": {\n"
+    "            \"COLUMN_IDX\": 1,\n"
+    "            \"TYPE\": 32,\n"
+    "            \"VALUE_TYPE\": 5 } } ],\n"
+    "  \"PARTITIONBY_EXPRESSIONS\": [\n"
+    "      { \"COLUMN_IDX\": 0,\n"
+    "        \"TYPE\": 32,\n"
+    "        \"VALUE_TYPE\": 5 }],\n"
+    "  \"PLAN_NODE_TYPE\": \"WINDOWFUNCTION\",\n"
+    "  \"SORT_COLUMNS\": [\n"
+    "      {\"SORT_EXPRESSION\": {\n"
+    "          \"COLUMN_IDX\": 1,\n"
+    "          \"TYPE\": 32,\n"
+    "          \"VALUE_TYPE\": 5 }}]\n"
+    "}\n",
+    "{\n"
+    "    \"AGGREGATE_COLUMNS\": [{\n"
+    "        \"AGGREGATE_DISTINCT\": 0,\n"
+    "        \"AGGREGATE_EXPRESSIONS\": [],\n"
+    "        \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
+    "        \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_DENSE_RANK\"\n"
+    "    }],\n"
+    "    \"CHILDREN_IDS\": [5],\n"
+    "    \"ID\": 4,\n"
+    "    \"OUTPUT_SCHEMA\": [\n"
     "        {\n"
-    "            \"AGGREGATE_COLUMNS\": [{\n"
-    "                \"AGGREGATE_DISTINCT\": 0,\n"
-    "                \"AGGREGATE_EXPRESSIONS\": [],\n"
-    "                \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
-    "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_RANK\",\n"
-    "                \"PARTITIONBY_EXPRESSIONS\": [{\n"
-    "                    \"COLUMN_IDX\": 0,\n"
-    "                    \"TYPE\": 32,\n"
-    "                    \"VALUE_TYPE\": 5\n"
-    "                }],\n"
-    "                \"SORT_COLUMNS\": [{\"SORT_EXPRESSION\": {\n"
-    "                    \"COLUMN_IDX\": 1,\n"
-    "                    \"TYPE\": 32,\n"
-    "                    \"VALUE_TYPE\": 5\n"
-    "                }}]\n"
-    "            }],\n"
-    "            \"CHILDREN_IDS\": [4],\n"
-    "            \"ID\": 3,\n"
-    "            \"OUTPUT_SCHEMA\": [\n"
-    "                {\n"
-    "                    \"COLUMN_NAME\": \"R\",\n"
-    "                    \"EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 0,\n"
-    "                        \"TYPE\": 32,\n"
-    "                        \"VALUE_TYPE\": 6\n"
-    "                    }\n"
-    "                },\n"
-    "                {\n"
-    "                    \"COLUMN_NAME\": \"A\",\n"
-    "                    \"EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 0,\n"
-    "                        \"TYPE\": 32,\n"
-    "                        \"VALUE_TYPE\": 5\n"
-    "                    }\n"
-    "                },\n"
-    "                {\n"
-    "                    \"COLUMN_NAME\": \"B\",\n"
-    "                    \"EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 1,\n"
-    "                        \"TYPE\": 32,\n"
-    "                        \"VALUE_TYPE\": 5\n"
-    "                    }\n"
-    "                },\n"
-    "                {\n"
-    "                    \"COLUMN_NAME\": \"C\",\n"
-    "                    \"EXPRESSION\": {\n"
-    "                        \"COLUMN_IDX\": 2,\n"
-    "                        \"TYPE\": 32,\n"
-    "                        \"VALUE_TYPE\": 5\n"
-    "                    }\n"
-    "                }\n"
-    "            ],\n"
-    "            \"PLAN_NODE_TYPE\": \"WINDOWFUNCTION\"\n"
-    "        }\n",
+    "            \"COLUMN_NAME\": \"R\",\n"
+    "            \"EXPRESSION\": {\n"
+    "                \"COLUMN_IDX\": 0,\n"
+    "                \"TYPE\": 32,\n"
+    "                \"VALUE_TYPE\": 6\n"
+    "            }\n"
+    "        },\n"
+    "        {\n"
+    "            \"COLUMN_NAME\": \"A\",\n"
+    "            \"EXPRESSION\": {\n"
+    "                \"COLUMN_IDX\": 0,\n"
+    "                \"TYPE\": 32,\n"
+    "                \"VALUE_TYPE\": 5\n"
+    "            }\n"
+    "        },\n"
+    "        {\n"
+    "            \"COLUMN_NAME\": \"B\",\n"
+    "            \"EXPRESSION\": {\n"
+    "                \"COLUMN_IDX\": 1,\n"
+    "                \"TYPE\": 32,\n"
+    "                \"VALUE_TYPE\": 5\n"
+    "            }\n"
+    "        },\n"
+    "        {\n"
+    "            \"COLUMN_NAME\": \"C\",\n"
+    "            \"EXPRESSION\": {\n"
+    "                \"COLUMN_IDX\": 2,\n"
+    "                \"TYPE\": 32,\n"
+    "                \"VALUE_TYPE\": 5\n"
+    "            }\n"
+    "        }\n"
+    "    ],\n"
+    "    \"PARTITIONBY_EXPRESSIONS\": [{\n"
+    "        \"COLUMN_IDX\": 0,\n"
+    "        \"TYPE\": 32,\n"
+    "        \"VALUE_TYPE\": 5\n"
+    "    }],\n"
+    "    \"PLAN_NODE_TYPE\": \"WINDOWFUNCTION\",\n"
+    "    \"SORT_COLUMNS\": [{\"SORT_EXPRESSION\": {\n"
+    "        \"COLUMN_IDX\": 1,\n"
+    "        \"TYPE\": 32,\n"
+    "        \"VALUE_TYPE\": 5\n"
+    "    }}]\n"
+    "}\n",
     (const char *)0
 };
-}
+struct aggDescription {
+    ExpressionType     aggType;
+    int                aDistinct;
+    int                aOutputColumn;
+    int                nAggArgs;
+};
+
+struct OColumn {
+    OColumn(std::string name)
+        : m_name(name) {}
+    const std::string &getName() const {
+        return m_name;
+    }
+    static OColumn EndList;
+private:
+    std::string   m_name;
+};
+
+OColumn OColumn::EndList("");
+
+struct OSchema {
+    OSchema(OColumn column0, ...) {
+        va_list args;
+        va_start(args, column0);
+
+        m_columns.push_back(column0);
+        if (column0.getName().size() > 0) {
+            do {
+                OColumn col = va_arg(args, OColumn);
+                if (col.getName().size() == 0) {
+                    break;
+                }
+                m_columns.push_back(col);
+            } while (true);
+        }
+        va_end(args);
+    }
+    const std::vector<OColumn> &getColumns() const {
+        return m_columns;
+    }
+private:
+    std::vector<OColumn> m_columns;
+};
+
+struct jsonDescription {
+    int                 nAggs;
+    aggDescription      aggDescr;
+    int                 nPartitionByExprs;
+    int                 nOrderByExprs;
+    int                 nOutputColumns;
+    OSchema             colDescriptions;
+} jsonDescrs[] = {
+    {
+        1, /* nAggs */
+        {EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, 0, 0, 0},
+        1, /* nPartitionByExprs */
+        1, /* nOrderByExprs     */
+        3, /* nOutputColumns    */
+        OSchema(OColumn("C1"),
+                OColumn("A"),
+                OColumn("B"),
+                OColumn::EndList)
+    },
+    {
+        1,  /* nAggs */
+        {EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK, 0, 0, 0},
+        1,  /* nPartitionByExprs */
+        1,  /* nOrderByExprs     */
+        4,  /* nOutputColumns    */
+        OSchema(OColumn("R"),
+                OColumn("A"),
+                OColumn("B"),
+                OColumn("C"),
+                OColumn::EndList)
+    }
+};
 
 class WindowFunctionPlanNodeTest : public Test {
 public:
@@ -120,36 +231,38 @@ public:
     {
     }
 };
-
+}
 //
-// There is not much here to test.  The only difference between a
-// WindowFunctionPlanNode and any other Aggregate node is that the
-// WindowFunctionPLanNode generates one output row per input row.
+// Test that the WindowFunctionPlanNode seems to have
+// what we expect.
+//
 TEST_F(WindowFunctionPlanNodeTest, TestJSON)
 {
     for (int jsonIdx = 0; jsonStrings[jsonIdx]; jsonIdx += 1) {
+        std::cout << "Test " << jsonIdx << "\n";
         const char *jsonString = jsonStrings[jsonIdx];
+        jsonDescription *jsonDescr = &jsonDescrs[jsonIdx];
         PlannerDomRoot root(jsonString);
         PlannerDomValue obj(root.rootObject());
         // If the json string is busted this will be true.
         EXPECT_FALSE(root.isNull());
-        boost::shared_ptr<voltdb::WindowFunctionPlanNode> pn(dynamic_cast<WindowFunctionPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
+        boost::shared_ptr<voltdb::WindowFunctionPlanNode>
+            pn(dynamic_cast<WindowFunctionPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
         EXPECT_TRUE(pn.get() != NULL);
-        EXPECT_EQ(1, pn->getAggregates().size());
+        EXPECT_EQ(jsonDescr->nAggs, pn->getAggregates().size());
         for (int aggIdx = 0; aggIdx < pn->getAggregates().size(); aggIdx += 1) {
-        	EXPECT_EQ(EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK, pn->getAggregates()[aggIdx]);
-        	EXPECT_EQ(1, pn->getPartitionByExpressions()[aggIdx].size());
-        	EXPECT_EQ(1, pn->getOrderByExpressions()[aggIdx].size());
-        	EXPECT_EQ(0, pn->getAggregateInputExpressions()[aggIdx].size());
+            aggDescription &aggDescr = jsonDescr->aggDescr;
+            EXPECT_EQ(aggDescr.aggType, pn->getAggregates()[aggIdx]);
+            EXPECT_EQ(aggDescr.nAggArgs, pn->getAggregateInputExpressions()[aggIdx].size());
         }
-        EXPECT_EQ(4, pn->getOutputSchema().size());
-        EXPECT_EQ("R", pn->getOutputSchema()[0]->getColumnName());
-        EXPECT_EQ("A", pn->getOutputSchema()[1]->getColumnName());
-        EXPECT_EQ("B", pn->getOutputSchema()[2]->getColumnName());
-        EXPECT_EQ("C", pn->getOutputSchema()[3]->getColumnName());
-        std::cout << "Window function node:\n"
-        		  << pn->debug("")
-				  << std::endl;
+        EXPECT_EQ(jsonDescr->nPartitionByExprs, pn->getPartitionByExpressions().size());
+        EXPECT_EQ(jsonDescr->nOrderByExprs, pn->getOrderByExpressions().size());
+        EXPECT_EQ(jsonDescr->nOutputColumns, pn->getOutputSchema().size());
+        const std::vector<OColumn> &columns = jsonDescr->colDescriptions.getColumns();
+        for (int ocIdx = 0; ocIdx < jsonDescr->nOutputColumns; ocIdx += 1) {
+            EXPECT_EQ(columns[ocIdx].getName().c_str(),
+                      pn->getOutputSchema()[ocIdx]->getColumnName());
+        }
     }
 }
 

@@ -161,8 +161,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         //
         SchemaColumn column = schema.getColumns().get(0);
         assertEquals("ARANK", column.getColumnAlias());
-        assertEquals(1, pbPlanNode.getPartitionByExpressions().size());
-        assertEquals(numPartitionExprs, pbPlanNode.getPartitionByExpressions().get(0).size());
+        assertEquals(numPartitionExprs, pbPlanNode.getPartitionByExpressions().size());
         validateTVEs(input_schema, pbPlanNode, false);
     }
 
@@ -171,10 +170,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
             WindowFunctionPlanNode pbPlanNode,
             boolean waiveAliasMatch) {
         List<AbstractExpression> tves = new ArrayList<>();
-        for (List<AbstractExpression> aes : pbPlanNode.getPartitionByExpressions()) {
-            for (AbstractExpression ae : aes) {
-                tves.addAll(ae.findAllTupleValueSubexpressions());
-            }
+        for (AbstractExpression ae : pbPlanNode.getPartitionByExpressions()) {
+            tves.addAll(ae.findAllTupleValueSubexpressions());
         }
         List<SchemaColumn> columns = input_schema.getColumns();
         for (AbstractExpression ae : tves) {

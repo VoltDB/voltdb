@@ -39,11 +39,11 @@ void WindowFunctionPlanNode::debugWriteAggregateExpressionList(
         const std::string &label,
         const OwningExpressionVector& argVec) const {
     buffer << spacer << label
-    	   << "(" << argVec.size() << ") = {\n";
+           << "(" << argVec.size() << ") = {\n";
     for (int ictr = 0; ictr < argVec.size(); ictr += 1) {
-    	buffer << spacer << "  "
-    			<< ictr << ".) "
-        		<< (argVec[ictr] ? argVec[ictr]->debug("") : "null")
+        buffer << spacer << "  "
+                << ictr << ".) "
+                << (argVec[ictr] ? argVec[ictr]->debug("") : "null")
                 << "\n";
     }
     buffer << spacer << "}\n";
@@ -52,8 +52,8 @@ void WindowFunctionPlanNode::debugWriteAggregateExpressionList(
 std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "\nAggregates[" << (int) m_aggregates.size() << "]: {\n";
-    std::string nspacer = spacer + "  |";
+    buffer << "\n" << spacer << "Aggregates[" << (int) m_aggregates.size() << "]: {\n";
+    std::string nspacer = spacer + "   ";
     for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
         buffer << nspacer << "type="
                << expressionToString(m_aggregates[ctr]) << "\n";
@@ -62,23 +62,23 @@ std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
         buffer << nspacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
         debugWriteAggregateExpressionList(buffer, nspacer, "arguments", m_aggregateInputExpressions[ctr]);
-        debugWriteAggregateExpressionList(buffer, nspacer, "partitionBys", m_partitionByExpressions[ctr]);
-        debugWriteAggregateExpressionList(buffer, nspacer, "orderBys", m_orderByExpressions[ctr]);
     }
+    debugWriteAggregateExpressionList(buffer, spacer, "partitionBys", m_partitionByExpressions);
+    debugWriteAggregateExpressionList(buffer, spacer, "orderBys", m_orderByExpressions);
     buffer << spacer << "}";
     return buffer.str();
 }
 
 void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
+    bool containsType = false;
+    bool containsDistinct = false;
+    bool containsOutputColumn = false;
+    bool containsExpressions = false;
+    bool containsPartitionExpressions = false;
+    bool containsOrderByExpressions = false;
     for (int i = 0; i < aggregateColumnsArray.arrayLen(); i++) {
         PlannerDomValue aggregateColumnValue = aggregateColumnsArray.valueAtIndex(i);
-        bool containsType = false;
-        bool containsDistinct = false;
-        bool containsOutputColumn = false;
-        bool containsExpressions = false;
-        bool containsPartitionExpressions = false;
-        bool containsOrderByExpressions = false;
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_TYPE")) {
             containsType = true;
             std::string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
@@ -101,29 +101,7 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             OwningExpressionVector &exprVec = m_aggregateInputExpressions[nExprs];
             exprVec.loadExpressionArrayFromJSONObject("AGGREGATE_EXPRESSIONS", aggregateColumnValue);
         }
-        if (aggregateColumnValue.hasNonNullKey("PARTITIONBY_EXPRESSIONS")) {
-            containsPartitionExpressions = true;
-            size_t nExprs = m_partitionByExpressions.size();
-            m_partitionByExpressions.push_back(OwningExpressionVector());
-            OwningExpressionVector &exprVec = m_partitionByExpressions[nExprs];
-            exprVec.loadExpressionArrayFromJSONObject("PARTITIONBY_EXPRESSIONS",
-                                                      aggregateColumnValue);
-        }
-        if (aggregateColumnValue.hasNonNullKey("SORT_COLUMNS")) {
-            containsOrderByExpressions = true;
-            size_t nExprs = m_orderByExpressions.size();
-            m_orderByExpressions.push_back(OwningExpressionVector());
-            OwningExpressionVector &exprVec = m_orderByExpressions[nExprs];
-            // We don't need the sort directions here.
-            loadSortListFromJSONObject(aggregateColumnValue,
-                                       &exprVec,
-                                       NULL);
-        }
-
-        if(!(containsType && containsDistinct && containsOutputColumn
-                && containsPartitionExpressions
-                && containsOrderByExpressions
-                && containsExpressions)) {
+        if(!(containsType && containsDistinct && containsOutputColumn && containsExpressions)) {
             std::ostringstream buffer;
             std::string sep = "";
             if (!containsType) {
@@ -138,22 +116,40 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
                 buffer << sep << "Output Column";
                 sep = ", ";
             }
-            if (!containsPartitionExpressions) {
-                buffer << sep << "Partition By List";
-                sep = ", ";
-            }
-            if (!containsOrderByExpressions) {
-                buffer << sep << "Order By List";
-                sep = ", ";
-            }
             if (!containsExpressions) {
                 buffer << sep << "Aggregate Argument Expressions";
             }
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "WindowFunctionPlanNode::loadFromJSONObject:"
-                                      " Missing components: "
+                                      " Aggregate missing components: "
                                       + buffer.str());
         }
+
+    }
+    if (obj.hasNonNullKey("PARTITIONBY_EXPRESSIONS")) {
+        containsPartitionExpressions = true;
+        m_partitionByExpressions.loadExpressionArrayFromJSONObject("PARTITIONBY_EXPRESSIONS", obj);
+    }
+    if (obj.hasNonNullKey("SORT_COLUMNS")) {
+        containsOrderByExpressions = true;
+        m_orderByExpressions.clear();
+        loadSortListFromJSONObject(obj, &m_orderByExpressions, NULL);
+    }
+    if(!(containsPartitionExpressions && containsOrderByExpressions)) {
+        std::ostringstream buffer;
+        std::string sep = "";
+        if (!containsPartitionExpressions) {
+            buffer << sep << "Partition By List";
+            sep = ", ";
+        }
+        if (!containsOrderByExpressions) {
+            buffer << sep << "Order By List";
+            sep = ", ";
+        }
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "WindowFunctionPlanNode::loadFromJSONObject:"
+                                  " Missing components: "
+                                  + buffer.str());
     }
 }
 }
