@@ -233,7 +233,7 @@ def get_max_mismatches(comparison_database, suite_name):
         # Failures in joined-matview-default-full due to ENG-11086
         elif config_name == 'joined-matview-default-full':
             max_mismatches = 3387
-        # Failures in joined-matview-int due to ENG-11196 & (mainly) ENG-11086
+        # Failures in joined-matview-int due to ENG-11086
         elif config_name == 'joined-matview-int':
             max_mismatches = 46440
 

@@ -66,7 +66,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("geography", "GEOGRAPHY");
         // NOTE: what VoltDB calls "GEOGRAPHY_POINT" would also be called
         // "geography" by PostgreSQL, so this mapping is imperfect; however,
-        // so far this has not been a problem
+        // so far this has not caused test failures
     }
 
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
@@ -114,18 +114,28 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(dayOfYearQuery)
             .initialText("EXTRACT ( ").prefix("DOY FROM").suffix(")").groups("column");
 
-    // Regex pattern for a typical column or column expression (including
-    // functions, operators, etc.) - currently only used for AVG, though this
-    // could be expanded in the future; note that AS or FROM can occur
-    // (rarely) if certain functions occur within the AVG function, e.g.,
-    // AVG(CAST(VCHAR AS INTEGER)) or AVG(EXTRACT(DAY FROM PAST))
-    private static final String COLUMN_PATTERN = "(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*"
-            + "\\s*((\\+|\\-|\\*|\\/)(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s+(AS|FROM)\\s+\\w+)?(\\s*\\))*)*\\s*";
+    // Regex patterns for a typical column, constant, or column expression
+    // (including functions, operators, etc.); used, e.g., for modifying an AVG
+    // query or a division (col1 / col2) query.
+    // Note 1: WHERE and SELECT are specifically forbidden since they are not
+    // function names, but they sometimes occur before parentheses; parentheses
+    // without an actual function name do match here.
+    // Note 2: an AS or FROM can occur here (rarely) if certain functions occur
+    // within an otherwise matching expression, e.g., AVG(CAST(VCHAR AS INTEGER))
+    // or AVG(EXTRACT(DAY FROM PAST))
+    private static final String COLUMN_NAME   = "(\\w+\\.)?(?<column1>\\w+)";
+    private static final String FUNCTION_NAME = "(?!WHERE|SELECT)((\\b\\w+\\s*)?\\(\\s*)*";
+    private static final String FUNCTION_END  = "(\\s+(AS|FROM)\\s+\\w+\\s*\\))?(\\s*\\))*";
+    private static final String ARITHMETIC_OP = "\\s*(\\+|\\-|\\*|\\/)\\s*";
+    private static final String SIMPLE_COLUMN_EXPRESSION = FUNCTION_NAME + COLUMN_NAME + FUNCTION_END;
+    private static final String COLUMN_EXPRESSION_PATTERN = SIMPLE_COLUMN_EXPRESSION
+            + "(" + ARITHMETIC_OP + SIMPLE_COLUMN_EXPRESSION.replace("column1", "column2")
+            + ")*";
 
     // Captures the use of AVG(columnExpression), which PostgreSQL handles
     // differently, when the columnExpression is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
-            "AVG\\s*\\("+COLUMN_PATTERN+"\\)",
+            "AVG\\s*\\(\\s*"+COLUMN_EXPRESSION_PATTERN+"\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     // Modifies a query containing an AVG(columnExpression) function, where
     // <i>columnName</i> is of an integer type, for which PostgreSQL returns
@@ -133,8 +143,49 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // so change it to: TRUNC ( AVG(columnExpression) )
     private static final QueryTransformer avgQueryTransformer
             = new QueryTransformer(avgQuery)
-            .prefix("TRUNC ( ").suffix(" )").groups("column")
+            .prefix("TRUNC ( ").suffix(" )").groups("column1", "column2")
             .useWholeMatch().columnType(ColumnType.INTEGER);
+
+    // Constants used in the two QueryTransformer's below,
+    // divisionQueryTransformer & bigintDivisionQueryTransformer
+    private static final String DIVISION_QUERY_TRANSFORMER_PREFIX = "TRUNC( ";
+    private static final String DIVISION_QUERY_TRANSFORMER_SUFFIX = " )";
+    private static final String BIGINT_DIV_QUERY_TRANSFORMER_PREFIX = "CAST(TRUNC (";
+    private static final String BIGINT_DIV_QUERY_TRANSFORMER_SUFFIX = ", 12) as BIGINT)";
+
+    // Captures the use of expression1 / expression2, which PostgreSQL handles
+    // differently, when the expressions are of one of the integer types
+    private static final Pattern divisionQuery = Pattern.compile(
+            SIMPLE_COLUMN_EXPRESSION + "\\s*\\/\\s*"
+            + SIMPLE_COLUMN_EXPRESSION.replace("column1", "column2"),
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing expression1 / expression2, where the
+    // expressions are of an integer type, for which PostgreSQL returns a
+    // numeric (non-integer) value, unlike VoltDB, which returns an integer;
+    // so change it to: TRUNC( expression1 / expression2 ).
+    private static final QueryTransformer divisionQueryTransformer
+            = new QueryTransformer(divisionQuery)
+            .prefix(DIVISION_QUERY_TRANSFORMER_PREFIX)
+            .suffix(DIVISION_QUERY_TRANSFORMER_SUFFIX)
+            .exclude(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
+            .groups("column1", "column2")
+            .useWholeMatch().columnType(ColumnType.INTEGER);
+    // Also modifies a query containing expression1 / expression2, but in this
+    // case at least one of the expressions is a BIGINT, which can complicate
+    // matters (for very large values), so here we change it to:
+    // CAST(TRUNC (expression1 / expression2, 12) as BIGINT)
+    // Note 1: the value of the second argument to TRUNC (', 12') does not
+    // appear to matter, so I chose 12 to suggest 12 decimal places, which is
+    // the default in sqlcoverage.
+    // Note 2: this needs to be called before divisionQueryTransformer (and is,
+    // in transformDML below), since the latter will exclude making changes
+    // where this QueryTransformer has already made them.
+    private static final QueryTransformer bigintDivisionQueryTransformer
+            = new QueryTransformer(divisionQuery)
+            .prefix(BIGINT_DIV_QUERY_TRANSFORMER_PREFIX)
+            .suffix(BIGINT_DIV_QUERY_TRANSFORMER_SUFFIX)
+            .groups("column1", "column2")
+            .useWholeMatch().columnType(ColumnType.BIGINT);
 
     // Captures the use of CEILING(columnName) or FLOOR(columnName)
     private static final Pattern ceilingOrFloorQuery = Pattern.compile(
@@ -148,7 +199,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // CAST ( FLOOR(columnName) as INTEGER ), respectively.
     private static final QueryTransformer ceilingOrFloorQueryTransformer
             = new QueryTransformer(ceilingOrFloorQuery)
-            .prefix("CAST ( ").suffix(" as INTEGER )").groups("column")
+            .prefix("CAST( ").suffix(" as BIGINT)").groups("column")
             .useWholeMatch().columnType(ColumnType.INTEGER);
 
     // Used in both versions, below, of an UPSERT statement: an
@@ -275,7 +326,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "TINYINT", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing TINYINT, which PostgreSQL does not
     // support, and replaces it with SMALLINT, which is an equivalent that
-    // PostGIS does support
+    // PostgreSQL does support
     private static final QueryTransformer tinyintDdlTransformer
             = new QueryTransformer(tinyintDdl)
             .replacementText("SMALLINT").useWholeMatch();
@@ -285,23 +336,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "ASSUMEUNIQUE", Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing ASSUMEUNIQUE, which PostgreSQL does
     // not support, and replaces it with UNIQUE, which is an equivalent that
-    // PostGIS does support
+    // PostgreSQL does support
     private static final QueryTransformer assumeUniqueDdlTransformer
             = new QueryTransformer(assumeUniqueDdl)
             .replacementText("UNIQUE").useWholeMatch();
 
-    // Captures up to 6 table names, for each FROM clause used in the query
-    // TODO: we may want to fix & finish this, in order to actually check the
-    // column types, rather than just go by the column names (ENG-9945); this
-    // would be used for for AVG, CEILING, FLOOR, and CAST queries
-//    private static final Pattern tableNames = Pattern.compile(
-//              "FROM\\s*\\(?<table1>\\w+)\\s*"
-//            + "(\\s*,s*\\(?<table2>\\w+)\\s*)?"
-//            + "(\\s*,s*\\(?<table3>\\w+)\\s*)?"
-//            + "(\\s*,s*\\(?<table4>\\w+)\\s*)?"
-//            + "(\\s*,s*\\(?<table5>\\w+)\\s*)?"
-//            + "(\\s*,s*\\(?<table6>\\w+)\\s*)?",
-//            Pattern.CASE_INSENSITIVE);
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -376,7 +415,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  similar terms, so that the results will match. */
     public String transformDML(String dml) {
         return transformQuery(dml, orderByQueryTransformer,
-                avgQueryTransformer, ceilingOrFloorQueryTransformer,
+                avgQueryTransformer, bigintDivisionQueryTransformer,
+                divisionQueryTransformer, ceilingOrFloorQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
                 stringConcatQueryTransformer, varbinaryConstantTransformer,
                 upsertValuesQueryTransformer, upsertSelectQueryTransformer);
@@ -429,6 +469,100 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             result = !result;
         }
         return result;
+    }
+
+    /** Returns the number of occurrences of the specified character in the specified String. */
+    static private int numOccurencesOfCharIn(String str, char ch) {
+        int num = 0;
+        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
+            num++;
+        }
+        return num;
+    }
+
+    /** Returns the Nth occurrence of the specified character in the specified String. */
+    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
+        int index = -1;
+        for (int i=0; i < n; i++) {
+            index = str.indexOf(ch, index+1);
+            if (index < 0) {
+                return -1;
+            }
+        }
+        return index;
+    }
+
+    /** Normally, simply returns a String consisting of the <i>prefix</i>,
+     *  <i>group</i>, and <i>suffix</i>, concatenated in that order; but also
+     *  takes care not to cause mismatched parentheses by including more
+     *  close-parentheses than open-parentheses before the <i>suffix</i>: if the
+     *  group does contain more close-parens than open-parens, the <i>suffix</i>
+     *  is inserted just after the matching close-parens (i.e., after the number
+     *  of close-parens that equals the number of open-parens), instead of at
+     *  the very end; but if there are no open-parens, then the <i>suffix</i> is
+     *  inserted just before the first close-parens.<p>
+     *  Also, there is a special case when using the divisionQueryTransformer or
+     *  bigintDivisionQueryTransformer (i.e., for 'expression1 / expression2'),
+     *  in which case both the <i>prefix</i> and the <i>suffix</i> need to be
+     *  placed so as to not cause mismatched parentheses. */
+    @Override
+    protected String handleParens(String group, String prefix, String suffix) {
+        // Default values, which indicate that the prefix simply goes before
+        // the entire group, and the suffix simply follows the entire group
+        int p_index = 0;
+        int s_index = group.length();
+
+        int numOpenParens  = numOccurencesOfCharIn(group, '(');
+        int numCloseParens = numOccurencesOfCharIn(group, ')');
+
+        // Special case, for divisionQueryTransformer or bigintDivisionQueryTransformer,
+        // i.e., the group is something like: expression1 / expression2; check
+        // if the expressions have too many open- or close-parentheses in them
+        if (!group.toUpperCase().startsWith("AVG") && (
+                ( DIVISION_QUERY_TRANSFORMER_PREFIX.equals(prefix)
+                        && DIVISION_QUERY_TRANSFORMER_SUFFIX.equals(suffix) )
+                || (BIGINT_DIV_QUERY_TRANSFORMER_PREFIX.equals(prefix)
+                        && BIGINT_DIV_QUERY_TRANSFORMER_SUFFIX.equals(suffix)) ) ) {
+            int numDivOperators = numOccurencesOfCharIn(group, '/');
+            int div_index = -2;
+            if (numDivOperators != 1) {
+                // Less than one should be impossible here; more than one means
+                // a potentially ambiguous situation
+                System.out.println("\nWARNING: in PostgreSQLBackend.handleParens, "
+                        + "numDivOperators is not 1: " + numDivOperators);
+            }
+            if (numDivOperators > 0) {
+                div_index = group.indexOf('/');
+                String subgroup = group.substring(0, div_index);
+                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
+                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
+                if (numOpenParens > numCloseParens) {
+                    // Put the prefix after the last unmatched open parenthesis
+                    p_index = indexOfNthOccurrenceOfCharIn(subgroup, '(', numOpenParens-numCloseParens) + 1;
+                }
+                subgroup = group.substring(div_index);
+                numOpenParens  = numOccurencesOfCharIn(subgroup, '(');
+                numCloseParens = numOccurencesOfCharIn(subgroup, ')');
+                if (numCloseParens > numOpenParens) {
+                    // Put the suffix before the first unmatched closed parenthesis
+                    s_index = div_index + indexOfNthOccurrenceOfCharIn(subgroup, ')', numOpenParens+1);
+                }
+            }
+
+        // Case for a function (e.g., AVG, CEILING, FLOOR), i.e., the group is
+        // something like: AVG(expression); check if the expression  has too
+        // many close-parentheses in it
+        } else if (numOpenParens < numCloseParens && !suffix.isEmpty())  {
+            if (numOpenParens == 0) {
+                s_index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
+            } else {
+                s_index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
+            }
+        }
+
+        return (           group.substring(0, p_index)
+                + prefix + group.substring(p_index, s_index) + suffix
+                         + group.substring(s_index)                  );
     }
 
     /** Returns the specified String, after replacing certain "variables", such
@@ -635,7 +769,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } else {
                 index = groupNames.indexOf(groupName);
                 if (index > -1 && index < groupValues.size()) {
-                    matcher.appendReplacement(modified_str, groupValues.get(index));
+                    String groupValue = groupValues.get(index);
+                    matcher.appendReplacement(modified_str, (groupValue == null ? "" : groupValue));
                 } else {
                     // No match: give up on this "variable"
                     matcher.appendReplacement(modified_str, "{"+groupName+"}");
