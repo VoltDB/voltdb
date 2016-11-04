@@ -258,6 +258,11 @@ public class AbstractTopology {
         int freeSpace() {
             return Math.max(targetSiteCount - partitions.size(), 0);
         }
+
+        /** Count the number of partitions that consider this host a leader */
+        int leaderCount() {
+            return (int) partitions.stream().filter(p -> p.leader == this).count();
+        }
     }
 
     /////////////////////////////////////
@@ -489,16 +494,9 @@ public class AbstractTopology {
         }
 
         /////////////////////////////////
-        // pick leaders for partitions that need them (naive)
+        // pick leaders for partitions that need them
         /////////////////////////////////
-        mutablePartitionMap.values().stream()
-                    .filter(mp -> mp.leader == null)
-                    .forEach(mp -> {
-                        mp.leader = mp.hosts.iterator().next(); // pick any from set
-                        // double checking
-                        assert(mp.leader != null);
-                        assert(mp.hosts.size() > 0);
-                    });
+        assignLeadersToPartitionsThatNeedThem(mutableHostMap, mutablePartitionMap);
 
         /////////////////////////////////
         // convert mutable hosts to hosts to prep a return value
@@ -554,14 +552,7 @@ public class AbstractTopology {
         /////////////////////////////////
         // pick leaders for partitions that need them (naive)
         /////////////////////////////////
-        mutablePartitionMap.values().stream()
-                .filter(mp -> (mp.leader == null) || (mp.leader == hostToRemove))
-                .forEach(mp -> {
-                    mp.leader = mp.hosts.iterator().next(); // pick any from set
-                    // double checking
-                    assert(mp.leader != null);
-                    assert(mp.hosts.size() > 0);
-                });
+        assignLeadersToPartitionsThatNeedThem(mutableHostMap, mutablePartitionMap);
 
         /////////////////////////////////
         // convert mutable hosts to hosts to prep a return value
@@ -1163,5 +1154,59 @@ public class AbstractTopology {
                 }
             }
         }
+    }
+
+    private static void assignLeadersToPartitionsThatNeedThem(
+            Map<Integer, MutableHost> mutableHostMap,
+            Map<Integer, MutablePartition> mutablePartitionMap)
+    {
+        // clean up any partitions with leaders that don't exist
+        // (this is used by remove node, not during new cluster forming)
+        mutablePartitionMap.values().stream()
+                .filter(p -> p.leader != null)
+                // if a leader isn't in the current set of hosts, set to null
+                .filter(p -> mutableHostMap.containsKey(p.leader.id) == false)
+                .forEach(p -> p.leader = null);
+
+        // sort partitions by small k, so we can assign less flexible partitions first
+        List<MutablePartition> leaderlessPartitionsSortedByK = mutablePartitionMap.values().stream()
+                .filter(p -> p.leader == null)
+                .sorted((p1, p2) -> p1.k - p2.k)
+                .collect(Collectors.toList());
+
+        // pick a leader for each partition based on the host that is least full of leaders
+        for (MutablePartition partition : leaderlessPartitionsSortedByK) {
+            // find host with fewest leaders
+            partition.hosts.stream()
+                    .sorted((h1, h2) -> h1.leaderCount() - h2.leaderCount())
+                    .forEach(h -> System.out.printf("h%d:%d ", h.id, h.leaderCount()));
+            System.out.println();
+
+            MutableHost leaderHost = partition.hosts.stream()
+                    .min((h1, h2) -> h1.leaderCount() - h2.leaderCount()).get();
+            partition.leader = leaderHost;
+            assert(partition.hosts.contains(leaderHost));
+        }
+
+        // run through and shift leaders from hosts with high partition counts to those with low ones
+        // iterate until it's not possible to shift things this way
+        //
+        // There might be better ways to do this that invovle mutli-swaps, but this is probably decent
+        boolean foundAMove;
+        do {
+            foundAMove = false;
+
+            for (MutablePartition partition : leaderlessPartitionsSortedByK) {
+                int loadOfLeadHost = partition.leader.leaderCount();
+                MutableHost loadWithMinLeaders = partition.hosts.stream()
+                        .min((h1, h2) -> h1.leaderCount() - h2.leaderCount()).get();
+                if ((loadOfLeadHost - loadWithMinLeaders.leaderCount()) >= 2) {
+                    foundAMove = true;
+                    partition.leader = loadWithMinLeaders;
+                    break;
+                }
+            }
+
+        } while (foundAMove);
     }
 }
