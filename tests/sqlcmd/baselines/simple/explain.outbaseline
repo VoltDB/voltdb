@@ -132,3 +132,12 @@ RETURN RESULTS TO STORED PROCEDURE
 
 
 (Returned 12 rows in #.##s)
+
+DROP PROCEDURE P_EXPLAINTEST;
+Command succeeded.
+
+DROP VIEW V_EXPLAINTEST;
+Command succeeded.
+
+DROP TABLE EXPLAINTEST;
+Command succeeded.
