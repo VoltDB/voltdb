@@ -504,6 +504,10 @@ public final class InvocationDispatcher {
             return true;
         }
 
+        if (VoltDB.instance().getMode() == OperationMode.SHUTTINGDOWN) {
+            return false;
+        }
+
         // If we got here, instance is paused and handler is not admin.
         if (procedure.getSystemproc() &&
                 ("@AdHoc".equals(invocation.procName) || "@AdHocSpForTest".equals(invocation.procName))) {
