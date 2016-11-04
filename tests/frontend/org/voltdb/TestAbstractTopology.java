@@ -92,6 +92,8 @@ public class TestAbstractTopology extends TestCase {
         int haGroupCount = 0;
         double avgReplicationPerHAGroup = 0;
         int maxReplicationPerHAGroup = 0;
+        int maxLeaderCount = 0;
+        int minLeaderCount = 0;
 
         @Override
         public String toString() {
@@ -102,7 +104,9 @@ public class TestAbstractTopology extends TestCase {
                    "  Non-Spanning Partitions   " + String.valueOf(partitionsThatDontSpanHAGroups) + "\n" +
                    "  HA Group Count            " + String.valueOf(haGroupCount) + "\n" +
                    "  AVG Replication Per Group " + String.valueOf(avgReplicationPerHAGroup) + "\n" +
-                   "  MAX Replication Per Group " + String.valueOf(maxReplicationPerHAGroup);
+                   "  MAX Replication Per Group " + String.valueOf(maxReplicationPerHAGroup) + "\n" +
+                   "  MAX Leadership Impalance  " + String.format("%d (%d-%d)", maxLeaderCount - minLeaderCount,
+                                                                  minLeaderCount, maxLeaderCount);
         }
     }
 
@@ -186,6 +190,16 @@ public class TestAbstractTopology extends TestCase {
         }
         metrics.avgReplicationPerHAGroup = sumOfReplicaCounts / (double) metrics.haGroupCount;
 
+        // find min and max leaders
+        if (topo.hostsById.size() > 0) {
+            metrics.maxLeaderCount = topo.hostsById.values().stream()
+                    .mapToInt(host -> (int) host.partitions.stream().filter(p -> p.leaderHostId == host.id).count())
+                    .max().getAsInt();
+            metrics.minLeaderCount = topo.hostsById.values().stream()
+                    .mapToInt(host -> (int) host.partitions.stream().filter(p -> p.leaderHostId == host.id).count())
+                    .min().getAsInt();
+        }
+
         return metrics;
     }
 
@@ -210,7 +224,7 @@ public class TestAbstractTopology extends TestCase {
     public void testTwoNodesTwoRacks() throws JSONException {
         TestDescription td = getBoringDescription(2, 7, 1, 2, 2);
         AbstractTopology topo = subTestDescription(td, false);
-        System.out.printf("TOPO PRE: %s\n", topo.topologyToJSON());
+        //System.out.printf("TOPO PRE: %s\n", topo.topologyToJSON());
 
         // kill and rejoin a host
         HostDescription hostDescription = td.hosts[0];
@@ -220,9 +234,9 @@ public class TestAbstractTopology extends TestCase {
             e.printStackTrace();
             fail();
         }
-        System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
+        //System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
         topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
-        System.out.printf("TOPO END: %s\n", topo.topologyToJSON());
+        //System.out.printf("TOPO END: %s\n", topo.topologyToJSON());
         validate(topo);
     }
 
