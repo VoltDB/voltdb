@@ -251,7 +251,7 @@ public class TestAbstractTopology extends TestCase {
     }
 
     public void testFiveNodeK1TwoRacks() throws JSONException {
-        TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
+        TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
         subTestDescription(td, false);
     }
 
@@ -283,7 +283,7 @@ public class TestAbstractTopology extends TestCase {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Partition requesting more replicas"));
+            assertTrue(e.getMessage().contains("Topology request invalid"));
         }
     }
 
@@ -387,16 +387,19 @@ public class TestAbstractTopology extends TestCase {
 
     private TestDescription getChaoticDescription(Random rand) {
         final int MAX_NODE_COUNT = 120;
-        final int MAX_SPH = 60;
         final int MAX_K = 10;
 
         TestDescription td = new TestDescription();
 
+        // for now, forget about ha groups
         List<String> haGroupTags = new ArrayList<>();
         haGroupTags.add("0");
 
+        // start with a random node count
         int nodeCount = rand.nextInt(MAX_NODE_COUNT) + 1; // 1 .. MAX_NODE_COUNT
         assert(nodeCount > 0);
+
+        // as we go, compute SPH for each node based on random partition needs
         int[] sph = new int[nodeCount];
         for (int i = 0; i < nodeCount; i++) sph[i] = 0;
 
@@ -438,8 +441,13 @@ public class TestAbstractTopology extends TestCase {
                 AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
         //System.out.println(topo.topologyToJSON());
 
+        try {
         topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(
                 topo, td.partitions);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
         if (print) System.out.println(topo.topologyToJSON());
         long subEnd = System.currentTimeMillis();
 
