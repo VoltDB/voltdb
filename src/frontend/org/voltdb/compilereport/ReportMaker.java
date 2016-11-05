@@ -356,11 +356,6 @@ public class ReportMaker {
             }
         }
 
-        // Generate explainview report.
-        if (table.getMaterializer() != null) {
-            sb.append(generateExplainViewTable(table));
-        }
-
         if (table.getIndexes().size() > 0) {
             sb.append(generateIndexesTable(table));
         }
@@ -368,8 +363,12 @@ public class ReportMaker {
             sb.append("<p>No indexes defined on table.</p>\n");
         }
 
-        sb.append("</td></tr>\n");
+        // Generate explainview report.
+        if (table.getMaterializer() != null) {
+            sb.append(generateExplainViewTable(table));
+        }
 
+        sb.append("</td></tr>\n");
         return sb.toString();
     }
 
