@@ -66,7 +66,7 @@ public class VoltCompilerUtils
             return null;
         }
 
-        byte[] bytes = InMemoryJarfile.readFromJarEntry(jarIn, catEntry);
+        byte[] bytes = InMemoryJarfile.readFromJarEntry(jarIn);
 
         return new String(bytes, "UTF-8");
     }

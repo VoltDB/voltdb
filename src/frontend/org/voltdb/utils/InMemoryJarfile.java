@@ -88,41 +88,70 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         loadFromStream(new ByteArrayInputStream(bytes));
     }
 
-    private void loadFromStream(InputStream in) throws IOException {
-        JarInputStream jarIn = new JarInputStream(in);
-        JarEntry catEntry = null;
-        while ((catEntry = jarIn.getNextJarEntry()) != null) {
-            byte[] value = readFromJarEntry(jarIn, catEntry);
-            String key = catEntry.getName();
-            put(key, value);
+    // A best guess at an upper bound for the size of entries in jar files, since
+    // we do not know the uncompressed size of the entries ahead of time.
+    // This number is used to size the buffers used to read from jar streams.
+    private static final int JAR_ENTRY_SIZE_GUESS = 1024 * 1024; // 1MB
+
+    // A class that can be used to read from a JarInputStream where the size of entries
+    // is not known.  Can be reused multiple times to avoid excessive memory allocations.
+    private static class JarInputStreamReader {
+
+        private byte[] m_array0;
+        private byte[] m_array1 = null;
+
+        JarInputStreamReader(int initSize) {
+            m_array0 = new byte[initSize];
+        }
+
+        byte[] readEntryFromStream(JarInputStream jarIn) throws IOException {
+            int totalRead = 0;
+
+            while (jarIn.available() == 1) {
+                int bytesToRead = m_array0.length - totalRead;
+                assert (bytesToRead > 0);
+                int readSize = jarIn.read(m_array0, totalRead, bytesToRead);
+                if (readSize < 0) {
+                    // we're done
+                    break;
+                }
+
+                totalRead += readSize;
+                // If we have filled up our buffer and there is still more to
+                // read...
+                if (readSize == bytesToRead && (jarIn.available() == 1)) {
+                    if (m_array1 == null || m_array1.length < 2 * m_array0.length) {
+                        m_array1 = new byte[2 * m_array0.length];
+                    }
+
+                    System.arraycopy(m_array0, 0, m_array1, 0, totalRead);
+
+                    byte[] tmp = m_array0;
+                    m_array0 = m_array1;
+                    m_array1 = tmp;
+                }
+            }
+
+            byte trimmedBytes[] = new byte[totalRead];
+            System.arraycopy(m_array0, 0, trimmedBytes, 0, totalRead);
+            return trimmedBytes;
         }
     }
 
-    public static byte[] readFromJarEntry(JarInputStream jarIn, JarEntry entry) throws IOException {
-        int totalRead = 0;
-        int maxToRead = 4096 << 10;
-        byte[] buffer = new byte[maxToRead];
-        byte[] bytes = new byte[maxToRead * 2];
+    public static byte[] readFromJarEntry(JarInputStream jarIn) throws IOException {
+        JarInputStreamReader reader = new JarInputStreamReader(JAR_ENTRY_SIZE_GUESS);
+        return reader.readEntryFromStream(jarIn);
+    }
 
-        // Keep reading until we run out of bytes for this entry
-        // We will resize our return value byte array if we run out of space
-        while (jarIn.available() == 1) {
-            int readSize = jarIn.read(buffer, 0, buffer.length);
-            if (readSize > 0) {
-                totalRead += readSize;
-                if (totalRead > bytes.length) {
-                    byte[] temp = new byte[bytes.length * 2];
-                    System.arraycopy(bytes, 0, temp, 0, bytes.length);
-                    bytes = temp;
-                }
-                System.arraycopy(buffer, 0, bytes, totalRead - readSize, readSize);
-            }
+    private void loadFromStream(InputStream in) throws IOException {
+        JarInputStream jarIn = new JarInputStream(in);
+        JarEntry catEntry = null;
+        JarInputStreamReader reader = new JarInputStreamReader(JAR_ENTRY_SIZE_GUESS);
+        while ((catEntry = jarIn.getNextJarEntry()) != null) {
+            byte[] value = reader.readEntryFromStream(jarIn);
+            String key = catEntry.getName();
+            put(key, value);
         }
-
-        // Trim bytes to proper size
-        byte retval[] = new byte[totalRead];
-        System.arraycopy(bytes, 0, retval, 0, totalRead);
-        return retval;
     }
 
     ///////////////////////////////////////////////////////
