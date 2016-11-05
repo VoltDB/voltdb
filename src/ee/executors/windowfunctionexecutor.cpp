@@ -27,21 +27,20 @@ namespace voltdb {
 WindowFunctionExecutor::~WindowFunctionExecutor() {
 }
 
+/**
+ * When this function is called, the AbstractExecutor's init function
+ * will have set the input tables in the plan node, but nothing else.
+ */
 bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits *limits) {
 #if 0
-    WindowFunctionPlanNode* node = dynamic_cast<WindowFunctionPlanNode*>(m_abstractNode);
+    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
-    assert(node == init_node);
 
-    std::string spacer("");
-    VOLT_DEBUG("WINDOW FUNCTION_EXECUTOR P_INIT:\n");
-    for (int i = 0; i < m_aggregateInputExpressions.size(); i++) {
-
-    }
-    for (int i = 0; i < 0; i++) {
+    m_inputExpressions = node->getAggregateInputExpressions();
+    for (int i = 0; i < m_inputExpressions.size(); i++) {
         VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
                    i,
-                   m_aggregateInputExpressions[i] ? m_aggregateInputExpressions[i]->debug().c_str() : "null\n");
+                   m_inputExpressions[i] ? m_inputExpressions[i]->debug().c_str() : "null");
     }
 
     /*
@@ -100,6 +99,24 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
 
 bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
 #if 0
+    // Input table
+    Table* input_table = m_abstractNode->getInputTable();
+    assert(input_table);
+    VOLT_TRACE("input table\n%s", input_table->debug().c_str());
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableTuple nextTuple(input_table->schema());
+
+    ProgressMonitorProxy pmp(m_engine, this);
+    AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
+
+    while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
+        m_pmp->countdownProgress();
+        AggregateSerialExecutor::p_execute_tuple(nextTuple);
+    }
+    AggregateSerialExecutor::p_execute_finish();
+    VOLT_TRACE("finalizing..");
+
+    cleanupInputTempTable(input_table);
     return true;
 #else
     return false;

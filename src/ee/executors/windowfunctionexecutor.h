@@ -23,17 +23,28 @@
 namespace voltdb {
 
 /**
+ * A WindowAgg is used to calculate one kind of
+ * windowed aggregate.  The algorithm
+ */
+struct WindowedAgg {
+    /**
+     * Initialize the window state for a given aggregate function.
+     */
+    virtual void initWindowState(Table *inputTable);
+    /**
+     * Given a new current row, update the window.
+     */
+    virtual void updateWindowState(TableIterator &currentRow);
+    /**
+     * Calculate the value of the aggregate for the given row.
+     */
+    virtual void calculateRowValue(TableIterator &currentRow);
+};
+
+/**
  * This is the executor for a WindowFunctionPlanNode.
  */
 class WindowFunctionExecutor: public AbstractExecutor {
-    /**
-     * Remember which columns are pass through columns.
-     */
-    std::vector<int> m_passThroughColumns;
-    /**
-     * Remember which columns are aggregate output columns.
-     */
-    std::vector<int> m_aggregateOutputColumns;
     Pool m_memoryPool;
     /**
      * The operation type of the aggregates.
@@ -60,7 +71,16 @@ class WindowFunctionExecutor: public AbstractExecutor {
      * All output column expressions.
      */
     const std::vector<AbstractExpression*> m_outputColumnExpressions;
-
+    /**
+     * We maintain a sequence of WindowAggs, one for each windowed aggregate.
+     * A WindowAgg contains the window and aggregate state.  The window state
+     * is an iterator for the start and end of a window.  This is an iterator
+     * into the input table.  There is an iterator for the row we are traversing,
+     * but this is not part of the WindowAgg state.  It's shared.
+     *
+     * Since we only support one windowed aggregate, this is a sequence of one.
+     */
+    std::vector<WindowAgg *>m_aggregateState;
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
@@ -71,13 +91,6 @@ public:
         m_aggregateInputExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()) {
     }
     virtual ~WindowFunctionExecutor();
-
-    /**
-     * Returns the integer output column index for each aggregate function.
-     */
-    const std::vector<int>& getAggregateOutputColumns() const {
-        return m_aggregateOutputColumns;
-    }
 
     /**
      * Returns the input expressions for each aggregate in the
@@ -110,7 +123,7 @@ public:
      * value's type. So, they are things like "MIN", "MAX",
      * "RANK" and so forth.  They are not "TINYINT" or "FLOAT".
      */
-    const std::vector<ExpressionType>& getAggTypes() const {
+    const std::vector<ExpressionType>& getAggregateTypes() const {
         return m_aggTypes;
     }
 
