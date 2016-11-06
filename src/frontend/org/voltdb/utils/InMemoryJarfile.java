@@ -97,20 +97,19 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     // is not known.  Can be reused multiple times to avoid excessive memory allocations.
     private static class JarInputStreamReader {
 
-        private byte[] m_array0;
-        private byte[] m_array1 = null;
+        private byte[] m_array;
 
         JarInputStreamReader(int initSize) {
-            m_array0 = new byte[initSize];
+            m_array = new byte[initSize];
         }
 
         byte[] readEntryFromStream(JarInputStream jarIn) throws IOException {
             int totalRead = 0;
 
             while (jarIn.available() == 1) {
-                int bytesToRead = m_array0.length - totalRead;
+                int bytesToRead = m_array.length - totalRead;
                 assert (bytesToRead > 0);
-                int readSize = jarIn.read(m_array0, totalRead, bytesToRead);
+                int readSize = jarIn.read(m_array, totalRead, bytesToRead);
                 if (readSize < 0) {
                     // we're done
                     break;
@@ -120,20 +119,16 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
                 // If we have filled up our buffer and there is still more to
                 // read...
                 if (readSize == bytesToRead && (jarIn.available() == 1)) {
-                    if (m_array1 == null || m_array1.length < 2 * m_array0.length) {
-                        m_array1 = new byte[2 * m_array0.length];
-                    }
-
-                    System.arraycopy(m_array0, 0, m_array1, 0, totalRead);
-
-                    byte[] tmp = m_array0;
-                    m_array0 = m_array1;
-                    m_array1 = tmp;
+                        // Make a new array double the size, and copy what we've read so far
+                        // in there.
+                        byte[] tmpArray = new byte[2 * m_array.length];
+                        System.arraycopy(m_array, 0, tmpArray, 0, totalRead);
+                        m_array = tmpArray;
                 }
             }
 
             byte trimmedBytes[] = new byte[totalRead];
-            System.arraycopy(m_array0, 0, trimmedBytes, 0, totalRead);
+            System.arraycopy(m_array, 0, trimmedBytes, 0, totalRead);
             return trimmedBytes;
         }
     }
