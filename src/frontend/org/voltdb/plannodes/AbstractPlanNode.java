@@ -915,8 +915,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
-        stringer.key(Members.ID.name()).value(m_id);
-        stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
+        stringer.keySymbolValuePair(Members.ID.name(), m_id);
+        stringer.keySymbolValuePair(Members.PLAN_NODE_TYPE.name(), getPlanNodeType().toString());
 
         if (m_inlineNodes.size() > 0) {
             PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];

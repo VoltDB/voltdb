@@ -594,8 +594,8 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.key("role").value(m_config.m_replicationRole.ordinal());
-                js.key("active").value(m_rvdb.getReplicationActive());
+                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
+                js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();

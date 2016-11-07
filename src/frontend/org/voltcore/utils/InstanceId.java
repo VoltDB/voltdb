@@ -78,8 +78,8 @@ public class InstanceId
     {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        stringer.key("coord").value(m_coord);
-        stringer.key("timestamp").value(m_timestamp);
+        stringer.keySymbolValuePair("coord", m_coord);
+        stringer.keySymbolValuePair("timestamp", m_timestamp);
         stringer.endObject();
         return new JSONObject(stringer.toString());
     }

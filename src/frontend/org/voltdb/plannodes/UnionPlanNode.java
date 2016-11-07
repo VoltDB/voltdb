@@ -120,7 +120,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.UNION_TYPE.name()).value(m_unionType.name());
+        stringer.keySymbolValuePair(Members.UNION_TYPE.name(), m_unionType.name());
     }
 
     @Override

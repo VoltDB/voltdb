@@ -344,9 +344,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
-        stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
+        stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
+        stringer.keySymbolValuePair(Members.END_TYPE.name(), m_endType.toString());
+        stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
 
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if ( m_endkeyExpressions.isEmpty()) {

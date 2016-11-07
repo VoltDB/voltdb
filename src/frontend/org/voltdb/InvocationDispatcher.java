@@ -1245,12 +1245,12 @@ public final class InvocationDispatcher {
         try {
             JSONWriter jss = new JSONStringer()
                     .object()
-                    .key(SnapshotUtil.JSON_URIPATH).value("file://" + paths.resolve(paths.getSnapshoth()).getPath())
-                    .key(SnapshotUtil.JSON_NONCE).value(SnapshotUtil.getShutdownSaveNonce(zkTxnId))
-                    .key(SnapshotUtil.JSON_TERMINUS).value(zkTxnId)
-                    .key(SnapshotUtil.JSON_BLOCK).value(true)
-                    .key(SnapshotUtil.JSON_PATH_TYPE).value(SnapshotPathType.SNAP_AUTO.toString())
-                    .key(SnapshotUtil.JSON_FORMAT).value(SnapshotFormat.NATIVE.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_URIPATH, "file://" + paths.resolve(paths.getSnapshoth()).getPath())
+                    .keySymbolValuePair(SnapshotUtil.JSON_NONCE, SnapshotUtil.getShutdownSaveNonce(zkTxnId))
+                    .keySymbolValuePair(SnapshotUtil.JSON_TERMINUS, zkTxnId)
+                    .keySymbolValuePair(SnapshotUtil.JSON_BLOCK, true)
+                    .keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_FORMAT, SnapshotFormat.NATIVE.toString())
                     .endObject();
             snapshotJson = jss.toString();
         } catch (JSONException e) {

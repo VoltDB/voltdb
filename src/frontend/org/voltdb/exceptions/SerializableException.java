@@ -223,10 +223,8 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
             JSONStringer js = new JSONStringer();
 
             js.object();
-            js.key("type");
-            js.value(getExceptionType().ordinal());
-            js.key("message");
-            js.value(m_message);
+            js.keySymbolValuePair("type", getExceptionType().ordinal());
+            js.keySymbolValuePair("message", m_message);
             js.endObject();
 
             return js.toString();

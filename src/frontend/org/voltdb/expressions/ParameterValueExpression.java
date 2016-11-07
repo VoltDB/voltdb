@@ -94,7 +94,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.PARAM_IDX.name()).value(m_paramIndex);
+        stringer.keySymbolValuePair(Members.PARAM_IDX.name(), m_paramIndex);
     }
 
     @Override
