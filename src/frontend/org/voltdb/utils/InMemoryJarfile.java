@@ -88,41 +88,63 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         loadFromStream(new ByteArrayInputStream(bytes));
     }
 
-    private void loadFromStream(InputStream in) throws IOException {
-        JarInputStream jarIn = new JarInputStream(in);
-        JarEntry catEntry = null;
-        while ((catEntry = jarIn.getNextJarEntry()) != null) {
-            byte[] value = readFromJarEntry(jarIn, catEntry);
-            String key = catEntry.getName();
-            put(key, value);
+    // A class that can be used to read from a JarInputStream where the size of entries
+    // is not known.  Can be reused multiple times to avoid excessive memory allocations.
+    private static class JarInputStreamReader {
+
+        // A best guess at an upper bound for the size of entries in
+        // jar files, since we do not know the uncompressed size of
+        // the entries ahead of time.  This number is used to size the
+        // buffers used to read from jar streams.
+        private static final int JAR_ENTRY_SIZE_GUESS = 1024 * 1024; // 1MB
+
+        private byte[] m_array;
+
+        JarInputStreamReader() {
+            m_array = new byte[JAR_ENTRY_SIZE_GUESS];
+        }
+
+        byte[] readEntryFromStream(JarInputStream jarIn) throws IOException {
+            int totalRead = 0;
+
+            while (jarIn.available() == 1) {
+                int bytesToRead = m_array.length - totalRead;
+                assert (bytesToRead > 0);
+                int readSize = jarIn.read(m_array, totalRead, bytesToRead);
+                if (readSize > 0) {
+                    totalRead += readSize;
+                    // If we have filled up our buffer and there is
+                    // still more to read...
+                    if (readSize == bytesToRead && (jarIn.available() == 1)) {
+                        // Make a new array double the size, and copy what we've read so far
+                        // in there.
+                        byte[] tmpArray = new byte[2 * m_array.length];
+                        System.arraycopy(m_array, 0, tmpArray, 0, totalRead);
+                        m_array = tmpArray;
+                    }
+                }
+            }
+
+            byte trimmedBytes[] = new byte[totalRead];
+            System.arraycopy(m_array, 0, trimmedBytes, 0, totalRead);
+            return trimmedBytes;
         }
     }
 
-    public static byte[] readFromJarEntry(JarInputStream jarIn, JarEntry entry) throws IOException {
-        int totalRead = 0;
-        int maxToRead = 4096 << 10;
-        byte[] buffer = new byte[maxToRead];
-        byte[] bytes = new byte[maxToRead * 2];
+    public static byte[] readFromJarEntry(JarInputStream jarIn) throws IOException {
+        JarInputStreamReader reader = new JarInputStreamReader();
+        return reader.readEntryFromStream(jarIn);
+    }
 
-        // Keep reading until we run out of bytes for this entry
-        // We will resize our return value byte array if we run out of space
-        while (jarIn.available() == 1) {
-            int readSize = jarIn.read(buffer, 0, buffer.length);
-            if (readSize > 0) {
-                totalRead += readSize;
-                if (totalRead > bytes.length) {
-                    byte[] temp = new byte[bytes.length * 2];
-                    System.arraycopy(bytes, 0, temp, 0, bytes.length);
-                    bytes = temp;
-                }
-                System.arraycopy(buffer, 0, bytes, totalRead - readSize, readSize);
-            }
+    private void loadFromStream(InputStream in) throws IOException {
+        JarInputStream jarIn = new JarInputStream(in);
+        JarEntry catEntry = null;
+        JarInputStreamReader reader = new JarInputStreamReader();
+        while ((catEntry = jarIn.getNextJarEntry()) != null) {
+            byte[] value = reader.readEntryFromStream(jarIn);
+            String key = catEntry.getName();
+            put(key, value);
         }
-
-        // Trim bytes to proper size
-        byte retval[] = new byte[totalRead];
-        System.arraycopy(bytes, 0, retval, 0, totalRead);
-        return retval;
     }
 
     ///////////////////////////////////////////////////////
