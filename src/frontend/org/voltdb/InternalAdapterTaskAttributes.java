@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import org.voltdb.importer.AbstractImporter;
-
 final class InternalAdapterTaskAttributes implements InvocationClientHandler, InternalConnectionContext {
 
     final boolean m_isAdmin;
