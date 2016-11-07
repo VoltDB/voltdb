@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="adhocsmash"
+APPNAME="aggregates"
 
 # find voltdb binaries (customized from examples to be one level deeper)
 if [ -e ../../../bin/voltdb ]; then
@@ -63,22 +63,13 @@ function init() {
 
 # run the client that drives the example
 function client() {
-    adhoc-smash
-}
-
-function adhoc-smash() {
     jars-ifneeded
     java -classpath $APPNAME-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        ${APPNAME}.AdhocSmash \
-        --displayinterval=5 \
-        --duration=120000 \
-        --servers=10.10.180.144 \
-        --port=21212 \
-        --ratelimit=4000
+        ${APPNAME}.Loader $SERVERS user pass 75
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|init|adhoc-smash}"
+    echo "Usage: ./run.sh {clean|jars|server|init|client}"
 }
 
 # Run the targets pass on the command line

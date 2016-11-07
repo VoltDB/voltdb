@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-APPNAME="adhocsmash"
-
-# find voltdb binaries (customized from examples to be one level deeper)
-if [ -e ../../../bin/voltdb ]; then
+# find voltdb binaries
+if [ -e ../../bin/voltdb ]; then
     # assume this is the examples folder for a kit
-    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
 elif [ -n "$(which voltdb 2> /dev/null)" ]; then
     # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -22,29 +20,33 @@ source $VOLTDB_BIN/voltenv
 # leader host for startup purposes only
 # (once running, all nodes are the same -- no leaders)
 STARTUPLEADERHOST="localhost"
-# list of cluster nodes separated by commas in host:[port] format
+# list of cluster nodes separated by commas in host[:port] format
 SERVERS="localhost"
 
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-
-# remove build artifacts
+# remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf $APPNAME-client.jar voltdbroot log src/$APPNAME/*.class
+    rm -rf voltdbroot log *.class
+}
+
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    clean
+    rm -rf insertmark-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $CLIENTCLASSPATH src/$APPNAME/*.java
+    javac -classpath $CLIENTCLASSPATH InsertMark.java
     # build procedure and client jars
-    jar cf $APPNAME-client.jar -C src $APPNAME
+    jar cf insertmark-client.jar *.class
     # remove compiled .class files
-    rm -rf src/$APPNAME/*.class
+    rm -rf *.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e $APPNAME-client.jar ]; then
+    if [ ! -e insertmark-client.jar ]; then
         jars;
     fi
 }
@@ -52,7 +54,8 @@ function jars-ifneeded() {
 # run the voltdb server locally
 function server() {
     # note: "create --force" will delete any existing data
-    voltdb create --force -H $STARTUPLEADERHOST
+    # use "recover" to start from an existing voltdbroot folder with data
+    voltdb create -d deployment.xml --force -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures
@@ -61,24 +64,22 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-# run the client that drives the example
-function client() {
-    adhoc-smash
+# Use this target for argument help
+function client-help() {
+    jars-ifneeded
+    java -classpath insertmark-client.jar:$CLIENTCLASSPATH InsertMark --help
 }
 
-function adhoc-smash() {
+# run the client that drives the example with some editable options
+function client() {
     jars-ifneeded
-    java -classpath $APPNAME-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        ${APPNAME}.AdhocSmash \
-        --displayinterval=5 \
-        --duration=120000 \
-        --servers=10.10.180.144 \
-        --port=21212 \
-        --ratelimit=4000
+    java -classpath insertmark-client.jar:$CLIENTCLASSPATH InsertMark \
+        --duration=60 \
+        --servers=$SERVERS
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|init|adhoc-smash}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
 }
 
 # Run the targets pass on the command line
