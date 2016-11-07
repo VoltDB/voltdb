@@ -69,6 +69,46 @@ message Response {
     optional int32 protocolVersion = 15;
 }
 
+// More structured Response object for use with VoltDB 7.0 and higher.
+message CtrlProtoResponse {
+    required UUID id = 1;
+    optional CtrlEnvelope.Type type = 2;
+    // status. 0 means ok
+    optional int32 status = 3 [default = 0];
+    optional string failureCause = 4;
+    optional ConnectResponse connectResponse = 5;
+    optional QueryResponse queryResponse = 6;
+    optional AckResponse ackResponse = 7;
+}
+
+message AckResponse {
+    optional bool isEndOfStream = 1;
+}
+
+message ConnectResponse {
+    optional fixed64 catalogCRC = 1;
+    optional string catalogSignature = 2;
+    optional int32 protocolVersion = 3;
+    repeated ClusterInfo clusterInfo = 4;
+}
+
+message ClusterInfo {
+    required int32 clusterId = 1;
+    required fixed64 clusterPersistedId = 2;
+}
+
+message QueryResponse {
+    optional fixed64 instanceIdHash = 1;
+    optional string version = 2;
+    optional int32 protocolVersion = 3;
+    // all known nodes globally
+    //  first entry is self
+    repeated NodeInfo nodeInfo = 6;
+    optional int32 globalPartitionCount = 7;
+    // local partitions
+    repeated PartitionInfo partitionInfo = 8;
+}
+
 message NodeInfo {
     optional string hostname = 1;
     optional int32 drport = 2;
