@@ -88,19 +88,20 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         loadFromStream(new ByteArrayInputStream(bytes));
     }
 
-    // A best guess at an upper bound for the size of entries in jar files, since
-    // we do not know the uncompressed size of the entries ahead of time.
-    // This number is used to size the buffers used to read from jar streams.
-    private static final int JAR_ENTRY_SIZE_GUESS = 1024 * 1024; // 1MB
-
     // A class that can be used to read from a JarInputStream where the size of entries
     // is not known.  Can be reused multiple times to avoid excessive memory allocations.
     private static class JarInputStreamReader {
 
+        // A best guess at an upper bound for the size of entries in
+        // jar files, since we do not know the uncompressed size of
+        // the entries ahead of time.  This number is used to size the
+        // buffers used to read from jar streams.
+        private static final int JAR_ENTRY_SIZE_GUESS = 1024 * 1024; // 1MB
+
         private byte[] m_array;
 
-        JarInputStreamReader(int initSize) {
-            m_array = new byte[initSize];
+        JarInputStreamReader() {
+            m_array = new byte[JAR_ENTRY_SIZE_GUESS];
         }
 
         byte[] readEntryFromStream(JarInputStream jarIn) throws IOException {
@@ -110,20 +111,17 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
                 int bytesToRead = m_array.length - totalRead;
                 assert (bytesToRead > 0);
                 int readSize = jarIn.read(m_array, totalRead, bytesToRead);
-                if (readSize < 0) {
-                    // we're done
-                    break;
-                }
-
-                totalRead += readSize;
-                // If we have filled up our buffer and there is still more to
-                // read...
-                if (readSize == bytesToRead && (jarIn.available() == 1)) {
+                if (readSize > 0) {
+                    totalRead += readSize;
+                    // If we have filled up our buffer and there is
+                    // still more to read...
+                    if (readSize == bytesToRead && (jarIn.available() == 1)) {
                         // Make a new array double the size, and copy what we've read so far
                         // in there.
                         byte[] tmpArray = new byte[2 * m_array.length];
                         System.arraycopy(m_array, 0, tmpArray, 0, totalRead);
                         m_array = tmpArray;
+                    }
                 }
             }
 
@@ -134,14 +132,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     }
 
     public static byte[] readFromJarEntry(JarInputStream jarIn) throws IOException {
-        JarInputStreamReader reader = new JarInputStreamReader(JAR_ENTRY_SIZE_GUESS);
+        JarInputStreamReader reader = new JarInputStreamReader();
         return reader.readEntryFromStream(jarIn);
     }
 
     private void loadFromStream(InputStream in) throws IOException {
         JarInputStream jarIn = new JarInputStream(in);
         JarEntry catEntry = null;
-        JarInputStreamReader reader = new JarInputStreamReader(JAR_ENTRY_SIZE_GUESS);
+        JarInputStreamReader reader = new JarInputStreamReader();
         while ((catEntry = jarIn.getNextJarEntry()) != null) {
             byte[] value = reader.readEntryFromStream(jarIn);
             String key = catEntry.getName();
