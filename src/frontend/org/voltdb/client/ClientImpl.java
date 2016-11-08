@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,7 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -76,7 +73,7 @@ public final class ClientImpl implements Client {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
-    final CSL m_listener = new CSL();
+    final InternalClientStatusListener m_listener = new InternalClientStatusListener();
     ClientStatusListenerExt m_clientStatusListener = null;
     /*
      * Username and password as set by the constructor.
@@ -85,8 +82,7 @@ public final class ClientImpl implements Client {
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
 
-    private final ScheduledExecutorService m_ex = Executors.newSingleThreadScheduledExecutor(
-                    CoreUtils.getThreadFactory("Connection Sync Thread"));
+
     /**
      * These threads belong to the network thread pool
      * that invokes callbacks. These threads are "blessed"
@@ -135,7 +131,7 @@ public final class ClientImpl implements Client {
             username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
-        m_distributer.setTopologyChangeAware((config.m_topologyChangeAware));
+        m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -617,8 +613,6 @@ public final class ClientImpl implements Client {
         }
 
         m_distributer.shutdown();
-        m_ex.shutdown();
-        m_ex.awaitTermination(365, TimeUnit.DAYS);
         ClientFactory.decreaseClientNum();
     }
 
@@ -697,7 +691,7 @@ public final class ClientImpl implements Client {
         }
     }
 
-    class CSL extends ClientStatusListenerExt {
+    class InternalClientStatusListener extends ClientStatusListenerExt {
 
         boolean m_useAdminPort = false;
         boolean m_adminPortChecked = false;
@@ -732,22 +726,22 @@ public final class ClientImpl implements Client {
          * @return a list of hosts which client does not have a connection to
          */
         Map<Integer, HostConfig> buildUnconnectedHostConfigMap(VoltTable vt) {
-            Map<Integer, HostConfig> info = new HashMap<Integer, HostConfig>();
-            Map<Integer, HostConfig> connected = new HashMap<Integer, HostConfig>();
+            Map<Integer, HostConfig> unconnectedMap = new HashMap<Integer, HostConfig>();
+            Map<Integer, HostConfig> connectedMap = new HashMap<Integer, HostConfig>();
             while (vt.advanceRow()) {
                 Integer hid = (int)vt.getLong("HOST_ID");
                 HostConfig config = null;
                 if (!m_distributer.isHostConnected(hid)) {
-                    config = info.get(hid);
+                    config = unconnectedMap.get(hid);
                     if (config == null) {
                         config = new HostConfig();
-                        info.put(hid, config);
+                        unconnectedMap.put(hid, config);
                     }
                 } else if (!m_adminPortChecked) {
-                    config = connected.get(hid);
+                    config = connectedMap.get(hid);
                     if (config == null) {
                         config = new HostConfig();
-                        connected.put(hid, config);
+                        connectedMap.put(hid, config);
                     }
                 }
                 if (config != null) {
@@ -759,15 +753,16 @@ public final class ClientImpl implements Client {
             if (!m_adminPortChecked) {
                 Map<String, Integer> connectedIpPortPairs = m_distributer.getConnectedHostIPAndPort();
                 int admintPortCount = 0;
-                for (HostConfig config : connected.values()){
-                    if (config.m_adminPort == connectedIpPortPairs.get(config.m_ipAddress)) {
+                for (HostConfig config : connectedMap.values()){
+                    Integer connectedPort = connectedIpPortPairs.get(config.m_ipAddress);
+                    if (connectedPort != null && config.m_adminPort == connectedPort) {
                         admintPortCount++;
                     }
                 }
-                m_useAdminPort = (admintPortCount == connected.values().size());
+                m_useAdminPort = (admintPortCount == connectedMap.values().size());
             }
             m_adminPortChecked = true;
-            return info;
+            return unconnectedMap;
         }
 
         /**
@@ -789,7 +784,7 @@ public final class ClientImpl implements Client {
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            m_ex.execute(new Runnable() {
+            m_distributer.getExecutorService().execute(new Runnable() {
                 @Override
                 public void run() {
                     try{

@@ -1224,7 +1224,7 @@ class Distributer {
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
         boolean handledByClient = false;
         for (ClientStatusListenerExt csl : m_listeners) {
-            if (csl instanceof ClientImpl.CSL) {
+            if (csl instanceof ClientImpl.InternalClientStatusListener) {
                 continue;
             }
             try {
@@ -1336,11 +1336,11 @@ class Distributer {
     }
 
     public Map<String, Integer> getConnectedHostIPAndPort() {
-        Map<String, Integer> map = Maps.newHashMap();
+        Map<String, Integer> connectedHostIPAndPortMap = Maps.newHashMap();
         for (NodeConnection conn : m_connections) {
-            map.put(conn.getSocketAddress().getAddress().getHostAddress(), (conn.getSocketAddress().getPort()));
+            connectedHostIPAndPortMap.put(conn.getSocketAddress().getAddress().getHostAddress(), (conn.getSocketAddress().getPort()));
         }
-        return Collections.unmodifiableMap(map);
+        return Collections.unmodifiableMap(connectedHostIPAndPortMap);
     }
 
     private void updateAffinityTopology(VoltTable tables[]) {
@@ -1543,10 +1543,9 @@ class Distributer {
             for (Integer host : unconnected) {
                 if (!isHostConnected(host)) {
                     for (ClientStatusListenerExt csl : m_listeners) {
-                        if (csl instanceof ClientImpl.CSL) {
-                            ((ClientImpl.CSL)csl).createConnectionsUponTopologyChange();
-                            m_createConnectionUponTopoChangeInProgress.set(false);
-                            return;
+                        if (csl instanceof ClientImpl.InternalClientStatusListener) {
+                            ((ClientImpl.InternalClientStatusListener)csl).createConnectionsUponTopologyChange();
+                            break;
                         }
                     }
                 }
@@ -1562,5 +1561,9 @@ class Distributer {
     void updateClientAffinityPartitionsUponTopoChange() throws NoConnectionsException {
         ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
         queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+    }
+
+    ScheduledExecutorService getExecutorService() {
+        return m_ex;
     }
 }
