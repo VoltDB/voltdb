@@ -528,7 +528,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             socket.configureBlocking(true);
             socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
             MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);
-            final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
 
             /*
              * Schedule a timeout to close the socket in case there is no response for the timeout
@@ -554,76 +553,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
+            ByteBuffer message = null;
             try {
-                while (lengthBuffer.hasRemaining()) {
-                    int read = socket.read(lengthBuffer);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
-                }
+                message = messagingChannel.readMessage();
             } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the value. Client isn't going to get anymore time.
-            if (lengthBuffer.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                              "): wire protocol violation (timeout reading message length).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                messagingChannel.writeMessage(responseBuffer);
-                socket.close();
-                return null;
-            }
-            lengthBuffer.flip();
-
-            final int messageLength = lengthBuffer.getInt();
-            if (messageLength < 0) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is negative).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                messagingChannel.writeMessage(responseBuffer);
-                socket.close();
-                return null;
-            }
-            if (messageLength > ((1024 * 1024) * 2)) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is too large).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                messagingChannel.writeMessage(responseBuffer);
-                socket.close();
-                return null;
-            }
-
-            ByteBuffer message = ByteBuffer.allocate(messageLength);
-
-            try {
-                while (message.hasRemaining()) {
-                    int read = socket.read(message);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
-                }
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the whole message. Client isn't going to get anymore time.
-            if (message.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading authentication strings).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                messagingChannel.writeMessage(responseBuffer);
-                socket.close();
-                return null;
-            }
 
             /*
              * Since we got the login message, cancel the timeout.
@@ -633,8 +566,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            message.flip();
-            message = messagingChannel.decryptMessage(message);
             int aversion = message.get(); //Get version
             ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
@@ -740,7 +671,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin, sslEngine);
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -773,15 +704,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * can be invalidated on catalog updates
          */
         private final String m_username;
-        private final SSLEngine m_sslEngine;
 
         public ClientInputHandler(String username,
-                                  boolean isAdmin,
-                                  SSLEngine sslEngine)
+                                  boolean isAdmin)
         {
             m_username = username.intern();
             m_isAdmin = isAdmin;
-            m_sslEngine = sslEngine;
         }
 
         @Override

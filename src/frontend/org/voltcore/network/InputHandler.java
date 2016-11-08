@@ -39,6 +39,16 @@ public interface InputHandler {
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
+     * Retrieve a buffer of bytes from the connection. Examine the connection's
+     * read stream. If any bytes are available to read, copy those bytes
+     * (via NIOReadStream.getBytes()) to a new byte buffer and return them.
+     *
+     * @param inputStream
+     * @return ByteBuffer containing the message data
+     */
+    ByteBuffer retrieveNextBuffer(NIOReadStream inputStream);
+
+    /**
      * Handle the incoming message produced by retrieve next message
      *
      * @param message

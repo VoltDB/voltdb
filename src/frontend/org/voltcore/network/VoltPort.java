@@ -178,23 +178,26 @@ public class VoltPort implements Connection
                 final int maxRead = m_handler.getMaxRead();
                 if (maxRead > 0) {
                     fillReadStream( maxRead);
-                    ByteBuffer message;
 
                     /*
                      * Process all the buffered bytes and retrieve as many messages as possible
                      * and pass them off to the input handler.
                      */
                     try {
-                        while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            if (m_sslEngine != null) {
-                                List<ByteBuffer> messages = m_sslBufferDecrypter.decryptBuffer(message);
-                                for (ByteBuffer mess : messages) {
-                                    m_handler.handleMessage(mess, this);
+                        if (m_sslEngine == null) {
+                            ByteBuffer message;
+                            while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
+                                m_handler.handleMessage( message, this);
+                                m_messagesRead++;
+                            }
+                        } else {
+                            ByteBuffer buffer;
+                            while ((buffer = m_handler.retrieveNextBuffer( readStream() )) != null) {
+                                List<ByteBuffer> messages = m_sslBufferDecrypter.decryptBuffer(buffer);
+                                for (ByteBuffer message : messages) {
+                                    m_handler.handleMessage(message, this);
                                     m_messagesRead++;
                                 }
-                            } else {
-                                m_handler.handleMessage(message, this);
-                                m_messagesRead++;
                             }
                         }
                     }

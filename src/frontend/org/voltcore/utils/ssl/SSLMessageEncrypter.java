@@ -37,11 +37,7 @@ public class SSLMessageEncrypter {
 
     public ByteBuffer encryptMessage(ByteBuffer message) throws IOException {
         wrap(message);
-        ByteBuffer encMessage = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
-        encMessage.putInt(m_encBuffer.remaining());
-        encMessage.put(m_encBuffer);
-        encMessage.flip();
-       return encMessage;
+        return m_encBuffer;
     }
 
     private void wrap(ByteBuffer chunk) throws IOException {

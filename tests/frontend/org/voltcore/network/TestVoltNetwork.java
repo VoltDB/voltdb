@@ -73,6 +73,12 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
+        public ByteBuffer retrieveNextBuffer(NIOReadStream c) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        @Override
         public void started(Connection c) {
             // TODO Auto-generated method stub
 

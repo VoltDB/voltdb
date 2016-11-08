@@ -22,6 +22,8 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.voltdb.common.Constants.SSL_CHUNK_SIZE;
 
@@ -31,35 +33,39 @@ import static org.voltdb.common.Constants.SSL_CHUNK_SIZE;
 public class SSLMessageDecrypter {
 
     private final SSLEngine m_sslEngine;
-    private ByteBuffer m_decBuffer;
 
     public SSLMessageDecrypter(SSLEngine m_sslEngine) {
         this.m_sslEngine = m_sslEngine;
-        this.m_decBuffer = ByteBuffer.allocate(SSL_CHUNK_SIZE + 128);
     }
 
-    public ByteBuffer decryptMessage(ByteBuffer message) throws IOException {
-        m_decBuffer.clear();
-        unwrapMessage(message);
-        int messageLength = m_decBuffer.getInt();
-        if (messageLength != m_decBuffer.remaining()) {
-            throw new IOException("malformed ssl message, failed to decrypt");
+    public ByteBuffer[] decryptMessage(ByteBuffer buffer) throws IOException {
+        List<ByteBuffer> messages = new ArrayList<>();
+        ByteBuffer dst = ByteBuffer.allocate(buffer.remaining());
+        unwrapMessage(buffer, dst);
+
+        dst.flip();
+        while (dst.hasRemaining()) {
+            int length = dst.getInt();
+            if (length > dst.remaining()) {
+                throw new IOException("no partial messages yet");
+            }
+            int oldLimit = dst.limit();
+            dst.limit(dst.position() + length);
+            messages.add(buffer.slice());
+            dst.position(dst.limit());
+            dst.limit(oldLimit);
         }
-        ByteBuffer clearMessage = ByteBuffer.allocate(messageLength);
-        clearMessage.put(m_decBuffer);
-        clearMessage.flip();
-        return clearMessage;
+        return messages.toArray(new ByteBuffer[messages.size()]);
     }
 
-    private void unwrapMessage(ByteBuffer message) throws IOException {
+    private void unwrapMessage(ByteBuffer message, ByteBuffer dst) throws IOException {
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(message, m_decBuffer);
+            SSLEngineResult result = m_sslEngine.unwrap(message, dst);
             switch (result.getStatus()) {
                 case OK:
-                    m_decBuffer.flip();
                     return;
                 case BUFFER_OVERFLOW:
-                    m_decBuffer = ByteBuffer.allocate(m_decBuffer.capacity() << 1);
+                    dst = ByteBuffer.allocate(dst.capacity() * 2);
                     break;  // try again
                 case BUFFER_UNDERFLOW:
                     throw new SSLException("SSL engine should never underflow on ssl unwrapMessage of buffer.");

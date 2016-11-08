@@ -35,49 +35,18 @@ public class SSLBufferEncrypter {
         this.m_sslEngine = sslEngine;
         int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
         // wrap will overflow until the encryption buffer is this size.
-        this.m_encBuffer = ByteBuffer.allocate(packetBufferSize);
+        this.m_encBuffer = ByteBuffer.allocateDirect(packetBufferSize);
     }
 
 
-    public List<ByteBuffer> encryptBuffer(ByteBuffer src) throws IOException {
-
-        List<ByteBuffer> encryptedBuffers = new ArrayList<>();
-        while (src.remaining() > 0) {
-            if (src.remaining() < Constants.SSL_CHUNK_SIZE) {
-                ByteBuffer chunk = src.slice();
-                wrap(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
-                encyptedChunk.putInt(m_encBuffer.remaining());
-                encyptedChunk.put(m_encBuffer);
-                encyptedChunk.flip();
-                encryptedBuffers.add(encyptedChunk);
-                src.position(src.limit());
-            } else {
-                int oldLimit = src.limit();
-                int nextPosition = src.position() + Constants.SSL_CHUNK_SIZE;
-                src.limit(nextPosition);
-                ByteBuffer chunk = src.slice();
-                wrap(chunk);
-                ByteBuffer encyptedChunk = ByteBuffer.allocate(m_encBuffer.remaining() + 4);
-                encyptedChunk.putInt(m_encBuffer.remaining());
-                encyptedChunk.put(m_encBuffer);
-                encyptedChunk.flip();
-                encryptedBuffers.add(encyptedChunk);
-                src.position(nextPosition);
-                src.limit(oldLimit);
-            }
-        }
-        return encryptedBuffers;
-    }
-
-    private void wrap(ByteBuffer src) throws IOException {
+    public ByteBuffer encryptBuffer(ByteBuffer src) throws IOException {
         m_encBuffer.clear();
         while (true) {
             SSLEngineResult result = m_sslEngine.wrap(src, m_encBuffer);
             switch (result.getStatus()) {
                 case OK:
                     m_encBuffer.flip();
-                    return;
+                    return m_encBuffer;
                 case BUFFER_OVERFLOW:
                     m_encBuffer = ByteBuffer.allocate(m_encBuffer.capacity() << 1);
                     break;

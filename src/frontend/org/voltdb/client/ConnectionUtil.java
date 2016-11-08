@@ -234,9 +234,17 @@ public class ConnectionUtil {
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);
             b.flip();
+
+
+            // TODO: do the retry here... ( 1 to 4 )
+
+
             try {
                 messagingChannel.writeMessage(b);
             } catch (IOException e) {
+                throw new IOException("Failed to write authentication message to server.");
+            }
+            if (b.hasRemaining()) {
                 throw new IOException("Failed to write authentication message to server.");
             }
 
