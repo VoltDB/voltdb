@@ -183,6 +183,9 @@ public class ReportMaker {
                 }
                 sb.append("    </thead>\n    </table>\n");
             }
+            else {
+                sb.append("<p>No view tasks to show.</p>\n");
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
