@@ -185,16 +185,16 @@ public class Collector {
                 JSONStringer stringer = new JSONStringer();
 
                 stringer.object();
-                stringer.key("server").value(m_config.prefix);
+                stringer.keySymbolValuePair("server", m_config.prefix);
                 stringer.key("files").array();
                 for (String path: collectionFilesList) {
                     stringer.object();
-                    stringer.key("filename").value(path);
+                    stringer.keySymbolValuePair("filename", path);
                     if (Arrays.asList(cmdFilenames).contains(path.split(" ")[0])) {
-                        stringer.key("size").value(0);
+                        stringer.keySymbolValuePair("size", 0);
                     }
                     else {
-                        stringer.key("size").value(new File(path).length());
+                        stringer.keySymbolValuePair("size", new File(path).length());
                     }
                     stringer.endObject();
                 }

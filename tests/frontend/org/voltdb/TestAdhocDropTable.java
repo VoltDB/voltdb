@@ -23,6 +23,12 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -31,6 +37,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocDropTable extends AdhocDDLTestBase {
 
+    @Test
     public void testDropTableBasic() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -150,6 +157,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testDropTableWithIndexesAndProcedures() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

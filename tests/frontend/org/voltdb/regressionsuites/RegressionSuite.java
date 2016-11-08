@@ -32,6 +32,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -87,6 +88,8 @@ public class RegressionSuite extends TestCase {
     public RegressionSuite(final String name) {
         super(name);
         m_methodName = name;
+
+        VoltServerConfig.setInstanceSet(new HashSet<>());
     }
 
     /**
@@ -95,6 +98,7 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void setUp() throws Exception {
+
         //New tests means a new server thread that hasn't done a restore
         m_config.setCallingMethodName(m_methodName);
         m_config.startUp(true);

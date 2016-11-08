@@ -31,8 +31,8 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class SchemaColumn {
     private static class Members {
-        public static final String COLUMN_NAME = "COLUMN_NAME";
-        public static final String EXPRESSION = "EXPRESSION";
+        static final String COLUMN_NAME = "COLUMN_NAME";
+        static final String EXPRESSION = "EXPRESSION";
     }
 
     private String m_tableName;
@@ -268,17 +268,15 @@ public class SchemaColumn {
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
         if (finalOutput) {
-            if (getColumnAlias() != null && !getColumnAlias().equals("")) {
-                stringer.key(Members.COLUMN_NAME).value(getColumnAlias());
+            String columnName = getColumnAlias();
+            if (columnName == null || columnName.equals("")) {
+                columnName = getColumnName();
             }
-            else if (getColumnName() != null) {
-                stringer.key(Members.COLUMN_NAME).value(getColumnName());
-            }
+            stringer.keySymbolValuePair(Members.COLUMN_NAME, columnName);
         }
 
         if (m_expression != null) {
-            stringer.key(Members.EXPRESSION);
-            stringer.object();
+            stringer.key(Members.EXPRESSION).object();
             m_expression.toJSONString(stringer);
             stringer.endObject();
         }
@@ -293,7 +291,7 @@ public class SchemaColumn {
         String columnName = null;
         String columnAlias = null;
         AbstractExpression expression = null;
-        if( ! jobj.isNull(Members.COLUMN_NAME)){
+        if ( ! jobj.isNull(Members.COLUMN_NAME)){
             columnName = jobj.getString(Members.COLUMN_NAME);
         }
         expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION);

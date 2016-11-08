@@ -24,7 +24,6 @@ import java.util.List;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -57,7 +56,7 @@ public class SnapshotPredicates {
                 final AbstractExpression predicate = p.getFirst();
                 JSONStringer stringer = new JSONStringer();
                 stringer.object();
-                stringer.key("triggersDelete").value(p.getSecond());
+                stringer.keySymbolValuePair("triggersDelete", p.getSecond());
                 // If the predicate is null, EE will serialize all rows to the corresponding data
                 // target. It's the same as passing an always-true expression,
                 // but without the overhead of the evaluating the expression. This avoids the

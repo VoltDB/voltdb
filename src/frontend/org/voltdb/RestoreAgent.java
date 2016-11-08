@@ -319,18 +319,18 @@ SnapshotCompletionInterest, Promotable
             JSONStringer stringer = new JSONStringer();
             try {
                 stringer.object();
-                stringer.key("txnId").value(txnId);
-                stringer.key("path").value(path);
-                stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType.name());
-                stringer.key("nonce").value(nonce);
-                stringer.key("partitionCount").value(partitionCount);
-                stringer.key("newPartitionCount").value(newPartitionCount);
-                stringer.key("catalogCrc").value(catalogCrc);
-                stringer.key("hostId").value(hostId);
+                stringer.keySymbolValuePair("txnId", txnId);
+                stringer.keySymbolValuePair("path", path);
+                stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType.name());
+                stringer.keySymbolValuePair("nonce", nonce);
+                stringer.keySymbolValuePair("partitionCount", partitionCount);
+                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair("catalogCrc", catalogCrc);
+                stringer.keySymbolValuePair("hostId", hostId);
                 stringer.key("tables").array();
                 for (Entry<String, Set<Integer>> p : partitions.entrySet()) {
                     stringer.object();
-                    stringer.key("name").value(p.getKey());
+                    stringer.keySymbolValuePair("name", p.getKey());
                     stringer.key("partitions").array();
                     for (int pid : p.getValue()) {
                         stringer.value(pid);
@@ -344,7 +344,7 @@ SnapshotCompletionInterest, Promotable
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
-                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("instanceId").value( instanceId.serializeToJSONObject());
                 stringer.key("digestTables").array();
                 for (String digestTable : digestTables) {
                     stringer.value(digestTable);
@@ -1216,10 +1216,10 @@ SnapshotCompletionInterest, Promotable
             stringer.object();
             // optional max value.
             if (max != null) {
-                stringer.key("max").value(max);
+                stringer.keySymbolValuePair("max", max);
             }
             // 1 means recover, 0 means to create new DB
-            stringer.key("action").value(m_action.ordinal());
+            stringer.keySymbolValuePair("action", m_action.ordinal());
             stringer.key("snapInfos").array();
             for (SnapshotInfo snapshot : snapshots) {
                 stringer.value(snapshot.toJSONObject());

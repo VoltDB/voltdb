@@ -33,10 +33,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
-public class TestMixedVersionClusters {
+public class TestMixedVersionClusters extends JUnit4LocalClusterTest {
 
     static final int K = MiscUtils.isPro() ? 1 : 0;
 

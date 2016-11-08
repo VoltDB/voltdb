@@ -23,8 +23,12 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogUpgradeTools;
@@ -36,6 +40,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestLiveDDLAfterAutoUpgrade extends AdhocDDLTestBase {
 
+    @Test
     public void testEng7357() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

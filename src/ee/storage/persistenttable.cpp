@@ -363,21 +363,18 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    if (originalTable->m_viewHandlers.size() == 0) {
-        // Single table view.
-        std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
-        // reset all view table pointers
-        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
-            PersistentTable * targetTable = originalView->targetTable();
-            targetTable->decrementRefcount();
-        }
+    // Single table view.
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
+    // reset all view table pointers
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        targetTable->decrementRefcount();
     }
-    else {
-        // Joined table view.
-        BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
-            PersistentTable *destTable = viewHandler->destTable();
-            destTable->decrementRefcount();
-        }
+
+    // Joined table view.
+    BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
+        PersistentTable *destTable = viewHandler->destTable();
+        destTable->decrementRefcount();
     }
     originalTable->decrementRefcount();
 }
@@ -472,34 +469,31 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->setPreTruncateTable(this);
     }
 
-    if (m_viewHandlers.size() == 0) {
-        // add matView
-        BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
-            PersistentTable * targetTable = originalView->targetTable();
-            TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
-            catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
-            targetTcd->init(*engine->getDatabase(), *catalogViewTable);
-            PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
-            assert(targetEmptyTable);
-            MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
-        }
+    // add matView
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
+        PersistentTable * targetTable = originalView->targetTable();
+        TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+        targetTcd->init(*engine->getDatabase(), *catalogViewTable);
+        PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
+        assert(targetEmptyTable);
+        MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
-    else {
-        BOOST_FOREACH (MaterializedViewHandler *viewHandler, m_viewHandlers) {
-            PersistentTable *destTable = viewHandler->destTable();
-            TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
-            catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
-            destTcd->init(*engine->getDatabase(), *catalogViewTable);
-            PersistentTable *destEmptyTable = destTcd->getPersistentTable();
-            assert(destEmptyTable);
-            auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
-            bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
-            MaterializedViewHandler *newHandler = new MaterializedViewHandler(destEmptyTable,
-                                                                              mvHandlerInfo,
-                                                                              engine);
-            if (populateInitialTuple) {
-                newHandler->catchUpWithExistingData(engine, fallible);
-            }
+
+    BOOST_FOREACH (MaterializedViewHandler *viewHandler, m_viewHandlers) {
+        PersistentTable *destTable = viewHandler->destTable();
+        TableCatalogDelegate *destTcd =  engine->getTableDelegate(destTable->name());
+        catalog::Table *catalogViewTable = engine->getCatalogTable(destTable->name());
+        destTcd->init(*engine->getDatabase(), *catalogViewTable);
+        PersistentTable *destEmptyTable = destTcd->getPersistentTable();
+        assert(destEmptyTable);
+        auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
+        bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
+        MaterializedViewHandler *newHandler = new MaterializedViewHandler(destEmptyTable,
+                                                                          mvHandlerInfo,
+                                                                          engine);
+        if (populateInitialTuple) {
+            newHandler->catchUpWithExistingData(engine, fallible);
         }
     }
 

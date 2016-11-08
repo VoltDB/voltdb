@@ -131,7 +131,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.TARGET_TABLE_NAME).value(m_targetTableName);
+        stringer.keySymbolValuePair(Members.TARGET_TABLE_NAME, m_targetTableName);
     }
 
     @Override

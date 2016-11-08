@@ -38,6 +38,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
 
@@ -45,7 +46,7 @@ import org.voltdb.utils.VoltFile;
  *  Test client all partition calls
  *
  */
-public class TestAllPartitionProcedureCalls {
+public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
 
     static final int  ROWS = 1000;
     private LocalCluster cluster;

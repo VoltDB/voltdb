@@ -323,6 +323,7 @@
                 '@AdHoc': { '1': ['varchar'] },
                 '@Explain': { '1': ['varchar'] },
                 '@ExplainProc': { '1': ['varchar'] },
+                '@ExplainView': { '1': ['varchar'] },
                 '@Pause': { '0': [] },
                 '@Promote': { '0': [] },
                 '@Quiesce': { '0': [] },
@@ -581,6 +582,7 @@
                 connection.Metadata['sysprocs'] = {
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
+                    '@ExplainView': { '1': ['Materialized View Name (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
                     '@Resume': { '0': ['Returns bit'] },

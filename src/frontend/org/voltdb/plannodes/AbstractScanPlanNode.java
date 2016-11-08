@@ -445,15 +445,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         if (m_predicate != null) {
             if (ConstantValueExpression.isBooleanFalse(m_predicate)) {
-                stringer.key(Members.PREDICATE_FALSE.name()).value("TRUE");
+                stringer.keySymbolValuePair(Members.PREDICATE_FALSE.name(), "TRUE");
             }
             stringer.key(Members.PREDICATE.name());
             stringer.value(m_predicate);
         }
-        stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
-        stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
+        stringer.keySymbolValuePair(Members.TARGET_TABLE_NAME.name(), m_targetTableName);
+        stringer.keySymbolValuePair(Members.TARGET_TABLE_ALIAS.name(), m_targetTableAlias);
         if (m_isSubQuery) {
-            stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
+            stringer.keySymbolValuePair(Members.SUBQUERY_INDICATOR.name(), "TRUE");
         }
     }
 
