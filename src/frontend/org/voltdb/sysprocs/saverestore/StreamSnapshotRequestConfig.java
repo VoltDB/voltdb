@@ -17,10 +17,11 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google_voltpatches.common.collect.ArrayListMultimap;
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMultimap;
-import com.google_voltpatches.common.collect.Multimap;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -28,10 +29,10 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMultimap;
+import com.google_voltpatches.common.collect.Multimap;
 
 public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
 
@@ -120,7 +121,6 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         if (jsData != null) {
             try {
                 JSONObject sp = jsData.getJSONObject("streamPairs");
-                @SuppressWarnings("unchecked")
                 Iterator<String> it = sp.keys();
                 while (it.hasNext()) {
                     String key = it.next();
@@ -144,13 +144,13 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     {
         super.toJSONString(stringer);
 
-        stringer.key("shouldTruncate").value(shouldTruncate);
+        stringer.keySymbolValuePair("shouldTruncate", shouldTruncate);
         stringer.key("streams").array();
 
         for (Stream stream : streams) {
             stringer.object();
 
-            stringer.key("newPartition").value(stream.newPartition == null ?
+            stringer.keySymbolValuePair("newPartition", stream.newPartition == null ?
                                                null : Integer.toString(stream.newPartition));
 
             stringer.key("streamPairs").object();

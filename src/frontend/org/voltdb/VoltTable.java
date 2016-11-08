@@ -1561,14 +1561,14 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             js.object();
 
             // status code (1 byte)
-            js.key(JSON_STATUS_KEY).value(getStatusCode());
+            js.keySymbolValuePair(JSON_STATUS_KEY, getStatusCode());
 
             // column schema
             js.key(JSON_SCHEMA_KEY).array();
             for (int i = 0; i < getColumnCount(); i++) {
                 js.object();
-                js.key(JSON_NAME_KEY).value(getColumnName(i));
-                js.key(JSON_TYPE_KEY).value(getColumnType(i).getValue());
+                js.keySymbolValuePair(JSON_NAME_KEY, getColumnName(i));
+                js.keySymbolValuePair(JSON_TYPE_KEY, getColumnType(i).getValue());
                 js.endObject();
             }
             js.endArray();

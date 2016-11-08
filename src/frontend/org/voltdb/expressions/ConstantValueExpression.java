@@ -112,14 +112,12 @@ public class ConstantValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.ISNULL.name());
-        stringer.value(m_isNull);
+        stringer.keySymbolValuePair(Members.ISNULL.name(), m_isNull);
         stringer.key(Members.VALUE.name());
-        if (m_isNull)
-        {
+        if (m_isNull) {
             stringer.value("NULL");
+            return;
         }
-        else
         {
             switch (m_valueType)
             {

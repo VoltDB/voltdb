@@ -297,10 +297,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException
-    {
+    public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
+        stringer.keySymbolValuePair(Members.JOIN_TYPE.name(), m_joinType.toString());
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
         stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
         stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);

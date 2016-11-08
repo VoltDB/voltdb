@@ -216,16 +216,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
-                js.key(GROUP).value(group);
-                js.key(COORDINATOR_IP).value(coordinatorIp.toString());
-                js.key(ZK_INTERFACE).value(zkInterface);
-                js.key(INTERNAL_INTERFACE).value(internalInterface);
-                js.key(INTERNAL_PORT).value(internalPort);
-                js.key(DEAD_HOST_TIMEOUT).value(deadHostTimeout);
-                js.key(BACKWARDS_TIME_FORGIVENESS_WINDOW).value(backwardsTimeForgivenessWindow);
-                js.key(NETWORK_THREADS).value(networkThreads);
+                js.keySymbolValuePair(GROUP, group);
+                js.keySymbolValuePair(COORDINATOR_IP, coordinatorIp.toString());
+                js.keySymbolValuePair(ZK_INTERFACE, zkInterface);
+                js.keySymbolValuePair(INTERNAL_INTERFACE, internalInterface);
+                js.keySymbolValuePair(INTERNAL_PORT, internalPort);
+                js.keySymbolValuePair(DEAD_HOST_TIMEOUT, deadHostTimeout);
+                js.keySymbolValuePair(BACKWARDS_TIME_FORGIVENESS_WINDOW, backwardsTimeForgivenessWindow);
+                js.keySymbolValuePair(NETWORK_THREADS, networkThreads);
                 js.key(ACCEPTOR).value(acceptor);
-                js.key(LOCAL_SITES_COUNT).value(localSitesCount);
+                js.keySymbolValuePair(LOCAL_SITES_COUNT, localSitesCount);
                 js.endObject();
 
                 return js.toString();
@@ -259,9 +259,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         {
             final JSONStringer js = new JSONStringer();
             js.object();
-            js.key(HOST_IP).value(m_hostIp);
-            js.key(GROUP).value(m_group);
-            js.key(LOCAL_SITES_COUNT).value(m_localSitesCount);
+            js.keySymbolValuePair(HOST_IP, m_hostIp);
+            js.keySymbolValuePair(GROUP, m_group);
+            js.keySymbolValuePair(LOCAL_SITES_COUNT, m_localSitesCount);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -879,45 +879,48 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         JSONObject jsObj = new JSONObject();
 
-        jsObj.put("accepted", decision.accepted);
+        jsObj.put(SocketJoiner.ACCEPTED, decision.accepted);
         if (decision.accepted) {
             /*
              * Tell the new node what its host id is
              */
-            jsObj.put("newHostId", hostId);
+            jsObj.put(SocketJoiner.NEW_HOST_ID, hostId);
 
             /*
              * Echo back the address that the node connected from
              */
-            jsObj.put("reportedAddress",
+            jsObj.put(SocketJoiner.REPORTED_ADDRESS,
                       ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
 
             /*
-             * Create an array containing an ad for every node including this one
+             * Create an array containing an id for every node including this one
              * even though the connection has already been made
              */
             JSONArray jsArray = new JSONArray();
             JSONObject hostObj = new JSONObject();
-            hostObj.put("hostId", getHostId());
-            hostObj.put("address",
+            hostObj.put(SocketJoiner.HOST_ID, getHostId());
+            hostObj.put(SocketJoiner.ADDRESS,
                         m_config.internalInterface.isEmpty() ?
-                        socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
-            hostObj.put("port", m_config.internalPort);
+                        socket.socket().getLocalAddress().getHostAddress() :
+                        m_config.internalInterface);
+            hostObj.put(SocketJoiner.PORT, m_config.internalPort);
             jsArray.put(hostObj);
             for (Map.Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
                 if (entry.getValue() == null) continue;
                 int hsId = entry.getKey();
                 ForeignHost fh = entry.getValue();
                 hostObj = new JSONObject();
-                hostObj.put("hostId", hsId);
-                hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
-                hostObj.put("port", fh.m_listeningAddress.getPort());
+                hostObj.put(SocketJoiner.HOST_ID, hsId);
+                hostObj.put(SocketJoiner.ADDRESS,
+                        fh.m_listeningAddress.getAddress().getHostAddress());
+                hostObj.put(SocketJoiner.PORT, fh.m_listeningAddress.getPort());
                 jsArray.put(hostObj);
             }
-            jsObj.put("hosts", jsArray);
-        } else {
-            jsObj.put("reason", decision.errMsg);
-            jsObj.put("mayRetry", decision.mayRetry);
+            jsObj.put(SocketJoiner.HOSTS, jsArray);
+        }
+        else {
+            jsObj.put(SocketJoiner.REASON, decision.errMsg);
+            jsObj.put(SocketJoiner.MAY_RETRY, decision.mayRetry);
         }
 
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");

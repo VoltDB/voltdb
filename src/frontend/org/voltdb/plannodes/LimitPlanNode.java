@@ -116,10 +116,10 @@ public class LimitPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.OFFSET.name()).value(m_offset);
-        stringer.key(Members.LIMIT.name()).value(m_limit);
-        stringer.key(Members.OFFSET_PARAM_IDX.name()).value(m_offsetParameterId);
-        stringer.key(Members.LIMIT_PARAM_IDX.name()).value(m_limitParameterId);
+        stringer.keySymbolValuePair(Members.OFFSET.name(), m_offset);
+        stringer.keySymbolValuePair(Members.LIMIT.name(), m_limit);
+        stringer.keySymbolValuePair(Members.OFFSET_PARAM_IDX.name(), m_offsetParameterId);
+        stringer.keySymbolValuePair(Members.LIMIT_PARAM_IDX.name(), m_limitParameterId);
         stringer.key(Members.LIMIT_EXPRESSION.name()).value(m_limitExpression);
     }
 

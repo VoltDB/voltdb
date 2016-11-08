@@ -51,7 +51,7 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.TRUNCATE.name()).value(m_truncate);
+        stringer.keySymbolValuePair(Members.TRUNCATE.name(), m_truncate);
     }
 
     @Override

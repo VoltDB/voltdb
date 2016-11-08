@@ -56,9 +56,9 @@ public class Promote extends VoltSystemProcedure {
         if (ctx.isLowestSiteId()) {
             JSONStringer js = new JSONStringer();
             js.object();
-            js.key("role").value(ReplicationRole.NONE.ordinal());
+            js.keySymbolValuePair("role", ReplicationRole.NONE.ordinal());
             // Replication active state should the be same across the cluster
-            js.key("active").value(VoltDB.instance().getReplicationActive());
+            js.keySymbolValuePair("active", VoltDB.instance().getReplicationActive());
             js.endObject();
 
             VoltDB.instance().getHostMessenger().getZK().setData(
