@@ -555,8 +555,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             ByteBuffer message = null;
             try {
-                message = messagingChannel.readMessage();
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
+                while (message == null) {
+                    message = messagingChannel.readMessage();
+                }
+            } catch (IOException e) {
+                // Possibly timeout firing
+                try {
+                    socket.close();
+                } catch (IOException e1) {
+                }
+                return null;
+            }
 
             /*
              * Since we got the login message, cancel the timeout.

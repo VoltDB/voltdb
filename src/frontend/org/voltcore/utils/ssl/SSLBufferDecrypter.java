@@ -54,7 +54,6 @@ public class SSLBufferDecrypter {
             srcBuffer = buffer;
         }
 
-
         List<ByteBuffer> messages = new ArrayList<>();
         while (srcBuffer.hasRemaining()) {
             // might have a partial buffer from last time.  Partial buffer holds bytes
