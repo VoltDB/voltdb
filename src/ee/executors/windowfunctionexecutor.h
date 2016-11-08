@@ -28,14 +28,16 @@ namespace voltdb {
  */
 class WindowAggregate {
 public:
-	virtual ~WindowAggregate() {
+    virtual ~WindowAggregate() {
 
-	}
-	void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+    }
+    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
     virtual void advance(const AbstractPlanNode::OwningExpressionVector &) = 0;
+
+    void advanceOrderBy(const TableTuple &nextOrderByTuple);
 
     virtual NValue finalize(ValueType type)
     {
@@ -61,7 +63,14 @@ private:
  */
 class WindowAggregateRow {
 public:
-	void resetAggs()
+    void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
+    {
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+    }
+    void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    void resetAggs()
     {
         // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
         for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
@@ -69,16 +78,16 @@ public:
         }
     }
 
-    void recordPassThroughTuple(TableTuple &passThroughTupleSource, const TableTuple &tuple)
+    void recordPassThroughTuple(const TableTuple &tuple)
     {
-        passThroughTupleSource.copy(tuple);
-        m_passThroughTuple = passThroughTupleSource;
+        m_passThroughTuple.copy(tuple);
     }
 
 private:
-	TableTuple m_passThroughTuple;
-	WindowAggregate   *m_aggregates[0];
+    TableTuple m_passThroughTuple;
+    WindowAggregate *m_aggregates[0];
 };
+
 /**
  * This is the executor for a WindowFunctionPlanNode.
  */
@@ -92,11 +101,12 @@ public:
         m_partitionByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
         m_orderByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
         m_aggregateInputExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()),
-		m_pmp(NULL),
-		m_partitionByKeySchema(NULL),
-		m_inputSchema(NULL),
-		m_aggregateRow(NULL)
-		{ }
+        m_pmp(NULL),
+        m_orderByKeySchema(NULL),
+        m_partitionByKeySchema(NULL),
+        m_inputSchema(NULL),
+        m_aggregateRow(NULL)
+        { }
     virtual ~WindowFunctionExecutor();
 
 
@@ -104,7 +114,7 @@ public:
      * How many aggregate functions are there?
      */
     int getAggregateCount() const {
-    	return m_aggregateInputExpressions.size();
+        return m_aggregateInputExpressions.size();
     }
     /**
      * Returns the input expressions for each aggregate in the
@@ -161,9 +171,9 @@ public:
      * Initiate the member variables for execute the window function.
      */
     TableTuple p_execute_init(const NValueArray& params,
-    						  const TupleSchema * schema,
-							  TempTable* newTempTable = NULL,
-							  CountingPostfilter* parentPredicate = NULL);
+                              const TupleSchema * schema,
+                              TempTable* newTempTable = NULL,
+                              CountingPostfilter* parentPredicate = NULL);
 
     /**
      * Execute a single tuple.
@@ -181,22 +191,27 @@ private:
     /** Concrete executor classes implement execution in p_execute() */
     virtual bool p_execute(const NValueArray& params);
 
-    void initPartitionByKeyTuple(const TableTuple& nextTuple);
+    void initPartitionByAndOrderByKeyTuple(const TableTuple& nextTuple);
 
     void initAggInstances(WindowAggregateRow *aggregateRow);
 
     void advanceAggs(WindowAggregateRow* aggregateRow, const TableTuple& tuple);
 
     /**
-     * Swap the current group by key tuple with the in-progress group by key tuple.
-     * Return the new group by key tuple associated with in-progress tuple address.
-     * This function is only used in serial or partial aggregation.
+     * Swap the current group by key tuple with the in-progress partition by key tuple.
+     * Return the new partition by key tuple associated with in-progress tuple address.
      */
     TableTuple& swapWithInprogressPartitionByKeyTuple();
 
+    /**
+     * Swap the current group by key tuple with the in-progress order by key tuple.
+     * Return the new order by key tuple associated with in-progress tuple address.
+     */
+    TableTuple& swapWithInprogressOrderByKeyTuple();
+
     void insertOutputTuple(WindowAggregateRow* winFunRow);
 
-    TupleSchema* constructPartitionBySchema();
+    TupleSchema* constructSomethingBySchema();
 
     /**
      * Do any initialization which needs the first tuple
@@ -248,13 +263,49 @@ private:
      */
     ProgressMonitorProxy* m_pmp;
 
+    TupleSchema *m_orderByKeySchema;
+    /*
+     * These next three are for handling partition by values.
+     */
+    /**
+     * This is the schema of a row of evaluations
+     * of all partition by expressions in order.
+     */
     TupleSchema* m_partitionByKeySchema;
+    /**
+     * This holds the evaluations for the current partition.
+     * Note that this is essentially a TableTuple, but that it
+     * uses the pool associated with this executor to allocate
+     * its memory.
+     */
+    PoolBackedTupleStorage m_inProgressPartitionByKeyTuple;
+    /**
+     * This holds the evaluations for the next row.  If the
+     * next row is in the current partition, these values will
+     * be the same as those for m_inProgressPartitionByKeyTuple.
+     * If not, these will be different.  If they are different,
+     * we will swap the data in this with the data in
+     * m_inProgressPartitionByKeyTuple.
+     *
+     * Note, again, that this is almost just an ordinary
+     * TableTuple, but that its data comes from the pool
+     * associated with this executor.
+     */
     PoolBackedTupleStorage m_nextPartitionByKeyStorage;
-    TableTuple m_inProgressPartitionByKeyTuple;
-    WindowAggregateRow *m_aggregateRow;
 
+    PoolBackedTupleStorage m_inProgressOrderByKeyTuple;
+    PoolBackedTupleStorage m_nextOrderByKeyStorage;
+    /**
+     * This is where the windowed aggregate values are calculated.
+     * This is essentially a C array of WindowAggregate objects, and
+     * each aggregate has an element in the array.  There is also
+     * a tuple for the values passed through from the input.
+     */
+    WindowAggregateRow *m_aggregateRow;
+    /**
+     * This is the schema of the input table.
+     */
     const TupleSchema * m_inputSchema;
-    TableTuple m_passThroughTupleSource;
 };
 
 } /* namespace voltdb */
