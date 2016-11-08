@@ -251,20 +251,21 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException
-    {
+    public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_sortDirection != SortDirectionType.INVALID) {
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+            stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(),
+                    m_sortDirection.toString());
         }
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
-    {
+    public void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        if (!jobj.isNull(Members.SORT_DIRECTION.name())) {
-            m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        if ( ! jobj.isNull(Members.SORT_DIRECTION.name())) {
+            m_sortDirection = SortDirectionType.get(
+                    jobj.getString(Members.SORT_DIRECTION.name()));
         }
     }
 }

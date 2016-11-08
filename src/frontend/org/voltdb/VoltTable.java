@@ -1527,19 +1527,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 }
                 else {
                     if (colType == VoltType.VARBINARY) {
-                    valueStr = Encoder.hexEncode((byte[]) value);
+                        valueStr = Encoder.hexEncode((byte[]) value);
                         // crop long varbinaries
                         if (valueStr.length() > MAX_PRINTABLE_CHARS) {
                             valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
-                }
+                        }
                     }
-                else {
-                    valueStr = value.toString();
-                }
+                    else {
+                        valueStr = value.toString();
+                    }
                 }
                 sb.append(pad).append(String.format(fmt[i], valueStr));
                 pad = " ";
-                }
+            }
             sb.append("\n");
         }
 
@@ -1561,14 +1561,14 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             js.object();
 
             // status code (1 byte)
-            js.key(JSON_STATUS_KEY).value(getStatusCode());
+            js.keySymbolValuePair(JSON_STATUS_KEY, getStatusCode());
 
             // column schema
             js.key(JSON_SCHEMA_KEY).array();
             for (int i = 0; i < getColumnCount(); i++) {
                 js.object();
-                js.key(JSON_NAME_KEY).value(getColumnName(i));
-                js.key(JSON_TYPE_KEY).value(getColumnType(i).getValue());
+                js.keySymbolValuePair(JSON_NAME_KEY, getColumnName(i));
+                js.keySymbolValuePair(JSON_TYPE_KEY, getColumnType(i).getValue());
                 js.endObject();
             }
             js.endArray();
