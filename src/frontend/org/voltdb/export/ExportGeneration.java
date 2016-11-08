@@ -775,7 +775,10 @@ public class ExportGeneration implements Generation {
                             source.getPartitionId());
                 }
                 else {
-                    tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
+                    if (!source.isClosed()) {
+                        tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    }
                 }
             }
         }

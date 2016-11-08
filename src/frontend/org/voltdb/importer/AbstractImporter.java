@@ -258,6 +258,11 @@ public abstract class AbstractImporter
      */
     public abstract URI getResourceID();
 
+
+    public String getTaskThreadName() {
+        return null;
+    }
+
     /**
      * Implementation of this should contain the main importer work. This is typically
      * called in its own thread so that each importer can do its work in parallel in its
