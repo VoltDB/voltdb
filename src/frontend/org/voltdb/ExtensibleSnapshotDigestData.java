@@ -134,10 +134,10 @@ public class ExtensibleSnapshotDigestData {
                     JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
                     Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
                     if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
-                        log.error("Found a mismatch in export sequence numbers of export table " + tableName +
+                        log.debug("Found a mismatch in export sequence numbers of export table " + tableName +
                                 " while recording snapshot metadata for partition " + partitionId +
-                                " the sequence number should be the same at all replicas, but one had " +
-                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber);
+                                ". This is expected only on replicated, write-to-file export streams (remote node reported " +
+                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber + ")");
                     }
                     existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
 
@@ -183,7 +183,7 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj) throws JSONException {
+    private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
         JSONObject stateInfoMap;
         // clusterCreateTime should be same across the cluster
         long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
@@ -205,7 +205,19 @@ public class ExtensibleSnapshotDigestData {
                 partitionStateInfo = e.getValue().replicatedInfo;
             }
             JSONObject existingStateInfo = stateInfoMap.optJSONObject(partitionId);
-            if (existingStateInfo == null || partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+            boolean addEntry = false;
+            if (existingStateInfo == null) {
+                addEntry = true;
+            }
+            else if (partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+                addEntry = true;
+                log.error("Found a mismatch in dr sequence numbers for partition " + partitionId +
+                        " the DRId should be the same at all replicas, but one had " +
+                        existingStateInfo.getLong("sequenceNumber") +
+                        " and the local node reported " + partitionStateInfo.drId);
+            }
+
+            if (addEntry) {
                 JSONObject stateInfo = new JSONObject();
                 stateInfo.put("sequenceNumber", partitionStateInfo.drId);
                 stateInfo.put("spUniqueId", partitionStateInfo.spUniqueId);
@@ -308,7 +320,7 @@ public class ExtensibleSnapshotDigestData {
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
         mergeExportSequenceNumbersToZK(jsonObj, log);
-        mergeDRTupleStreamInfoToZK(jsonObj);
+        mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
         mergeTerminusToZK(jsonObj);
     }
