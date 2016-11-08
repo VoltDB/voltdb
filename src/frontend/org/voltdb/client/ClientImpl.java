@@ -794,7 +794,7 @@ public final class ClientImpl implements Client {
                             for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
                                 HostConfig config = entry.getValue();
                                 try {
-                                    createConnection(config.m_ipAddress,config.getPort(m_useAdminPort));
+                                    connectToOneServerWithRetry(config.m_ipAddress,config.getPort(m_useAdminPort));
                                     nofifyClientConnectionCreation(config, ClientResponse.SUCCESS, null);
                                 } catch (IOException e) {
                                     nofifyClientConnectionCreation(config, ClientResponse.SERVER_UNAVAILABLE, e);
@@ -810,7 +810,32 @@ public final class ClientImpl implements Client {
                 }
             });
         }
-}
+
+        /**
+         * Connect to a single server with retry. Limited exponential back off.
+         * if it's not able to connect.
+         * @param ipAddress host IP
+         * @param port port
+         */
+        private void connectToOneServerWithRetry(String ipAddress, int port) throws Exception {
+            long sleep = 1000;
+            final long maxSleep = 30000;
+            while (true) {
+                try {
+                    createConnection(ipAddress, port);
+                    break;
+                } catch (Exception e) {
+                    try { Thread.sleep(sleep);
+                    } catch (Exception ignored) { }
+                    if (sleep < maxSleep) {
+                        sleep = Math.min(sleep + sleep, maxSleep);
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+        }
+    }
 
      /****************************************************
                         Implementation
