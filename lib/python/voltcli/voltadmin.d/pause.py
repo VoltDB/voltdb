@@ -27,7 +27,7 @@ from voltcli import checkstats
     )
 )
 def pause(runner):
-    # Check the STATUS column. runner.call_proc() detects and aborts on errors.
+    #Check the STATUS column. runner.call_proc() detects and aborts on errors.
     status = runner.call_proc('@Pause', [], []).table(0).tuple(0).column_integer(0)
     if status <> 0:
         runner.error('The cluster has failed to pause with status: %d' % status)
@@ -39,5 +39,13 @@ def pause(runner):
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
-        #check the dr stats
-        checkstats.check_export_dr(runner)
+        try:
+            checkstats.check_clients(runner)
+            checkstats.check_importer(runner)
+            checkstats.check_dr_consumer(runner)
+            checkstats.check_command_log(runner)
+            checkstats.check_exporter(runner)
+            checkstats.check_dr_producer(runner)
+        except (KeyboardInterrupt, SystemExit):
+            runner.info('The pause process has stopped. The cluster is in a paused state.')
+            runner.abort('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
