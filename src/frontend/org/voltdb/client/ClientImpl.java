@@ -726,6 +726,11 @@ public final class ClientImpl implements Client {
             }
         }
 
+        /**
+         * get a list of hosts which client does not have a connection to
+         * @param vt Results from @SystemInformation
+         * @return a list of hosts which client does not have a connection to
+         */
         Map<Integer, HostConfig> buildUnconnectedHostConfigMap(VoltTable vt) {
             Map<Integer, HostConfig> info = new HashMap<Integer, HostConfig>();
             Map<Integer, HostConfig> connected = new HashMap<Integer, HostConfig>();
@@ -765,14 +770,24 @@ public final class ClientImpl implements Client {
             return info;
         }
 
+        /**
+         * notify client upon a connection to a host is created.
+         * @param host HostConfig with IP address and port
+         * @param status The status of connection creation
+         * @param e The reason that a connection to the host fails to be created.
+         */
         void nofifyClientConnectionCreation(HostConfig host, byte status, Throwable e) {
             if (m_clientStatusListener != null) {
-                m_clientStatusListener.nofifyClientConnectionCreation((host != null) ? host.m_hostName : "",
+                m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
                         (host != null) ? host.m_ipAddress : "",
                         (host != null) ? host.m_clientPort : -1, status, e);
             }
         }
 
+        /**
+         * find all the host which have not been connected to the client via @SystemInformation
+         * and make connections
+         */
         public void createConnectionsUponTopologyChange() {
             m_ex.execute(new Runnable() {
                 @Override
