@@ -215,14 +215,6 @@ public class LeaderElector {
         return isLeader;
     }
 
-    /**
-     * Get the current leader node
-     * @return
-     */
-    public String leader() {
-        return leader;
-    }
-
     public String getNode() {
         return node;
     }

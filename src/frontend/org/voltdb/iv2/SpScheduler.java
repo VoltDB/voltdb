@@ -419,7 +419,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
-    public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
+    private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
@@ -690,7 +690,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     // Pass a response through the duplicate counters.
-    public void handleInitiateResponseMessage(InitiateResponseMessage message)
+    private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
@@ -974,7 +974,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // Eventually, the master for a partition set will need to be able to dedupe
     // FragmentResponses from its replicas.
-    public void handleFragmentResponseMessage(FragmentResponseMessage message)
+    private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
@@ -1021,7 +1021,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
-    public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
+    private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
@@ -1068,7 +1068,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
+    private void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
     {
         final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
         DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
@@ -1110,7 +1110,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * Should only receive these messages at replicas, when told by the leader
      */
-    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    private void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
         //call the internal log write with the provided SP handle and wait for the fault log IO to complete
         SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
@@ -1148,7 +1148,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void handleDumpMessage()
+    private void handleDumpMessage()
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         hostLog.warn("State dump for site: " + who);
@@ -1343,6 +1343,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    // This is for test only
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
         m_defaultConsistencyReadLevel = readLevel;
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {

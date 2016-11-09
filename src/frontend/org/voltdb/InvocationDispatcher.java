@@ -1899,7 +1899,6 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    @SuppressWarnings("unused")
     public  boolean createTransaction(
             final long connectionId,
             final long txnId,
@@ -1924,29 +1923,24 @@ public final class InvocationDispatcher {
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
-
         /*
          * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
          *
          * ReadLevel.SAFE:
-         * Send the read to the partition leader always (reads & writes)
-         *
-         * Someday could support per-transaction consistency for reads.
+         * Send the read to the partition leader only
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
-            }
-            if (initiatorHSId != null) {
                 isShortCircuitRead = true;
+                initiatorHSId = m_localReplicas.get().get(partition);
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
-            //Multi-part transactions go to the multi-part coordinator
+            // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool
