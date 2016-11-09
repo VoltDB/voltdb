@@ -814,6 +814,14 @@ public class SQLCommand
                 return;
             }
 
+            String explainViewName = SQLParser.parseExplainViewCall(statement);
+            if (explainViewName != null) {
+                // We've got a statement that starts with "explainview", send the statement to
+                // @ExplainView (now that parseExplainViewCall() has stripped out "explainview").
+                printResponse(m_client.callProcedure("@ExplainView", explainViewName));
+                return;
+            }
+
             // LOAD CLASS <jar>?
             String loadPath = SQLParser.parseLoadClasses(statement);
             if (loadPath != null) {

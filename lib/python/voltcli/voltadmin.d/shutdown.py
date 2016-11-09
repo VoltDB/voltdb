@@ -44,16 +44,17 @@ def shutdown(runner):
             status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
             if status <> 0:
                 runner.abort('The cluster has failed to be quiesce with status: %d' % status)
-            runner.info('Completing outstanding export and DR transactions...')
-            checkstats.check_export_dr(runner)
-            runner.info('Completing outstanding client transactions.')
             checkstats.check_clients(runner)
-            runner.info('Completing outstanding importer requests.')
             checkstats.check_importer(runner)
-            runner.info('Cluster is ready for shutdown')
+            checkstats.check_dr_consumer(runner)
+            checkstats.check_command_log(runner)
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
+               #save option, check more stats
+               checkstats.check_exporter(runner)
+               checkstats.check_dr_producer(runner)
+            runner.info('Cluster is safe to be shutdown, everything has been drained')
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')

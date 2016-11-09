@@ -40,14 +40,20 @@ import org.voltdb.types.SortDirectionType;
  *
  */
 public abstract class AbstractExpression implements JSONString, Cloneable {
-    public enum Members {
-        TYPE,
-        LEFT,
-        RIGHT,
-        VALUE_TYPE,
-        VALUE_SIZE,
-        IN_BYTES,
-        ARGS,
+    protected static class Members {
+        static final String TYPE = "TYPE";
+        static final String LEFT = "LEFT";
+        static final String RIGHT = "RIGHT";
+        static final String VALUE_TYPE = "VALUE_TYPE";
+        static final String VALUE_SIZE = "VALUE_SIZE";
+        static final String IN_BYTES = "IN_BYTES";
+        static final String ARGS = "ARGS";
+    }
+
+    private static class SortMembers {
+        static final String SORT_COLUMNS = "SORT_COLUMNS";
+        static final String SORT_EXPRESSION = "SORT_EXPRESSION";
+        static final String SORT_DIRECTION = "SORT_DIRECTION";
     }
 
     protected String m_id;
@@ -570,45 +576,35 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
-        stringer.key(Members.TYPE.name()).value(m_type.getValue());
+        stringer.keySymbolValuePair(Members.TYPE, m_type.getValue());
 
         if (m_valueType == null) {
-            stringer.key(Members.VALUE_TYPE.name()).value( VoltType.NULL.getValue());
-            stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+            stringer.keySymbolValuePair(Members.VALUE_TYPE, VoltType.NULL.getValue());
+            stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
         }
         else {
-            stringer.key(Members.VALUE_TYPE.name()).value(m_valueType.getValue());
+            stringer.keySymbolValuePair(Members.VALUE_TYPE, m_valueType.getValue());
             if (m_valueType.getLengthInBytesForFixedTypesWithoutCheck() == -1) {
-                stringer.key(Members.VALUE_SIZE.name()).value(m_valueSize);
+                stringer.keySymbolValuePair(Members.VALUE_SIZE, m_valueSize);
             }
 
             if (m_inBytes) {
                 assert(m_valueType == VoltType.STRING);
-                stringer.key(Members.IN_BYTES.name()).value(true);
+                stringer.keySymbolValuePair(Members.IN_BYTES, true);
             }
         }
 
         if (m_left != null) {
-            stringer.key(Members.LEFT.name()).value(m_left);
+            stringer.key(Members.LEFT).value(m_left);
         }
 
         if (m_right != null) {
-            stringer.key(Members.RIGHT.name()).value(m_right);
+            stringer.key(Members.RIGHT).value(m_right);
         }
 
         if (m_args != null) {
-            stringer.key(Members.ARGS.name()).array(m_args);
+            stringer.key(Members.ARGS).array(m_args);
         }
-    }
-
-    /**
-     * We need some enumerals which are common to PartitionByPlanNode and
-     * OrderByPlanNode and maybe others. These are used as keys to create JSON.
-     */
-    private static class SortMembers {
-        static final String SORT_COLUMNS = "SORT_COLUMNS";
-        static final String SORT_DIRECTION = "SORT_DIRECTION";
-        static final String SORT_EXPRESSION = "SORT_EXPRESSION";
     }
 
     /**
@@ -632,12 +628,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         int listSize = sortExpressions.size();
         for (int ii = 0; ii < listSize; ii++) {
             stringer.object();
-            stringer.key(SortMembers.SORT_EXPRESSION);
-            stringer.object();
+            stringer.key(SortMembers.SORT_EXPRESSION).object();
             sortExpressions.get(ii).toJSONString(stringer);
             stringer.endObject();
             if (sortDirections != null) {
-                stringer.key(SortMembers.SORT_DIRECTION).value(
+                stringer.keySymbolValuePair(SortMembers.SORT_DIRECTION,
                         sortDirections.get(ii).toString());
             }
             stringer.endObject();
@@ -671,7 +666,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private static AbstractExpression fromJSONObject(
             JSONObject obj, StmtTableScan tableScan) throws JSONException {
-        ExpressionType type = ExpressionType.get(obj.getInt(Members.TYPE.name()));
+        ExpressionType type = ExpressionType.get(obj.getInt(Members.TYPE));
         AbstractExpression expr;
         try {
             expr = type.getExpressionClass().newInstance();
@@ -687,19 +682,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         expr.m_type = type;
 
-        expr.m_valueType = VoltType.get((byte) obj.getInt(Members.VALUE_TYPE.name()));
-        if (obj.has(Members.VALUE_SIZE.name())) {
-            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE.name());
+        expr.m_valueType = VoltType.get((byte) obj.getInt(Members.VALUE_TYPE));
+        if (obj.has(Members.VALUE_SIZE)) {
+            expr.m_valueSize = obj.getInt(Members.VALUE_SIZE);
         }
         else {
             expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
         }
 
-        expr.m_left = fromJSONChild(obj, Members.LEFT.name(), tableScan);
-        expr.m_right = fromJSONChild(obj, Members.RIGHT.name(), tableScan);
+        expr.m_left = fromJSONChild(obj, Members.LEFT, tableScan);
+        expr.m_right = fromJSONChild(obj, Members.RIGHT, tableScan);
 
-        if ( ! obj.isNull(Members.ARGS.name())) {
-            JSONArray jarray = obj.getJSONArray(Members.ARGS.name());
+        if ( ! obj.isNull(Members.ARGS)) {
+            JSONArray jarray = obj.getJSONArray(Members.ARGS);
             ArrayList<AbstractExpression> arguments = new ArrayList<>();
             loadFromJSONArray(arguments, jarray, tableScan);
             expr.setArgs(arguments);

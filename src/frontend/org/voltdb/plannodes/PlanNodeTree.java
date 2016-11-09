@@ -100,7 +100,7 @@ public class PlanNodeTree implements JSONString {
             stringer.key(Members.PLAN_NODES_LISTS).array();
             for (Map.Entry<Integer, List<AbstractPlanNode>> planNodes : m_planNodesListMap.entrySet()) {
                 stringer.object();
-                stringer.key(Members.STATEMENT_ID).value(planNodes.getKey());
+                stringer.keySymbolValuePair(Members.STATEMENT_ID, planNodes.getKey());
                 stringer.key(Members.PLAN_NODES).array(planNodes.getValue());
                 stringer.endObject();
             }

@@ -17,8 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +25,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
@@ -80,8 +77,8 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
     throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
-        stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
+        stringer.keySymbolValuePair("lastConsumerSpUniqueId", lastConsumerUniqueIds.getFirst());
+        stringer.keySymbolValuePair("lastConsumerMpUniqueId", lastConsumerUniqueIds.getSecond());
         stringer.key("trackers").object();
         if (allProducerTrackers != null) {
             for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {

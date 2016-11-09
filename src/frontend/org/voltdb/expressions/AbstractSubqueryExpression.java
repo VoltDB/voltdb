@@ -144,8 +144,8 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.SUBQUERY_ID.name()).value(m_subqueryId);
-        stringer.key(Members.SUBQUERY_ROOT_NODE_ID.name()).value(m_subqueryNodeId);
+        stringer.keySymbolValuePair(Members.SUBQUERY_ID.name(), m_subqueryId);
+        stringer.keySymbolValuePair(Members.SUBQUERY_ROOT_NODE_ID.name(), m_subqueryNodeId);
         // Output the correlated parameter ids that originates at this subquery immediate
         // parent and need to be set before the evaluation
         if (!m_parameterIdxList.isEmpty()) {
@@ -159,11 +159,10 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
-        super.loadFromJSONObject(obj);
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
-        if (obj.has(AbstractExpression.Members.VALUE_TYPE.name())) {
-            m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE.name()));
+        if (obj.has(AbstractExpression.Members.VALUE_TYPE)) {
+            m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE));
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
         }
         if (obj.has(Members.PARAM_IDX.name())) {
