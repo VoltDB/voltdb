@@ -81,7 +81,7 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon,
 a.alertIcon,
-
+.iconDRDatabase,
 input.icon-search,
 a.save-search,
 a.icon-search,
@@ -91,9 +91,11 @@ a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-
     background-repeat: no-repeat;
 }
 
-
-
-
+.iconDRDatabase {
+    background-position: left top;
+    height: 25px;
+    line-height: 25px;
+}
 .user {
     background-position: left -209px;
     width: 25px;
@@ -649,6 +651,7 @@ ul.rightShowhideList {
     -moz-box-shadow: 0px 6px 7px -5px #ccc; /* Firefox 3.5 - 3.6 */
     box-shadow: 0px 6px 7px -5px #ccc; /* Opera 10.5, IE 9, Firefox 4+, Chrome 6+, iOS 5 */
 }
+.chartDR {margin-bottom:10px;}
 
 .left {
     float: left;
@@ -706,9 +709,15 @@ ul.rightShowhideList {
 .collapsed {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
 }
+.collapsedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -537px no-repeat;
+}
 
 .expanded {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;
+}
+.expandedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -491px no-repeat;
 }
 
 .leftShowhide .expanded {
@@ -721,6 +730,11 @@ ul.rightShowhideList {
 
 .arrowAdjust {
     padding: 0px 0 0 26px;
+    position: relative;
+    top: 4px;
+}
+.arrowAdjustDR {
+    padding: 0px 0 0 7px;
     position: relative;
     top: 4px;
 }
@@ -1440,7 +1454,7 @@ a.icon-document {
         color: #76bd1d;
     }
 
-#schema, #sqlQuery, #admin {
+#schema, #sqlQuery, #admin, #dr {
     display: none;
 }
 
@@ -2017,6 +2031,20 @@ h1.icon-queryResult {
     background-position: 0px -1039px;
     padding-left:30px!important;
 }
+/***********************************DR page*******************************/
+#containerMain1 { background:#fff; padding:10px;}
+.DRContantWrap {background:#ccc; padding:10px; display:block;}
+.contentDR {
+    margin: 0 0 20px 0;
+    padding:0 20px;
+
+
+}
+.drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
+.drBody { padding:0;}
+.DRHeaderName { position:relative;top:5px;}
+.iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 5px;}
+.DRHeaderWrap {float:left;}
 
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
@@ -3420,7 +3448,7 @@ table.tblPopup {
 /****DR *******/
 
 .drWrapper {
-    margin: 20px 0 0 0;
+    margin: 0 0 0 0;
 }
 
     .drWrapper .content {
