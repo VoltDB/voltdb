@@ -209,12 +209,12 @@ public class ExtensibleSnapshotDigestData {
             if (existingStateInfo == null) {
                 addEntry = true;
             }
-            else if (partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+            else if (partitionStateInfo.drId != existingStateInfo.getLong("sequenceNumber")) {
                 addEntry = true;
                 log.error("Found a mismatch in dr sequence numbers for partition " + partitionId +
-                        " the DRId should be the same at all replicas, but one had " +
-                        existingStateInfo.getLong("sequenceNumber") +
-                        " and the local node reported " + partitionStateInfo.drId);
+                        " the DRId should be the same at all replicas, but one node had " +
+                        DRLogSegmentId.getDebugStringFromDRId(existingStateInfo.getLong("sequenceNumber")) +
+                        " and the local node reported " + DRLogSegmentId.getDebugStringFromDRId(partitionStateInfo.drId));
             }
 
             if (addEntry) {
