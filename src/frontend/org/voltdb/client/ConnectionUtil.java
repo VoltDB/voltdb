@@ -199,6 +199,7 @@ public class ConnectionUtil {
         if (sslEngine != null) {
             SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
             if (!handshaker.handshake()) {
+                aChannel.close();
                 throw new IOException("SSL handshake failed");
             }
         }
