@@ -17,6 +17,7 @@
 #include "MaterializedViewTriggerForWrite.h"
 
 #include "persistenttable.h"
+#include "MaterializedViewUtil.h"
 
 #include "catalog/indexref.h"
 #include "catalog/planfragment.h"
@@ -38,6 +39,8 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
     : MaterializedViewTriggerForInsert(destTable, mvInfo)
     , m_srcPersistentTable(srcTable)
     , m_minMaxSearchKeyBackingStoreSize(0)
+    , m_swappableSQL(MaterializedViewUtil::sourceTableDidact(
+              mvInfo->statementsql(), srcTable->name()))
 {
     // set up mechanisms for min/max recalculation
     setupMinMaxRecalculation(mvInfo->indexForMinMax(), mvInfo->fallbackQueryStmts());

@@ -415,6 +415,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
     }
+    case PLAN_NODE_TYPE_SWAPTABLES: {
+        return "SWAPTABLES";
+    }
     case PLAN_NODE_TYPE_SEND: {
         return "SEND";
     }
@@ -483,6 +486,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_INSERT;
     } else if (str == "DELETE") {
         return PLAN_NODE_TYPE_DELETE;
+    } else if (str == "SWAPTABLES") {
+        return PLAN_NODE_TYPE_SWAPTABLES;
     } else if (str == "SEND") {
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {

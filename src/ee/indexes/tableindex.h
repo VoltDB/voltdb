@@ -392,6 +392,11 @@ public:
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const;
 
     /**
+     * @return a compact definition of the index for swappability checking.
+     */
+    TableIndexScheme const& getScheme() const { return m_scheme; }
+
+    /**
      * Currently, UniqueIndex is just a TableIndex with additional checks.
      * We might have to make a different class in future for maximizing
      * performance of UniqueIndex.

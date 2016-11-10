@@ -25,27 +25,30 @@ namespace voltdb {
 
 class PersistentTableUndoTruncateTableAction: public UndoAction {
 public:
-    inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd,
+    inline PersistentTableUndoTruncateTableAction(TableCatalogDelegate * tcd,
             PersistentTable *originalTable, PersistentTable *emptyTable)
-    :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable)
+        : m_tcd(tcd)
+        , m_originalTable(originalTable)
+        , m_emptyTable(emptyTable)
     {}
 
 private:
     virtual ~PersistentTableUndoTruncateTableAction() {}
 
     /*
-     * Undo whatever this undo action was created to undo. In this case delete the newly constructed table,
+     * Undo whatever this undo action was created to undo.
+     *  In this case delete the newly constructed table,
      * and assign the table delegate with the original table.
      *
      */
     virtual void undo() {
-        m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
+        m_emptyTable->truncateTableForUndo(m_tcd, m_originalTable);
     }
 
     /*
-     * Release any resources held by the undo action. It will not need to be undone in the future.
-     * In this case delete all tuples from indexes, views and free the strings associated with each
-     * tuple in the original table.
+     * Release any resources held by the undo action. It will not need to be undone.
+     * In this case delete all tuples from indexes, views and free the strings
+     * associated with each tuple in the original table.
      */
     virtual void release() {
         //It's very important not to add anything else to this release method
@@ -57,12 +60,11 @@ private:
     }
 
 private:
-    VoltDBEngine * m_engine;
     TableCatalogDelegate * m_tcd;
     PersistentTable *m_originalTable;
     PersistentTable *m_emptyTable;
 };
 
-}
+}// namespace voltdb
 
 #endif /* PERSISTENTTABLEUNDOTRUNCATETABLEACTION_H_ */

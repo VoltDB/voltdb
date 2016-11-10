@@ -147,6 +147,7 @@ end
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
   Table? dest                       "The table which will be updated when the source table is updated"
   ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string statementsql               "The view definition's SELECT statement text"
   string predicate                  "A filtering predicate"
   string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"

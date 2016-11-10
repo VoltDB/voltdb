@@ -321,8 +321,22 @@ void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
 {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue intArray = obj.valueForKey(label);
-        for (int i = 0; i < intArray.arrayLen(); i++) {
+        int len = intArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
             result.push_back(intArray.valueAtIndex(i).asInt());
+        }
+    }
+}
+
+void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
+                                                     PlannerDomValue obj,
+                                                     std::vector<std::string>& result)
+{
+    if (obj.hasNonNullKey(label)) {
+        PlannerDomValue stringArray = obj.valueForKey(label);
+        int len = stringArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
+            result.push_back(stringArray.valueAtIndex(i).asStr());
         }
     }
 }

@@ -55,6 +55,7 @@
 #include "PersistentTableUndoInsertAction.h"
 #include "PersistentTableUndoDeleteAction.h"
 #include "PersistentTableUndoTruncateTableAction.h"
+#include "PersistentTableUndoSwapTableAction.h"
 #include "PersistentTableUndoUpdateAction.h"
 #include "TableCatalogDelegate.hpp"
 #include "tablefactory.h"
@@ -90,6 +91,8 @@
 #include <cstdio>
 #include <sstream>
 
+using namespace std;
+
 namespace voltdb {
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
@@ -124,6 +127,7 @@ PersistentTable::PersistentTable(int partitionColumn, const char * signature, bo
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
+    m_preSwapTable(NULL),
     m_isMaterialized(isMaterialized),
     m_drEnabled(drEnabled),
     m_noAvailableUniqueIndex(false),
@@ -143,7 +147,6 @@ PersistentTable::PersistentTable(int partitionColumn, const char * signature, bo
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
 
-    m_preTruncateTable = NULL;
     ::memcpy(&m_signature, signature, 20);
 }
 
@@ -319,16 +322,17 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
     }
 }
 
-void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd,
+void PersistentTable::truncateTableForUndo(TableCatalogDelegate * tcd,
         PersistentTable *originalTable) {
     VOLT_DEBUG("**** Truncate table undo *****\n");
 
     if (originalTable->m_tableStreamer != NULL) {
         // Elastic Index may complete when undo Truncate
-        unsetPreTruncateTable();
+        unsetPreSwapTable();
     }
 
-    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    auto views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
@@ -360,11 +364,11 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
         originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
 
-        unsetPreTruncateTable();
+        unsetPreSwapTable();
     }
 
     // Single table view.
-    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
+    auto views = originalTable->views();
     // reset all view table pointers
     BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
@@ -466,7 +470,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
         // There is an Elastic Index work going on and it should continue access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setPreTruncateTable(this);
+        emptyTable->setPreSwapTable(this);
     }
 
     // add matView
@@ -508,6 +512,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentSpHandle = ec->currentSpHandle();
@@ -515,13 +520,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn,
                                                 currentSpHandle, currentUniqueId);
 
-        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
             uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
         }
     }
 
-    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
     if (uq) {
         if (!fallible) {
             throwFatalException("Attempted to truncate table %s when there was an "
@@ -531,7 +534,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable));
     }
     else {
         if (fallible) {
@@ -545,6 +548,461 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 }
 
+struct Swappability {
+    vector<TableIndex*>* m_theIndexesToSwap;
+    vector<TableIndex*>* m_otherIndexesToSwap;
+    vector<TableIndex*>* m_theIndexesToRepopulate;
+    vector<TableIndex*>* m_otherIndexesToRepopulate;
+    vector<MaterializedViewTriggerForWrite*>* m_theScanViewsToSwap;
+    vector<MaterializedViewTriggerForWrite*>* m_otherScanViewsToSwap;
+    vector<MaterializedViewTriggerForWrite*>* m_theScanViewsToRepopulate;
+    vector<MaterializedViewTriggerForWrite*>* m_otherScanViewsToRepopulate;
+    vector<MaterializedViewHandler*>* m_theJoinViewsToSwap;
+    vector<MaterializedViewHandler*>* m_otherJoinViewsToSwap;
+    vector<MaterializedViewHandler*>* m_theJoinViewsToRepopulate;
+    vector<MaterializedViewHandler*>* m_otherJoinViewsToRepopulate;
+
+    void init() {
+        m_theIndexesToSwap = new vector<TableIndex*>();
+        m_otherIndexesToSwap = new vector<TableIndex*>();
+        m_theIndexesToRepopulate = new vector<TableIndex*>();
+        m_otherIndexesToRepopulate = new vector<TableIndex*>();
+        m_theScanViewsToSwap = new vector<MaterializedViewTriggerForWrite*>();
+        m_otherScanViewsToSwap = new vector<MaterializedViewTriggerForWrite*>();
+        m_theScanViewsToRepopulate = new vector<MaterializedViewTriggerForWrite*>();
+        m_otherScanViewsToRepopulate = new vector<MaterializedViewTriggerForWrite*>();
+        m_theJoinViewsToSwap = new vector<MaterializedViewHandler*>();
+        m_otherJoinViewsToSwap = new vector<MaterializedViewHandler*>();
+        m_theJoinViewsToRepopulate = new vector<MaterializedViewHandler*>();
+        m_otherJoinViewsToRepopulate = new vector<MaterializedViewHandler*>();
+    }
+
+    void analyze(PersistentTable* theTable, PersistentTable* otherTable) {
+        init();
+        analyzeIndexes(theTable, otherTable);
+        analyzeScanViews(theTable, otherTable);
+        analyzeJoinViews(theTable, otherTable);
+    }
+
+    void analyzeIndexes(PersistentTable* theTable, PersistentTable* otherTable) {
+        const auto& theIndexes = theTable->allIndexes();
+        const auto& otherIndexes = otherTable->allIndexes();
+        auto indexCount = theIndexes.size();
+        for (int ii = 0; ii < indexCount; ++ii) {
+            auto theIndex = theIndexes[ii];
+            auto otherIndex = otherIndexes[ii];
+            auto theSpec = TableCatalogDelegate::getIndexIdString(otherIndex->getScheme());
+            auto otherSpec = TableCatalogDelegate::getIndexIdString(otherIndex->getScheme());
+            if (theSpec == otherSpec) {
+                // Add the swappable pair.
+                m_theIndexesToSwap->push_back(theIndex);
+                m_otherIndexesToSwap->push_back(otherIndex);
+                continue;
+            }
+
+            bool unmatched;
+
+            unmatched = true;
+            auto otherBacklogCount = m_otherIndexesToRepopulate->size();
+            for (int jj = 0; jj < otherBacklogCount; ++jj) {
+                auto otherAltIndex = (*m_otherIndexesToRepopulate)[jj];
+                auto otherAltSpec = TableCatalogDelegate::getIndexIdString(otherAltIndex->getScheme());
+                if (theSpec == otherAltSpec) {
+                    // Add the swappable pair.
+                    m_theIndexesToSwap->push_back(theIndex);
+                    m_otherIndexesToSwap->push_back(otherAltIndex);
+
+                    // Take the matched other entry out of the backlog.
+                    if (jj != otherBacklogCount - 1) {
+                        (*m_otherIndexesToRepopulate)[jj] =
+                            (*m_otherIndexesToRepopulate)[otherBacklogCount - 1];
+                    }
+                    m_otherIndexesToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_theIndexesToRepopulate->push_back(theIndex);
+            }
+
+            unmatched = true;
+            auto theBacklogCount = m_theIndexesToRepopulate->size();
+            for (int jj = 0; jj < theBacklogCount; ++jj) {
+                auto theAltIndex = (*m_theIndexesToRepopulate)[jj];
+                auto theAltSpec = TableCatalogDelegate::getIndexIdString(theAltIndex->getScheme());//*/(theIndex->getName());
+                if (theAltSpec == otherSpec) {
+                    // Add the swappable pair.
+                    m_theIndexesToSwap->push_back(theAltIndex);
+                    m_otherIndexesToSwap->push_back(otherIndex);
+
+                    // Take the matched entry out of the backlog.
+                    if (jj != theBacklogCount - 1) {
+                        (*m_theIndexesToRepopulate)[jj] =
+                            (*m_theIndexesToRepopulate)[theBacklogCount - 1];
+                    }
+                    m_theIndexesToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_otherIndexesToRepopulate->push_back(otherIndex);
+            }
+        }
+    }
+
+    void analyzeScanViews(PersistentTable* theTable, PersistentTable* otherTable) {
+        const auto& theScanViews = theTable->views();
+        const auto& otherScanViews = otherTable->views();
+        auto viewCount = theScanViews.size();
+        for (int ii = 0; ii < viewCount; ++ii) {
+            auto theScanView = theScanViews[ii];
+            auto otherScanView = otherScanViews[ii];
+            auto theSpec = theScanView->getSwappableSQL();
+            auto otherSpec = otherScanView->getSwappableSQL();
+            if (theSpec == otherSpec) {
+                // Add the swappable pair.
+                m_theScanViewsToSwap->push_back(theScanView);
+                m_otherScanViewsToSwap->push_back(otherScanView);
+                continue;
+            }
+
+            bool unmatched;
+
+            unmatched = true;
+            auto otherBacklogCount = m_otherScanViewsToRepopulate->size();
+            for (int jj = 0; jj < otherBacklogCount; ++jj) {
+                auto otherAltScanView = (*m_otherScanViewsToRepopulate)[jj];
+                auto otherAltSpec = otherAltScanView->getSwappableSQL();
+                if (theSpec == otherAltSpec) {
+                    // Add the swappable pair.
+                    m_theScanViewsToSwap->push_back(theScanView);
+                    m_otherScanViewsToSwap->push_back(otherAltScanView);
+
+                    // Take the matched other entry out of the backlog.
+                    if (jj != otherBacklogCount - 1) {
+                        (*m_otherScanViewsToRepopulate)[jj] =
+                            (*m_otherScanViewsToRepopulate)[otherBacklogCount - 1];
+                    }
+                    m_otherScanViewsToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_theScanViewsToRepopulate->push_back(theScanView);
+            }
+
+            unmatched = true;
+            auto theBacklogCount = m_theScanViewsToRepopulate->size();
+            for (int jj = 0; jj < theBacklogCount; ++jj) {
+                auto theAltScanView = (*m_theScanViewsToRepopulate)[jj];
+                auto theAltSpec = theAltScanView->getSwappableSQL();
+                if (theAltSpec == otherSpec) {
+                    // Add the swappable pair.
+                    m_theScanViewsToSwap->push_back(theAltScanView);
+                    m_otherScanViewsToSwap->push_back(otherScanView);
+
+                    // Take the matched entry out of the backlog.
+                    if (jj != theBacklogCount - 1) {
+                        (*m_theScanViewsToRepopulate)[jj] =
+                            (*m_theScanViewsToRepopulate)[theBacklogCount - 1];
+                    }
+                    m_theScanViewsToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_otherScanViewsToRepopulate->push_back(otherScanView);
+            }
+        }
+    }
+
+    void analyzeJoinViews(PersistentTable* theTable, PersistentTable* otherTable) {
+        const auto& theJoinViews = theTable->allViewHandlers();
+        const auto& otherJoinViews = otherTable->allViewHandlers();
+        auto viewCount = theJoinViews.size();
+        for (int ii = 0; ii < viewCount; ++ii) {
+            auto theJoinView = theJoinViews[ii];
+            auto otherJoinView = otherJoinViews[ii];
+            auto theSpec = theJoinView->getSwappableSQL(theTable);
+            auto otherSpec = otherJoinView->getSwappableSQL(otherTable);
+            if (theSpec == otherSpec) {
+                // Add the swappable pair.
+                m_theJoinViewsToSwap->push_back(theJoinView);
+                m_otherJoinViewsToSwap->push_back(otherJoinView);
+                continue;
+            }
+
+            bool unmatched;
+
+            unmatched = true;
+            auto otherBacklogCount = m_otherJoinViewsToRepopulate->size();
+            for (int jj = 0; jj < otherBacklogCount; ++jj) {
+                auto otherAltJoinView = (*m_otherJoinViewsToRepopulate)[jj];
+                auto otherAltSpec = otherAltJoinView->getSwappableSQL(otherTable);
+                if (theSpec == otherAltSpec) {
+                    // Add the swappable pair.
+                    m_theJoinViewsToSwap->push_back(theJoinView);
+                    m_otherJoinViewsToSwap->push_back(otherAltJoinView);
+
+                    // Take the matched other entry out of the backlog.
+                    if (jj != otherBacklogCount - 1) {
+                        (*m_otherJoinViewsToRepopulate)[jj] =
+                            (*m_otherJoinViewsToRepopulate)[otherBacklogCount - 1];
+                    }
+                    m_otherJoinViewsToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_theJoinViewsToRepopulate->push_back(theJoinView);
+            }
+
+            unmatched = true;
+            auto theBacklogCount = m_theJoinViewsToRepopulate->size();
+            for (int jj = 0; jj < theBacklogCount; ++jj) {
+                auto theAltJoinView = (*m_theJoinViewsToRepopulate)[jj];
+                auto theAltSpec = theAltJoinView->getSwappableSQL(theTable);
+                if (theAltSpec == otherSpec) {
+                    // Add the swappable pair.
+                    m_theJoinViewsToSwap->push_back(theAltJoinView);
+                    m_otherJoinViewsToSwap->push_back(otherJoinView);
+
+                    // Take the matched entry out of the backlog.
+                    if (jj != theBacklogCount - 1) {
+                        (*m_theJoinViewsToRepopulate)[jj] =
+                            (*m_theJoinViewsToRepopulate)[theBacklogCount - 1];
+                    }
+                    m_theJoinViewsToRepopulate->pop_back();
+                    unmatched = false;
+                    break;
+                }
+            }
+            if (unmatched) {
+                m_otherJoinViewsToRepopulate->push_back(otherJoinView);
+            }
+        }
+    }
+
+};
+
+void PersistentTable::swapTable(PersistentTable* otherTable,
+                                VoltDBEngine* engine, bool fallible) {
+    Swappability analysis;
+    analysis.analyze(this, otherTable);
+    swapTable
+           (otherTable, engine,
+            *analysis.m_theIndexesToSwap,
+            *analysis.m_otherIndexesToSwap,
+            *analysis.m_theIndexesToRepopulate,
+            *analysis.m_otherIndexesToRepopulate,
+            *analysis.m_theScanViewsToSwap,
+            *analysis.m_otherScanViewsToSwap,
+            *analysis.m_theScanViewsToRepopulate,
+            *analysis.m_otherScanViewsToRepopulate,
+            *analysis.m_theJoinViewsToSwap,
+            *analysis.m_otherJoinViewsToSwap,
+            *analysis.m_theJoinViewsToRepopulate,
+            *analysis.m_otherJoinViewsToRepopulate);
+    if (fallible) {
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        uq->registerUndoAction(new (*uq) PersistentTableUndoSwapTableAction(this, otherTable));
+    }
+}
+
+void PersistentTable::swapTable
+       (PersistentTable* otherTable,
+        VoltDBEngine* engine,
+        TableIndexVector& theIndexesToSwap,
+        TableIndexVector& otherIndexesToSwap,
+        TableIndexVector& theIndexesToRepopulate,
+        TableIndexVector& otherIndexesToRepopulate,
+        ScanViewVector& theScanViewsToSwap,
+        ScanViewVector& otherScanViewsToSwap,
+        ScanViewVector& theScanViewsToRepopulate,
+        ScanViewVector& otherScanViewsToRepopulate,
+        JoinViewVector& joinViewsToSwap,
+        JoinViewVector& otherJoinViewsToSwap,
+        JoinViewVector& joinViewsToRepopulate,
+        JoinViewVector& otherJoinViewsToRepopulate) {
+    auto tcd1 = engine->getTableDelegate(m_name);
+    if (tcd1->getTable() == this) {
+        cout << "Found this " << endl;
+    tcd1->setTable(otherTable);
+    }
+    else {
+        cout << "Should have found this " << endl;
+    }
+    if (tcd1->getTable() == this) {
+        cout << "Should not have found this " << endl;
+    }
+
+    auto tcd2 = engine->getTableDelegate(otherTable->m_name);
+    if (tcd2->getTable() == otherTable) {
+        cout << "Found other " << endl;
+    tcd2->setTable(this);
+    }
+    else {
+        cout << "Should have found other " << endl;
+    }
+    if (tcd2->getTable() == otherTable) {
+        cout << "Should not have found other " << endl;
+    }
+
+    auto namedTable = dynamic_cast<PersistentTable*>(engine->getTable(m_name));
+    if (namedTable != otherTable) {
+        cout << "This table mismatch: " << (void*)namedTable << " vs " << (void*)this << " vs " << (void*)otherTable << endl;
+    }
+    namedTable = dynamic_cast<PersistentTable*>(engine->getTable(otherTable->m_name));
+    if (namedTable != this) {
+        cout << "Other table mismatch: " << (void*)namedTable << " vs " << (void*)this << " vs " << (void*)otherTable << endl;
+    }
+
+    // Swap the table attributes that must continue to be associated with each
+    // table's name/identity, not its swapped content.
+    // We MIGHT want to consider making these attributes of TableCatalogDelegate
+    // instead of PersistentTable?
+
+    auto name1 = m_name;
+    auto name2 = otherTable->m_name;
+    m_name = name2;
+    otherTable->m_name = name1;
+
+    auto preSwapTable1 = currentPreSwapTable();
+    auto preSwapTable2 = otherTable->currentPreSwapTable();
+    m_preSwapTable = preSwapTable2;
+    otherTable->m_preSwapTable = preSwapTable1;
+
+    auto streamer1 = m_tableStreamer;
+    auto streamer2 = otherTable->m_tableStreamer;
+    m_tableStreamer = streamer2;
+    otherTable->m_tableStreamer = streamer1;
+
+    // Swap the names of the corresponding indexes.
+    swapTableIndexes(otherTable, theIndexesToSwap, otherIndexesToSwap);
+    // Some day, we may want to deal with repopulation of asymmetric indexes
+    // and enforcement of asymmetric constraints.
+    repopulateSwappedTableIndexes(otherTable,
+            theIndexesToRepopulate, otherIndexesToRepopulate);
+
+    // Swap the names of the corresponding views.
+    swapTableViews
+           (otherTable, engine,
+            theScanViewsToSwap, otherScanViewsToSwap,
+            joinViewsToSwap, otherJoinViewsToSwap);
+    // Some day, we may want to deal with repopulation of asymmetric views
+    repopulateSwappedTableViews
+           (otherTable,
+            theScanViewsToRepopulate, otherScanViewsToRepopulate,
+            joinViewsToRepopulate, otherJoinViewsToRepopulate);
+}
+
+void PersistentTable::swapTableIndexes
+       (PersistentTable* otherTable,
+        TableIndexVector& theIndexesToSwap,
+        TableIndexVector& otherIndexesToSwap) {
+    size_t nSwaps = theIndexesToSwap.size();
+    assert(nSwaps == otherIndexesToSwap.size());
+
+    // FIXME: FOR NOW, every index on the two tables must be swappable
+    // because we never repopulate them.
+    assert(nSwaps == otherTable->indexCount());
+    assert(nSwaps == indexCount());
+
+    for (int ii = 0; ii < nSwaps; ++ii) {
+        TableIndex* theIndex = theIndexesToSwap[ii];
+        assert(theIndex);
+        const string& theName = theIndex->getName();
+        TableIndex* otherIndex = otherIndexesToSwap[ii];
+        assert(otherIndex);
+        const string& otherName = otherIndex->getName();
+
+        theIndex->rename(otherName);
+        otherIndex->rename(theName);
+    }
+}
+
+void PersistentTable::repopulateSwappedTableIndexes
+       (PersistentTable* otherTable,
+        TableIndexVector& theIndexesToRepopulate,
+        TableIndexVector& otherIndexesToRepopulate) {
+    // FIXME: SOME DAY, we may want to deal with repopulation
+    // of asymmetric indexes
+    // and enforcement of asymmetric constraints.
+    assert(theIndexesToRepopulate.size() == 0);
+    assert(otherIndexesToRepopulate.size() == 0);
+}
+
+void PersistentTable::swapTableViews
+       (PersistentTable* otherTable,
+        VoltDBEngine* engine,
+        ScanViewVector& theScanViewsToSwap,
+        ScanViewVector& otherScanViewsToSwap,
+        JoinViewVector& theJoinViewsToSwap,
+        JoinViewVector& otherJoinViewsToSwap) {
+    size_t nScanSwaps = theScanViewsToSwap.size();
+    assert(nScanSwaps == otherScanViewsToSwap.size());
+    size_t nJoinSwaps = theJoinViewsToSwap.size();
+    assert(nJoinSwaps == otherJoinViewsToSwap.size());
+
+    // FIXME: FOR NOW, every view on the two tables must be swappable,
+    // because we never repopulate.
+    assert(nScanSwaps == otherTable->m_views.size());
+    assert(nScanSwaps == m_views.size());
+    assert(nJoinSwaps == otherTable->m_viewHandlers.size());
+    assert(nJoinSwaps == m_viewHandlers.size());
+
+    // View swapping involves two steps.
+    // Step 1 is to swap the view target tables to ensure that
+    // query plans are now executed against the other target table.
+    // That's just a recursive application of swapTable.
+    // Step 2 is to swap the plans embedded in the views.
+    // This is required to keep each target table refreshing from the
+    // same source table, in spite of all the name changes that have
+    // occured thus far to the tables and indexes.
+    // This step needs to avoid undoing its own work in the edge
+    // case where the view joins BOTH of the tables in the swap.
+    // In such a case, the views would need to be swapped exactly once --
+    // no double-dipping.
+    for (int ii = 0; ii < nScanSwaps; ++ii) {
+        auto theView = theScanViewsToSwap[ii];
+        PersistentTable* theTarget = theView->targetTable();
+        auto otherView = otherScanViewsToSwap[ii];
+        PersistentTable* otherTarget = otherView->targetTable();
+        theTarget->swapTable(otherTarget, engine);
+
+        theView->swapPlans(otherView);
+    }
+
+    for (int ii = 0; ii < nJoinSwaps; ++ii) {
+        auto theView = theJoinViewsToSwap[ii];
+        PersistentTable* theTarget = theView->destTable();
+        auto otherView = otherJoinViewsToSwap[ii];
+        PersistentTable* otherTarget = otherView->destTable();
+        theTarget->swapTable(otherTarget, engine);
+
+        theView->swapPlans(otherView);
+    }
+
+}
+
+void PersistentTable::repopulateSwappedTableViews
+       (PersistentTable* otherTable,
+        ScanViewVector& theScanViewsToRepopulate,
+        ScanViewVector& otherScanViewsToRepopulate,
+        JoinViewVector& joinViewsToRepopulate,
+        JoinViewVector& otherJoinViewsToRepopulate) {
+    // FIXME: SOME DAY, we may want to deal with repopulation
+    // of asymmetric views.
+    assert(theScanViewsToRepopulate.size() == 0);
+    assert(otherScanViewsToRepopulate.size() == 0);
+    assert(joinViewsToRepopulate.size() == 0);
+    assert(otherJoinViewsToRepopulate.size() == 0);
+}
 
 void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(0, source.getNValue(1));

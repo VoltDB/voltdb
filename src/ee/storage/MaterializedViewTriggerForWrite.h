@@ -52,6 +52,13 @@ public:
                                  mvInfo->fallbackQueryStmts());
     }
 
+    void swapPlans(MaterializedViewTriggerForWrite* otherView) {
+        auto fallbackExecutorVectors = m_fallbackExecutorVectors;
+        m_fallbackExecutorVectors = otherView->m_fallbackExecutorVectors;
+        otherView->m_fallbackExecutorVectors = fallbackExecutorVectors;
+    }
+
+    std::string getSwappableSQL() const { return m_swappableSQL; }
 
 private:
     MaterializedViewTriggerForWrite(PersistentTable *srcTable,
@@ -87,7 +94,10 @@ private:
     boost::shared_array<char> m_minMaxSearchKeyBackingStore;
     size_t m_minMaxSearchKeyBackingStoreSize;
     // the index on srcTable which can be used to find each fallback min or max column.
-    std::vector<TableIndex *> m_indexForMinMax;
+    std::vector<TableIndex*> m_indexForMinMax;
+    // The view's defining select statement with the table name elided to allow
+    // matching with another table's identically defined view.
+    std::string m_swappableSQL;
     // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
     std::vector<boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
     std::vector<bool> m_usePlanForAgg;
