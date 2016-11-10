@@ -37,7 +37,7 @@ final public class TxnEgo {
     static final long SEQUENCE_MAX_VALUE = (1L << SEQUENCE_BITS) - 1L;
     static final int PARTITIONID_MAX_VALUE = (1 << PARTITIONID_BITS) - 1;
 
-    // (Copy/Pasted (on purpose) from voltdb.TransactionIdManager)
+    // (Copy/Pasted (on purpose) from voltcore.TransactionIdManager)
     // The legacy transaction id included 40-bits of timestamp starting
     // from VOLT_EPOCH: time in millis since 1/1/2008 at 12am. Iv2 ids
     // are seeded from 12/31/2014 to guarantee uniqueness with previously
