@@ -27,7 +27,7 @@
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),
-    @Grab('org.apache.kafka:kafka_2.10:0.8.2.1'),
+    @Grab('org.apache.kafka:kafka_2.11:0.8.2.2'),
     @GrabExclude('javax.mail:mail'),
     @GrabExclude('javax.jms:jms'),
     @GrabExclude('com.sun.jdmk:jmxtools')
@@ -97,6 +97,7 @@ class Fetcher {
     final long startOffset
     final SimpleConsumer cnsmr
     final int msglmt
+    final int fetchWait
     final SettableFuture<ProbeResults> fut = SettableFuture.create()
 
     ListenableFuture<ProbeResults> fetch() {
@@ -104,6 +105,9 @@ class Fetcher {
             try {
                 FetchRequestBuilder frb =
                     new FetchRequestBuilder().clientId(clientId)
+                if (fetchWait > 0) {
+                    frb.maxWait(fetchWait).minBytes(64)
+                }
                 int msgcnt = 0
                 long bytes = 0L
                 long offset = startOffset
@@ -146,6 +150,8 @@ cli.with {
     g(longOpt: 'group', 'consumenr group', required:true, args:1)
     t(longOpt: 'topic', 'kafka topic', required:true, args:1)
     h(longOpt: 'help', 'usage information', required: false)
+    w(longOpt: 'wait', 'fetch request wait time', args:1, required:false)
+    m(longOpt: 'messages', 'number of messages to read', args:1, required:false)
 }
 
 def opts = cli.parse(args)
@@ -158,6 +164,8 @@ if (opts.h) {
 
 topic = opts.t
 group = opts.g
+fwait = (opts.w ?: '-1').replaceAll('_','') as int
+msgs  = (opts.m ?: '1_000').replaceAll('_','') as int
 
 SO_TIMEOUT = 100 * 1000
 SO_BUFFSIZE = 64 * 1024
@@ -209,7 +217,7 @@ ofstldr = new Attempter(brokers).attempt {
     chnl
 }
 
-printf("%-36s %4s %16s %16s %16s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED')
+printf("%-36s %4s %16s %16s %16s %12s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED','LAG')
 
 prtldrs.collect { int p, Broker b ->
     cnsmr = new SimpleConsumer(b.host(), b.port(), SO_TIMEOUT, SO_BUFFSIZE, clientid)
@@ -248,11 +256,14 @@ prtldrs.collect { int p, Broker b ->
         throw ErrorMapping.exceptionFor(code)
     }
 
-    printf("%-36s %4d %,16d %,16d %,16d\n",topic,p,earliest,latest,committed)
+    long lag = (committed <= 0 || committed < earliest) ? (latest-earliest) :
+        (committed > latest) ? 0L : (latest-committed)
+
+    printf("%-36s %4d %,16d %,16d %,16d %,12d\n",topic,p,earliest,latest,committed,lag)
 
     long offset = committed < earliest ? earliest : committed < latest ? committed : latest
 
-    new Fetcher(tnp,clientid,offset,cnsmr,1_000)
+    new Fetcher(tnp,clientid,offset,cnsmr,msgs,fwait)
 }.collect {
     it.fetch()
 }.collect {
@@ -260,7 +271,7 @@ prtldrs.collect { int p, Broker b ->
 }.eachWithIndex { it, i ->
     if (i==0) println ""
     it.with {
-        printf("Read %,5d messages totaling %,d bytes from topic and partition %s starting from offset %,d\n",
+        printf("Read %,7d messages totaling %,d bytes from %s starting from offset %,d\n",
                msgs, bytes, tnp, startOffset)
     }
 }
