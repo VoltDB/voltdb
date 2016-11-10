@@ -20,7 +20,7 @@ if sys.hexversion < 0x02050000:
     raise Exception("Python version 2.5 or greater is required.")
 import array
 import socket
-import ssl, jks, base64, textwrap
+import ssl, base64, textwrap
 import struct
 import datetime
 import decimal
@@ -283,6 +283,7 @@ class FastSerializer:
             f.write("\n-----END %s-----\n" % type)
 
         # extract key and certs
+        import jks
         if 'keystore' in jks_config and jks_config['keystore'] and \
                 'keystorepassword' in jks_config and jks_config['keystorepassword']:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
@@ -302,17 +303,18 @@ class FastSerializer:
             self.ssl_config['keyfile'] = keyfile.name
             self.ssl_config['certfile'] = certfile.name
 
-        # extract ca certs
-        if 'truststore' in jks_config and jks_config['truststore'] and \
-                        'truststorepassword' in jks_config and jks_config['truststorepassword']:
-            ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
-            cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
-            for alias, c in ts.certs.items():
-                # print("Certificate: %s" % c.alias)
-                write_pem(c.cert, "CERTIFICATE", cafile)
-            cafile.close()
-            self.ssl_config['ca_certs'] = cafile.name
-            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+            # extract ca certs
+            if 'truststore' in jks_config and jks_config['truststore'] and \
+                            'truststorepassword' in jks_config and jks_config['truststorepassword']:
+                ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
+                cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
+                for alias, c in ts.certs.items():
+                    # print("Certificate: %s" % c.alias)
+                    write_pem(c.cert, "CERTIFICATE", cafile)
+
+                cafile.close()
+                self.ssl_config['ca_certs'] = cafile.name
+                self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
                                self.ssl_config['certfile'], False,
