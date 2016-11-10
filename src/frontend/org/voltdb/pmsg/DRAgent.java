@@ -2416,15 +2416,15 @@ public final class DRAgent {
      */
     int getClusterId();
 
-    // optional fixed64 persistInstanceId = 2;
+    // optional fixed64 clusterCreationId = 2;
     /**
-     * <code>optional fixed64 persistInstanceId = 2;</code>
+     * <code>optional fixed64 clusterCreationId = 2;</code>
      */
-    boolean hasPersistInstanceId();
+    boolean hasClusterCreationId();
     /**
-     * <code>optional fixed64 persistInstanceId = 2;</code>
+     * <code>optional fixed64 clusterCreationId = 2;</code>
      */
-    long getPersistInstanceId();
+    long getClusterCreationId();
 
     // optional int32 protocolVersion = 3;
     /**
@@ -2494,7 +2494,7 @@ public final class DRAgent {
             }
             case 17: {
               bitField0_ |= 0x00000002;
-              persistInstanceId_ = input.readFixed64();
+              clusterCreationId_ = input.readFixed64();
               break;
             }
             case 24: {
@@ -2558,20 +2558,20 @@ public final class DRAgent {
       return clusterId_;
     }
 
-    // optional fixed64 persistInstanceId = 2;
-    public static final int PERSISTINSTANCEID_FIELD_NUMBER = 2;
-    private long persistInstanceId_;
+    // optional fixed64 clusterCreationId = 2;
+    public static final int CLUSTERCREATIONID_FIELD_NUMBER = 2;
+    private long clusterCreationId_;
     /**
-     * <code>optional fixed64 persistInstanceId = 2;</code>
+     * <code>optional fixed64 clusterCreationId = 2;</code>
      */
-    public boolean hasPersistInstanceId() {
+    public boolean hasClusterCreationId() {
       return ((bitField0_ & 0x00000002) == 0x00000002);
     }
     /**
-     * <code>optional fixed64 persistInstanceId = 2;</code>
+     * <code>optional fixed64 clusterCreationId = 2;</code>
      */
-    public long getPersistInstanceId() {
-      return persistInstanceId_;
+    public long getClusterCreationId() {
+      return clusterCreationId_;
     }
 
     // optional int32 protocolVersion = 3;
@@ -2592,7 +2592,7 @@ public final class DRAgent {
 
     private void initFields() {
       clusterId_ = 0;
-      persistInstanceId_ = 0L;
+      clusterCreationId_ = 0L;
       protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
@@ -2611,7 +2611,7 @@ public final class DRAgent {
         output.writeInt32(1, clusterId_);
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeFixed64(2, persistInstanceId_);
+        output.writeFixed64(2, clusterCreationId_);
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         output.writeInt32(3, protocolVersion_);
@@ -2631,7 +2631,7 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(2, persistInstanceId_);
+          .computeFixed64Size(2, clusterCreationId_);
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
@@ -2755,7 +2755,7 @@ public final class DRAgent {
         super.clear();
         clusterId_ = 0;
         bitField0_ = (bitField0_ & ~0x00000001);
-        persistInstanceId_ = 0L;
+        clusterCreationId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
         protocolVersion_ = 0;
         bitField0_ = (bitField0_ & ~0x00000004);
@@ -2794,7 +2794,7 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
           to_bitField0_ |= 0x00000002;
         }
-        result.persistInstanceId_ = persistInstanceId_;
+        result.clusterCreationId_ = clusterCreationId_;
         if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
           to_bitField0_ |= 0x00000004;
         }
@@ -2818,8 +2818,8 @@ public final class DRAgent {
         if (other.hasClusterId()) {
           setClusterId(other.getClusterId());
         }
-        if (other.hasPersistInstanceId()) {
-          setPersistInstanceId(other.getPersistInstanceId());
+        if (other.hasClusterCreationId()) {
+          setClusterCreationId(other.getClusterCreationId());
         }
         if (other.hasProtocolVersion()) {
           setProtocolVersion(other.getProtocolVersion());
@@ -2884,35 +2884,35 @@ public final class DRAgent {
         return this;
       }
 
-      // optional fixed64 persistInstanceId = 2;
-      private long persistInstanceId_ ;
+      // optional fixed64 clusterCreationId = 2;
+      private long clusterCreationId_ ;
       /**
-       * <code>optional fixed64 persistInstanceId = 2;</code>
+       * <code>optional fixed64 clusterCreationId = 2;</code>
        */
-      public boolean hasPersistInstanceId() {
+      public boolean hasClusterCreationId() {
         return ((bitField0_ & 0x00000002) == 0x00000002);
       }
       /**
-       * <code>optional fixed64 persistInstanceId = 2;</code>
+       * <code>optional fixed64 clusterCreationId = 2;</code>
        */
-      public long getPersistInstanceId() {
-        return persistInstanceId_;
+      public long getClusterCreationId() {
+        return clusterCreationId_;
       }
       /**
-       * <code>optional fixed64 persistInstanceId = 2;</code>
+       * <code>optional fixed64 clusterCreationId = 2;</code>
        */
-      public Builder setPersistInstanceId(long value) {
+      public Builder setClusterCreationId(long value) {
         bitField0_ |= 0x00000002;
-        persistInstanceId_ = value;
+        clusterCreationId_ = value;
         onChanged();
         return this;
       }
       /**
-       * <code>optional fixed64 persistInstanceId = 2;</code>
+       * <code>optional fixed64 clusterCreationId = 2;</code>
        */
-      public Builder clearPersistInstanceId() {
+      public Builder clearClusterCreationId() {
         bitField0_ = (bitField0_ & ~0x00000002);
-        persistInstanceId_ = 0L;
+        clusterCreationId_ = 0L;
         onChanged();
         return this;
       }
@@ -9430,15 +9430,15 @@ public final class DRAgent {
      */
     int getClusterId();
 
-    // required fixed64 clusterPersistedId = 2;
+    // required fixed64 clusterCreationId = 2;
     /**
-     * <code>required fixed64 clusterPersistedId = 2;</code>
+     * <code>required fixed64 clusterCreationId = 2;</code>
      */
-    boolean hasClusterPersistedId();
+    boolean hasClusterCreationId();
     /**
-     * <code>required fixed64 clusterPersistedId = 2;</code>
+     * <code>required fixed64 clusterCreationId = 2;</code>
      */
-    long getClusterPersistedId();
+    long getClusterCreationId();
   }
   /**
    * Protobuf type {@code pmsg.ClusterInfo}
@@ -9498,7 +9498,7 @@ public final class DRAgent {
             }
             case 17: {
               bitField0_ |= 0x00000002;
-              clusterPersistedId_ = input.readFixed64();
+              clusterCreationId_ = input.readFixed64();
               break;
             }
           }
@@ -9557,25 +9557,25 @@ public final class DRAgent {
       return clusterId_;
     }
 
-    // required fixed64 clusterPersistedId = 2;
-    public static final int CLUSTERPERSISTEDID_FIELD_NUMBER = 2;
-    private long clusterPersistedId_;
+    // required fixed64 clusterCreationId = 2;
+    public static final int CLUSTERCREATIONID_FIELD_NUMBER = 2;
+    private long clusterCreationId_;
     /**
-     * <code>required fixed64 clusterPersistedId = 2;</code>
+     * <code>required fixed64 clusterCreationId = 2;</code>
      */
-    public boolean hasClusterPersistedId() {
+    public boolean hasClusterCreationId() {
       return ((bitField0_ & 0x00000002) == 0x00000002);
     }
     /**
-     * <code>required fixed64 clusterPersistedId = 2;</code>
+     * <code>required fixed64 clusterCreationId = 2;</code>
      */
-    public long getClusterPersistedId() {
-      return clusterPersistedId_;
+    public long getClusterCreationId() {
+      return clusterCreationId_;
     }
 
     private void initFields() {
       clusterId_ = 0;
-      clusterPersistedId_ = 0L;
+      clusterCreationId_ = 0L;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -9586,7 +9586,7 @@ public final class DRAgent {
         memoizedIsInitialized = 0;
         return false;
       }
-      if (!hasClusterPersistedId()) {
+      if (!hasClusterCreationId()) {
         memoizedIsInitialized = 0;
         return false;
       }
@@ -9601,7 +9601,7 @@ public final class DRAgent {
         output.writeInt32(1, clusterId_);
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeFixed64(2, clusterPersistedId_);
+        output.writeFixed64(2, clusterCreationId_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -9618,7 +9618,7 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(2, clusterPersistedId_);
+          .computeFixed64Size(2, clusterCreationId_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -9738,7 +9738,7 @@ public final class DRAgent {
         super.clear();
         clusterId_ = 0;
         bitField0_ = (bitField0_ & ~0x00000001);
-        clusterPersistedId_ = 0L;
+        clusterCreationId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
         return this;
       }
@@ -9775,7 +9775,7 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
           to_bitField0_ |= 0x00000002;
         }
-        result.clusterPersistedId_ = clusterPersistedId_;
+        result.clusterCreationId_ = clusterCreationId_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -9795,8 +9795,8 @@ public final class DRAgent {
         if (other.hasClusterId()) {
           setClusterId(other.getClusterId());
         }
-        if (other.hasClusterPersistedId()) {
-          setClusterPersistedId(other.getClusterPersistedId());
+        if (other.hasClusterCreationId()) {
+          setClusterCreationId(other.getClusterCreationId());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -9807,7 +9807,7 @@ public final class DRAgent {
           
           return false;
         }
-        if (!hasClusterPersistedId()) {
+        if (!hasClusterCreationId()) {
           
           return false;
         }
@@ -9866,35 +9866,35 @@ public final class DRAgent {
         return this;
       }
 
-      // required fixed64 clusterPersistedId = 2;
-      private long clusterPersistedId_ ;
+      // required fixed64 clusterCreationId = 2;
+      private long clusterCreationId_ ;
       /**
-       * <code>required fixed64 clusterPersistedId = 2;</code>
+       * <code>required fixed64 clusterCreationId = 2;</code>
        */
-      public boolean hasClusterPersistedId() {
+      public boolean hasClusterCreationId() {
         return ((bitField0_ & 0x00000002) == 0x00000002);
       }
       /**
-       * <code>required fixed64 clusterPersistedId = 2;</code>
+       * <code>required fixed64 clusterCreationId = 2;</code>
        */
-      public long getClusterPersistedId() {
-        return clusterPersistedId_;
+      public long getClusterCreationId() {
+        return clusterCreationId_;
       }
       /**
-       * <code>required fixed64 clusterPersistedId = 2;</code>
+       * <code>required fixed64 clusterCreationId = 2;</code>
        */
-      public Builder setClusterPersistedId(long value) {
+      public Builder setClusterCreationId(long value) {
         bitField0_ |= 0x00000002;
-        clusterPersistedId_ = value;
+        clusterCreationId_ = value;
         onChanged();
         return this;
       }
       /**
-       * <code>required fixed64 clusterPersistedId = 2;</code>
+       * <code>required fixed64 clusterCreationId = 2;</code>
        */
-      public Builder clearClusterPersistedId() {
+      public Builder clearClusterCreationId() {
         bitField0_ = (bitField0_ & ~0x00000002);
-        clusterPersistedId_ = 0L;
+        clusterCreationId_ = 0L;
         onChanged();
         return this;
       }
@@ -15854,7 +15854,7 @@ public final class DRAgent {
       "nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitionId\030\001 \001(" +
       "\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n\013partiti" +
       "onId\030\001 \001(\005\"P\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
-      "\022\031\n\021persistInstanceId\030\002 \001(\006\022\027\n\017protocolV" +
+      "\022\031\n\021clusterCreationId\030\002 \001(\006\022\027\n\017protocolV" +
       "ersion\030\003 \001(\005\"t\n\tSubscribe\022\023\n\013partitionId" +
       "\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\nisCovering\030",
       "\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 \001(\006\022\021\n\tisSyn" +
@@ -15882,34 +15882,34 @@ public final class DRAgent {
       "\030\001 \001(\010\"\200\001\n\017ConnectResponse\022\022\n\ncatalogCRC" +
       "\030\001 \001(\006\022\030\n\020catalogSignature\030\002 \001(\t\022\027\n\017prot" +
       "ocolVersion\030\003 \001(\005\022&\n\013clusterInfo\030\004 \003(\0132\021" +
-      ".pmsg.ClusterInfo\"<\n\013ClusterInfo\022\021\n\tclus" +
-      "terId\030\001 \002(\005\022\032\n\022clusterPersistedId\030\002 \002(\006\"" +
-      "\275\001\n\rQueryResponse\022\026\n\016instanceIdHash\030\001 \001(" +
-      "\006\022\017\n\007version\030\002 \001(\t\022\027\n\017protocolVersion\030\003 " +
-      "\001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n",
-      "\024globalPartitionCount\030\007 \001(\005\022*\n\rpartition" +
-      "Info\030\010 \003(\0132\023.pmsg.PartitionInfo\"@\n\010NodeI" +
-      "nfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n" +
-      "\ncatalogCRC\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013p" +
-      "artitionId\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 " +
-      "\001(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022lastSen" +
-      "tTupleIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001" +
-      "(\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022\034\n\024ou" +
-      "tstandingByteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001" +
-      "(\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001",
-      "(\003\022\017\n\007isEnded\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004" +
-      "type\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002i" +
-      "d\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg." +
-      "Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause" +
-      "\030\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016." +
-      "pmsg.Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pms" +
-      "g.SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg." +
-      "Subscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connec" +
-      "t\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020" +
-      "\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_R",
-      "EQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013" +
-      "\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb" +
-      ".pmsgB\007DRAgent"
+      ".pmsg.ClusterInfo\";\n\013ClusterInfo\022\021\n\tclus" +
+      "terId\030\001 \002(\005\022\031\n\021clusterCreationId\030\002 \002(\006\"\275" +
+      "\001\n\rQueryResponse\022\026\n\016instanceIdHash\030\001 \001(\006" +
+      "\022\017\n\007version\030\002 \001(\t\022\027\n\017protocolVersion\030\003 \001" +
+      "(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024",
+      "globalPartitionCount\030\007 \001(\005\022*\n\rpartitionI" +
+      "nfo\030\010 \003(\0132\023.pmsg.PartitionInfo\"@\n\010NodeIn" +
+      "fo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\n" +
+      "catalogCRC\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013pa" +
+      "rtitionId\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001" +
+      "(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022lastSent" +
+      "TupleIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(" +
+      "\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022\034\n\024out" +
+      "standingByteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(" +
+      "\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(",
+      "\003\022\017\n\007isEnded\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004t" +
+      "ype\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id" +
+      "\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.A" +
+      "ck\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030" +
+      "\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.p" +
+      "msg.Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg" +
+      ".SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.S" +
+      "ubscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect" +
+      "\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003" +
+      "\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_RE",
+      "Q\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n" +
+      "\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb." +
+      "pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -15951,7 +15951,7 @@ public final class DRAgent {
           internal_static_pmsg_Connect_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Connect_descriptor,
-              new java.lang.String[] { "ClusterId", "PersistInstanceId", "ProtocolVersion", });
+              new java.lang.String[] { "ClusterId", "ClusterCreationId", "ProtocolVersion", });
           internal_static_pmsg_Subscribe_descriptor =
             getDescriptor().getMessageTypes().get(6);
           internal_static_pmsg_Subscribe_fieldAccessorTable = new
@@ -15987,7 +15987,7 @@ public final class DRAgent {
           internal_static_pmsg_ClusterInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_ClusterInfo_descriptor,
-              new java.lang.String[] { "ClusterId", "ClusterPersistedId", });
+              new java.lang.String[] { "ClusterId", "ClusterCreationId", });
           internal_static_pmsg_QueryResponse_descriptor =
             getDescriptor().getMessageTypes().get(12);
           internal_static_pmsg_QueryResponse_fieldAccessorTable = new

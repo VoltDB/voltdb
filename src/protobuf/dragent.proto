@@ -28,7 +28,7 @@ message Pause {
 
 message Connect {
     optional int32 clusterId = 1;
-    optional fixed64 persistInstanceId = 2;
+    optional fixed64 clusterCreationId = 2;
     optional int32 protocolVersion = 3;
 }
 
@@ -94,7 +94,7 @@ message ConnectResponse {
 
 message ClusterInfo {
     required int32 clusterId = 1;
-    required fixed64 clusterPersistedId = 2;
+    required fixed64 clusterCreationId = 2;
 }
 
 message QueryResponse {
