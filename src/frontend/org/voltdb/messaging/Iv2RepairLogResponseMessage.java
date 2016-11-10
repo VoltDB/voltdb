@@ -26,9 +26,8 @@ import org.voltcore.utils.Pair;
 import org.voltdb.iv2.TxnEgo;
 
 /**
- * Message from a client interface to an initiator, instructing the
- * site to begin executing a stored procedure, coordinating other
- * execution sites if needed.
+ * Message from replicas returning to new leader with repair log entries,
+ * while doing node rejoin promotion.
  *
  */
 public class Iv2RepairLogResponseMessage extends VoltMessage
