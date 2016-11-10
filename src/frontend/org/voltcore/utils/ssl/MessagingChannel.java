@@ -37,7 +37,6 @@ public class MessagingChannel {
     private final SocketChannel m_socketChannel;
     private final SSLEngine m_sslEngine;
     private ByteBuffer m_encBuffer;
-    private final ByteBuffer m_readBuffer;
     private final SSLBufferDecrypter m_sslBufferDescrypter;
 
     public MessagingChannel(SocketChannel m_socketChannel, SSLEngine sslEngine) {
@@ -47,10 +46,8 @@ public class MessagingChannel {
             int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
             // wrapMessage will overflow until the encryption buffer is this size.
             this.m_encBuffer = ByteBuffer.allocate(packetBufferSize);
-            this.m_readBuffer = ByteBuffer.allocate(16 * 1024);
             this.m_sslBufferDescrypter = new SSLBufferDecrypter(sslEngine);
         } else {
-            this.m_readBuffer = null;
             this.m_sslBufferDescrypter = null;
         }
     }
@@ -82,15 +79,16 @@ public class MessagingChannel {
     }
 
     private ByteBuffer readEncrypted() throws IOException {
+        ByteBuffer readBuffer = m_sslBufferDescrypter.getReadBuffer();
         int read;
-        read = m_socketChannel.read(m_readBuffer);
+        read = m_socketChannel.read(readBuffer);
         if (read == -1) {
             throw new IOException("Failed to read message");
         }
         // there will always be a length, need to have more than four bytes to have a message
         if (read > 4) {
-            m_readBuffer.flip();
-            List<ByteBuffer> messages = m_sslBufferDescrypter.decryptBuffer(m_readBuffer);
+            readBuffer.flip();
+            List<ByteBuffer> messages = m_sslBufferDescrypter.decryptBuffer();
             if (messages != null) {
                 if (messages.size() > 1) {
                     throw new IOException("Unexpectedly read more than one message");

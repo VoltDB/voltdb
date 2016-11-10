@@ -30,99 +30,92 @@ import java.util.List;
 public class SSLBufferDecrypter {
 
     private final SSLEngine m_sslEngine;
+    private final ByteBuffer m_readBuffer;
     private ByteBuffer m_partialMessage;
     private ByteBuffer m_partialLength;
-    private ByteBuffer m_partialBuffer;
 
     public SSLBufferDecrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
+        this.m_readBuffer = ByteBuffer.allocateDirect(Constants.SSL_CHUNK_SIZE + 128);
     }
 
-    public List<ByteBuffer> decryptBuffer(ByteBuffer buffer) throws IOException {
+    /**
+     * Returns the read buffer.
+     * @return  The read buffer.
+     */
+    public ByteBuffer getReadBuffer() {
+        return m_readBuffer;
+    }
 
-        ByteBuffer dstBuffer;
-        ByteBuffer srcBuffer;
-        if (m_partialBuffer != null) {
-            dstBuffer = ByteBuffer.allocate(m_partialBuffer.remaining() + buffer.remaining() + 128);
-            srcBuffer = ByteBuffer.allocate(m_partialBuffer.remaining() + buffer.remaining());
-            srcBuffer.put(m_partialBuffer);
-            srcBuffer.put(buffer);
-            srcBuffer.flip();
-            m_partialBuffer = null;
-        } else {
-            dstBuffer = ByteBuffer.allocate(buffer.remaining() + 128);
-            srcBuffer = buffer;
-        }
+    public List<ByteBuffer> decryptBuffer() throws IOException {
+        m_readBuffer.position(0);
+        ByteBuffer dstBuffer = ByteBuffer.allocate(m_readBuffer.remaining() + 128);
 
         List<ByteBuffer> messages = new ArrayList<>();
-        while (srcBuffer.hasRemaining()) {
-            // might have a partial buffer from last time.  Partial buffer holds bytes
-            // that were read but could not yet be decrypted.
-            List<ByteBuffer> chunks = unwrapBuffer(srcBuffer, dstBuffer);
-            for (ByteBuffer chunk : chunks) {
-                while (chunk.hasRemaining()) {
-                    if (m_partialLength != null) {
-                        if (chunk.remaining() >= (4 - m_partialLength.remaining())) {
-                            // write the rest of the length into the buffer, flip it
-                            int oldLimit = chunk.limit();
-                            chunk.limit(chunk.position() + m_partialLength.remaining());
-                            m_partialLength.put(chunk.slice());
-                            chunk.position(chunk.limit());
-                            chunk.limit(oldLimit);
+        List<ByteBuffer> chunks = unwrapBuffer(m_readBuffer, dstBuffer);
+        for (ByteBuffer chunk : chunks) {
+            while (chunk.hasRemaining()) {
+                if (m_partialLength != null) {
+                    if (chunk.remaining() >= (4 - m_partialLength.remaining())) {
+                        // write the rest of the length into the buffer, flip it
+                        int oldLimit = chunk.limit();
+                        chunk.limit(chunk.position() + m_partialLength.remaining());
+                        m_partialLength.put(chunk.slice());
+                        chunk.position(chunk.limit());
+                        chunk.limit(oldLimit);
 
-                            m_partialLength.flip();
-                            int messageLength = m_partialLength.getInt();
-                            m_partialLength = null;
+                        m_partialLength.flip();
+                        int messageLength = m_partialLength.getInt();
+                        m_partialLength = null;
 
-                            if (chunk.remaining() >= messageLength) {
-                                oldLimit = chunk.limit();
-                                chunk.limit(chunk.position() + messageLength);
-                                ByteBuffer message = chunk.slice();
-                                messages.add(message);
-                                chunk.position(chunk.limit());
-                                chunk.limit(oldLimit);
-                            } else {
-                                m_partialMessage = ByteBuffer.allocate(messageLength);
-                                m_partialMessage.put(chunk);
-                            }
-                        } else {
-                            // net enough remaining in chunk to finish length.
-                            m_partialLength.put(chunk);
-                        }
-                    } else if (m_partialMessage != null) {
-                        if (chunk.remaining() >= m_partialMessage.remaining()) {
-                            int oldLimit = chunk.limit();
-                            chunk.limit(chunk.position() + m_partialMessage.remaining());
-                            m_partialMessage.put(chunk.slice());
-                            m_partialMessage.flip();
-                            messages.add(m_partialMessage);
-                            m_partialMessage = null;
+                        if (chunk.remaining() >= messageLength) {
+                            oldLimit = chunk.limit();
+                            chunk.limit(chunk.position() + messageLength);
+                            ByteBuffer message = chunk.slice();
+                            messages.add(message);
                             chunk.position(chunk.limit());
                             chunk.limit(oldLimit);
                         } else {
+                            m_partialMessage = ByteBuffer.allocate(messageLength);
                             m_partialMessage.put(chunk);
                         }
                     } else {
-                        // at a message boundary.
-                        if (chunk.remaining() >= 4) {
-                            int messageLength = chunk.getInt();
-                            if (chunk.remaining() >= messageLength) {
-                                int oldLimit = chunk.limit();
-                                chunk.limit(chunk.position() + messageLength);
-                                ByteBuffer message = chunk.slice();
-                                messages.add(message);
-                                chunk.position(chunk.limit());
-                                chunk.limit(oldLimit);
-                            } else {
-                                m_partialMessage = ByteBuffer.allocate(messageLength);
-                                m_partialMessage.put(chunk.slice());
-                                chunk.position(chunk.limit());
-                            }
+                        // net enough remaining in chunk to finish length.
+                        m_partialLength.put(chunk);
+                    }
+                } else if (m_partialMessage != null) {
+                    if (chunk.remaining() >= m_partialMessage.remaining()) {
+                        int oldLimit = chunk.limit();
+                        chunk.limit(chunk.position() + m_partialMessage.remaining());
+                        m_partialMessage.put(chunk.slice());
+                        m_partialMessage.flip();
+                        messages.add(m_partialMessage);
+                        m_partialMessage = null;
+                        chunk.position(chunk.limit());
+                        chunk.limit(oldLimit);
+                    } else {
+                        m_partialMessage.put(chunk);
+                    }
+                } else {
+                    // at a message boundary.
+                    if (chunk.remaining() >= 4) {
+                        int messageLength = chunk.getInt();
+                        if (chunk.remaining() >= messageLength) {
+                            int oldLimit = chunk.limit();
+                            chunk.limit(chunk.position() + messageLength);
+                            ByteBuffer message = chunk.slice();
+                            messages.add(message);
+                            chunk.position(chunk.limit());
+                            chunk.limit(oldLimit);
                         } else {
-                            m_partialLength = ByteBuffer.allocate(4);
-                            m_partialLength.put(chunk.slice());
+                            m_partialMessage = ByteBuffer.allocate(messageLength);
+                            m_partialMessage.put(chunk.slice());
                             chunk.position(chunk.limit());
                         }
+                    } else {
+                        m_partialLength = ByteBuffer.allocate(4);
+                        m_partialLength.put(chunk.slice());
+                        chunk.position(chunk.limit());
                     }
                 }
             }
@@ -132,30 +125,31 @@ public class SSLBufferDecrypter {
 
     private List<ByteBuffer> unwrapBuffer(ByteBuffer src, ByteBuffer dst) throws IOException {
         List<ByteBuffer> chunks = new ArrayList<ByteBuffer>();
-        while (src.hasRemaining()) {
-            ByteBuffer srcSlice = src.slice();
-            ByteBuffer dstSlice = dst.slice();
-            SSLEngineResult result = m_sslEngine.unwrap(srcSlice, dstSlice);
+        while (true) {
+            SSLEngineResult result = m_sslEngine.unwrap(src, dst);
             switch (result.getStatus()) {
                 case OK:
-                    dst.limit(dst.position() + result.bytesProduced());
+                    dst.limit(dst.position());
+                    dst.position(dst.position() - result.bytesProduced());
                     chunks.add(dst.slice());
                     dst.position(dst.limit());
                     dst.limit(dst.capacity());
-                    src.position(src.position() + result.bytesConsumed());
+                    if (src.hasRemaining()) {
+                        src.compact();
+                        src.flip();
+                    } else {
+                        src.clear();
+                        return chunks;
+                    }
                     break;
                 case BUFFER_OVERFLOW:
-                    m_partialBuffer = src.slice();
-                    src.position(src.limit());
-                    return chunks;
                 case BUFFER_UNDERFLOW:
-                    m_partialBuffer = src.slice();
                     src.position(src.limit());
+                    src.limit(src.capacity());
                     return chunks;
                 case CLOSED:
                     throw new SSLException("SSL engine is closed on ssl unwrapBuffer of buffer.");
             }
         }
-        return chunks;
     }
 }

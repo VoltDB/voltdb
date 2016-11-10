@@ -74,6 +74,35 @@ public class NIOReadStream {
         return output;
     }
 
+    void getBytes(ByteBuffer output) {
+        output.mark();
+        while (m_totalAvailable > 0 && output.hasRemaining()) {
+            BBContainer firstC = getFirstC();
+            ByteBuffer first = firstC.b();
+            assert first.remaining() > 0;
+
+            if (first.remaining() >= output.remaining()) {
+                int bytesToCopy = output.remaining();
+                int oldLimit = first.limit();
+                first.limit(first.position() + bytesToCopy);
+                output.put(first);
+                first.limit(oldLimit);
+                m_totalAvailable -= bytesToCopy;
+            } else {
+                int bytesToCopy = first.remaining();
+                output.put(first);
+                m_totalAvailable -= bytesToCopy;
+            }
+            if (first.remaining() == 0) {
+                // read an entire block: move it to the empty buffers list
+                m_readBuffers.poll();
+                firstC.discard();
+            }
+        }
+        output.limit(output.position());
+        output.reset();
+    }
+
     void getBytes(byte[] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
@@ -82,14 +111,7 @@ public class NIOReadStream {
 
         int bytesCopied = 0;
         while (bytesCopied < output.length) {
-            BBContainer firstC = m_readBuffers.peekFirst();
-            if (firstC == null) {
-                // Steal the write buffer
-                m_writeBuffer.b().flip();
-                m_readBuffers.add(m_writeBuffer);
-                firstC = m_writeBuffer;
-                m_writeBuffer = null;
-            }
+            BBContainer firstC = getFirstC();
             ByteBuffer first = firstC.b();
             assert first.remaining() > 0;
 
@@ -107,6 +129,18 @@ public class NIOReadStream {
                 firstC.discard();
             }
         }
+    }
+
+    private BBContainer getFirstC() {
+        BBContainer firstC = m_readBuffers.peekFirst();
+        if (firstC == null) {
+            // Steal the write buffer
+            m_writeBuffer.b().flip();
+            m_readBuffers.add(m_writeBuffer);
+            firstC = m_writeBuffer;
+            m_writeBuffer = null;
+        }
+        return firstC;
     }
 
     /**

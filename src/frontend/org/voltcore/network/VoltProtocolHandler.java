@@ -87,17 +87,13 @@ public abstract class VoltProtocolHandler implements InputHandler {
     }
 
     @Override
-    public ByteBuffer retrieveNextBuffer(NIOReadStream inputStream) {
+    public int fillBufferFromInputStream(NIOReadStream inputStream, ByteBuffer buffer) {
         if (inputStream.dataAvailable() > 0) {
-            // this method is used to support ssl.  The simple thing for now
-            // is to limit the read buffer to the size ssl can decrypt at once,
-            // which is 16k.
-            int bytesToRead = Math.min(inputStream.dataAvailable(), Constants.SSL_CHUNK_SIZE);
-            ByteBuffer result = ByteBuffer.allocate(bytesToRead);
-            inputStream.getBytes(result.array());
-            return result;
+            inputStream.getBytes(buffer);
+            return buffer.remaining();
+        } else {
+            return 0;
         }
-        return null;
     }
 
     @Override
