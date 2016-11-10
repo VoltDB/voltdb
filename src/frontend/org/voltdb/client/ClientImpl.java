@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -75,6 +78,9 @@ public final class ClientImpl implements Client {
     private int m_passwordHashCode = 0;
     final InternalClientStatusListener m_listener = new InternalClientStatusListener();
     ClientStatusListenerExt m_clientStatusListener = null;
+
+    private ScheduledExecutorService m_ex = null;
+
     /*
      * Username and password as set by the constructor.
      */
@@ -612,6 +618,10 @@ public final class ClientImpl implements Client {
             m_reconnectStatusListener.close();
         }
 
+        if (m_ex != null) {
+            m_ex.shutdown();
+            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        }
         m_distributer.shutdown();
         ClientFactory.decreaseClientNum();
     }
@@ -784,7 +794,10 @@ public final class ClientImpl implements Client {
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            m_distributer.getExecutorService().execute(new Runnable() {
+            if (m_ex == null) {
+                m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+            }
+            m_ex.execute(new Runnable() {
                 @Override
                 public void run() {
                     try{
