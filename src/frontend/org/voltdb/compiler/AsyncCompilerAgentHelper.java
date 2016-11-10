@@ -44,7 +44,7 @@ public class AsyncCompilerAgentHelper
         m_licenseApi = licenseApi;
     }
 
-    public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+    public CatalogChangeResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
         retval.clientData = work.clientData;
