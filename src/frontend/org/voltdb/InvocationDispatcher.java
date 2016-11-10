@@ -95,6 +95,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -1465,91 +1466,91 @@ public final class InvocationDispatcher {
         final ListenableFutureTask<?> ft = ListenableFutureTask.create(new Runnable() {
             @Override
             public void run() {
-                if (result.errorMsg == null) {
-                    if (result instanceof AdHocPlannedStmtBatch) {
-                        final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+                if (result.errorMsg != null) {
+                    ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(
+                                    (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
+                                    new VoltTable[0], result.errorMsg,
+                                    result.clientHandle);
+                    writeResponseToConnection(errorResponse);
+                    return;
+                }
+                Preconditions.checkState(
+                        result instanceof AdHocPlannedStmtBatch || result instanceof CatalogChangeResult,
+                        "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
 
-                        // assume all stmts have the same catalog version
-                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
-                        {
+                if (result instanceof AdHocPlannedStmtBatch) {
+                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                    ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
-                            /* The adhoc planner learns of catalog updates after the EE and the
-                               rest of the system. If the adhoc sql was planned against an
-                               obsolete catalog, re-plan. */
-                            LocalObjectMessage work = new LocalObjectMessage(
-                                    AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+                    // assume all stmts have the same catalog version
+                    if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
+                    {
 
-                            m_mailbox.send(m_plannerSiteId, work);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
-                            processExplainPlannedStmtBatch(plannedStmtBatch);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
-                            processExplainDefaultProc(plannedStmtBatch);
-                        }
-                        else {
-                            try {
-                                createAdHocTransaction(plannedStmtBatch, c);
-                            }
-                            catch (VoltTypeException vte) {
-                                String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
-                                writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
-                            }
-                        }
+                        /* The adhoc planner learns of catalog updates after the EE and the
+                           rest of the system. If the adhoc sql was planned against an
+                           obsolete catalog, re-plan. */
+                        LocalObjectMessage work = new LocalObjectMessage(
+                                AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+
+                        m_mailbox.send(m_plannerSiteId, work);
                     }
-                    else if (result instanceof CatalogChangeResult) {
-                        final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-
-                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
-                            ClientResponseImpl shortcutResponse =
-                                    new ClientResponseImpl(
-                                            ClientResponseImpl.SUCCESS,
-                                            new VoltTable[0], "Catalog update with no changes was skipped.",
-                                            result.clientHandle);
-                            writeResponseToConnection(shortcutResponse);
-                        }
-                        else {
-                            // create the execution site task
-                            StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
-
-                            ClientResponseImpl error = null;
-                            if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
-                                    SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-                                writeResponseToConnection(error);
-                            }
-                            else {
-                                /*
-                                 * Round trip the invocation to initialize it for command logging
-                                 */
-                                try {
-                                    task = MiscUtils.roundTripForCL(task);
-                                } catch (Exception e) {
-                                    hostLog.fatal(e);
-                                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                                }
-                                // initiate the transaction. These hard-coded values from catalog
-                                // procedure are horrible, horrible, horrible.
-                                createTransaction(changeResult.connectionId,
-                                        task, false, false, false, 0, task.getSerializedSize(),
-                                        System.nanoTime());
-                            }
-                        }
+                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                        processExplainPlannedStmtBatch(plannedStmtBatch);
+                    }
+                    else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+                        processExplainDefaultProc(plannedStmtBatch);
                     }
                     else {
-                        throw new RuntimeException(
-                                "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+                        try {
+                            createAdHocTransaction(plannedStmtBatch, c);
+                        }
+                        catch (VoltTypeException vte) {
+                            String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
+                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
+                        }
                     }
+                    // early return for @AdHocPlannedStmtBatch case
+                    return;
                 }
-                else {
-                    ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(
-                                (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
-                                new VoltTable[0], result.errorMsg,
-                                result.clientHandle);
-                    writeResponseToConnection(errorResponse);
+
+                // case for @CatalogChangeResult
+                final CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                    ClientResponseImpl shortcutResponse =
+                            new ClientResponseImpl(
+                                    ClientResponseImpl.SUCCESS,
+                                    new VoltTable[0], "Catalog update with no changes was skipped.",
+                                    result.clientHandle);
+                    writeResponseToConnection(shortcutResponse);
+                    return;
                 }
+
+                // create the execution site task
+                StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
+
+                ClientResponseImpl error = null;
+                if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
+                        SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
+                    writeResponseToConnection(error);
+                    return;
+                }
+
+                /*
+                 * Round trip the invocation to initialize it for command logging
+                 */
+                try {
+                    task = MiscUtils.roundTripForCL(task);
+                } catch (Exception e) {
+                    hostLog.fatal(e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
+                // initiate the transaction. These hard-coded values from catalog
+                // procedure are horrible, horrible, horrible.
+                createTransaction(changeResult.connectionId,
+                        task, false, false, false, 0, task.getSerializedSize(),
+                        System.nanoTime());
             }
 
             private final void writeResponseToConnection(ClientResponseImpl response) {
@@ -1824,7 +1825,6 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    @SuppressWarnings("unused")
     public  boolean createTransaction(
             final long connectionId,
             final long txnId,
@@ -1849,29 +1849,24 @@ public final class InvocationDispatcher {
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
-
         /*
          * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
          *
          * ReadLevel.SAFE:
-         * Send the read to the partition leader always (reads & writes)
-         *
-         * Someday could support per-transaction consistency for reads.
+         * Send the read to the partition leader only
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
-            }
-            if (initiatorHSId != null) {
                 isShortCircuitRead = true;
+                initiatorHSId = m_localReplicas.get().get(partition);
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
-            //Multi-part transactions go to the multi-part coordinator
+            // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool
