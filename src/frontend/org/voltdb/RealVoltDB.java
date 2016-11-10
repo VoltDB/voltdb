@@ -1363,6 +1363,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     for (int hostId : failedHosts) {
                         CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
                     }
+
+                    // If the current node hasn't finished rejoin when another
+                    // node fails, fail this node to prevent locking up the
+                    // system.
+                    if (m_rejoining) {
+                        VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
+                                                "As a result, the rejoin operation has been canceled. " +
+                                                "Please try again.");
+                    }
                 }
             });
         }
