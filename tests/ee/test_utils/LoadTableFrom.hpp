@@ -48,6 +48,7 @@
 #include "common/TupleSchemaBuilder.h"
 
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "common/debuglog.h"
 
 namespace voltdb {
 /**
@@ -61,7 +62,6 @@ namespace voltdb {
  * The caller owns the table object, and is responsible for
  * deleting it.
  */
-bool debug_print = false;
 TempTable *loadTableFrom(const char *buffer,
                          size_t size,
                          Pool * pool= NULL,
@@ -77,17 +77,15 @@ TempTable *loadTableFrom(const char *buffer,
     int32_t tbl_metadata_len = result.readInt();  // table metadata length
     int8_t  tbl_status       = result.readByte();
     int16_t column_count     = result.readShort();
-    if (debug_print) {
-        printf("\n");
-        printf("  msg size:              %d\n",   msg_size);
-        printf("  status:                %hhd\n", status);
-        printf("  inter cluster latency: %d\n",   icl);
-        printf("  serialized exception:  %d\n",   serialized_exp);
-        printf("  table length:          %d\n",   tbl_len);
-        printf("  table metadata length: %d\n",   tbl_metadata_len);
-        printf("  table_status:          %hhd\n", tbl_status);
-        printf("  column count:          %d\n",   column_count);
-    }
+    VOLT_TRACE("\n");
+    VOLT_TRACE("  msg size:              %d\n",   msg_size);
+    VOLT_TRACE("  status:                %hhd\n", status);
+    VOLT_TRACE("  inter cluster latency: %d\n",   icl);
+    VOLT_TRACE("  serialized exception:  %d\n",   serialized_exp);
+    VOLT_TRACE("  table length:          %d\n",   tbl_len);
+    VOLT_TRACE("  table metadata length: %d\n",   tbl_metadata_len);
+    VOLT_TRACE("  table_status:          %hhd\n", tbl_status);
+    VOLT_TRACE("  column count:          %d\n",   column_count);
     /*
      * Read the schema information.
      */
@@ -95,22 +93,18 @@ TempTable *loadTableFrom(const char *buffer,
     voltdb::TupleSchemaBuilder builder(column_count);
     for (int idx = 0; idx < column_count; idx += 1) {
         ValueType colType = static_cast<ValueType>(result.readByte());
-        if (debug_print) {
-            printf("  column %02d type:         %hd\n",
-                   idx,
-                   column_count);
-        }
+        VOLT_TRACE("  column %02d type:         %hd\n",
+                    idx,
+                    column_count);
         assert(colType != VALUE_TYPE_ARRAY);
         builder.setColumnAtIndex(idx, colType);
     }
     TupleSchema *schema = builder.build();
     for (int idx = 0; idx < column_count; idx += 1) {
         columnNames.push_back(result.readTextString());
-        if (debug_print) {
-            printf("  column %02d name:         %s\n",
-                   idx,
-                   columnNames[idx].c_str());
-        }
+        VOLT_TRACE("  column %02d name:         %s\n",
+                    idx,
+                    columnNames[idx].c_str());
     }
     TempTable *table;
     table = TableFactory::getTempTable(0,
