@@ -309,27 +309,24 @@ $(document).ready(function () {
         $('.contents').hide().eq($(this).index()).show();
         $("#nav li").removeClass('active');
         $(this).addClass('active');
-        console.log(isMobile)
         if(isMobile==false){
-                var gutterLength = $("#BlockContainer01").find(".gutter").length
+               if(VoltDbUI.gutterInstanceHor != undefined)
+                    VoltDbUI.gutterInstanceHor.destroy();
+                VoltDbUI.gutterInstanceHor = Split(['#a', '#inputQuery'],{
+                    gutterSize:15,
+                    minSize:380,
+                    sizes:[25, 75]
+                });
 
-                if(gutterLength == 0){
-                    Split(['#a', '#inputQuery'],{
-                        gutterSize:15,
-                        minSize:380,
-                        sizes:[25, 75]
-                    });
-                }
-
-                    var queryLength = $("#ulTabList li").length -1;
-                if($("#querybox-" + queryLength).parent().find(".gutter").length == 0){
-                    Split(['#querybox-'+ queryLength, '#blockContainer' + queryLength], {
-                          direction: 'vertical',
-                          sizes: [30, 70],
-                          gutterSize: 15,
-                          minSize: 120
-                        })
-                    }
+               var queryLength = $("#ulTabList li").length -1;
+               if(VoltDbUI.gutterInstanceVer != undefined)
+                    VoltDbUI.gutterInstanceVer.destroy()
+               VoltDbUI.gutterInstanceVer = Split(['#querybox-'+ queryLength, '#blockContainer' + queryLength], {
+                   direction: 'vertical',
+                   sizes: [30, 70],
+                   gutterSize: 15,
+                   minSize: [120, 150]
+               })
 
         }
 
@@ -2744,6 +2741,8 @@ var adjustGraphSpacing = function () {
         this.isConnectionChecked = false;
         this.connectionTimeInterval = null;
         this.partitionGraphInterval = null;
+        this.gutterInstanceHor = null;
+        this.gutterInstanceVer = null;
         //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();

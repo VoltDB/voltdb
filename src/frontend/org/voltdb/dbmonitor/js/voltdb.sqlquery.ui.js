@@ -587,17 +587,17 @@ $(document).ready(function () {
         var counter = ui.newTab.attr('id').split('-')[1];
 
         if($("#querybox-"+ counter).parent().find(".gutter").length == 0){
-            debugger;
-            console.log(isMobile)
             if(isMobile == false){
-            Split(['#querybox-' + counter, '#blockContainer'+ counter], {
-                  direction: 'vertical',
-                  sizes: [30, 70],
-                  gutterSize: 15,
-                  minSize: 120
-            })
+                Split(['#querybox-' + counter, '#blockContainer'+ counter], {
+                      direction: 'vertical',
+                      sizes: [30, 70],
+                      gutterSize: 15,
+                      minSize: [120, 150]
+                })
             }
         }
+
+
     }
 
     });
@@ -709,7 +709,7 @@ $(document).ready(function () {
             }
 
 
-            var html_body = '<div class="verticalWrapper"><div id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+' querybox split split-vertical" contenteditable></div>'
+           var html_body = '<div class="verticalWrapper"><div id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+' querybox split split-vertical" contenteditable></div>'
             var html_query = '<div class="blockWrapper split split-vertical" id="blockContainer'+tab_counter+'">' +
                              '   <div class="exportType">' +
                              '<form name="" id="queryResult-'+tab_counter+'">' +
@@ -719,19 +719,31 @@ $(document).ready(function () {
                              '   <option>Monospace</option>' +
                              '</select>' +
                              '</form>' +
-                             '</div>' +
-                             '<h1 class="theHeading icon-queryResult">Query Result</h1>' +
-                             '<div class="queryWrapper">' +
-                             '<div class="queryResult-'+tab_counter+'">' +
-                             '<div id="resultHtml-'+tab_counter+'" style="display: none;" class="resultHtml"></div>' +
-                             '<div id="resultCsv-'+tab_counter+'" style="display: none;" class="resultCsv"></div>' +
-                             '<div id="resultMonospace-'+tab_counter+'" style="display: block;" class="resultMonospace">' +
-                             '<pre>                    </pre>' +
-                             '</div>' +
-                             '</div>' +
-                             '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div>' +
-                             '</div>' +
-                            '</div></div>' ;
+                             '</div>';
+
+            if(!isMobile){
+            html_query = html_query + '<h1 class="theHeading icon-queryResult"><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
+            }
+            else{
+            html_query = html_query + '<h1 class="theHeading icon-queryResult"><span class="queryResultStyle">Query Result</span></h1>';
+            }
+
+            html_query = html_query + '<div id="queryWrapper-'+tab_counter+'" class="queryWrapper">' +
+                 '<div class="queryResult-'+tab_counter+'">' +
+                 '<div id="resultHtml-'+tab_counter+'" style="display: none;" class="resultHtml"></div>' +
+                 '<div id="resultCsv-'+tab_counter+'" style="display: none;" class="resultCsv"></div>' +
+                 '<div id="resultMonospace-'+tab_counter+'" style="display: block;" class="resultMonospace">' +
+                 '<pre>                    </pre>' +
+                 '</div>' +
+                 '</div>';
+
+
+            if(isMobile){
+            html_query = html_query + '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div>';
+            }
+
+            html_query = html_query + '</div></div>';
+
             $(html).appendTo( ul );
             $('#ulTabList').append($('#liNewQuery'))
             $('#worktabs').append('<div id="q-'+tab_counter+'" >' + html_body + html_query + '</div>')
@@ -773,7 +785,7 @@ $(document).ready(function () {
                                 direction: 'vertical',
                                 sizes: [30, 70],
                                 gutterSize: 15,
-                                minSize: 120
+                                minSize: [120, 150]
                             })
                         }
                     }
@@ -1155,7 +1167,9 @@ $(document).ready(function () {
         var toggleSpinner = function (show) {
             if (!show) {
                 $("#sqlQueryOverlay").hide();
-                $("#tabScroller").css("height", 556);
+//                $("#tabScroller").css("height", "calc(100% - 96px)");
+//                $("#tabScroller").css("height", "-moz-calc(100% - 96px)");
+                //$("#tabScroller").css("height", "-webkit-calc(100% - 96px)");
                 $(".slimScrollBar").css('z-index', '99');
             }
             else if (show) {
