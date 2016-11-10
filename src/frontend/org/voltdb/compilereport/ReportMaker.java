@@ -165,6 +165,33 @@ public class ReportMaker {
         return sb.toString();
     }
 
+    static String generateExplainViewTable(Table table) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            ArrayList<String[]> viewExplanation = ViewExplainer.explain(table);
+            if (viewExplanation.size() > 0) {
+                sb.append("    <table class='table tableL2 table-condensed'>\n    <thead><tr>" +
+                          "<th>View Task</th>" +
+                          "<th>Execution Plan</th>" +
+                          "</tr>\n");
+                for (String[] row : viewExplanation) {
+                    sb.append("        <tr class='primaryrow2'>");
+                    sb.append("<td>").append(row[0]).append("</td>");
+                    row[1] = escapeHtml4(row[1]).replace("\n", "<br/>").replace(" ", "&nbsp;");
+                    sb.append("<td>").append(row[1]).append("</td>");
+                    sb.append("</tr>\n");
+                }
+                sb.append("    </thead>\n    </table>\n");
+            }
+            else {
+                sb.append("<p>No view tasks to show.</p>\n");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return sb.toString();
+    }
+
     static String generateSchemaRow(Table table, boolean isExportTable) {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
@@ -339,8 +366,12 @@ public class ReportMaker {
             sb.append("<p>No indexes defined on table.</p>\n");
         }
 
-        sb.append("</td></tr>\n");
+        // Generate explainview report.
+        if (table.getMaterializer() != null) {
+            sb.append(generateExplainViewTable(table));
+        }
 
+        sb.append("</td></tr>\n");
         return sb.toString();
     }
 
