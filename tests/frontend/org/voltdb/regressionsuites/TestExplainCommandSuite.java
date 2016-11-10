@@ -96,8 +96,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         VoltTable vt = null;
 
         // Test if the error checking is working properly.
-        verifyProcFails(client, "Materialized view t does not exist.", "@ExplainView", "t");
-        verifyProcFails(client, "Table t1 is not a materialized view.", "@ExplainView", "t1");
+        verifyProcFails(client, "View T does not exist.", "@ExplainView", "T");
+        verifyProcFails(client, "Table T1 is not a view.", "@ExplainView", "T1");
 
         final String[] aggTypes = {"MAX", "MIN"};
         final int numOfMinMaxColumns = 12;
@@ -109,9 +109,9 @@ public class TestExplainCommandSuite extends RegressionSuite {
         for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
-            String resolution = vt.getString(1);
+            String plan = vt.getString(1);
             assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
-            assertEquals("Use built-in sequential scan.", resolution);
+            assertEquals("Built-in sequential scan.", plan);
         }
 
         // -2- Create an index on TSRC1(G1), then all columns will use built-in index scan now.
@@ -121,9 +121,9 @@ public class TestExplainCommandSuite extends RegressionSuite {
         for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
-            String resolution = vt.getString(1);
+            String plan = vt.getString(1);
             assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
-            assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
+            assertEquals("Built-in index scan \"IDX_TSRC1_G1\".", plan);
         }
 
         // -3- Create an index on TSRC1(G1, C1), C1 will pick up the new index.
@@ -133,13 +133,13 @@ public class TestExplainCommandSuite extends RegressionSuite {
         for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
-            String resolution = vt.getString(1);
+            String plan = vt.getString(1);
             assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             if (i != 1) {
-                assertEquals("Use built-in index scan on index IDX_TSRC1_G1.", resolution);
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1\".", plan);
             }
             else {
-                assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1C1\".", plan);
             }
         }
 
@@ -153,15 +153,14 @@ public class TestExplainCommandSuite extends RegressionSuite {
         for (int i = 0; i < numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
-            String resolution = vt.getString(1);
+            String plan = vt.getString(1);
             assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
             if (i != 1) {
-                assertTrue(resolution.contains("Use the following execution plan:"));
-                assertTrue(resolution.contains("INDEX SCAN of \"TSRC1\" using \"IDX_TSRC1_G1C1\""));
-                assertTrue(resolution.contains("range-scan on 1 of 2 cols from (G1 >= ?0) while (G1 = ?0)"));
+                assertTrue(plan.contains("INDEX SCAN of \"TSRC1\" using \"IDX_TSRC1_G1C1\""));
+                assertTrue(plan.contains("range-scan on 1 of 2 cols from (G1 >= ?0) while (G1 = ?0)"));
             }
             else {
-                assertEquals("Use built-in index scan on index IDX_TSRC1_G1C1.", resolution);
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1C1\".", plan);
             }
         }
         client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1C1;");
@@ -179,18 +178,16 @@ public class TestExplainCommandSuite extends RegressionSuite {
         for (int i = 0; i <= numOfMinMaxColumns; i++) {
             vt.advanceRow();
             String task = vt.getString(0);
-            String resolution = vt.getString(1);
+            String plan = vt.getString(1);
             if (i == 0) {
                 assertEquals("Join Evaluation", task);
-                assertTrue(resolution.contains("Use the following execution plan with built-in delta tables:"));
             }
             else {
                 assertEquals("Refresh " + aggTypes[(i-1) % 2] + " column \"C" + (i-1) + "\"", task);
-                assertTrue(resolution.contains("Use the following execution plan:"));
             }
-            assertTrue(resolution.contains("NESTLOOP INDEX INNER JOIN"));
-            assertTrue(resolution.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
-            assertTrue(resolution.contains("SEQUENTIAL SCAN of \"TSRC2\""));
+            assertTrue(plan.contains("NESTLOOP INDEX INNER JOIN"));
+            assertTrue(plan.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
+            assertTrue(plan.contains("SEQUENTIAL SCAN of \"TSRC2\""));
         }
     }
 

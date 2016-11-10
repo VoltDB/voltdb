@@ -26,6 +26,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -67,9 +68,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.IndexRef;
-import org.voltdb.catalog.MaterializedViewHandlerInfo;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -83,6 +81,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.jni.ExecutionEngine;
@@ -92,8 +91,6 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -814,90 +811,19 @@ public final class InvocationDispatcher {
             // get the view table from the catalog
             Table viewTable = tables.getIgnoreCase(viewName);
             if (viewTable == null) {
-                return unexpectedFailureResponse("Materialized view " + viewName + " does not exist.", task.clientHandle);
+                return unexpectedFailureResponse("View " + viewName + " does not exist.", task.clientHandle);
             }
 
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",       VoltType.STRING),
-                                  new VoltTable.ColumnInfo("RESOLUTION", VoltType.STRING));
-
-            MaterializedViewHandlerInfo mvHandlerInfo = viewTable.getMvhandlerinfo().get("mvHandlerInfo");
-            MaterializedViewInfo mvInfo = null;
-            CatalogMap<Statement> fallBackQueryStmts;
-            List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(viewTable.getColumns(), "index");
-
-            // Is this view single-table?
-            if (mvHandlerInfo == null) {
-                // If this is not a multi-table view, we need to go to its source table for metadata.
-                // (Legacy code for single table view uses a different model and code path)
-                if (viewTable.getMaterializer() == null) {
-                    // If we cannot find view metadata from both locations, this table is not a materialized view.
-                    return unexpectedFailureResponse("Table " + viewName + " is not a materialized view.", task.clientHandle);
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",           VoltType.STRING),
+                                  new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
+            try {
+                ArrayList<String[]> viewExplanation = ViewExplainer.explain(viewTable);
+                for (String[] row : viewExplanation) {
+                    vt[i].addRow(row[0], row[1]);
                 }
-                mvInfo = viewTable.getMaterializer().getViews().get(viewName);
-                fallBackQueryStmts = mvInfo.getFallbackquerystmts();
             }
-            else {
-                // For multi-table views we need to show the query plan for evaluating joins.
-                Statement createQuery = mvHandlerInfo.getCreatequery().get("createQuery");
-                vt[i].addRow("Join Evaluation",
-                             "Use the following execution plan with built-in delta tables:\n" +
-                             Encoder.hexDecodeToString(createQuery.getExplainplan()));
-                fallBackQueryStmts = mvHandlerInfo.getFallbackquerystmts();
-            }
-            // For each min/max column find out if an execution plan is used.
-            int minMaxAggIdx = 0;
-            for (int j = 0; j < destColumnArray.size(); j++) {
-                Column destColumn = destColumnArray.get(j);
-                ExpressionType aggType = ExpressionType.get(destColumn.getAggregatetype());
-                if (aggType == ExpressionType.AGGREGATE_MIN ||
-                    aggType == ExpressionType.AGGREGATE_MAX) {
-                    Statement fallBackQueryStmt = fallBackQueryStmts.get(String.valueOf(minMaxAggIdx));
-                    // How this min/max will be refreshed?
-                    String resolution = "";
-                    // For single-table views, check if we uses:
-                    // * built-in sequential scan
-                    // * built-in index scan
-                    // * execution plan
-                    if (mvHandlerInfo == null) {
-                        CatalogMap<IndexRef> hardCodedIndicesForSingleTableView = mvInfo.getIndexforminmax();
-                        String hardCodedIndexName = hardCodedIndicesForSingleTableView.get(String.valueOf(minMaxAggIdx)).getName();
-                        // getIndexesused() should give at most one index.
-                        String[] indicesUsedInPlan = fallBackQueryStmt.getIndexesused().split(",");
-                        assert(indicesUsedInPlan.length <= 1);
-                        for (String tableDotIndexPair : indicesUsedInPlan) {
-                            if (tableDotIndexPair.length() == 0) {
-                                continue;
-                            }
-                            String parts[] = tableDotIndexPair.split("\\.", 2);
-                            assert(parts.length == 2);
-                            if (parts.length != 2) {
-                                continue;
-                            }
-                            String indexNameUsedInPlan = parts[1];
-                            if (! indexNameUsedInPlan.equalsIgnoreCase(hardCodedIndexName)) {
-                                resolution = "Use the following execution plan:\n" +
-                                             Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
-                                break;
-                            }
-                        }
-                        // If we do not use execution plan, see which built-in method is used.
-                        if (resolution.equals("")) {
-                            if (hardCodedIndexName.equals("")) {
-                                resolution = "Use built-in sequential scan.";
-                            }
-                            else {
-                                resolution = "Use built-in index scan on index " + hardCodedIndexName + ".";
-                            }
-                        }
-                    }
-                    else {
-                        resolution = "Use the following execution plan:\n" +
-                                     Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
-                    }
-                    vt[i].addRow("Refresh " + (aggType == ExpressionType.AGGREGATE_MIN ? "MIN" : "MAX") +
-                                 " column \"" + destColumn.getName() + "\"", resolution);
-                    minMaxAggIdx++;
-                }
+            catch (Exception e) {
+                return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
             }
         }
 
