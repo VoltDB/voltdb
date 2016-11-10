@@ -35,7 +35,8 @@ import org.voltdb.utils.Encoder;
 public class ViewExplainer {
 
     private static String getIndexNameUsedInStatement(Statement stmt) {
-        // We should get at most one index from the statement.
+        // Get the name of the index used in a statement (query plan)
+        // that is used for refreshing a min/max column in a single-table view.
         String[] indicesUsedInStatement = stmt.getIndexesused().split(",");
         assert(indicesUsedInStatement.length <= 1);
         for (String tableDotIndexPair : indicesUsedInStatement) {
