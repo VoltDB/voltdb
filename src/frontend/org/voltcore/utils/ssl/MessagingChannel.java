@@ -19,13 +19,10 @@ package org.voltcore.utils.ssl;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.List;
-
-import static org.voltdb.common.Constants.SSL_CHUNK_SIZE;
 
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB
@@ -79,7 +76,7 @@ public class MessagingChannel {
     }
 
     private ByteBuffer readEncrypted() throws IOException {
-        ByteBuffer readBuffer = m_sslBufferDescrypter.getReadBuffer();
+        ByteBuffer readBuffer = m_sslBufferDescrypter.getSrcBuffer();
         int read;
         read = m_socketChannel.read(readBuffer);
         if (read == -1) {
@@ -87,8 +84,7 @@ public class MessagingChannel {
         }
         // there will always be a length, need to have more than four bytes to have a message
         if (read > 4) {
-            readBuffer.flip();
-            List<ByteBuffer> messages = m_sslBufferDescrypter.decryptBuffer();
+            List<ByteBuffer> messages = m_sslBufferDescrypter.decrypt();
             if (messages != null) {
                 if (messages.size() > 1) {
                     throw new IOException("Unexpectedly read more than one message");

@@ -74,8 +74,8 @@ public class NIOReadStream {
         return output;
     }
 
-    void getBytes(ByteBuffer output) {
-        output.mark();
+    int getBytes(ByteBuffer output) {
+        int totalBytesCopied = 0;
         while (m_totalAvailable > 0 && output.hasRemaining()) {
             BBContainer firstC = getFirstC();
             ByteBuffer first = firstC.b();
@@ -87,10 +87,12 @@ public class NIOReadStream {
                 first.limit(first.position() + bytesToCopy);
                 output.put(first);
                 first.limit(oldLimit);
+                totalBytesCopied += bytesToCopy;
                 m_totalAvailable -= bytesToCopy;
             } else {
                 int bytesToCopy = first.remaining();
                 output.put(first);
+                totalBytesCopied += bytesToCopy;
                 m_totalAvailable -= bytesToCopy;
             }
             if (first.remaining() == 0) {
@@ -99,8 +101,7 @@ public class NIOReadStream {
                 firstC.discard();
             }
         }
-        output.limit(output.position());
-        output.reset();
+        return totalBytesCopied;
     }
 
     void getBytes(byte[] output) {

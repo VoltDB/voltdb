@@ -89,8 +89,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
     @Override
     public int fillBufferFromInputStream(NIOReadStream inputStream, ByteBuffer buffer) {
         if (inputStream.dataAvailable() > 0) {
-            inputStream.getBytes(buffer);
-            return buffer.remaining();
+            int bytes = inputStream.getBytes(buffer);
+            return bytes;
         } else {
             return 0;
         }
