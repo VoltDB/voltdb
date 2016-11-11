@@ -735,7 +735,7 @@ public class MiscUtils {
     /**
      * Create an ArrayListMultimap that uses TreeMap as the container map, so order is preserved.
      */
-    public static <K extends Comparable, V> ListMultimap<K, V> sortedArrayListMultimap()
+    public static <K extends Comparable<?>, V> ListMultimap<K, V> sortedArrayListMultimap()
     {
         Map<K, Collection<V>> map = Maps.newTreeMap();
         return Multimaps.newListMultimap(map, new Supplier<List<V>>() {
@@ -755,17 +755,16 @@ public class MiscUtils {
      */
     public static StoredProcedureInvocation roundTripForCL(StoredProcedureInvocation invocation) throws IOException
     {
-        if (invocation.getSerializedParams() == null) {
-            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
-            invocation.flattenToBuffer(buf);
-            buf.flip();
-
-            StoredProcedureInvocation rti = new StoredProcedureInvocation();
-            rti.initFromBuffer(buf);
-            return rti;
-        } else {
+        if (invocation.getSerializedParams() != null) {
             return invocation;
         }
+        ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+        invocation.flattenToBuffer(buf);
+        buf.flip();
+
+        StoredProcedureInvocation rti = new StoredProcedureInvocation();
+        rti.initFromBuffer(buf);
+        return rti;
     }
 
     /**
