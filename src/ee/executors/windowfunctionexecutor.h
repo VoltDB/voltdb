@@ -73,7 +73,7 @@ public:
     }
     void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
     {
-        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+      return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
     }
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
@@ -123,7 +123,9 @@ public:
         m_lastOrderByKeyTuple(m_lastOrderByKeyStorage),
         m_inputSchema(NULL),
         m_aggregateRow(NULL)
-        { }
+        {
+    		dynamic_cast<WindowFunctionPlanNode *>(abstract_node)->collectOutputExpressions(m_outputColumnExpressions);
+        }
     virtual ~WindowFunctionExecutor();
 
 
@@ -246,6 +248,9 @@ private:
 
     int compareTuples(const TableTuple &tuple1,
                       const TableTuple &tuple2) const;
+
+    void initWorkingTupleStorage();
+
 private:
      Pool m_memoryPool;
     /**
@@ -277,7 +282,7 @@ private:
     /**
      * This is the list of all output column expressions.
      */
-    const std::vector<AbstractExpression*> m_outputColumnExpressions;
+    std::vector<AbstractExpression*> m_outputColumnExpressions;
     /*
      * This progress monitor is a local variable in p_execute.  So, it
      * does not need to be deleted.  But we need to reset it to NULL there.

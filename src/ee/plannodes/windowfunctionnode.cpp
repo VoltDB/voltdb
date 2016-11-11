@@ -152,4 +152,16 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
                                   + buffer.str());
     }
 }
+
+void WindowFunctionPlanNode::collectOutputExpressions(std::vector<AbstractExpression *>&outputColumnExpressions) const
+{
+    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    size_t size = outputSchema.size();
+    outputColumnExpressions.resize(size);
+    for (int ii = 0; ii < size; ii++) {
+        SchemaColumn* outputColumn = outputSchema[ii];
+        outputColumnExpressions[ii] = outputColumn->getExpression();
+    }
+}
+
 }

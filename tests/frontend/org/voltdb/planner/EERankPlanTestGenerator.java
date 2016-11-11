@@ -80,7 +80,7 @@ public class EERankPlanTestGenerator extends PlannerTestCase {
                                                     { 20,  2, 2201},
                                                     { 20,  2, 2202},
                                                     //======================================
-                                                    { 20,  3, 22033},
+                                                    { 20,  3, 2203},
                                                     //--------------------------------------
                                                 });
         DBConfig db = new DBConfig(getClass(),

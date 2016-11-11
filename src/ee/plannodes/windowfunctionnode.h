@@ -45,10 +45,6 @@ public:
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 
-    const std::vector<int>& getAggregateOutputColumns() const {
-        return m_aggregateOutputColumns;
-    }
-
     const std::vector<ExpressionType>& getAggregates() const {
         return m_aggregates;
     }
@@ -69,6 +65,7 @@ public:
         return m_partitionByExpressions;
     }
 
+    void collectOutputExpressions(std::vector<AbstractExpression *>&columnExpressions) const;
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 };
