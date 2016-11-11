@@ -40,10 +40,6 @@ def pause(runner):
             return
         runner.info('The cluster is quiesced.')
         try:
-            checkstats.check_clients(runner)
-            checkstats.check_importer(runner)
-            checkstats.check_dr_consumer(runner)
-            checkstats.check_command_log(runner)
             checkstats.check_exporter(runner)
             checkstats.check_dr_producer(runner)
         except (KeyboardInterrupt, SystemExit):
