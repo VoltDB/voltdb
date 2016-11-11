@@ -794,6 +794,7 @@ DISTRIBUTION
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
             <include name="toolrunner.py" />
+            <include name="watch_performance.py" />
             <include name="voltify" />
             <include name="voltify-README.md" />
             <include name="voltify.d/**" />
