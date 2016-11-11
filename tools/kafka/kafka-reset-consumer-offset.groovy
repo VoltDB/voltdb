@@ -27,7 +27,7 @@
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),
-    @Grab('org.apache.kafka:kafka_2.10:0.8.2.1'),
+    @Grab('org.apache.kafka:kafka_2.11:0.8.2.2'),
     @GrabExclude('javax.mail:mail'),
     @GrabExclude('javax.jms:jms'),
     @GrabExclude('com.sun.jdmk:jmxtools')
