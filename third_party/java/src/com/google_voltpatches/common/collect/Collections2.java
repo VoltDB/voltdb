@@ -19,7 +19,6 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Predicates.and;
-import static com.google_voltpatches.common.base.Predicates.in;
 import static com.google_voltpatches.common.base.Predicates.not;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google_voltpatches.common.math.LongMath.binomial;
@@ -32,7 +31,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Predicates;
 import com.google_voltpatches.common.math.IntMath;
 import com.google_voltpatches.common.primitives.Ints;
-
 import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,8 +39,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-
-import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -53,7 +49,6 @@ import javax.annotation_voltpatches.Nullable;
  * @author Jared Levy
  * @since 2.0
  */
-@CheckReturnValue
 @GwtCompatible
 public final class Collections2 {
   private Collections2() {}
@@ -88,7 +83,6 @@ public final class Collections2 {
    */
   // TODO(kevinb): how can we omit that Iterables link when building gwt
   // javadoc?
-  @CheckReturnValue
   public static <E> Collection<E> filter(Collection<E> unfiltered, Predicate<? super E> predicate) {
     if (unfiltered instanceof FilteredCollection) {
       // Support clear(), removeAll(), and retainAll() when filtering a filtered

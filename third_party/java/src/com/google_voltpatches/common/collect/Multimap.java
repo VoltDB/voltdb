@@ -17,12 +17,11 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -212,6 +211,7 @@ public interface Multimap<K, V> {
    *     {@code false} if the multimap already contained the key-value pair and
    *     doesn't allow duplicates
    */
+  @CanIgnoreReturnValue
   boolean put(@Nullable K key, @Nullable V value);
 
   /**
@@ -222,6 +222,7 @@ public interface Multimap<K, V> {
    *
    * @return {@code true} if the multimap changed
    */
+  @CanIgnoreReturnValue
   boolean remove(@Nullable Object key, @Nullable Object value);
 
   // Bulk Operations
@@ -239,6 +240,7 @@ public interface Multimap<K, V> {
    *
    * @return {@code true} if the multimap changed
    */
+  @CanIgnoreReturnValue
   boolean putAll(@Nullable K key, Iterable<? extends V> values);
 
   /**
@@ -247,6 +249,7 @@ public interface Multimap<K, V> {
    *
    * @return {@code true} if the multimap changed
    */
+  @CanIgnoreReturnValue
   boolean putAll(Multimap<? extends K, ? extends V> multimap);
 
   /**
@@ -261,6 +264,7 @@ public interface Multimap<K, V> {
    *     <i>may</i> be modifiable, but updating it will have no effect on the
    *     multimap.
    */
+  @CanIgnoreReturnValue
   Collection<V> replaceValues(@Nullable K key, Iterable<? extends V> values);
 
   /**
@@ -274,6 +278,7 @@ public interface Multimap<K, V> {
    *     collection <i>may</i> be modifiable, but updating it will have no
    *     effect on the multimap.
    */
+  @CanIgnoreReturnValue
   Collection<V> removeAll(@Nullable Object key);
 
   /**

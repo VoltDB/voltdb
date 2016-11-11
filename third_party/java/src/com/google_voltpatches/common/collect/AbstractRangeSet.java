@@ -14,6 +14,7 @@
 
 package com.google_voltpatches.common.collect;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -21,6 +22,7 @@ import javax.annotation_voltpatches.Nullable;
  *
  * @author Louis Wasserman
  */
+@GwtIncompatible
 abstract class AbstractRangeSet<C extends Comparable> implements RangeSet<C> {
   AbstractRangeSet() {}
 
@@ -74,6 +76,11 @@ abstract class AbstractRangeSet<C extends Comparable> implements RangeSet<C> {
     for (Range<C> range : other.asRanges()) {
       remove(range);
     }
+  }
+
+  @Override
+  public boolean intersects(Range<C> otherRange) {
+    return !subRangeSet(otherRange).isEmpty();
   }
 
   @Override

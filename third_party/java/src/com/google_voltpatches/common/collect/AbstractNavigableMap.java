@@ -16,15 +16,14 @@
 
 package com.google_voltpatches.common.collect;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
-
 import java.util.Iterator;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedMap;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -32,6 +31,7 @@ import javax.annotation_voltpatches.Nullable;
  * 
  * @author Louis Wasserman
  */
+@GwtIncompatible
 abstract class AbstractNavigableMap<K, V> extends IteratorBasedAbstractMap<K, V>
     implements NavigableMap<K, V> {
 

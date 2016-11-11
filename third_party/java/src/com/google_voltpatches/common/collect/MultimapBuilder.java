@@ -23,7 +23,6 @@ import static com.google_voltpatches.common.collect.Maps.newLinkedHashMapWithExp
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Supplier;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,8 +40,6 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import javax.annotation_voltpatches.CheckReturnValue;
 
 /**
  * A builder for a multimap implementation that allows customization of the backing map and value
@@ -71,7 +68,6 @@ import javax.annotation_voltpatches.CheckReturnValue;
  */
 @Beta
 @GwtCompatible
-@CheckReturnValue
 public abstract class MultimapBuilder<K0, V0> {
   /*
    * Leaving K and V as upper bounds rather than the actual key and value types allows type
