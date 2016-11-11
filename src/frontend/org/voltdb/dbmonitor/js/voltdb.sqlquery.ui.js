@@ -722,10 +722,10 @@ $(document).ready(function () {
                              '</div>';
 
             if(!isMobile){
-            html_query = html_query + '<h1 class="theHeading icon-queryResult"><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
+            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
             }
             else{
-            html_query = html_query + '<h1 class="theHeading icon-queryResult"><span class="queryResultStyle">Query Result</span></h1>';
+            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span></h1>';
             }
 
             html_query = html_query + '<div id="queryWrapper-'+tab_counter+'" class="queryWrapper">' +
