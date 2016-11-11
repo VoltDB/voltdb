@@ -1726,6 +1726,14 @@ Scala:
 /**
  * License : BSD
  */
+scala-parser-combinators
+/**
+ * License : BSD
+ */
+scala-xml
+/**
+ * License : BSD
+ */
 Metrics:
 /**
  * License : Apache 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
