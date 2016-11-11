@@ -490,7 +490,6 @@ if whichtests in ("${eetestsuite}", "execution"):
      add_drop_table
      engine_test
      FragmentManagerTest
-     
     """
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """

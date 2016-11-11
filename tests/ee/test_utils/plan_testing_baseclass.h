@@ -272,12 +272,6 @@ public:
                            (expected != v1) ? "failed" : "ok");
                 if (expected != v1) {
                     failed = true;
-                    std::cout << "Failure: Row " << row
-                    		  << ", Col " << col << ": "
-							  << "expected \"" << expected
-							  << "\", got \"" << v1
-							  << "\""
-							  << std::endl;
                 }
             }
         }

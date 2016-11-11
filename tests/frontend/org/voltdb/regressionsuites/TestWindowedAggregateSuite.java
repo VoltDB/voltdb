@@ -414,10 +414,6 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }
         // Check rank with windowed partition on two columns, one partitioned and
         // one not partitioned, but ordered by a non-partitioned column.
-        sql = "select A, AA, B, C from T_PAA ORDER BY A, B, C";
-        cr = client.callProcedure("@AdHoc", sql);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        VoltTable expectedVt = cr.getResults()[0];
         sql = "select A, B, C, rank() over (partition by A, AA order by B) as R from T_PAA ORDER BY A, B, C, R;";
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());

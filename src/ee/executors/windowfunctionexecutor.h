@@ -124,7 +124,7 @@ public:
         m_inputSchema(NULL),
         m_aggregateRow(NULL)
         {
-    		dynamic_cast<WindowFunctionPlanNode *>(abstract_node)->collectOutputExpressions(m_outputColumnExpressions);
+            dynamic_cast<WindowFunctionPlanNode *>(abstract_node)->collectOutputExpressions(m_outputColumnExpressions);
         }
     virtual ~WindowFunctionExecutor();
 
