@@ -83,14 +83,8 @@ public class MessagingChannel {
             throw new IOException("Failed to read message");
         }
         // there will always be a length, need to have more than four bytes to have a message
-        if (read > 4) {
-            List<ByteBuffer> messages = m_sslBufferDescrypter.decrypt();
-            if (messages != null) {
-                if (messages.size() > 1) {
-                    throw new IOException("Unexpectedly read more than one message");
-                }
-                return messages.get(0);
-            }
+        if (read > 4 && m_sslBufferDescrypter.decrypt() > 0) {
+            return m_sslBufferDescrypter.message();
         }
         return null;
     }

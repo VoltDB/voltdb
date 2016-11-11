@@ -191,10 +191,10 @@ public class VoltPort implements Connection
                                 m_messagesRead++;
                             }
                         } else {
-                            List<ByteBuffer> messages;
+                            ByteBuffer message;
                             while ((m_handler.fillBufferFromInputStream( readStream(), m_sslBufferDecrypter.getSrcBuffer() )) > 0) {
-                                while ((messages = m_sslBufferDecrypter.decrypt()) != null) {
-                                    for (ByteBuffer message : messages) {
+                                while (m_sslBufferDecrypter.decrypt() > 0) {
+                                    while ((message = m_sslBufferDecrypter.message()) != null) {
                                         m_handler.handleMessage(message, this);
                                         m_messagesRead++;
                                     }
