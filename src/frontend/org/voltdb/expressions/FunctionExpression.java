@@ -203,13 +203,13 @@ public class FunctionExpression extends AbstractExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         assert(m_name != null);
-        stringer.key(Members.NAME.name()).value(m_name);
-        stringer.key(Members.FUNCTION_ID.name()).value(m_functionId);
+        stringer.keySymbolValuePair(Members.NAME.name(), m_name);
+        stringer.keySymbolValuePair(Members.FUNCTION_ID.name(), m_functionId);
         if (m_impliedArgument != null) {
-            stringer.key(Members.IMPLIED_ARGUMENT.name()).value(m_impliedArgument);
+            stringer.keySymbolValuePair(Members.IMPLIED_ARGUMENT.name(), m_impliedArgument);
         }
         if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
-            stringer.key(Members.RESULT_TYPE_PARAM_IDX.name()).value(m_resultTypeParameterIndex);
+            stringer.keySymbolValuePair(Members.RESULT_TYPE_PARAM_IDX.name(), m_resultTypeParameterIndex);
         }
     }
 

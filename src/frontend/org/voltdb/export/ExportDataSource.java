@@ -17,6 +17,8 @@
 
 package org.voltdb.export;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -60,7 +62,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -201,7 +202,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key("database").value(m_database);
+            stringer.keySymbolValuePair("database", m_database);
             writeAdvertisementTo(stringer);
             stringer.endObject();
             JSONObject jsObj = new JSONObject(stringer.toString());
@@ -360,23 +361,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public final void writeAdvertisementTo(JSONStringer stringer) throws JSONException {
-        stringer.key("adVersion").value(0);
-        stringer.key("generation").value(m_generation);
-        stringer.key("partitionId").value(getPartitionId());
-        stringer.key("signature").value(m_signature);
-        stringer.key("tableName").value(getTableName());
-        stringer.key("startTime").value(ManagementFactory.getRuntimeMXBean().getStartTime());
+        stringer.keySymbolValuePair("adVersion", 0);
+        stringer.keySymbolValuePair("generation", m_generation);
+        stringer.keySymbolValuePair("partitionId", getPartitionId());
+        stringer.keySymbolValuePair("signature", m_signature);
+        stringer.keySymbolValuePair("tableName", getTableName());
+        stringer.keySymbolValuePair("startTime", ManagementFactory.getRuntimeMXBean().getStartTime());
         stringer.key("columns").array();
         for (int ii=0; ii < m_columnNames.size(); ++ii) {
             stringer.object();
-            stringer.key("name").value(m_columnNames.get(ii));
-            stringer.key("type").value(m_columnTypes.get(ii));
-            stringer.key("length").value(m_columnLengths.get(ii));
+            stringer.keySymbolValuePair("name", m_columnNames.get(ii));
+            stringer.keySymbolValuePair("type", m_columnTypes.get(ii));
+            stringer.keySymbolValuePair("length", m_columnLengths.get(ii));
             stringer.endObject();
         }
         stringer.endArray();
-        stringer.key("format").value(ExportFormat.FOURDOTFOUR.toString());
-        stringer.key("partitionColumnName").value(m_partitionColumnName);
+        stringer.keySymbolValuePair("format", ExportFormat.FOURDOTFOUR.toString());
+        stringer.keySymbolValuePair("partitionColumnName", m_partitionColumnName);
     }
 
     /**
@@ -587,22 +588,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> closeAndDelete() {
-        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
-            @Override
-            public void run() {
-                try {
-                    m_committedBuffers.closeAndDelete();
-                } catch(IOException e) {
-                    exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
-                } finally {
-                    getLocalExecutorService().shutdown();
-                }
-            }
-        };
-        return stashOrSubmitTask(runnable, false, false);
-    }
-
     public long getGeneration() {
         return m_generation;
     }
@@ -655,6 +640,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
+        return stashOrSubmitTask(runnable, false, false);
+    }
+
+    public boolean isClosed() {
+        return m_closed;
+    }
+
+    public ListenableFuture<?> closeAndDelete() {
+        m_closed = true;
+        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
+            @Override
+            public void run() {
+                try {
+                    m_committedBuffers.closeAndDelete();
+                } catch(IOException e) {
+                    exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
+                } finally {
+                    getLocalExecutorService().shutdown();
+                }
+            }
+        };
         return stashOrSubmitTask(runnable, false, false);
     }
 

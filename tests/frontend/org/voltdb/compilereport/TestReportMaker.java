@@ -244,6 +244,32 @@ public class TestReportMaker extends TestCase {
         assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
     }
 
+    public void testExplainViewTable() throws IOException {
+        final String ddl =
+            "CREATE TABLE VIEW_SOURCE (" +
+            "    GROUPBY1 INT NOT NULL," +
+            "    GROUPBY2 INT NOT NULL," +
+            "    MINCOL DECIMAL NOT NULL," +
+            "    SUMCOL FLOAT NOT NULL, " +
+            "    MAXCOL TIMESTAMP NOT NULL," +
+            "    COUNTCOL VARCHAR(128) NOT NULL" +
+            ");" +
+            "PARTITION TABLE VIEW_SOURCE ON COLUMN GROUPBY1;" +
+            "CREATE INDEX IDXG1 ON VIEW_SOURCE(GROUPBY1, MINCOL);" +
+            "CREATE VIEW VIEW_SEQSCAN (GROUPBY2, CNT, MINSEQ, SUMCOL, MAXSEQ, COUNTCOL) AS" +
+            "    SELECT GROUPBY2, COUNT(*), MIN(MINCOL), SUM(SUMCOL), MAX(MAXCOL), COUNT(COUNTCOL)" +
+            "    FROM VIEW_SOURCE GROUP BY GROUPBY2;" +
+            "CREATE VIEW VIEW_IDXPLAN (GROUPBY1, CNT, MINIDX, SUMCOL, MAXPLAN, COUNTCOL) AS" +
+            "    SELECT GROUPBY1, COUNT(*), MIN(MINCOL), SUM(SUMCOL), MAX(MAXCOL), COUNT(COUNTCOL)" +
+            "    FROM VIEW_SOURCE GROUP BY GROUPBY1;";
+        String report = compileAndGenerateCatalogReport(ddl);
+        assertTrue(report.contains("<thead><tr><th>View Task</th><th>Execution Plan</th></tr>"));
+        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINIDX\"</td><td>Built-in&nbsp;index&nbsp;scan&nbsp;&quot;IDXG1&quot;.</td></tr>"));
+        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXPLAN\"</td><td>RETURN&nbsp;RESULTS&nbsp;TO&nbsp;STORED&nbsp;PROCEDURE<br/>&nbsp;INDEX&nbsp;SCAN&nbsp;of&nbsp;&quot;VIEW_SOURCE&quot;&nbsp;using&nbsp;&quot;IDXG1&quot;<br/>&nbsp;range-scan&nbsp;on&nbsp;1&nbsp;of&nbsp;2&nbsp;cols&nbsp;from&nbsp;(GROUPBY1&nbsp;&gt;=&nbsp;?0)&nbsp;while&nbsp;(GROUPBY1&nbsp;=&nbsp;?0),&nbsp;filter&nbsp;by&nbsp;(MAXCOL&nbsp;&lt;=&nbsp;?1)<br/>&nbsp;&nbsp;inline&nbsp;Serial&nbsp;AGGREGATION&nbsp;ops:&nbsp;MAX(VIEW_SOURCE.MAXCOL)<br/></td></tr>"));
+        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
+        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
+    }
+
     // Under active/active DR, create a DRed table without index will trigger warning
     public void testTableWithIndexNoWarning() throws IOException {
         final String tableName = "TABLE_WITH_INDEX";

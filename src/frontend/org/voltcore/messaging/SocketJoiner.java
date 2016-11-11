@@ -66,20 +66,19 @@ import com.google_voltpatches.common.net.HostAndPort;
  * before accepting new connections
  */
 public class SocketJoiner {
-
-    private static final String HOSTS = "hosts";
-    private static final String REPORTED_ADDRESS = "reportedAddress";
-    private static final String NEW_HOST_ID = "newHostId";
-    private static final String REASON = "reason";
-    private static final String MAY_RETRY = "mayRetry";
-    private static final String ACCEPTED = "accepted";
+    static final String HOSTS = "hosts";
+    static final String REPORTED_ADDRESS = "reportedAddress";
+    static final String NEW_HOST_ID = "newHostId";
+    static final String REASON = "reason";
+    static final String MAY_RETRY = "mayRetry";
+    static final String ACCEPTED = "accepted";
     private static final String MAY_EXCHANGE_TS = "mayExchangeTs";
     private static final String TYPE = "type";
     private static final String PUBLISH_HOSTID = "PUBLISH_HOSTID";
     private static final String REQUEST_HOSTID = "REQUEST_HOSTID";
-    private static final String HOST_ID = "hostId";
-    private static final String PORT = "port";
-    private static final String ADDRESS = "address";
+    static final String HOST_ID = "hostId";
+    static final String PORT = "port";
+    static final String ADDRESS = "address";
     private static final String VERSION_COMPATIBLE = "versionCompatible";
     private static final String BUILD_STRING = "buildString";
     public  static final String VERSION_STRING = "versionString";

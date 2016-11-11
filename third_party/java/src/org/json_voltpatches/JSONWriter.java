@@ -132,7 +132,7 @@ public class JSONWriter {
 
     /**
      * Make a fresh JSONWriter. It can be used to build one JSON text.
-     * It expects an initial call to <code>object</code>.
+     * It expects an initial call to <code>object</code> or <code>array</code>.
      */
     public JSONWriter(Writer writer) {
         m_writer = writer;
@@ -174,25 +174,51 @@ public class JSONWriter {
         m_expectingComma = true;
     }
 
+    private static enum ScopeOptions {
+        ArrayWithComma(",[") {
+            @Override
+            HashSetOfString createKeyTracker() { return null; }
+        },
+        ArrayWithoutComma("[") {
+            @Override
+            HashSetOfString createKeyTracker() { return null; }
+        },
+        ObjectWithComma(",{"),
+        ObjectWithoutComma("{"),
+       ;
+
+       final String m_prefix;
+
+        ScopeOptions(String prefix) {
+            m_prefix = prefix;
+        }
+
+        HashSetOfString createKeyTracker() {
+            return new HashSetOfString();
+        }
+    }
+
     /**
      * Push an array or object scope.
-     * @param object Whether the scope should detect key duplication.
-     * @param opener
+     * @param options settings to control prefix output and
+     *        optional key tracking for object vs. array scopes.
      * @throws JSONException If nesting is too deep.
      */
-    private void push(boolean object, String opener) throws JSONException {
+    private void push(ScopeOptions options) throws JSONException {
         m_top += 1;
         if (m_top >= MAX_DEPTH) {
             throw new JSONException("Nesting too deep.");
         }
         try {
-            m_writer.write(opener);
+            m_writer.write(options.m_prefix);
         }
         catch (IOException e) {
             throw new JSONException(e);
         }
-        m_scopeStack[m_top] = object ? new HashSetOfString() : null;
-        m_mode = object ? 'k' : 'a';
+
+        HashSetOfString keyTracker = options.createKeyTracker();
+        m_scopeStack[m_top] = keyTracker;
+        m_mode = (keyTracker == null) ? 'a' : 'k';
         m_expectingComma = false;
     }
 
@@ -212,7 +238,9 @@ public class JSONWriter {
             throw new JSONException(e);
         }
         --m_top;
-        m_mode = m_top == -1 ? 'd' : m_scopeStack[m_top] == null ? 'a' : 'k';
+        m_mode = (m_top == -1) ?
+                'd' :
+                (m_scopeStack[m_top] == null) ? 'a' : 'k';
         m_expectingComma = true;
     }
 
@@ -229,7 +257,9 @@ public class JSONWriter {
         if (m_mode == 'k' || m_mode == 'd') {
             throw new JSONException("Misplaced array.");
         }
-        push(false, m_expectingComma ? ",[" : "[");
+        push(m_expectingComma ?
+                ScopeOptions.ArrayWithComma :
+                ScopeOptions.ArrayWithoutComma);
         return this;
     }
 
@@ -260,7 +290,9 @@ public class JSONWriter {
         if (m_mode == 'k' || m_mode == 'd') {
             throw new JSONException("Misplaced object.");
         }
-        push(true, m_expectingComma ? ",{" : "{");
+        push(m_expectingComma ?
+                ScopeOptions.ObjectWithComma :
+                ScopeOptions.ObjectWithoutComma);
         return this;
     }
 
@@ -322,8 +354,8 @@ public class JSONWriter {
      * @throws JSONException if the value is out of sequence or
      * if the writer throws an IOException
      */
-    public JSONWriter value(boolean b) throws JSONException {
-        appendValue(b ? "true" : "false");
+    public JSONWriter value(boolean aValue) throws JSONException {
+        appendValue(aValue ? "true" : "false");
         return this;
     }
 
@@ -335,8 +367,8 @@ public class JSONWriter {
      * or if the value is out of sequence or
      * if the writer throws an IOException
      */
-    public JSONWriter value(double d) throws JSONException {
-        appendValue(JSONObject.numberToString(d));
+    public JSONWriter value(double aValue) throws JSONException {
+        appendValue(JSONObject.numberToString(aValue));
         return this;
     }
 
@@ -347,8 +379,8 @@ public class JSONWriter {
      * @throws JSONException if the value is out of sequence or
      * if the writer throws an IOException
      */
-    public JSONWriter value(long l) throws JSONException {
-        appendValue(Long.toString(l));
+    public JSONWriter value(long aValue) throws JSONException {
+        appendValue(Long.toString(aValue));
         return this;
     }
 
@@ -361,8 +393,8 @@ public class JSONWriter {
      * toJSONString method throws an Exception or
      * if the writer throws an IOException
      */
-    public JSONWriter value(Object o) throws JSONException {
-        appendValue(JSONObject.valueToString(o));
+    public JSONWriter value(Object aValue) throws JSONException {
+        appendValue(JSONObject.valueToString(aValue));
         return this;
     }
 
@@ -424,6 +456,110 @@ public class JSONWriter {
             value(element);
         }
         endArray();
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, String aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+	        if (aValue == null) {
+                m_writer.write("\":null");
+	        }
+	        else {
+                m_writer.write("\":\"");
+                m_writer.write(JSONObject.quotable(aValue));
+                m_writer.write('"');
+	        }
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, long aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+            m_writer.write("\":");
+            m_writer.write(Long.toString(aValue));
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, boolean aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+            m_writer.write(aValue ? "\":true" : "\":false");
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
         return this;
     }
 

@@ -409,9 +409,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
-            stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
-            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
-            stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
+            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
             AbstractExpression ae = m_aggregateExpressions.get(ii);
             if (ae != null) {
                 stringer.key(Members.AGGREGATE_EXPRESSION.name());

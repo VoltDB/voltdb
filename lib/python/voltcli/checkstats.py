@@ -17,40 +17,57 @@
 import time
 import voltdbclient
 
-
-def check_export_dr(runner):
-        partition_min_host = dict()
-        partition_min = dict()
-        partition_max = dict()
-        check_dr(runner, partition_min_host, partition_min, partition_max)
-        # check the export stats twice because they are periodic
-        export_tables_with_data = dict()
-        check_dr(runner, partition_min_host, partition_min, partition_max)
-        last_table_stat_time = 0
-        last_table_stat_time = check_export(runner, export_tables_with_data, last_table_stat_time)
-        if not partition_min and last_table_stat_time == 1:
-            # there are no outstanding export or dr transactions
-            runner.info('All export and DR transactions have been processed.')
-            return
-        # after 10 seconds notify admin of what transactions have not drained
-        notifyInterval = 10
-        # have to get two samples of table stats because the cached value could be from before Quiesce
-        while True:
-            time.sleep(1)
-            if partition_min:
-                check_dr(runner, partition_min_host, partition_min, partition_max)
-            if last_table_stat_time > 1:
-                curr_table_stat_time = check_export(runner, export_tables_with_data, last_table_stat_time)
+def check_exporter(runner):
+    runner.info('Completing outstanding exporter transactions...')
+    last_table_stat_time = 0
+    export_tables_with_data = dict()
+    last_table_stat_time = check_export_stats(runner, export_tables_with_data, last_table_stat_time)
+    if last_table_stat_time == 1:
+        # there are no outstanding export transactions
+        runner.info('All exporter transactions have been processed.')
+        return
+    # after 10 seconds notify admin of what transactions have not drained
+    notifyInterval = 10
+    # have to get two samples of table stats because the cached value could be from before Quiesce
+    while True:
+        time.sleep(1)
+        if last_table_stat_time > 1:
+            curr_table_stat_time = check_export_stats(runner, export_tables_with_data, last_table_stat_time)
             if last_table_stat_time == 1 or curr_table_stat_time > last_table_stat_time:
                 # have a new sample from table stat cache or there are no tables
-                if not export_tables_with_data and not partition_min:
-                    runner.info('All export and DR transactions have been processed.')
+                if not export_tables_with_data:
+                    runner.info('All exporter transactions have been processed.')
                     return
             notifyInterval -= 1
             if notifyInterval == 0:
                 notifyInterval = 10
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
+
+
+def check_dr_producer(runner):
+    runner.info('Completing outstanding DR producer transactions...')
+    partition_min_host = dict()
+    partition_min = dict()
+    partition_max = dict()
+    dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
+    if not partition_min:
+        # there are no outstanding export or dr transactions
+        runner.info('All DR producer transactions have been processed.')
+        return
+    # after 10 seconds notify admin of what transactions have not drained
+    notifyInterval = 10
+    # have to get two samples of table stats because the cached value could be from before Quiesce
+    while True:
+        time.sleep(1)
+        if partition_min:
+            dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
+            if not partition_min:
+                runner.info('All DR producer transactions have been processed.')
+                return
+            notifyInterval -= 1
+            if notifyInterval == 0:
+                notifyInterval = 10
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
 
@@ -71,7 +88,7 @@ def get_stats(runner, component):
             runner.error("Unexpected response to @Statistics %s: %s" % (component, resp))
         return response
 
-def check_dr(runner, partition_min_host, partition_min, partition_max):
+def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
     resp = get_stats(runner, 'DRPRODUCER')
     partition_data = resp.table(0)
     for pid in partition_min:
@@ -127,7 +144,7 @@ def print_dr_pending(runner, partition_min_host, partition_min, partition_max):
     for pid in partition_min_host:
         runner.info(summaryline % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
 
-def check_export(runner, export_tables_with_data, last_collection_time):
+def check_export_stats(runner, export_tables_with_data, last_collection_time):
     resp = get_stats(runner, 'TABLE')
     export_tables = 0
     collection_time = 0
@@ -147,10 +164,15 @@ def check_export(runner, export_tables_with_data, last_collection_time):
 
     for r in tablestats.tuples():
         # first look for streaming (export) tables
+        #table type
         if str(r[6]) == 'StreamedTable':
+            #TUPLE_ALLOCATED_MEMORY
             pendingData = r[8]
+            #table name
             tablename = str(r[5])
+            #partition id
             pid = r[4]
+            #host name
             hostname = str(r[2])
             if pendingData > 0:
                 if not tablename in export_tables_with_data:
@@ -171,8 +193,8 @@ def check_export(runner, export_tables_with_data, last_collection_time):
     return collection_time
 
 def print_export_pending(runner, export_tables_with_data):
-    runner.info('The following export tables have unacknowledged transactions:')
-    summaryline = "    %s needs acknowledgement on host(s) %s for partition(s) %s."
+    runner.info('\tThe following export tables have unacknowledged transactions:')
+    summaryline = "    %s needs acknowledgement on host %s for partition %s."
     for table in export_tables_with_data:
         pidlist = set()
         hostlist = list(export_tables_with_data[table].keys())
@@ -182,6 +204,7 @@ def print_export_pending(runner, export_tables_with_data):
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
 
 def check_clients(runner):
+     runner.info('Completing outstanding client transactions...')
      while True:
         resp = get_stats(runner, 'LIVECLIENTS')
         trans = 0
@@ -191,12 +214,13 @@ def check_clients(runner):
             bytes += r[6]
             msgs += r[7]
             trans += r[8]
-        runner.info('Outstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
+        runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         time.sleep(1)
 
 def check_importer(runner):
+     runner.info('Completing outstanding importer requests...')
      while True:
         resp = get_stats(runner, 'IMPORTER')
         outstanding = 0
@@ -204,7 +228,48 @@ def check_importer(runner):
             return
         for r in resp.table(0).tuples():
             outstanding += r[8]
-        runner.info('Outstanding importer requests=%d' %(outstanding))
+        runner.info('\tOutstanding importer requests=%d' %(outstanding))
         if outstanding == 0:
             return
+        time.sleep(1)
+
+def check_dr_consumer(runner):
+     runner.info('Completing outstanding DR consumer transactions...')
+     while True:
+        resp = get_stats(runner, 'DRCONSUMER')
+        outstanding = 0
+        if len(resp.table(1).tuples()) == 0:
+            return
+        # DR consumer stats
+        # column 7: The timestamp of the last transaction received from the producer for the partition
+        # column 8: The timestamp of the last transaction successfully applied to this partition on the consumer
+        # If the two timestamps are the same, all the transactions have been applied for the partition.
+        for r in resp.table(1).tuples():
+            if r[7] <> r[8]:
+                outstanding += 1
+                runner.info('\tPartition %d on host %d has outstanding DR consumer transactions.' %(r[4], r[1]))
+        if outstanding == 0:
+            return
+        time.sleep(1)
+
+def check_command_log(runner):
+    runner.info('Completing outstanding Command Log transactions...')
+    while True:
+        resp = get_stats(runner, 'COMMANDLOG')
+        outstandingByte = 0
+        outstandingTxn = 0
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # Command log stats
+        # column 3: OUTSTANDING_BYTES for a host
+        # column 4: OUTSTANDING_TXNS for a host
+        # The sum of both should be zero
+        for r in resp.table(0).tuples():
+            outstandingByte += r[3]
+            outstandingTxn += r[4]
+
+        if outstandingByte == 0 and outstandingTxn == 0:
+            runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
+            return
+        runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         time.sleep(1)

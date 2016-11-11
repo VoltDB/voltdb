@@ -32,8 +32,8 @@ import org.voltdb.types.QuantifierType;
  */
 public class ComparisonExpression extends AbstractExpression {
 
-    public enum Members {
-        QUANTIFIER;
+    private static class Members {
+        private static final String QUANTIFIER = "QUANTIFIER";
     }
 
     private QuantifierType m_quantifier = QuantifierType.NONE;
@@ -83,19 +83,19 @@ public class ComparisonExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
-        super.loadFromJSONObject(obj);
-       if (obj.has(Members.QUANTIFIER.name())) {
-           m_quantifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER.name()));
-       } else {
-           m_quantifier = QuantifierType.NONE;
-       }
+        if (obj.has(Members.QUANTIFIER)) {
+            m_quantifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER));
+        }
+        else {
+            m_quantifier = QuantifierType.NONE;
+        }
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_quantifier != QuantifierType.NONE) {
-            stringer.key(Members.QUANTIFIER.name()).value(m_quantifier.getValue());
+            stringer.keySymbolValuePair(Members.QUANTIFIER, m_quantifier.getValue());
         }
     }
 
