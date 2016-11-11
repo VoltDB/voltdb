@@ -46,6 +46,8 @@
         <classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
         <classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
         <classpathentry kind="lib" path="lib/scala-library-2.11.5.jar"/>
+        <classpathentry kind="lib" path="scala-parser-combinators_2.11-1.0.2.jar"/>
+        <classpathentry kind="lib" path="scala-xml_2.11-1.0.2.jar"/>
         <classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
         <classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.13.jar"/>
         <classpathentry kind="lib" path="lib/felix.jar"/>
