@@ -37,6 +37,35 @@ public class ClientStatusListenerExt {
     }
 
     /**
+     * Cause of the connection creation failure.
+     */
+    public static enum ConnectionCause {
+        /** connection is timed out */
+        CONNECTION_TIMEOUT,
+        /**host unknown*/
+        HOST_UNKNOWN,
+        /** Connection closed by other side */
+        SERVER_UNAVAILABLE,
+        /**system procedure failure*/
+        TOPOLOY_QUERY_FAILURE;
+
+        /**
+         * convert ClientResponse status to ConnectionCause
+         * @param clientResponseStatus
+         * @return ConnectionCause
+         */
+        static ConnectionCause toConnectionCreationCause(byte clientResponseStatus) {
+            ConnectionCause cause = TOPOLOY_QUERY_FAILURE;
+            if (clientResponseStatus == ClientResponse.CONNECTION_LOST || clientResponseStatus == ClientResponse.CONNECTION_TIMEOUT) {
+                cause = CONNECTION_TIMEOUT;
+            } else if (clientResponseStatus == ClientResponse.SERVER_UNAVAILABLE) {
+                cause = SERVER_UNAVAILABLE;
+            }
+            return cause;
+        }
+    }
+
+    /**
      * Notify listeners that a connection to a host was lost.
      * @param hostname Name of the host the connection was lost from.
      * @param port Port number of the connection to the lost host.
@@ -54,10 +83,9 @@ public class ClientStatusListenerExt {
      * @param hostname Name of the host the connection was created.
      * @param ip  The IP address
      * @param port Port number of the connection to the node.
-     * @param status The creation status {@link ClientResponse}
-     * @param e The reason that the creation fails
+     * @param cause The creation failure cause
      */
-    public void connectionCreated(String hostname, String ip, int port, byte status, Throwable e) {}
+    public void connectionCreated(String hostname, String ip, int port, ConnectionCause cause) {}
 
     /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition

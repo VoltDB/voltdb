@@ -776,16 +776,15 @@ public final class ClientImpl implements Client {
         }
 
         /**
-         * notify client upon a connection to a host is created.
+         * notify client upon a connection creation failure.
          * @param host HostConfig with IP address and port
-         * @param status The status of connection creation
-         * @param e The reason that a connection to the host fails to be created.
+         * @param cause The status of connection creation
          */
-        void nofifyClientConnectionCreation(HostConfig host, byte status, Throwable e) {
+        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.ConnectionCause cause) {
             if (m_clientStatusListener != null) {
                 m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
                         (host != null) ? host.m_ipAddress : "",
-                        (host != null) ? host.m_clientPort : -1, status, e);
+                        (host != null) ? host.m_clientPort : -1, cause);
             }
         }
 
@@ -800,56 +799,45 @@ public final class ClientImpl implements Client {
             m_ex.execute(new Runnable() {
                 @Override
                 public void run() {
-                    try{
-                        ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
-                        if (resp.getStatus() == ClientResponse.SUCCESS) {
-                            Map<Integer, HostConfig> hosts = buildUnconnectedHostConfigMap(resp.getResults()[0]);
-                            for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
-                                HostConfig config = entry.getValue();
-                                try {
-                                    connectToOneServerWithRetry(config.m_ipAddress,config.getPort(m_useAdminPort));
-                                    nofifyClientConnectionCreation(config, ClientResponse.SUCCESS, null);
-                                } catch (IOException e) {
-                                    nofifyClientConnectionCreation(config, ClientResponse.SERVER_UNAVAILABLE, e);
+                    int retryCount = 0;
+                    //if there are connection creation failures, retry for 5 times
+                    while (retryCount < 5) {
+                        retryCount++;
+                        boolean allSuccess = true;
+                        try {
+                            ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
+                            if (resp.getStatus() == ClientResponse.SUCCESS) {
+                                Map<Integer, HostConfig> hosts = buildUnconnectedHostConfigMap(resp.getResults()[0]);
+                                for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
+                                    HostConfig config = entry.getValue();
+                                    try {
+                                        createConnection(config.m_ipAddress,config.getPort(m_useAdminPort));
+                                    } catch (UnknownHostException e) {
+                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.ConnectionCause.HOST_UNKNOWN);
+                                        allSuccess = false;
+                                    } catch (Exception e) {
+                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.ConnectionCause.SERVER_UNAVAILABLE);
+                                        allSuccess = false;
+                                    }
                                 }
+                                m_distributer.updateClientAffinityPartitionsUponTopoChange();
+                            } else {
+                                nofifyClientConnectionCreation(null, ClientStatusListenerExt.ConnectionCause.toConnectionCreationCause(resp.getStatus()));
+                                allSuccess = false;
                             }
-                            m_distributer.updateClientAffinityPartitionsUponTopoChange();
-                        } else {
-                            nofifyClientConnectionCreation(null, resp.getStatus(), null);
+                        } catch (Exception e) {
+                            nofifyClientConnectionCreation(null, ClientStatusListenerExt.ConnectionCause.TOPOLOY_QUERY_FAILURE);
+                            allSuccess = false;
                         }
-                    } catch (Exception e) {
-                        nofifyClientConnectionCreation(null, ClientResponse.SERVER_UNAVAILABLE, e);
+                        if (allSuccess) return;
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException e) { }
                     }
                 }
             });
         }
-
-        /**
-         * Connect to a single server with retry. Limited exponential back off.
-         * if it's not able to connect.
-         * @param ipAddress host IP
-         * @param port port
-         */
-        private void connectToOneServerWithRetry(String ipAddress, int port) throws Exception {
-            long sleep = 1000;
-            final long maxSleep = 30000;
-            while (true) {
-                try {
-                    createConnection(ipAddress, port);
-                    break;
-                } catch (Exception e) {
-                    try { Thread.sleep(sleep);
-                    } catch (Exception ignored) { }
-                    if (sleep < maxSleep) {
-                        sleep = Math.min(sleep + sleep, maxSleep);
-                    } else {
-                        throw e;
-                    }
-                }
-            }
-        }
     }
-
      /****************************************************
                         Implementation
      ****************************************************/
