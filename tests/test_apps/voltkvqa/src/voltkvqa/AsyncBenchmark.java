@@ -199,6 +199,9 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Enable topology awareness")
+        boolean topologyaware = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -308,6 +311,9 @@ public class AsyncBenchmark {
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         clientConfig.setReconnectOnConnectionLoss(config.recover);
 
+        if (config.topologyaware) {
+            clientConfig.setTopologyChangeAware(true);
+        }
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
@@ -409,24 +415,29 @@ public class AsyncBenchmark {
     void connect(String servers, final String info) throws InterruptedException {
         String[] serverArray = servers.split(",");
         String msg;
-        final CountDownLatch connections = new CountDownLatch(1);
         if(debug) {
             msg = "\n=========\n" + info + "\nIn connect Server counts: " + serverArray.length +
                     ", Server Names: " + servers;
             prt(msg);
         }
 
-        // use a new thread to connect to each server
-        for (final String server : serverArray) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server, info);
-                    connections.countDown();
-                }
-            }).start();
+        if (config.topologyaware) {
+            //client.createConnection(serverArray[0]);
+            connectToOneServerWithRetry(serverArray[0], info);
+        } else {
+            final CountDownLatch connections = new CountDownLatch(1);
+            // use a new thread to connect to each server
+            for (final String server : serverArray) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server, info);
+                        connections.countDown();
+                    }
+                }).start();
+            }
+            connections.await();
         }
-        connections.await();
     }
 
     /**
