@@ -22,8 +22,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
@@ -83,7 +81,8 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     private long m_lastPendingWriteTime = -1;
 
     private final SSLBufferEncrypter m_sslBufferEncrypter;
-    private final WriteBuffers m_writeBuffers;
+    private ByteBuffer m_encryptedWriteBuffer;
+    private int m_writeSize;
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null, null);
@@ -102,11 +101,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         m_monitor = monitor;
         if (sslEngine != null) {
             m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine);
-            m_writeBuffers = new SSLWriteBuffers();
         } else {
             m_sslBufferEncrypter = null;
-            m_writeBuffers = new ClearWriteBuffers();
         }
+        m_encryptedWriteBuffer = null;
+        m_writeSize = 0;
     }
 
     /*
@@ -121,7 +120,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     @Override
     synchronized public boolean isEmpty()
     {
-        return super.isEmpty() && m_writeBuffers.isEmpty();
+        return super.isEmpty() && m_encryptedWriteBuffer == null && m_queuedWrites.isEmpty();
     }
 
     /**
@@ -341,7 +340,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         try {
             long rc = 0;
             do {
-                    ByteBuffer buffer = m_writeBuffers.getBuffer();
+                    ByteBuffer buffer = getBufferToWrite();
                     if (buffer == null) {
                         return bytesWritten;
                     }
@@ -353,10 +352,11 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                             backpressureStarted();
                         }
                     } else {
-                        int discarded = m_writeBuffers.discardBuffer();
+                        int discarded = discardBuffer();
                         if (discarded > 0) {
                             updateQueued(-discarded, false);
                             m_messagesWritten++;
+                            m_writeSize = 0;
                         }
                     }
                     bytesWritten += rc;
@@ -383,96 +383,69 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return bytesWritten;
     }
 
-    private interface WriteBuffers {
-        ByteBuffer getBuffer() throws IOException;
-        int discardBuffer();
-        boolean isEmpty();
+    private ByteBuffer getBufferToWrite() throws IOException {
+        if (m_sslBufferEncrypter == null) {
+            return getClearBuffer();
+        }
+        return getEncryptedBuffer();
     }
-    private class ClearWriteBuffers implements WriteBuffers {
 
-        private int currentBuffSize = 0;
-
-        // get the buffer that is currently being written.
-        // returns null if no buffer to write.
-        public ByteBuffer getBuffer() {
-            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                return null;
-            }
-            if (m_currentWriteBuffer == null) {
-                m_currentWriteBuffer = m_queuedBuffers.poll();
-                ByteBuffer buffer = m_currentWriteBuffer.b();
-                buffer.flip();
-                currentBuffSize = buffer.remaining();
-                return buffer;
-            } else {
-                return m_currentWriteBuffer.b();
-            }
+    private ByteBuffer getClearBuffer() {
+        if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+            return null;
         }
-
-        // no more bytes to write in the current buffer.
-        public int discardBuffer() {
-            m_currentWriteBuffer.discard();
-            m_currentWriteBuffer = null;
-            return currentBuffSize;
-        }
-
-        public boolean isEmpty() {
-            return m_queuedWrites.isEmpty();
+        if (m_currentWriteBuffer == null) {
+            m_currentWriteBuffer = m_queuedBuffers.poll();
+            ByteBuffer buffer = m_currentWriteBuffer.b();
+            buffer.flip();
+            m_writeSize = buffer.remaining();
+            return buffer;
+        } else {
+            return m_currentWriteBuffer.b();
         }
     }
 
-    private class SSLWriteBuffers implements WriteBuffers {
-
-        private int m_currentBuffSize = 0;
-        private ByteBuffer m_lastEncrypted;
-
-        public ByteBuffer getBuffer() throws IOException {
-            if (m_lastEncrypted != null) {
-                return m_lastEncrypted;
-            }
-            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                return null;
-            }
-            ByteBuffer writeBuffer;
-            if (m_currentWriteBuffer == null) {
-                m_currentWriteBuffer = m_queuedBuffers.poll();
-                writeBuffer = m_currentWriteBuffer.b();
-                writeBuffer.flip();
-                m_currentBuffSize = writeBuffer.remaining();
-            } else {
-                writeBuffer = m_currentWriteBuffer.b();
-            }
-            // the write buffer may be too big to encrypt.
-
-            ByteBuffer buffToEncrypt;
-            if (writeBuffer.remaining() <= Constants.SSL_CHUNK_SIZE) {
-                buffToEncrypt = writeBuffer.slice();
-                writeBuffer.position(writeBuffer.limit());
-            } else {
-                int oldLimit = writeBuffer.limit();
-                writeBuffer.limit(writeBuffer.position() + Constants.SSL_CHUNK_SIZE);
-                buffToEncrypt = writeBuffer.slice();
-                writeBuffer.position(writeBuffer.limit());
-                writeBuffer.limit(oldLimit);
-            }
-            m_lastEncrypted = m_sslBufferEncrypter.encryptBuffer(buffToEncrypt);
-            return m_lastEncrypted;
+    private ByteBuffer getEncryptedBuffer() throws IOException {
+        if (m_encryptedWriteBuffer != null) {
+            return m_encryptedWriteBuffer;
         }
-
-        public int discardBuffer() {
-            m_lastEncrypted = null;
-            if (!m_currentWriteBuffer.b().hasRemaining()) {
-                m_currentWriteBuffer.discard();
-                m_currentWriteBuffer = null;
-                return m_currentBuffSize;
-            } else {
-                return 0;
-            }
+        ByteBuffer writeBuffer;
+        if ((writeBuffer = getClearBuffer()) == null) {
+            return null;
         }
-
-        @Override
-        public boolean isEmpty() {
-            return m_lastEncrypted == null && m_queuedWrites.isEmpty();
+        ByteBuffer buffToEncrypt;
+        if (writeBuffer.remaining() <= Constants.SSL_CHUNK_SIZE) {
+            buffToEncrypt = writeBuffer.slice();
+            writeBuffer.position(writeBuffer.limit());
+        } else {
+            int oldLimit = writeBuffer.limit();
+            writeBuffer.limit(writeBuffer.position() + Constants.SSL_CHUNK_SIZE);
+            buffToEncrypt = writeBuffer.slice();
+            writeBuffer.position(writeBuffer.limit());
+            writeBuffer.limit(oldLimit);
         }
+        m_encryptedWriteBuffer = m_sslBufferEncrypter.encryptBuffer(buffToEncrypt);
+        return m_encryptedWriteBuffer;
+    }
+
+    private int discardBuffer() {
+        if (m_sslBufferEncrypter == null) {
+            return discardClearBuffer();
+        }
+        return discardEncryptedBuffer();
+    }
+
+    private int discardClearBuffer() {
+        m_currentWriteBuffer.discard();
+        m_currentWriteBuffer = null;
+        return m_writeSize;
+    }
+
+    private int discardEncryptedBuffer() {
+        m_encryptedWriteBuffer = null;
+        if (!m_currentWriteBuffer.b().hasRemaining()) {
+            return discardClearBuffer();
+        }
+        return 0;
     }
 }
