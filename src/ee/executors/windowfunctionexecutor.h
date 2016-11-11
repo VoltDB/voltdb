@@ -212,12 +212,18 @@ private:
     virtual bool p_execute(const NValueArray& params);
 
     /**
-     * Evaluate the order by and partition by expressions in
+     * Evaluate the partition by expressions in
      * the context of nextTuple.  Leave the results scattered
      * around the house.
      */
-    void initPartitionByAndOrderByKeyTuple(const TableTuple& nextTuple);
+    void initPartitionByKeyTuple(const TableTuple& nextTuple);
 
+    /**
+     * Evaluate the order by expressions in
+     * the context of nextTuple.  Leave the results scattered
+     * around the house.
+     */
+    void initOrderByKeyTuple(const TableTuple& nextTuple);
     /**
      * Create all the WindowAggregate objects in aggregateRow.
      * These hold the state of a window function computation.

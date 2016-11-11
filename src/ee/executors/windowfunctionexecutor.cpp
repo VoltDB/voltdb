@@ -91,7 +91,7 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
 class DenseRankAgg : public WindowAggregate {
 public:
     DenseRankAgg()
-      : m_rank(1) {
+      : m_rank(0) {
     }
 
     virtual ~DenseRankAgg() {}
@@ -108,7 +108,7 @@ public:
     }
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        m_rank = 1;
+        m_rank = 0;
     }
 protected:
     int m_rank;
@@ -123,7 +123,7 @@ class RankAgg : public DenseRankAgg {
 public:
     RankAgg()
     : DenseRankAgg(),
-      m_numOrderByPeers(0) {}
+      m_numOrderByPeers(1) {}
     ~RankAgg() {}
     void advance(const AbstractPlanNode::OwningExpressionVector & val,
                  const TableTuple &nextTuple,
@@ -135,6 +135,11 @@ public:
        } else {
            m_numOrderByPeers += 1;
        }
+    }
+
+    void resetAgg() {
+    	DenseRankAgg::resetAgg();
+    	m_numOrderByPeers = 1;
     }
 private:
     long m_numOrderByPeers;
@@ -230,29 +235,42 @@ int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
 void WindowFunctionExecutor::p_execute_tuple(const TableTuple& nextTuple, bool firstTuple)
 {
 	VOLT_TRACE("WindowFunctionExecutor::p_execute_tuple(start)\n");
-    initPartitionByAndOrderByKeyTuple(nextTuple);
-
-    bool newGroup = false;
+	/*
+	 * Evaluate the parition by and order by keys.  We don't evaluate
+	 * the order by keys here, because we may not need to.
+	 */
+    initPartitionByKeyTuple(nextTuple);
+    initOrderByKeyTuple(nextTuple);
+    bool newPartitionByGroup = firstTuple;
     /*
      * If this is not the first tuple, see if this is
      * the start of a new group.  Compare the m_inProgressPartitionByKeyTuple
-     * with the m_lastPartitionByKeyTuple.
+     * with the m_lastPartitionByKeyTuple.  If this is the first tuple,
+     * we know it's a new group already, so no comparison is required.
      */
     if (!firstTuple) {
-        newGroup = compareTuples(m_inProgressPartitionByKeyTuple,
-                                 m_lastPartitionByKeyTuple);
+        newPartitionByGroup = (compareTuples(m_inProgressPartitionByKeyTuple,
+                                  	  	     m_lastPartitionByKeyTuple) != 0);
     }
-    if (newGroup) {
+    if (newPartitionByGroup) {
         m_pmp->countdownProgress();
         m_aggregateRow->resetAggs();
     }
     // Update the aggregation calculation.
-    int newOrderByGroup = compareTuples(m_inProgressOrderByKeyTuple,
-                                        m_lastOrderByKeyTuple);
+    // If this is a new group, it's necessarily a
+    // new order by group.  So don't bother comparing.
+    // Otherwise compare the order by keys.
+    bool newOrderByGroup;
+    if (newPartitionByGroup) {
+    	newOrderByGroup = true;
+    } else {
+    	newOrderByGroup = (compareTuples(m_inProgressOrderByKeyTuple,
+    			      	  	   	  	     m_lastOrderByKeyTuple) != 0);
+    }
     /*
      * The first tuple is not a new order by group.
      */
-    advanceAggs(nextTuple, !firstTuple && newOrderByGroup != 0);
+    advanceAggs(nextTuple, newOrderByGroup);
     // Output the current row.
     insertOutputTuple(m_aggregateRow);
     VOLT_TRACE("WindowFunctionExecutor::p_execute_tuple(end)\n");
@@ -339,76 +357,95 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-void WindowFunctionExecutor::initPartitionByAndOrderByKeyTuple(const TableTuple& nextTuple)
+void WindowFunctionExecutor::initPartitionByKeyTuple(const TableTuple& nextTuple)
 {
+	/*
+	 * The partition by keys should not be null tuples.
+	 */
     assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
-    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
     assert( ! m_lastPartitionByKeyTuple.isNullTuple());
-    assert( ! m_lastOrderByKeyTuple.isNullTuple());
     /*
-     * Now the partition by and order by keys for the
-     * row before nextTuple are in m_inProgress*KeyTuple,
-     * and m_last*TupleKeyStorage has nothing interesting.
+     * Swap the data, so that m_inProgressPartitionByKey
+     * gets m_lastPartitionByKey's data and vice versa.
+     * This just swaps the data pointers.
      */
     swapPartitionByKeyTupleData();
-    swapOrderByKeyTupleData();
     /*
-     * Now, after the swap, the partition key and order by key
-     * values for the row before nextTuple are in
-     * m_last*TupleKeyStorage, and m_inProgress*TupleKeyStorage
-     * has nothing interesting for us.  So we will put the
-     * key values from nextTuple there.
+     * The partition by keys should still not be null tuples.
      */
     assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
-    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
     assert( ! m_lastPartitionByKeyTuple.isNullTuple());
-    assert( ! m_lastOrderByKeyTuple.isNullTuple());
     /*
-     * Calculate the partition by key values.
+     * Calculate the partition by key values.  Put them in
+     * m_inProgressPartitionByKeyTuple.
      */
     for (int ii = 0; ii < m_partitionByExpressions.size(); ii++) {
         m_inProgressPartitionByKeyTuple.setNValue(ii, m_partitionByExpressions[ii]->eval(&nextTuple));
     }
+}
+
+void WindowFunctionExecutor::initOrderByKeyTuple(const TableTuple& nextTuple)
+{
+	/*
+	 * The OrderByKey should not be null tuples.
+	 */
+    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
+    assert( ! m_lastOrderByKeyTuple.isNullTuple());
+    /*
+     * Swap the data pointers.  No data is moved.
+     */
+    swapOrderByKeyTupleData();
+    /*
+     * Still should not be null tuples.
+     */
+    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
+    assert( ! m_lastOrderByKeyTuple.isNullTuple());
     /*
      * Calculate the order by key values.
      */
     for (int ii = 0; ii < m_orderByExpressions.size(); ii++) {
         m_inProgressOrderByKeyTuple.setNValue(ii, m_orderByExpressions[ii]->eval(&nextTuple));
     }
+    /*
+     * Still should not be null tuples.
+     */
+    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
+    assert( ! m_lastOrderByKeyTuple.isNullTuple());
 }
 
 void WindowFunctionExecutor::swapPartitionByKeyTupleData() {
     assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
-    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
     assert( ! m_lastPartitionByKeyTuple.isNullTuple());
-    assert( ! m_lastOrderByKeyTuple.isNullTuple());
     void* inProgressData = m_inProgressPartitionByKeyTuple.address();
     void* nextData = m_lastPartitionByKeyTuple.address();
     m_inProgressPartitionByKeyTuple.move(nextData);
     m_lastPartitionByKeyTuple.move(inProgressData);
     assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
-    assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
     assert( ! m_lastPartitionByKeyTuple.isNullTuple());
-    assert( ! m_lastOrderByKeyTuple.isNullTuple());
 }
 
 void WindowFunctionExecutor::swapOrderByKeyTupleData() {
-    assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
+	/*
+	 * Should not be null tuples.
+	 */
     assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
-    assert( ! m_lastPartitionByKeyTuple.isNullTuple());
     assert( ! m_lastOrderByKeyTuple.isNullTuple());
     void* inProgressData = m_inProgressOrderByKeyTuple.address();
     void* nextData = m_lastOrderByKeyTuple.address();
     m_inProgressOrderByKeyTuple.move(nextData);
     m_lastOrderByKeyTuple.move(inProgressData);
-    assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
+	/*
+	 * Still should not be null tuples.
+	 */
     assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
-    assert( ! m_lastPartitionByKeyTuple.isNullTuple());
     assert( ! m_lastOrderByKeyTuple.isNullTuple());
 }
 
 
 void WindowFunctionExecutor::p_execute_finish() {
+	/*
+	 * The working tuples should not be null.
+	 */
     assert( ! m_inProgressPartitionByKeyTuple.isNullTuple());
     assert( ! m_inProgressOrderByKeyTuple.isNullTuple());
     assert( ! m_lastPartitionByKeyTuple.isNullTuple());
@@ -417,6 +454,9 @@ void WindowFunctionExecutor::p_execute_finish() {
     m_inProgressOrderByKeyTuple.move(NULL);
     m_lastPartitionByKeyTuple.move(NULL);
     m_lastOrderByKeyTuple.move(NULL);
+    /*
+     * The working tuples have just been set to null.
+     */
     assert( m_inProgressPartitionByKeyTuple.isNullTuple());
     assert( m_inProgressOrderByKeyTuple.isNullTuple());
     assert( m_lastPartitionByKeyTuple.isNullTuple());
