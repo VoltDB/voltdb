@@ -88,8 +88,8 @@ public class Cartographer extends StatsSource
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key(JSON_PARTITION_ID).value(partitionId);
-            stringer.key(JSON_INITIATOR_HSID).value(hsId);
+            stringer.keySymbolValuePair(JSON_PARTITION_ID, partitionId);
+            stringer.keySymbolValuePair(JSON_INITIATOR_HSID, hsId);
             stringer.endObject();
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
             int hostId = m_hostMessenger.getHostId();
@@ -210,7 +210,7 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
-            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 

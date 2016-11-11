@@ -169,7 +169,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
@@ -415,10 +415,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
-    }
-
-    private long getMaxTaskedSpHandle() {
-        return m_pendingTasks.getMaxTaskedSpHandle();
     }
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
@@ -888,9 +884,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
-            if (msg.getInitiateTask() != null) {
-                logThis = !msg.getInitiateTask().isReadOnly();
-            }
+
+            // Like SP, we should log writes and safe reads.
+            // Fast reads can be directly put on the task queue.
+            boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+            logThis = !shortcutRead;
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early

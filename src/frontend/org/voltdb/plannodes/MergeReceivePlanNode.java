@@ -19,7 +19,6 @@ package org.voltdb.plannodes;
 
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -103,13 +102,9 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         if (jobj.has(Members.OUTPUT_SCHEMA_PRE_AGG.name())) {
-            m_outputSchemaPreInlineAgg = new NodeSchema();
             m_hasSignificantOutputSchema = true;
-            JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
-            int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
-            }
+            String jsonKey = Members.OUTPUT_SCHEMA_PRE_AGG.name();
+            m_outputSchemaPreInlineAgg = loadSchemaFromJSONObject(jobj, jsonKey);
         }
     }
 

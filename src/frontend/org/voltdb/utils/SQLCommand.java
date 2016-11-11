@@ -32,7 +32,6 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -70,12 +69,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.history.FileHistory;
-
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
 
 public class SQLCommand
 {
@@ -821,6 +814,14 @@ public class SQLCommand
                 return;
             }
 
+            String explainViewName = SQLParser.parseExplainViewCall(statement);
+            if (explainViewName != null) {
+                // We've got a statement that starts with "explainview", send the statement to
+                // @ExplainView (now that parseExplainViewCall() has stripped out "explainview").
+                printResponse(m_client.callProcedure("@ExplainView", explainViewName));
+                return;
+            }
+
             // LOAD CLASS <jar>?
             String loadPath = SQLParser.parseLoadClasses(statement);
             if (loadPath != null) {
@@ -973,6 +974,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@ExplainView",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
@@ -989,6 +992,7 @@ public class SQLCommand
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
+        String connectionErrorMessages = "";
 
         for (String server : servers) {
             try {
@@ -996,14 +1000,15 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
-
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
             }
         }
 
         if (!connectedAnyServer) {
-            throw new IOException("Unable to connect to VoltDB cluster");
+            throw new IOException("Unable to connect to VoltDB cluster" + connectionErrorMessages);
         }
         return client;
     }
@@ -1508,52 +1513,5 @@ public class SQLCommand
         } catch (Throwable e) {
             // ignore any error
         }
-    }
-
-    /**
-     * Creates the key managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-     *
-     * @param filepath - the path to the JKS keystore.
-     * @param keystorePassword - the keystore's password.
-     * @param keyPassword - the key's passsword.
-     * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
-     * @throws Exception
-     */
-    protected static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
-        KeyStore keyStore = KeyStore.getInstance("JKS");
-        InputStream keyStoreIS = new FileInputStream(filepath);
-        try {
-            keyStore.load(keyStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (keyStoreIS != null) {
-                keyStoreIS.close();
-            }
-        }
-        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(keyStore, keyPassword.toCharArray());
-        return kmf.getKeyManagers();
-    }
-
-    /**
-     * Creates the trust managers required to initiate the {@link SSLContext}, using a JKS keystore as an input.
-     *
-     * @param filepath - the path to the JKS keystore.
-     * @param keystorePassword - the keystore's password.
-     * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
-     * @throws Exception
-     */
-    protected static TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
-        KeyStore trustStore = KeyStore.getInstance("JKS");
-        InputStream trustStoreIS = new FileInputStream(filepath);
-        try {
-            trustStore.load(trustStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (trustStoreIS != null) {
-                trustStoreIS.close();
-            }
-        }
-        TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        trustFactory.init(trustStore);
-        return trustFactory.getTrustManagers();
     }
 }

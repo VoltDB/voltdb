@@ -41,7 +41,6 @@ public interface WriteStream {
      * @param ds A deferred serialization task that will generate the message
      */
     public void enqueue(final DeferredSerialization ds);
-
     /**
      * Queue a ByteBuffer for writing to the network. If the ByteBuffer is not direct then it will
      * be copied to a DirectByteBuffer if it is less then DBBPool.MAX_ALLOCATION_SIZE. This method

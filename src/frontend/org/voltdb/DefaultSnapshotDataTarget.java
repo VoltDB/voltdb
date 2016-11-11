@@ -197,21 +197,21 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         byte jsonBytes[] = null;
         try {
             stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("hostId").value(hostId);
-            stringer.key("hostname").value(hostname);
-            stringer.key("clusterName").value(clusterName);
-            stringer.key("databaseName").value(databaseName);
-            stringer.key("tableName").value(tableName.toUpperCase());
-            stringer.key("isReplicated").value(isReplicated);
-            stringer.key("isCompressed").value(true);
-            stringer.key("checksumType").value("CRC32C");
-            stringer.key("timestamp").value(timestamp);
+            stringer.keySymbolValuePair("txnId", txnId);
+            stringer.keySymbolValuePair("hostId", hostId);
+            stringer.keySymbolValuePair("hostname", hostname);
+            stringer.keySymbolValuePair("clusterName", clusterName);
+            stringer.keySymbolValuePair("databaseName", databaseName);
+            stringer.keySymbolValuePair("tableName", tableName.toUpperCase());
+            stringer.keySymbolValuePair("isReplicated", isReplicated);
+            stringer.keySymbolValuePair("isCompressed", true);
+            stringer.keySymbolValuePair("checksumType", "CRC32C");
+            stringer.keySymbolValuePair("timestamp", timestamp);
             /*
              * The timestamp string is for human consumption, automated stuff should use
              * the actual timestamp
              */
-            stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+            stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
             if (!isReplicated) {
                 stringer.key("partitionIds").array();
                 for (int partitionId : partitionIds) {
@@ -219,7 +219,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 }
                 stringer.endArray();
 
-                stringer.key("numPartitions").value(numPartitions);
+                stringer.keySymbolValuePair("numPartitions", numPartitions);
             }
             stringer.endObject();
             String jsonString = stringer.toString();

@@ -76,14 +76,14 @@ public class ExtensibleSnapshotDigestData {
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
-                stringer.key("exportTableName").value(entry.getKey());
+                stringer.keySymbolValuePair("exportTableName", entry.getKey());
 
                 stringer.key("sequenceNumberPerPartition").array();
                 for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getKey());
+                    stringer.keySymbolValuePair("partition", sequenceNumber.getKey());
                     //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+                    stringer.keySymbolValuePair("exportSequenceNumber", sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();
@@ -167,13 +167,13 @@ public class ExtensibleSnapshotDigestData {
                 stringer.key(e.getKey().toString());
                 stringer.object();
                 if (e.getKey() != MpInitiator.MP_INIT_PID) {
-                    stringer.key("sequenceNumber").value(e.getValue().partitionInfo.drId);
-                    stringer.key("spUniqueId").value(e.getValue().partitionInfo.spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().partitionInfo.mpUniqueId);
+                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
+                    stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
+                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
                 } else {
-                    stringer.key("sequenceNumber").value(e.getValue().replicatedInfo.drId);
-                    stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
+                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
+                    stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
+                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
                 }
                 stringer.endObject();
             }
@@ -282,11 +282,11 @@ public class ExtensibleSnapshotDigestData {
     private void writeDRStateToSnapshot(JSONStringer stringer) throws IOException {
         try {
             long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
-            stringer.key("clusterCreateTime").value(clusterCreateTime);
+            stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
 
             Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
             if (iter.hasNext()) {
-                stringer.key("drVersion").value(iter.next().getValue().drVersion);
+                stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
             }
             writeDRTupleStreamInfoToSnapshot(stringer);
             stringer.key("drMixedClusterSizeConsumerState");

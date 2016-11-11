@@ -23,6 +23,9 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -30,6 +33,7 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocWithOnlyComment extends AdhocDDLTestBase {
 
+    @Test
     public void testAdhocWithOnlyComment() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");

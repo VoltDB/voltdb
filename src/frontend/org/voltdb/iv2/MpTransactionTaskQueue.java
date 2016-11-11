@@ -49,9 +49,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
-    MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
+    MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        super(queue, initialTnxId);
+        super(queue);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)

@@ -247,9 +247,9 @@ public abstract class CatalogSchemaTools {
                             }
                         }
                         String col_add = "";
-                        String exprStrings = new String();
                         if (catalog_idx.getExpressionsjson() != null && !catalog_idx.getExpressionsjson().equals("")) {
-                            StmtTargetTableScan tableScan = new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName());
+                            String exprStrings = new String();
+                            StmtTargetTableScan tableScan = new StmtTargetTableScan(catalog_tbl);
                             try {
                                 List<AbstractExpression> expressions = AbstractExpression.fromJSONArrayString(catalog_idx.getExpressionsjson(), tableScan);
                                 String sep = "";
@@ -363,7 +363,7 @@ public abstract class CatalogSchemaTools {
                 List<AbstractExpression> indexedExprs = null;
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
-                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
+                            new StmtTargetTableScan(catalog_tbl));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -379,7 +379,7 @@ public abstract class CatalogSchemaTools {
             if (!jsonPredicate.isEmpty()) {
                 try {
                     AbstractExpression predicate = AbstractExpression.fromJSONString(jsonPredicate,
-                        new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
+                        new StmtTargetTableScan(catalog_tbl));
                     sb.append(" WHERE " + predicate.explain(catalog_tbl.getTypeName()));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block

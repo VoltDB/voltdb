@@ -15,42 +15,40 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.client;
+package org.voltcore.utils.ssl;
+
+import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
-public class SSLMessageEncrypter {
+public class SSLBufferEncrypter {
 
-    public static ByteBuffer encrypt(SSLEngine sslEngine, ByteBuffer src, ByteBuffer dst) throws IOException {
-        SSLEngineResult result = sslEngine.wrap(src, dst);
-        switch (result.getStatus()) {
-            case OK:
-                dst.flip();
-                return null;
-            case BUFFER_OVERFLOW:
-                return encryptWithAllocated(sslEngine, src);
-            case BUFFER_UNDERFLOW:
-                throw new IOException("Underflow on ssl wrap of buffer.");
-            case CLOSED:
-                throw new IOException("SSL engine is closed on ssl wrap of buffer.");
-            default:
-                throw new IOException("Unexpected SSLEngineResult.Status");
-        }
+    private final SSLEngine m_sslEngine;
+    private ByteBuffer m_encBuffer;
+
+    public SSLBufferEncrypter(SSLEngine sslEngine) {
+        this.m_sslEngine = sslEngine;
+        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+        // wrap will overflow until the encryption buffer is this size.
+        this.m_encBuffer = ByteBuffer.allocateDirect(packetBufferSize);
     }
 
-    private static ByteBuffer encryptWithAllocated(SSLEngine sslEngine, ByteBuffer src) throws IOException {
-        ByteBuffer allocated = ByteBuffer.allocate((int) (src.capacity() * 1.2));
+
+    public ByteBuffer encryptBuffer(ByteBuffer src) throws IOException {
+        m_encBuffer.clear();
         while (true) {
-            SSLEngineResult result = sslEngine.wrap(src, allocated);
+            SSLEngineResult result = m_sslEngine.wrap(src, m_encBuffer);
             switch (result.getStatus()) {
                 case OK:
-                    allocated.flip();
-                    return allocated;
+                    m_encBuffer.flip();
+                    return m_encBuffer;
                 case BUFFER_OVERFLOW:
-                    allocated = ByteBuffer.allocate(allocated.capacity() * 2);
+                    m_encBuffer = ByteBuffer.allocate(m_encBuffer.capacity() << 1);
                     break;
                 case BUFFER_UNDERFLOW:
                     throw new IOException("Underflow on ssl wrap of buffer.");
@@ -59,7 +57,6 @@ public class SSLMessageEncrypter {
                 default:
                     throw new IOException("Unexpected SSLEngineResult.Status");
             }
-
         }
     }
 }

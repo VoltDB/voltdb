@@ -56,8 +56,6 @@ public class VoltZK {
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
     public static final String importerBase = "/db/import";
-    // This node is used for keeping local sites count under its path individually
-    public static final String sitesPerHost = "/db/sitesperhost";
 
     /*
      * Processes that want to block catalog updates create children here

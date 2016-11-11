@@ -124,6 +124,7 @@ public class MatViewFallbackQueryXMLGenerator {
                 // System.out.println(m_xml.toString());
                 columns.clear();
                 joincondList.clear();
+                parameters.remove(m_groupByColumnsParsedInfo.size());
             }
         }
     }

@@ -35,7 +35,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
@@ -46,6 +45,7 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
@@ -148,17 +148,17 @@ public class ConnectionUtil {
 
     public static Object[] getAuthenticatedConnection(String host, String username,
                                                       byte[] hashedPassword, int port,
-                                                      final Subject subject, ClientAuthScheme scheme, SSLContext sslContext) throws IOException {
+                                                      final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslContext);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslEngine);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslContext);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslEngine);
     }
 
     private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
@@ -179,9 +179,9 @@ public class ConnectionUtil {
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLContext sslContext)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
-        Object returnArray[] = new Object[4];
+        Object returnArray[] = new Object[3];
         boolean success = false;
         if (addr.isUnresolved()) {
             throw new java.net.UnknownHostException(addr.getHostName());
@@ -196,10 +196,7 @@ public class ConnectionUtil {
 
         aChannel.configureBlocking(false);
 
-        SSLEngine sslEngine = null;
-        if (sslContext != null) {
-            sslEngine = sslContext.createSSLEngine("client", 5432);
-            sslEngine.setUseClientMode(true);
+        if (sslEngine != null) {
             SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
             if (!handshaker.handshake()) {
                 throw new IOException("SSL handshake failed");
@@ -214,6 +211,7 @@ public class ConnectionUtil {
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
+            MessagingChannel messagingChannel = new MessagingChannel(aChannel, sslEngine);
 
             // encode strings
             byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
@@ -237,52 +235,26 @@ public class ConnectionUtil {
             b.put(hashedPassword);
             b.flip();
 
-            boolean successfulWrite = false;
-            IOException writeException = null;
+
+            // TODO: do the retry here... ( 1 to 4 )
+
+
             try {
-                for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                    aChannel.write(b);
-                }
-                if (!b.hasRemaining()) {
-                    successfulWrite = true;
-                }
+                messagingChannel.writeMessage(b);
             } catch (IOException e) {
-                writeException = e;
+                throw new IOException("Failed to write authentication message to server.");
+            }
+            if (b.hasRemaining()) {
+                throw new IOException("Failed to write authentication message to server.");
             }
 
-            int read = 0;
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                read = aChannel.read(lengthBuffer);
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
+            ByteBuffer loginResponse;
+            try {
+                loginResponse = messagingChannel.readMessage();
+            } catch (IOException e) {
+                throw new IOException("Authentication rejected");
             }
-            lengthBuffer.flip();
 
-            int len = lengthBuffer.getInt();
-            ByteBuffer loginResponse = ByteBuffer.allocate(len);//Read version and length etc.
-
-            while (loginResponse.hasRemaining()) {
-                read = aChannel.read(loginResponse);
-
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
-            }
-            loginResponse.flip();
             byte version = loginResponse.get();
             byte loginResponseCode = loginResponse.get();
 
@@ -327,7 +299,6 @@ public class ConnectionUtil {
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
-            returnArray[3] = sslEngine;
 
             aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);

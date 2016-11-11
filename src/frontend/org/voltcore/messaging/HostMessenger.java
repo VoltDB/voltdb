@@ -46,7 +46,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -69,7 +68,6 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -127,18 +125,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private static final String ZK_INTERFACE = "zkinterface";
         private static final String COORDINATOR_IP = "coordinatorip";
         private static final String GROUP = "group";
+        private static final String LOCAL_SITES_COUNT = "localSitesCount";
 
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:7181";
         public String internalInterface = "";
         public int internalPort = 3021;
-        public String group = "0";
         public int deadHostTimeout = Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
         public JoinAcceptor acceptor = null;
+        public String group = "0";
+        public int localSitesCount;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -216,15 +216,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
-                js.key(GROUP).value(group);
-                js.key(COORDINATOR_IP).value(coordinatorIp.toString());
-                js.key(ZK_INTERFACE).value(zkInterface);
-                js.key(INTERNAL_INTERFACE).value(internalInterface);
-                js.key(INTERNAL_PORT).value(internalPort);
-                js.key(DEAD_HOST_TIMEOUT).value(deadHostTimeout);
-                js.key(BACKWARDS_TIME_FORGIVENESS_WINDOW).value(backwardsTimeForgivenessWindow);
-                js.key(NETWORK_THREADS).value(networkThreads);
+                js.keySymbolValuePair(GROUP, group);
+                js.keySymbolValuePair(COORDINATOR_IP, coordinatorIp.toString());
+                js.keySymbolValuePair(ZK_INTERFACE, zkInterface);
+                js.keySymbolValuePair(INTERNAL_INTERFACE, internalInterface);
+                js.keySymbolValuePair(INTERNAL_PORT, internalPort);
+                js.keySymbolValuePair(DEAD_HOST_TIMEOUT, deadHostTimeout);
+                js.keySymbolValuePair(BACKWARDS_TIME_FORGIVENESS_WINDOW, backwardsTimeForgivenessWindow);
+                js.keySymbolValuePair(NETWORK_THREADS, networkThreads);
                 js.key(ACCEPTOR).value(acceptor);
+                js.keySymbolValuePair(LOCAL_SITES_COUNT, localSitesCount);
                 js.endObject();
 
                 return js.toString();
@@ -242,21 +243,25 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         private final static String HOST_IP = "hostIp";
         private final static String GROUP = "group";
+        private final static String LOCAL_SITES_COUNT = "localSitesCount";
 
         final String m_hostIp;
         final String m_group;
+        final int m_localSitesCount;
 
-        public HostInfo(String hostIp, String group) {
+        public HostInfo(String hostIp, String group, int localSitesCount) {
             m_hostIp = hostIp;
             m_group = group;
+            m_localSitesCount = localSitesCount;
         }
 
         public byte[] toBytes() throws JSONException
         {
             final JSONStringer js = new JSONStringer();
             js.object();
-            js.key(HOST_IP).value(m_hostIp);
-            js.key(GROUP).value(m_group);
+            js.keySymbolValuePair(HOST_IP, m_hostIp);
+            js.keySymbolValuePair(GROUP, m_group);
+            js.keySymbolValuePair(LOCAL_SITES_COUNT, m_localSitesCount);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -264,7 +269,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
             final JSONObject obj = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
-            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP));
+            return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP), obj.getInt(LOCAL_SITES_COUNT));
         }
     }
 
@@ -654,7 +659,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * Store all the hosts and host ids here so that waitForGroupJoin
              * knows the size of the mesh. This part only registers this host
              */
-            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group);
+            final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group, m_config.localSitesCount);
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
@@ -874,45 +879,48 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         JSONObject jsObj = new JSONObject();
 
-        jsObj.put("accepted", decision.accepted);
+        jsObj.put(SocketJoiner.ACCEPTED, decision.accepted);
         if (decision.accepted) {
             /*
              * Tell the new node what its host id is
              */
-            jsObj.put("newHostId", hostId);
+            jsObj.put(SocketJoiner.NEW_HOST_ID, hostId);
 
             /*
              * Echo back the address that the node connected from
              */
-            jsObj.put("reportedAddress",
+            jsObj.put(SocketJoiner.REPORTED_ADDRESS,
                       ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
 
             /*
-             * Create an array containing an ad for every node including this one
+             * Create an array containing an id for every node including this one
              * even though the connection has already been made
              */
             JSONArray jsArray = new JSONArray();
             JSONObject hostObj = new JSONObject();
-            hostObj.put("hostId", getHostId());
-            hostObj.put("address",
+            hostObj.put(SocketJoiner.HOST_ID, getHostId());
+            hostObj.put(SocketJoiner.ADDRESS,
                         m_config.internalInterface.isEmpty() ?
-                        socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
-            hostObj.put("port", m_config.internalPort);
+                        socket.socket().getLocalAddress().getHostAddress() :
+                        m_config.internalInterface);
+            hostObj.put(SocketJoiner.PORT, m_config.internalPort);
             jsArray.put(hostObj);
             for (Map.Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
                 if (entry.getValue() == null) continue;
                 int hsId = entry.getKey();
                 ForeignHost fh = entry.getValue();
                 hostObj = new JSONObject();
-                hostObj.put("hostId", hsId);
-                hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
-                hostObj.put("port", fh.m_listeningAddress.getPort());
+                hostObj.put(SocketJoiner.HOST_ID, hsId);
+                hostObj.put(SocketJoiner.ADDRESS,
+                        fh.m_listeningAddress.getAddress().getHostAddress());
+                hostObj.put(SocketJoiner.PORT, fh.m_listeningAddress.getPort());
                 jsArray.put(hostObj);
             }
-            jsObj.put("hosts", jsArray);
-        } else {
-            jsObj.put("reason", decision.errMsg);
-            jsObj.put("mayRetry", decision.mayRetry);
+            jsObj.put(SocketJoiner.HOSTS, jsArray);
+        }
+        else {
+            jsObj.put(SocketJoiner.REASON, decision.errMsg);
+            jsObj.put(SocketJoiner.MAY_RETRY, decision.mayRetry);
         }
 
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");
@@ -1008,13 +1016,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
             hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
-                                    m_config.group);
+                                    m_config.group, m_config.localSitesCount);
         } else {
             hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
-                                    m_config.group);
+                                    m_config.group, m_config.localSitesCount);
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+    }
+
+    private static int parseHostId(String name) {
+        // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
+        return Integer.parseInt(name.substring(name.indexOf("host") + 4));
     }
 
     /**
@@ -1031,8 +1044,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
                 for (String child : children) {
                     final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
-                    // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
-                    hostGroups.put(Integer.parseInt(child.substring(child.indexOf("host") + 4)), info.m_group);
+
+                    hostGroups.put(parseHostId(child), info.m_group);
                 }
 
                 /*
@@ -1065,72 +1078,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostGroups;
     }
 
-    public int getLocalSitesCount() {
-        int sitesperhost = VoltDB.UNDEFINED;
-        try {
-            List<String> children = m_zk.getChildren(VoltZK.sitesPerHost, false);
-            for (String child : children) {
-                if (m_localHostId == Integer.parseInt(child)) {
-                    byte[] payload = m_zk.getData(
-                            ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, new Stat());
-                    sitesperhost = ByteBuffer.wrap(payload).getInt();
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to get sitesperhost from Zookeeper", false, e);
-        }
-        return sitesperhost;
-    }
-
-    public Map<Integer, Integer> getSitesPerHostFromZK() {
+    public Map<Integer, Integer> getSitesPerHostMapFromZK() {
         Map<Integer, Integer> sphMap = new HashMap<>();
         try {
-            List<String> children = m_zk.getChildren(VoltZK.sitesPerHost, false);
+            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
             for (String child : children) {
-                byte[] payload = m_zk.getData(
-                        ZKUtil.joinZKPath(VoltZK.sitesPerHost, child), false, new Stat());
-                int sitesperhost = ByteBuffer.wrap(payload).getInt();
-                int hostId = Integer.parseInt(child);
-                sphMap.put(hostId, sitesperhost);
+                byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
+                final HostInfo info = HostInfo.fromBytes(payload);
+                sphMap.put(parseHostId(child), info.m_localSitesCount);
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to get sitesperhost from Zookeeper", false, e);
         }
         return sphMap;
-    }
-
-    public void waitForAllSitesPerHostToBeRegistered(int expectedHosts)
-    {
-        while (true) {
-            ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-            try {
-                if (m_zk.getChildren(VoltZK.sitesPerHost, fw).size() == expectedHosts) {
-                    break;
-                }
-                fw.get();
-            } catch (Exception e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for all hosts to register their sitesperhost", false, e);
-            }
-        }
-    }
-
-    public void registerSitesPerHostToZK(int sitesperhost) {
-        try {
-            ZKUtil.addIfMissing(m_zk, VoltZK.sitesPerHost, CreateMode.PERSISTENT, new byte[0]);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to create " + VoltZK.sitesPerHost + " node to Zookeeper, dying", false, e);
-        }
-        String path = ZKUtil.joinZKPath(VoltZK.sitesPerHost, String.valueOf(m_localHostId));
-        try {
-            ByteBuffer b = ByteBuffer.allocate(4);
-            b.putInt(sitesperhost);
-            m_zk.create(path, b.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            m_hostLog.info("Zookeeper node " + path + "already exists");
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to write sitePerHost to ZK, dying", false, e);
-        }
     }
 
     public boolean isPaused() {

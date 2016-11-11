@@ -32,17 +32,11 @@ public interface DeferredSerialization {
     public static final int EMPTY_MESSAGE_LENGTH = -1;
 
     /**
-     * Serialize the Object contained in this DeferredSerialization.  If the
-     * serialized Object fits into the passed buffer, put the result in that
-     * buffer and return null.  If the serialized Object doesn't fit into the
-     * passed buffer, allocate a new buffer of the right size and return it,
-     * leaving the passed buffer unchanged.
-     * @param buf Tries to serialize into this buffer.
-     * @return A buffer with the serialized result if the serialized result doesn't fit
-     * into the passed buffer.
+     * Serialize the Object contained in this DeferredSerialization
+     * @return Serialized representation of the object stored
      * @throws IOException Thrown here because FastSerialzier throws IOException
      */
-    ByteBuffer serialize(ByteBuffer buf) throws IOException;
+    void serialize(ByteBuffer buf) throws IOException;
 
     /**
      * A deferred serialization might not be able to take place if a stream is closed

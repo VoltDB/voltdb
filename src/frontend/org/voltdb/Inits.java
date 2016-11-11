@@ -34,7 +34,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -58,7 +57,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -400,7 +399,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_paths),
+                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
@@ -494,18 +493,42 @@ public class Inits {
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
             SslContextFactory sslContextFactory = new SslContextFactory();
-            String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path", true);
-            sslContextFactory.setKeyStorePath(value);
-            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password", true);
+            String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
+            if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
+                hostLog.fatal("A path for the SSL keystore file was not specified.");
+                System.exit(-1);
+            }
+            if (! new File(keyStorePath).exists()) {
+                hostLog.fatal("The specified SSL keystore file was not found.");
+                System.exit(-1);
+            }
+            sslContextFactory.setKeyStorePath(keyStorePath);
+
+            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
+            if (keyStorePassword == null) {
+                hostLog.fatal("An SSL keystore password was not specified.");
+                System.exit(-1);
+            }
             sslContextFactory.setKeyStorePassword(keyStorePassword);
-            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path", false);
-            if (value!=null) {
-                sslContextFactory.setTrustStorePath(value);
+
+            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                hostLog.fatal("A path for the SSL truststore file was not specified.");
+                System.exit(-1);
             }
-            value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password", false);
-            if (value!=null) {
-                sslContextFactory.setTrustStorePassword(value);
+            if (! new File(trustStorePath).exists()) {
+                hostLog.fatal("The specified SSL truststore file was not found.");
+                System.exit(-1);
             }
+            sslContextFactory.setTrustStorePath(trustStorePath);
+
+            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+            if (trustStorePassword == null) {
+                hostLog.fatal("An SSL truststore password was not specified.");
+                System.exit(-1);
+            }
+            sslContextFactory.setTrustStorePassword(trustStorePassword);
+
             // exclude weak ciphers
             sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                     "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
@@ -517,22 +540,24 @@ public class Inits {
             return sslContextFactory;
         }
 
-        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
-            String sysProp = System.getProperty(sysPropName);
-            if (StringUtils.isNotBlank(sysProp)) {
-                return sysProp.trim();
-            } else {
-                String value = null;
-                if (store!=null) {
-                    value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-                }
-                if (StringUtils.isBlank(value) && throwForNull) {
-                    throw new IllegalArgumentException(
-                            "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
+            String sysProp = System.getProperty(sysPropName, "");
+
+            // allow leading/trailing blanks for password, not otherwise
+            if (!sysProp.isEmpty()) {
+                if ("password".equals(valueType)) {
+                    return sysProp;
                 } else {
-                    return value;
+                    if (!sysProp.trim().isEmpty()) {
+                        return sysProp.trim();
+                    }
                 }
             }
+            String value = null;
+            if (store != null) {
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            }
+            return value;
         }
     }
 
@@ -658,8 +683,8 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.key("role").value(m_config.m_replicationRole.ordinal());
-                js.key("active").value(m_rvdb.getReplicationActive());
+                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
+                js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
@@ -812,7 +837,7 @@ public class Inits {
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
                 if (cl == null || !cl.getEnabled()) return;
-                PathSettings paths = m_rvdb.m_paths;
+                NodeSettings paths = m_rvdb.m_nodeSettings;
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,

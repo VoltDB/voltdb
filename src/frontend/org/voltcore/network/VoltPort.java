@@ -23,11 +23,12 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.ssl.SSLMessageDecrypter;
+import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import javax.net.ssl.SSLEngine;
 
@@ -90,8 +91,7 @@ public class VoltPort implements Connection
     private String m_toString = null;
 
     private final SSLEngine m_sslEngine;
-    private final boolean m_isSSLConfigured;
-    private final SSLMessageDecrypter m_sslMessageDecrypter;
+    private final SSLBufferDecrypter m_sslBufferDecrypter;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
@@ -108,8 +108,7 @@ public class VoltPort implements Connection
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
         m_sslEngine = sslEngine;
-        m_isSSLConfigured = m_sslEngine == null ? false : true;
-        m_sslMessageDecrypter = new SSLMessageDecrypter(sslEngine);
+        m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
     }
 
     /**
@@ -179,27 +178,26 @@ public class VoltPort implements Connection
                 final int maxRead = m_handler.getMaxRead();
                 if (maxRead > 0) {
                     fillReadStream( maxRead);
-                    ByteBuffer message;
 
                     /*
                      * Process all the buffered bytes and retrieve as many messages as possible
                      * and pass them off to the input handler.
                      */
                     try {
-                        while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                            if (m_isSSLConfigured) {
-                                if (m_sslMessageDecrypter.needsChunk()) {
-                                    m_sslMessageDecrypter.addChunk(message);
-                                } else {
-                                    m_sslMessageDecrypter.initialize(message);
-                                }
-                                if (!m_sslMessageDecrypter.needsChunk()) {
-                                    m_handler.handleMessage(m_sslMessageDecrypter.getMessage(), this);
+                        if (m_sslEngine == null) {
+                            ByteBuffer message;
+                            while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
+                                m_handler.handleMessage( message, this);
+                                m_messagesRead++;
+                            }
+                        } else {
+                            ByteBuffer buffer;
+                            while ((buffer = m_handler.retrieveNextBuffer( readStream() )) != null) {
+                                List<ByteBuffer> messages = m_sslBufferDecrypter.decryptBuffer(buffer);
+                                for (ByteBuffer message : messages) {
+                                    m_handler.handleMessage(message, this);
                                     m_messagesRead++;
                                 }
-                            } else {
-                                m_handler.handleMessage(message, this);
-                                m_messagesRead++;
                             }
                         }
                     }

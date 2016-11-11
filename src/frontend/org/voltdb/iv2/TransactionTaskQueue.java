@@ -37,15 +37,9 @@ public class TransactionTaskQueue
      */
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    /*
-     * Track the maximum spHandle offered to the task queue
-     */
-    private long m_maxTaskedSpHandle;
-
-    TransactionTaskQueue(SiteTaskerQueue queue, long initialSpHandle)
+    TransactionTaskQueue(SiteTaskerQueue queue)
     {
         m_taskQueue = queue;
-        m_maxTaskedSpHandle = initialSpHandle;
     }
 
     /**
@@ -59,7 +53,6 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         TransactionState txnState = task.getTransactionState();
-        m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
             /*
@@ -99,13 +92,6 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
         m_taskQueue.offer(task);
-    }
-
-    /**
-     * @return the maximum spHandle offered to the task queue
-     */
-    public long getMaxTaskedSpHandle() {
-        return m_maxTaskedSpHandle;
     }
 
     /**

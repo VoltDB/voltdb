@@ -68,6 +68,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -325,11 +326,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Thread for Running authentication of client.
         class AuthRunnable implements Runnable {
             final SocketChannel m_socket;
-            final SSLContext m_sslContext;
+            final SSLEngine m_sslEngine;
 
-            AuthRunnable(SocketChannel socket, SSLContext sslContext) {
+            AuthRunnable(SocketChannel socket, SSLEngine sslEngine) {
                 this.m_socket = socket;
-                this.m_sslContext = sslContext;
+                this.m_sslEngine = sslEngine;
             }
 
             @Override
@@ -339,20 +340,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        SSLEngine sslEngine = null;
-                        if (m_sslContext != null) {
-                            sslEngine = m_sslContext.createSSLEngine();
-                            sslEngine.setUseClientMode(false);
-                            sslEngine.setNeedClientAuth(false);
-                            // blocking needs to be false for handshaking.
-                            m_socket.configureBlocking(false);
-                            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
-                            if (!handshaker.handshake()) {
-                                throw new IOException("SSL handshake failed");
-                            }
-                        }
-
-                        final InputHandler handler = authenticate(m_socket, sslEngine, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -366,7 +354,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 handler,
                                                 0,
                                                 ReverseDNSPolicy.ASYNCHRONOUS,
-                                                sslEngine);
+                                                m_sslEngine);
                                 /*
                                  * If IV2 is enabled the logic initially enabling read is
                                  * in the started method of the InputHandler
@@ -377,7 +365,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         handler,
                                         SelectionKey.OP_READ,
                                         ReverseDNSPolicy.ASYNCHRONOUS,
-                                        sslEngine);
+                                        m_sslEngine);
                             }
                             success = true;
                         }
@@ -427,6 +415,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }
 
+                    SSLEngine sslEngine = null;
+                    if (m_sslContext != null) {
+                        try {
+                            sslEngine = m_sslContext.createSSLEngine();
+                        } catch (Exception e) {
+                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
+                                    "indicates problem with SSL configuration: " + e.getMessage());
+                            return;
+                        }
+                        sslEngine.setUseClientMode(false);
+                        sslEngine.setNeedClientAuth(false);
+                        // blocking needs to be false for handshaking.
+                        socket.configureBlocking(false);
+                        SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
+                        boolean handshakeStatus;
+                        try {
+                            handshakeStatus = handshaker.handshake();
+                        } catch (IOException e) {
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
+                            return;
+                        }
+                        if (!handshakeStatus) {
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
+                            return;
+                        }
+                    }
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
@@ -438,7 +452,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             /*
                              * Send rejection message with reason code
                              */
-                            final ByteBuffer b = ByteBuffer.allocate(1);
+                            ByteBuffer b = ByteBuffer.allocate(1);
                             b.put(MAX_CONNECTIONS_LIMIT_ERROR);
                             b.flip();
                             socket.configureBlocking(true);
@@ -457,7 +471,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, m_sslContext);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
@@ -513,7 +527,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             socket.configureBlocking(true);
             socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
-            final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+            MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);
 
             /*
              * Schedule a timeout to close the socket in case there is no response for the timeout
@@ -539,76 +553,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
+            ByteBuffer message = null;
             try {
-                while (lengthBuffer.hasRemaining()) {
-                    int read = socket.read(lengthBuffer);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
-                }
+                message = messagingChannel.readMessage();
             } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the value. Client isn't going to get anymore time.
-            if (lengthBuffer.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                              "): wire protocol violation (timeout reading message length).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-            }
-            lengthBuffer.flip();
-
-            final int messageLength = lengthBuffer.getInt();
-            if (messageLength < 0) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is negative).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-            }
-            if (messageLength > ((1024 * 1024) * 2)) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is too large).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-              }
-
-            final ByteBuffer message = ByteBuffer.allocate(messageLength);
-
-            try {
-                while (message.hasRemaining()) {
-                    int read = socket.read(message);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
-                }
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the whole message. Client isn't going to get anymore time.
-            if (message.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading authentication strings).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-            }
 
             /*
              * Since we got the login message, cancel the timeout.
@@ -618,7 +566,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            message.flip();
             int aversion = message.get(); //Get version
             ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
@@ -629,7 +576,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
                     //Send negative response
                     responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                    socket.write(responseBuffer);
+                    messagingChannel.writeMessage(responseBuffer);
                     socket.close();
                     return null;
                 }
@@ -645,7 +592,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         + "): user " + username + " failed authentication.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 return null;
             }
@@ -663,7 +610,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (ap == null) {
                 //Send negative response
                 responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 authLog.warn("Rejected user " + username +
                         " attempting to use disabled or unconfigured service " +
@@ -706,7 +653,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                        socket.write(responseBuffer);
+                        messagingChannel.writeMessage(responseBuffer);
                     }
                     socket.close();
                     return null;
@@ -716,7 +663,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         "): user " + username + " because this node is rejoining.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE_DUE_TO_REJOIN).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 return null;
             }
@@ -724,7 +671,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin, sslEngine);
+            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -739,7 +686,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
             responseBuffer.putInt(buildString.length);
             responseBuffer.put(buildString).flip();
-            socket.write(responseBuffer);
+            messagingChannel.writeMessage(responseBuffer);
             return handler;
         }
     }
@@ -757,15 +704,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * can be invalidated on catalog updates
          */
         private final String m_username;
-        private final SSLEngine m_sslEngine;
 
         public ClientInputHandler(String username,
-                                  boolean isAdmin,
-                                  SSLEngine sslEngine)
+                                  boolean isAdmin)
         {
             m_username = username.intern();
             m_isAdmin = isAdmin;
-            m_sslEngine = sslEngine;
         }
 
         @Override
@@ -913,11 +857,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public ByteBuffer serialize(ByteBuffer buf) throws IOException
+        public void serialize(ByteBuffer buf) throws IOException
         {
-            buf.putInt(clientResponse.getSerializedSize());
+            buf.putInt(buf.capacity() - 4);
             clientResponse.flattenToBuffer(buf);
-            return null;
         }
 
         @Override
@@ -1392,7 +1335,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -1500,9 +1443,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     m_currentTopologyValues.set(new DeferredSerialization() {
                         @Override
-                        public ByteBuffer serialize(ByteBuffer outbuf) throws IOException {
+                        public void serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
-                            return null;
                         }
                         @Override
                         public void cancel() {}

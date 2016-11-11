@@ -17,6 +17,8 @@
 
 package org.voltcore.network;
 
+import org.voltdb.common.Constants;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
@@ -82,6 +84,20 @@ public abstract class VoltProtocolHandler implements InputHandler {
             m_sequenceId++;
         }
         return result;
+    }
+
+    @Override
+    public ByteBuffer retrieveNextBuffer(NIOReadStream inputStream) {
+        if (inputStream.dataAvailable() > 0) {
+            // this method is used to support ssl.  The simple thing for now
+            // is to limit the read buffer to the size ssl can decrypt at once,
+            // which is 16k.
+            int bytesToRead = Math.min(inputStream.dataAvailable(), Constants.SSL_CHUNK_SIZE);
+            ByteBuffer result = ByteBuffer.allocate(bytesToRead);
+            inputStream.getBytes(result.array());
+            return result;
+        }
+        return null;
     }
 
     @Override

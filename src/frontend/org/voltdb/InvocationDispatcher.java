@@ -67,6 +67,9 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.IndexRef;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -86,9 +89,11 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -105,6 +110,22 @@ public final class InvocationDispatcher {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
+    public enum OverrideCheck {
+        NONE(false, false, false),
+        INVOCATION(false, false, true)
+        ;
+
+        final boolean skipAdmimCheck;
+        final boolean skipPermissionCheck;
+        final boolean skipInvocationCheck;
+
+        OverrideCheck(boolean skipAdminCheck, boolean skipPermissionCheck, boolean skipInvocationCheck) {
+            this.skipAdmimCheck = skipAdminCheck;
+            this.skipPermissionCheck = skipPermissionCheck;
+            this.skipInvocationCheck = skipInvocationCheck;
+        }
+    }
 
     /**
      * This reference is shared with the one in {@link ClientInterface}
@@ -258,7 +279,13 @@ public final class InvocationDispatcher {
         });
     }
 
-    public final ClientResponseImpl dispatch(StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn, AuthUser user) {
+    public final ClientResponseImpl dispatch(
+            StoredProcedureInvocation task,
+            InvocationClientHandler handler,
+            Connection ccxn,
+            AuthUser user,
+            OverrideCheck bypass)
+    {
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -274,25 +301,27 @@ public final class InvocationDispatcher {
                             );
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
-        // Check for pause mode restrictions before proceeding any further
-        if (!allowPauseModeExecution(handler, catProc, task)) {
-            String msg = "Server is paused and is available in read-only mode - please try again later.";
-            if (VoltDB.instance().isShuttingdown()) {
-                msg = "Server shutdown in progress - new transactions are not processed.";
-            }
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg,task.clientHandle);
-         }
 
         ClientResponseImpl error = null;
+
+        // Check for pause mode restrictions before proceeding any further
+        if ((error = allowPauseModeExecution(handler, catProc, task)) != null) {
+            if (bypass == null || !bypass.skipAdmimCheck) {
+                return error;
+            }
+         }
         //Check permissions
         if ((error = m_permissionValidator.shouldAccept(procName, user, task, catProc)) != null) {
-            return error;
+            if (bypass == null || !bypass.skipPermissionCheck) {
+                return error;
+            }
         }
         //Check param deserialization policy for sysprocs
         if ((error = m_invocationValidator.shouldAccept(procName, user, task, catProc)) != null) {
-            return error;
+            if (bypass == null || !bypass.skipInvocationCheck) {
+                return error;
+            }
         }
-
         //Check individual query timeout value settings with privilege
         int batchTimeout = task.getBatchTimeout();
         if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
@@ -365,6 +394,9 @@ public final class InvocationDispatcher {
             else if ("@ExplainProc".equals(procName)) {
                 return dispatchExplainProcedure(task, handler, ccxn, user);
             }
+            else if ("@ExplainView".equals(procName)) {
+                return dispatchExplainView(task, ccxn);
+            }
             else if ("@AdHoc".equals(procName)) {
                 return dispatchAdHoc(task, handler, ccxn, false, user);
             }
@@ -420,11 +452,11 @@ public final class InvocationDispatcher {
                     return retval;
                 }
                 if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
-                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user);
+                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
             } else if ("@Shutdown".equals(procName)) {
                 if (task.getParams().size() == 1) {
-                    return takeShutdownSaveSnapshot(task, handler, ccxn, user);
+                    return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             }
             else if ("@Rebalance".equals(procName)) {
@@ -510,31 +542,46 @@ public final class InvocationDispatcher {
         return catProc;
     }
 
-    private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
+    private final static ClientResponseImpl allowPauseModeExecution(
+            InvocationClientHandler handler,
+            Procedure procedure,
+            StoredProcedureInvocation task)
+    {
         final VoltDBInterface voltdb = VoltDB.instance();
 
-        //block transactions while shutting down
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
-            return false;
+            return serverUnavailableResponse(
+                    "Server is shutting down.",
+                    task.clientHandle);
         }
 
-        //@Statistics and  @Shutdown are allowed in pause/shutdown mode
+        if (voltdb.isShuttingdown() && procedure.getAllowedinshutdown()) {
+            return null;
+        }
+
         if (voltdb.isShuttingdown()) {
-            return procedure.getAllowedinshutdown();
+            return serverUnavailableResponse(
+                    "Server shutdown in progress - new transactions are not processed.",
+                    task.clientHandle);
         }
 
         if (voltdb.getMode() != OperationMode.PAUSED || handler.isAdmin()) {
-            return true;
+            return null;
         }
 
         // If we got here, instance is paused and handler is not admin.
+        final String procName = task.getProcName();
         if (procedure.getSystemproc() &&
-                ("@AdHoc".equals(invocation.getProcName()) || "@AdHocSpForTest".equals(invocation.getProcName()))) {
+                ("@AdHoc".equals(procName) || "@AdHocSpForTest".equals(procName))) {
             // AdHoc is handled after it is planned and we figure out if it is read-only or not.
-            return true;
-        } else {
-            return procedure.getReadonly();
+            return null;
+        } else if (!procedure.getReadonly()) {
+            return serverUnavailableResponse(
+                    "Server is paused and is available in read-only mode - please try again later.",
+                    task.clientHandle);
+
         }
+        return null;
     }
 
     private final static ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
@@ -746,6 +793,128 @@ public final class InvocationDispatcher {
             hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    // Go to the catalog and fetch all the "explain plan" strings of the queries in the view.
+    private final ClientResponseImpl dispatchExplainView(StoredProcedureInvocation task, Connection ccxn) {
+        ParameterSet params = task.getParams();
+        /*
+         * TODO: We don't actually support multiple view names in an ExplainView call,
+         * so I THINK that the string is always a single view symbol and all this
+         * splitting and iterating is a no-op.
+         */
+        List<String> viewNames = SQLLexer.splitStatements((String)params.toArray()[0]);
+        int size = viewNames.size();
+        VoltTable[] vt = new VoltTable[size];
+        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+        for (int i = 0; i < size; i++) {
+            String viewName = viewNames.get(i);
+
+            // look in the catalog
+            // get the view table from the catalog
+            Table viewTable = tables.getIgnoreCase(viewName);
+            if (viewTable == null) {
+                return unexpectedFailureResponse("Materialized view " + viewName + " does not exist.", task.clientHandle);
+            }
+
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",       VoltType.STRING),
+                                  new VoltTable.ColumnInfo("RESOLUTION", VoltType.STRING));
+
+            MaterializedViewHandlerInfo mvHandlerInfo = viewTable.getMvhandlerinfo().get("mvHandlerInfo");
+            MaterializedViewInfo mvInfo = null;
+            CatalogMap<Statement> fallBackQueryStmts;
+            List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(viewTable.getColumns(), "index");
+
+            // Is this view single-table?
+            if (mvHandlerInfo == null) {
+                // If this is not a multi-table view, we need to go to its source table for metadata.
+                // (Legacy code for single table view uses a different model and code path)
+                if (viewTable.getMaterializer() == null) {
+                    // If we cannot find view metadata from both locations, this table is not a materialized view.
+                    return unexpectedFailureResponse("Table " + viewName + " is not a materialized view.", task.clientHandle);
+                }
+                mvInfo = viewTable.getMaterializer().getViews().get(viewName);
+                fallBackQueryStmts = mvInfo.getFallbackquerystmts();
+            }
+            else {
+                // For multi-table views we need to show the query plan for evaluating joins.
+                Statement createQuery = mvHandlerInfo.getCreatequery().get("createQuery");
+                vt[i].addRow("Join Evaluation",
+                             "Use the following execution plan with built-in delta tables:\n" +
+                             Encoder.hexDecodeToString(createQuery.getExplainplan()));
+                fallBackQueryStmts = mvHandlerInfo.getFallbackquerystmts();
+            }
+            // For each min/max column find out if an execution plan is used.
+            int minMaxAggIdx = 0;
+            for (int j = 0; j < destColumnArray.size(); j++) {
+                Column destColumn = destColumnArray.get(j);
+                ExpressionType aggType = ExpressionType.get(destColumn.getAggregatetype());
+                if (aggType == ExpressionType.AGGREGATE_MIN ||
+                    aggType == ExpressionType.AGGREGATE_MAX) {
+                    Statement fallBackQueryStmt = fallBackQueryStmts.get(String.valueOf(minMaxAggIdx));
+                    // How this min/max will be refreshed?
+                    String resolution = "";
+                    // For single-table views, check if we uses:
+                    // * built-in sequential scan
+                    // * built-in index scan
+                    // * execution plan
+                    if (mvHandlerInfo == null) {
+                        CatalogMap<IndexRef> hardCodedIndicesForSingleTableView = mvInfo.getIndexforminmax();
+                        String hardCodedIndexName = hardCodedIndicesForSingleTableView.get(String.valueOf(minMaxAggIdx)).getName();
+                        // getIndexesused() should give at most one index.
+                        String[] indicesUsedInPlan = fallBackQueryStmt.getIndexesused().split(",");
+                        assert(indicesUsedInPlan.length <= 1);
+                        for (String tableDotIndexPair : indicesUsedInPlan) {
+                            if (tableDotIndexPair.length() == 0) {
+                                continue;
+                            }
+                            String parts[] = tableDotIndexPair.split("\\.", 2);
+                            assert(parts.length == 2);
+                            if (parts.length != 2) {
+                                continue;
+                            }
+                            String indexNameUsedInPlan = parts[1];
+                            if (! indexNameUsedInPlan.equalsIgnoreCase(hardCodedIndexName)) {
+                                resolution = "Use the following execution plan:\n" +
+                                             Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
+                                break;
+                            }
+                        }
+                        // If we do not use execution plan, see which built-in method is used.
+                        if (resolution.equals("")) {
+                            if (hardCodedIndexName.equals("")) {
+                                resolution = "Use built-in sequential scan.";
+                            }
+                            else {
+                                resolution = "Use built-in index scan on index " + hardCodedIndexName + ".";
+                            }
+                        }
+                    }
+                    else {
+                        resolution = "Use the following execution plan:\n" +
+                                     Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
+                    }
+                    vt[i].addRow("Refresh " + (aggType == ExpressionType.AGGREGATE_MIN ? "MIN" : "MAX") +
+                                 " column \"" + destColumn.getName() + "\"", resolution);
+                    minMaxAggIdx++;
+                }
+            }
+        }
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        vt,
+                        null);
+        response.setClientHandle( task.clientHandle );
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        ccxn.writeStream().enqueue(buf);
+        return null;
     }
 
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
@@ -1005,21 +1174,33 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl takeShutdownSaveSnapshot(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user
+            final AuthUser user, OverrideCheck bypass
             )
     {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            return dispatch(task, handler, ccxn, user);
+            return dispatch(task, handler, ccxn, user, bypass);
         }
+
         Object p0 = task.getParams().getParam(0);
-        if (!(p0 instanceof Long)) {
+        final long zkTxnId;
+        if (p0 instanceof Long) {
+            zkTxnId = ((Long)p0).longValue();
+        } else if (p0 instanceof String) {
+            try {
+                zkTxnId = Long.parseLong((String)p0);
+            } catch (NumberFormatException e) {
+                return gracefulFailureResponse(
+                        "Incorrect argument type",
+                        task.clientHandle);
+            }
+        } else {
             return gracefulFailureResponse(
                     "Incorrect argument type",
                     task.clientHandle);
+
         }
-        final long zkTxnId = ((Long)p0).longValue();
         VoltDBInterface voltdb = VoltDB.instance();
 
         if (!voltdb.isShuttingdown()) {
@@ -1059,17 +1240,17 @@ public final class InvocationDispatcher {
             return null;
         }
 
-        PathSettings paths = m_catalogContext.get().getPaths();
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
         String snapshotJson = null;
         try {
             JSONWriter jss = new JSONStringer()
                     .object()
-                    .key(SnapshotUtil.JSON_URIPATH).value("file://" + paths.resolve(paths.getSnapshoth()).getPath())
-                    .key(SnapshotUtil.JSON_NONCE).value(SnapshotUtil.getShutdownSaveNonce(zkTxnId))
-                    .key(SnapshotUtil.JSON_TERMINUS).value(zkTxnId)
-                    .key(SnapshotUtil.JSON_BLOCK).value(true)
-                    .key(SnapshotUtil.JSON_PATH_TYPE).value(SnapshotPathType.SNAP_AUTO.toString())
-                    .key(SnapshotUtil.JSON_FORMAT).value(SnapshotFormat.NATIVE.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_URIPATH, "file://" + paths.resolve(paths.getSnapshoth()).getPath())
+                    .keySymbolValuePair(SnapshotUtil.JSON_NONCE, SnapshotUtil.getShutdownSaveNonce(zkTxnId))
+                    .keySymbolValuePair(SnapshotUtil.JSON_TERMINUS, zkTxnId)
+                    .keySymbolValuePair(SnapshotUtil.JSON_BLOCK, true)
+                    .keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_FORMAT, SnapshotFormat.NATIVE.toString())
                     .endObject();
             snapshotJson = jss.toString();
         } catch (JSONException e) {
@@ -1144,7 +1325,7 @@ public final class InvocationDispatcher {
                 // remove parameter so it does not recurse infinitely
                 consoleLog.info("Snapshot taken successfully");
                 task.setParams();
-                dispatch(task, alternateHandler, alternateAdapter, user);
+                dispatch(task, alternateHandler, alternateAdapter, user, bypass);
             }
         },
         CoreUtils.SAMETHREADEXECUTOR);
@@ -1180,13 +1361,29 @@ public final class InvocationDispatcher {
         }
 
         voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
-        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user);
+        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user, bypass);
+    }
+
+    private final File getSnapshotCatalogFile(JSONObject snapJo) throws JSONException {
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
+        String catFN = snapJo.getString(SnapshotUtil.JSON_NONCE) + ".jar";
+        SnapshotPathType pathType = SnapshotPathType.valueOf(
+                snapJo.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.name()));
+        switch(pathType) {
+        case SNAP_AUTO:
+            return new File(paths.resolve(paths.getSnapshoth()), catFN);
+        case SNAP_CL:
+            return new File(paths.resolve(paths.getCommandLogSnapshot()), catFN);
+        default:
+            File snapDH = new VoltFile(snapJo.getString(SnapshotUtil.JSON_PATH));
+            return new File(snapDH, catFN);
+        }
     }
 
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user
+            final AuthUser user, OverrideCheck bypass
             )
     {
         CatalogContext catalogContext = m_catalogContext.get();
@@ -1198,9 +1395,7 @@ public final class InvocationDispatcher {
         log.info("No schema found. Restoring schema and procedures from snapshot.");
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-            final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
-            final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new VoltFile(path, nonce + ".jar");
+            final File catalogFH = getSnapshotCatalogFile(jsObj);
 
             final byte[] catalog;
             try {
@@ -1279,7 +1474,7 @@ public final class InvocationDispatcher {
                         return;
                     }
                     m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                    dispatch(task, alternateHandler, alternateAdapter, user);
+                    dispatch(task, alternateHandler, alternateAdapter, user, bypass);
                 }
             },
             CoreUtils.SAMETHREADEXECUTOR);
@@ -1848,5 +2043,9 @@ public final class InvocationDispatcher {
 
     private final static ClientResponseImpl gracefulFailureResponse(String msg, long handle) {
         return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0], msg, handle);
+    }
+
+    private final static ClientResponseImpl serverUnavailableResponse(String msg, long handle) {
+        return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
     }
 }
