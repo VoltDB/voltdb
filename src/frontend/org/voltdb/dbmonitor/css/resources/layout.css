@@ -1883,7 +1883,7 @@ ul.topRightList li a {
     background: #FFFFFF;
     padding: 15px;
 }
-.queryResultStyle {float:left; margin-top:3px;position: relative;top:6px;}
+.queryResultStyle {float:left; margin-top:3px;position: relative;top:1px;}
 
 .blockWrapper {
     margin-bottom: 20px;
@@ -1942,7 +1942,7 @@ ul.topRightList li a {
 
 .blockWrapper h1.theHeading {
     margin: 0 0 10px 0 !important;
-    padding: 17px 20px 15px 45px;
+    padding: 17px 20px 15px 0;
     background-color: #FFFFFF;
     border-bottom:1px solid #ccc;
     }
@@ -1999,7 +1999,7 @@ h3.ui-accordion-header {
     height: auto !important;
 }
 
-h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query, h1.icon-queryResult {
+h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query/* h1.icon-queryResult*/ {
     background-image: url(images/voltdb-icon-sprite.png)!important;
     background-repeat: no-repeat!important;
 }
@@ -2028,10 +2028,13 @@ h3.ui-state-active {
     background-position: 15px -1254px;
 }
 
-h1.icon-queryResult {
+/*h1.icon-queryResult {
     background-position: 0px -1034px;
     padding-left:30px!important;
-}
+}*/
+.icon-queryResult { float:left;
+    background-image: url(images/icon_query_result.jpg);
+    background-repeat: no-repeat; width:25px; height:25px; margin:0 5px 0 0;}
 /***********************************DR page*******************************/
 #containerMain1 { background:#fff; padding:10px;}
 .DRContantWrap {background:#ccc; padding:10px; display:block;}
@@ -4159,7 +4162,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
         overflow-y: auto;}
         .resultHtml { height:65%;}
         .queryWrapper {border:1px solid #ccc;margin: 10px 0 0 0; height:calc(60% - 85px)}
-        .blockWrapper h1.theHeading { border:none;padding:17px 20px 30px 45px;}
+        .blockWrapper h1.theHeading { border:none;padding:17px 20px 30px 0;}
         .queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: 18px;}
         .exportType select {margin-top: 5px;}
 
@@ -4907,7 +4910,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
      }
     .resultHtml { height:65%;}
     .queryWrapper {border:1px solid #ccc;margin: 10px 0 0 0; height:calc(60% - 85px)}
-    .blockWrapper h1.theHeading { border:none;padding:17px 20px 30px 45px;}
+    .blockWrapper h1.theHeading { border:none;}
     .queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: -6px;}
     .exportType select {margin-top: 5px;}
     .queryResultStyle {float:none;}
@@ -4937,9 +4940,12 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 @media (width: 1024px)
 {
 .queryInput { width:580px!important; }
-.queryStatus {position:relative;top:228px; padding:10px 0 0 10px;}
-.blockWrapper h1.theHeading{5px 20px 30px 45px}
-..queryResultStyle{position: relative;top: 19px;}
+.queryStatus {position:relative;top:212px; right:0; padding:0;}
+.blockWrapper h1.theHeading{ padding:0;  }
+.queryResultStyle{position: relative;top: 17px;}
+.icon-queryResult {margin-top:13px;}
+.exportType select{margin-top:-3px;}
+
 
 }
 
