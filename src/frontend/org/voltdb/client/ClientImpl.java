@@ -799,7 +799,7 @@ public final class ClientImpl implements Client {
                 @Override
                 public void run() {
                     int failCount = Integer.MAX_VALUE;
-                    //if there are connection creation failures, retry for 5 times
+                    //if there are connection creation failures, retry
                     while (failCount != 0) {
                         failCount = 0;
                         try {
