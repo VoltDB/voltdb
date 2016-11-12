@@ -80,7 +80,6 @@ public final class ClientImpl implements Client {
     ClientStatusListenerExt m_clientStatusListener = null;
 
     private ScheduledExecutorService m_ex = null;
-
     /*
      * Username and password as set by the constructor.
      */
@@ -138,6 +137,9 @@ public final class ClientImpl implements Client {
         }
         m_username = username;
         m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
+        if (config.m_topologyChangeAware) {
+            m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+        }
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -705,6 +707,7 @@ public final class ClientImpl implements Client {
 
         boolean m_useAdminPort = false;
         boolean m_adminPortChecked = false;
+        boolean m_connectionSuccess = false;
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -778,13 +781,12 @@ public final class ClientImpl implements Client {
         /**
          * notify client upon a connection creation failure.
          * @param host HostConfig with IP address and port
-         * @param cause The status of connection creation
+         * @param status The status of connection creation
          */
-        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.ConnectionCause cause) {
+        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
             if (m_clientStatusListener != null) {
                 m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
-                        (host != null) ? host.m_ipAddress : "",
-                        (host != null) ? host.m_clientPort : -1, cause);
+                        (host != null) ? host.m_clientPort : -1, status);
             }
         }
 
@@ -793,17 +795,13 @@ public final class ClientImpl implements Client {
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            if (m_ex == null) {
-                m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
-            }
             m_ex.execute(new Runnable() {
                 @Override
                 public void run() {
-                    int retryCount = 0;
+                    int failCount = Integer.MAX_VALUE;
                     //if there are connection creation failures, retry for 5 times
-                    while (retryCount < 5) {
-                        retryCount++;
-                        boolean allSuccess = true;
+                    while (failCount != 0) {
+                        failCount = 0;
                         try {
                             ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
                             if (resp.getStatus() == ClientResponse.SUCCESS) {
@@ -812,32 +810,32 @@ public final class ClientImpl implements Client {
                                     HostConfig config = entry.getValue();
                                     try {
                                         createConnection(config.m_ipAddress,config.getPort(m_useAdminPort));
-                                    } catch (UnknownHostException e) {
-                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.ConnectionCause.HOST_UNKNOWN);
-                                        allSuccess = false;
+                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
                                     } catch (Exception e) {
-                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.ConnectionCause.SERVER_UNAVAILABLE);
-                                        allSuccess = false;
+                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                                        failCount++;
                                     }
                                 }
                                 m_distributer.updateClientAffinityPartitionsUponTopoChange();
                             } else {
-                                nofifyClientConnectionCreation(null, ClientStatusListenerExt.ConnectionCause.toConnectionCreationCause(resp.getStatus()));
-                                allSuccess = false;
+                                nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                                failCount++;
                             }
                         } catch (Exception e) {
-                            nofifyClientConnectionCreation(null, ClientStatusListenerExt.ConnectionCause.TOPOLOY_QUERY_FAILURE);
-                            allSuccess = false;
+                            nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                            failCount++;
                         }
-                        if (allSuccess) return;
+                        if (failCount == 0) return;
+                        //wait for 30 seconds and try again to ensure all nodes are connected.
                         try {
-                            Thread.sleep(200);
+                            Thread.sleep(30000);
                         } catch (InterruptedException e) { }
                     }
                 }
             });
         }
-    }
+}
+
      /****************************************************
                         Implementation
      ****************************************************/

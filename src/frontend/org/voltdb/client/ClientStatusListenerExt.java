@@ -39,30 +39,13 @@ public class ClientStatusListenerExt {
     /**
      * Cause of the connection creation failure.
      */
-    public static enum ConnectionCause {
-        /** connection is timed out */
-        CONNECTION_TIMEOUT,
-        /**host unknown*/
-        HOST_UNKNOWN,
-        /** Connection closed by other side */
-        SERVER_UNAVAILABLE,
-        /**system procedure failure*/
-        TOPOLOY_QUERY_FAILURE;
-
-        /**
-         * convert ClientResponse status to ConnectionCause
-         * @param clientResponseStatus
-         * @return ConnectionCause
-         */
-        static ConnectionCause toConnectionCreationCause(byte clientResponseStatus) {
-            ConnectionCause cause = TOPOLOY_QUERY_FAILURE;
-            if (clientResponseStatus == ClientResponse.CONNECTION_LOST || clientResponseStatus == ClientResponse.CONNECTION_TIMEOUT) {
-                cause = CONNECTION_TIMEOUT;
-            } else if (clientResponseStatus == ClientResponse.SERVER_UNAVAILABLE) {
-                cause = SERVER_UNAVAILABLE;
-            }
-            return cause;
-        }
+    public static enum AutoConnectionStatus {
+        /**creation success*/
+        SUCCESS,
+        /**fail to creat */
+        UNABLE_TO_CONNECT,
+        /**could not get topology*/
+        UNABLE_TO_QUERY_TOPOLOGY;
     }
 
     /**
@@ -80,11 +63,10 @@ public class ClientStatusListenerExt {
      * within the cluster will be created. This method will be invoked to notify the client upon a new connection is created.
      * Client can override this method to keep track of the connections
      * @param hostname Name of the host the connection was created.
-     * @param ip  The IP address
      * @param port Port number of the connection to the node.
-     * @param cause The creation failure cause
+     * @param status The creation status
      */
-    public void connectionCreated(String hostname, String ip, int port, ConnectionCause cause) {}
+    public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {}
 
     /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition
