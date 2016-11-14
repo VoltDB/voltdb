@@ -284,6 +284,7 @@ class FastSerializer:
 
         # extract key and certs
         import jks
+        use_key_cert = False
         if 'keystore' in jks_config and jks_config['keystore'] and \
                 'keystorepassword' in jks_config and jks_config['keystorepassword']:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
@@ -298,21 +299,25 @@ class FastSerializer:
 
                 for c in pk.cert_chain:
                     write_pem(c[1], "CERTIFICATE", certfile)
+                useKeyAndCert = True
             keyfile.close()
             certfile.close()
-            self.ssl_config['keyfile'] = keyfile.name
-            self.ssl_config['certfile'] = certfile.name
+            if use_key_cert:
+                self.ssl_config['keyfile'] = keyfile.name
+                self.ssl_config['certfile'] = certfile.name
 
-            # extract ca certs
-            if 'truststore' in jks_config and jks_config['truststore'] and \
-                            'truststorepassword' in jks_config and jks_config['truststorepassword']:
-                ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
-                cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
-                for alias, c in ts.certs.items():
-                    # print("Certificate: %s" % c.alias)
-                    write_pem(c.cert, "CERTIFICATE", cafile)
-
-                cafile.close()
+        # extract ca certs
+        use_ca_cert = False
+        if 'truststore' in jks_config and jks_config['truststore'] and \
+                        'truststorepassword' in jks_config and jks_config['truststorepassword']:
+            ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
+            cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
+            for alias, c in ts.certs.items():
+                # print("Certificate: %s" % c.alias)
+                write_pem(c.cert, "CERTIFICATE", cafile)
+                use_ca_cert = True
+            cafile.close()
+            if use_ca_cert:
                 self.ssl_config['ca_certs'] = cafile.name
                 self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
