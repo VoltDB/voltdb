@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
 import time
 import voltdbclient
 
@@ -74,19 +74,21 @@ def check_dr_producer(runner):
 def get_stats(runner, component):
     retry = 5
     while True:
-        response = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
-                                    voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0])
-        status = response.status()
-        if status <> 1 and "timeout" in response.statusString:
+        #do not automatically abort if the proc call fails.
+        resp = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
+                                    voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0], False)
+        status = resp.status()
+        if status <> 1 and "timeout" in resp.response.statusString:
             if retry == 0:
-                runner.error("Unable to collect %s statistics from the cluster" % component)
+                #abort here after 5 try
+                raise StatisticsError("Unable to collect %s statistics from the cluster" % component)
             else:
                 time.sleep(1)
                 retry -= 1
                 continue
         if status <> 1:
-            runner.error("Unexpected response to @Statistics %s: %s" % (component, resp))
-        return response
+            raise StatisticsError("Unexpected response to @Statistics %s: %s" % (component, resp))
+        return resp
 
 def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
     resp = get_stats(runner, 'DRPRODUCER')
@@ -273,3 +275,7 @@ def check_command_log(runner):
             return
         runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         time.sleep(1)
+
+class StatisticsError(Exception):
+    def __init__(self, message):
+        self.message = message
