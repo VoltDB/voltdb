@@ -175,7 +175,8 @@ def install_required_packages(pip=''):
 
         for package_name in packages:
             if package_name != '' and '#' not in package_name:
-                run_cmd(pip, '--quiet', 'install', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
+                if package_name not in sys.modules:
+                    run_cmd(pip, '--quiet', 'install', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
     else:
         if pip == '':
             info('Installing the python dependencies.')
@@ -183,7 +184,11 @@ def install_required_packages(pip=''):
             packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
         else:
             packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements_python_2.6.txt')
-        run_cmd(pip, '--quiet', 'install', '-r', packages)
+        for package_name in packages:
+            if package_name != '' and '#' not in package_name:
+                if package_name not in sys.modules:
+                    run_cmd(pip, '--quiet', 'install', package_name)
+        # run_cmd(pip, '--quiet', 'install', '-r', packages)
 
 def create_data_config_path(path, con_path):
     org_wd = os.getcwd()
