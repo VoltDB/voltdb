@@ -176,7 +176,7 @@ def install_required_packages(pip=''):
         for package_name in packages:
             if package_name != '' and '#' not in package_name:
                 if package_name not in sys.modules:
-                    run_cmd(pip, '--quiet', 'install', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
+                    run_cmd(pip, '--quiet', 'install', '--user', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
     else:
         if pip == '':
             info('Installing the python dependencies.')
@@ -187,8 +187,7 @@ def install_required_packages(pip=''):
         for package_name in packages:
             if package_name != '' and '#' not in package_name:
                 if package_name not in sys.modules:
-                    run_cmd(pip, '--quiet', 'install', package_name)
-        # run_cmd(pip, '--quiet', 'install', '-r', packages)
+                    run_cmd(pip, '--quiet', 'install', '--user', package_name)
 
 def create_data_config_path(path, con_path):
     org_wd = os.getcwd()
