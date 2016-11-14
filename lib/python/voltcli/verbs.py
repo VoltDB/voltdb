@@ -586,7 +586,7 @@ class ConnectionBundle(object):
                            default_port = self.default_port),
             cli.StringOption('-p', '--password', 'password', "the connection password"),
             cli.StringOption('-u', '--user', 'username', 'the connection user name'),
-            cli.StringOption('-s', '--ssl', 'ssl_config','''enable and config ssl''', default=None))
+            cli.StringOption(None,'--ssl', 'ssl_config','''enable and config ssl''', default=None))
 
     def start(self, verb, runner):
         pass
