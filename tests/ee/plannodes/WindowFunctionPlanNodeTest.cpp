@@ -155,41 +155,29 @@ struct aggDescription {
     int                nAggArgs;
 };
 
-struct OColumn {
-    OColumn(std::string name)
-        : m_name(name) {}
-    const std::string &getName() const {
-        return m_name;
-    }
-    static OColumn EndList;
-private:
-    std::string   m_name;
-};
-
-OColumn OColumn::EndList("");
-
 struct OSchema {
-    OSchema(OColumn column0, ...) {
-        va_list args;
-        va_start(args, column0);
+    OSchema(const char *name0, ...) 
+	: m_numColumns(0) {
+      va_list args;
+      va_start(args, name0);
 
-        m_columns.push_back(column0);
-        if (column0.getName().size() > 0) {
-            do {
-                OColumn col = va_arg(args, OColumn);
-                if (col.getName().size() == 0) {
-                    break;
-                }
-                m_columns.push_back(col);
-            } while (true);
-        }
-        va_end(args);
+      m_columns[m_numColumns++] = name0;
+      for (const char *cname = va_arg(args, const char *);
+           cname != NULL;
+           cname = va_arg(args, const char *)) {
+	    m_columns[m_numColumns++] = cname;
+      }
+      va_end(args);
     }
-    const std::vector<OColumn> &getColumns() const {
+    const char * const*getColumns() const {
         return m_columns;
     }
+    int getNumColumns() const {
+	return m_numColumns;
+    }
 private:
-    std::vector<OColumn> m_columns;
+    int         m_numColumns;
+    const char *m_columns[100];
 };
 
 struct jsonDescription {
@@ -206,10 +194,10 @@ struct jsonDescription {
         1, /* nPartitionByExprs */
         1, /* nOrderByExprs     */
         3, /* nOutputColumns    */
-        OSchema(OColumn("C1"),
-                OColumn("A"),
-                OColumn("B"),
-                OColumn::EndList)
+        OSchema(("C1"),
+                ("A"),
+                ("B"),
+                NULL)
     },
     {
         1,  /* nAggs */
@@ -217,11 +205,11 @@ struct jsonDescription {
         1,  /* nPartitionByExprs */
         1,  /* nOrderByExprs     */
         4,  /* nOutputColumns    */
-        OSchema(OColumn("R"),
-                OColumn("A"),
-                OColumn("B"),
-                OColumn("C"),
-                OColumn::EndList)
+        OSchema(("R"),
+                ("A"),
+                ("B"),
+                ("C"),
+                NULL)
     }
 };
 
@@ -258,9 +246,10 @@ TEST_F(WindowFunctionPlanNodeTest, TestJSON)
         EXPECT_EQ(jsonDescr->nPartitionByExprs, pn->getPartitionByExpressions().size());
         EXPECT_EQ(jsonDescr->nOrderByExprs, pn->getOrderByExpressions().size());
         EXPECT_EQ(jsonDescr->nOutputColumns, pn->getOutputSchema().size());
-        const std::vector<OColumn> &columns = jsonDescr->colDescriptions.getColumns();
+	EXPECT_EQ(jsonDescr->nOutputColumns, jsonDescr->colDescriptions.getNumColumns());
+        auto columns = jsonDescr->colDescriptions.getColumns();
         for (int ocIdx = 0; ocIdx < jsonDescr->nOutputColumns; ocIdx += 1) {
-            EXPECT_EQ(columns[ocIdx].getName().c_str(),
+            EXPECT_EQ(columns[ocIdx],
                       pn->getOutputSchema()[ocIdx]->getColumnName());
         }
     }
