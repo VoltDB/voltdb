@@ -156,8 +156,8 @@ struct aggDescription {
 };
 
 struct OSchema {
-    OSchema(const char *name0, ...) 
-	: m_numColumns(0) {
+    OSchema(const char *name0, ...)
+    : m_numColumns(0) {
       va_list args;
       va_start(args, name0);
 
@@ -165,7 +165,7 @@ struct OSchema {
       for (const char *cname = va_arg(args, const char *);
            cname != NULL;
            cname = va_arg(args, const char *)) {
-	    m_columns[m_numColumns++] = cname;
+        m_columns[m_numColumns++] = cname;
       }
       va_end(args);
     }
@@ -173,7 +173,7 @@ struct OSchema {
         return m_columns;
     }
     int getNumColumns() const {
-	return m_numColumns;
+    return m_numColumns;
     }
 private:
     int         m_numColumns;
@@ -246,7 +246,7 @@ TEST_F(WindowFunctionPlanNodeTest, TestJSON)
         EXPECT_EQ(jsonDescr->nPartitionByExprs, pn->getPartitionByExpressions().size());
         EXPECT_EQ(jsonDescr->nOrderByExprs, pn->getOrderByExpressions().size());
         EXPECT_EQ(jsonDescr->nOutputColumns, pn->getOutputSchema().size());
-	EXPECT_EQ(jsonDescr->nOutputColumns, jsonDescr->colDescriptions.getNumColumns());
+    EXPECT_EQ(jsonDescr->nOutputColumns, jsonDescr->colDescriptions.getNumColumns());
         auto columns = jsonDescr->colDescriptions.getColumns();
         for (int ocIdx = 0; ocIdx < jsonDescr->nOutputColumns; ocIdx += 1) {
             EXPECT_EQ(columns[ocIdx],
