@@ -43,22 +43,49 @@ args = parser.parse_args()
 
 client = FastSerializer(args.server, args.port, args.username, args.password)
 
+# procedure call response error handling
+def check_response(response):
+    status = response.status
+    if status != 1:
+        status_codes = {
+            -1: "User Abort",
+            -2: "Graceful Failure",
+            -3: "Unexpected Failure",
+            -4: "Connection Lost",
+            -5: "Server Unavailable",
+            -6: "Connection Timeout",
+            -7: "Response Unkonwn",
+            -8: "Transaction Restart",
+            -9: "Operational Failure"
+        }
+        print status_codes.get(status, "No Status code was returned") + ": " + response.statusString
+        ex = response.exception
+        if ex is not None:
+            print ex.typestr + ": " + ex.message
+        exit(-1)
+
 # define procedure calls
 proc_stats = VoltProcedure( client, "@Statistics", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_INTEGER] )
 proc_catalog = VoltProcedure( client, "@SystemCatalog", [FastSerializer.VOLTTYPE_STRING] )
 
 # Statistics gathering functions
 def get_cpu():
-    table = proc_stats.call(["CPU",0]).tables[0]
+    response = proc_stats.call(["CPU",0])
+    check_response(response)
+    table = response.tables[0]
     cpu_perc = table.tuples[0][3]
     return cpu_perc
 
 def get_pp():
-    table = proc_stats.call(["PROCEDUREPROFILE",1]).tables[0]
+    response = proc_stats.call(["PROCEDUREPROFILE",1])
+    check_response(response)
+    table = response.tables[0]
     return table.tuples
 
 def get_latencies():
-    table = proc_stats.call(["INITIATOR",1]).tables[0]
+    response = proc_stats.call(["INITIATOR",1])
+    check_response(response)
+    table = response.tables[0]
     latencies = dict()
     for row in table.tuples:
         procname = row[6]
@@ -67,7 +94,9 @@ def get_latencies():
     return latencies
 
 def get_proc_labels():
-    table = proc_catalog.call(["PROCEDURES"]).tables[0]
+    response = proc_catalog.call(["PROCEDURES"])
+    check_response(response)
+    table = response.tables[0]
     labels = dict()
     for row in table.tuples:
         procname = row[2]
