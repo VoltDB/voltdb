@@ -24,10 +24,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
 /**
- * Message from a client interface to an initiator, instructing the
- * site to begin executing a stored procedure, coordinating other
- * execution sites if needed.
- *
+ * Message from a new leader requesting for repair log entries
+ * from all surviving replicas, which doing node promotion.
  */
 public class Iv2RepairLogRequestMessage extends VoltMessage
 {

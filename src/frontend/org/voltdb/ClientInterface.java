@@ -433,12 +433,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         try {
                             handshakeStatus = handshaker.handshake();
                         } catch (IOException e) {
+                            socket.close();
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
-                            return;
+                            continue;
                         }
                         if (!handshakeStatus) {
+                            socket.close();
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
-                            return;
+                            continue;
                         }
                     }
                     /*
@@ -555,8 +557,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             ByteBuffer message = null;
             try {
-                message = messagingChannel.readMessage();
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
+                while (message == null) {
+                    message = messagingChannel.readMessage();
+                }
+            } catch (IOException e) {
+                // Possibly timeout firing
+                try {
+                    socket.close();
+                } catch (IOException e1) {
+                }
+                return null;
+            }
 
             /*
              * Since we got the login message, cancel the timeout.
@@ -1174,7 +1185,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         List<Iv2InFlight> transactions =
-                cihm.removeHandlesForPartitionAndInitiator( partitionId, initiatorHSId);
+                cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
 
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
@@ -1185,7 +1196,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "Transaction dropped due to change in mastership. " +
                             "It is possible the transaction was committed");
-            response.setClientHandle( inFlight.m_clientHandle );
+            response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);

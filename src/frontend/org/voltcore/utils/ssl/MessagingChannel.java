@@ -19,12 +19,10 @@ package org.voltcore.utils.ssl;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-
-import static org.voltdb.common.Constants.SSL_CHUNK_SIZE;
+import java.util.List;
 
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB
@@ -36,7 +34,7 @@ public class MessagingChannel {
     private final SocketChannel m_socketChannel;
     private final SSLEngine m_sslEngine;
     private ByteBuffer m_encBuffer;
-    private final ByteBuffer m_readBuffer;
+    private final SSLBufferDecrypter m_sslBufferDescrypter;
 
     public MessagingChannel(SocketChannel m_socketChannel, SSLEngine sslEngine) {
         this.m_socketChannel = m_socketChannel;
@@ -45,9 +43,9 @@ public class MessagingChannel {
             int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
             // wrapMessage will overflow until the encryption buffer is this size.
             this.m_encBuffer = ByteBuffer.allocate(packetBufferSize);
-            this.m_readBuffer = ByteBuffer.allocate(16 * 1024);
+            this.m_sslBufferDescrypter = new SSLBufferDecrypter(sslEngine);
         } else {
-            this.m_readBuffer = null;
+            this.m_sslBufferDescrypter = null;
         }
     }
 
@@ -78,22 +76,17 @@ public class MessagingChannel {
     }
 
     private ByteBuffer readEncrypted() throws IOException {
+        ByteBuffer readBuffer = m_sslBufferDescrypter.getSrcBuffer();
         int read;
-        while (true) {
-            // I can't read into the dec buffer...
-            // or ... I'm allocating a dest buffer and slicing it.
-            // allocate based on incoming, then need to include leftover.
-            read = m_socketChannel.read(m_readBuffer);
-            if (read == -1) {
-                throw new IOException("Failed to read message");
-            }
-            ByteBuffer dstBuffer = ByteBuffer.allocate(m_readBuffer.remaining() + 128);
-            m_readBuffer.flip();
-            ByteBuffer message = unwrapMessage(m_readBuffer, dstBuffer);
-            if (message != null) {
-                return message;
-            }
+        read = m_socketChannel.read(readBuffer);
+        if (read == -1) {
+            throw new IOException("Failed to read message");
         }
+        // there will always be a length, need to have more than four bytes to have a message
+        if (read > 4 && m_sslBufferDescrypter.decrypt() > 0) {
+            return m_sslBufferDescrypter.message();
+        }
+        return null;
     }
 
     public int writeMessage(ByteBuffer message) throws IOException {
@@ -107,22 +100,6 @@ public class MessagingChannel {
         }
         return bytesWritten;
     }
-
-    public ByteBuffer decryptMessage(ByteBuffer message) throws IOException {
-        // part of the public api, can be called directly without going through
-        // readMessage
-        if (m_sslEngine == null) {
-            return message;
-        }
-        ByteBuffer dst = ByteBuffer.allocate(message.remaining());
-        unwrapMessage(message, dst);
-        int messageLength = dst.getInt();
-        if (messageLength != dst.remaining()) {
-            throw new IOException("malformed ssl message, failed to decrypt");
-        }
-        return dst;
-    }
-
 
     private ByteBuffer wrapMessage(ByteBuffer src) throws IOException {
         m_encBuffer.clear();
@@ -141,28 +118,6 @@ public class MessagingChannel {
                     throw new IOException("SSL engine is closed on ssl wrapMessage of buffer.");
                 default:
                     throw new IOException("Unexpected SSLEngineResult.Status");
-            }
-        }
-    }
-
-    private ByteBuffer unwrapMessage(ByteBuffer message, ByteBuffer dst) throws IOException {
-        while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(message, dst);
-            switch (result.getStatus()) {
-                case OK:
-                    dst.flip();
-                    int length = dst.getInt();
-                    if (length > dst.remaining()) {
-                        System.err.println("partial message");
-                    }
-                    return dst;
-                case BUFFER_OVERFLOW:
-                    dst = ByteBuffer.allocate(dst.capacity() << 1);
-                    break;  // try again
-                case BUFFER_UNDERFLOW:
-                    return null;
-                case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrapMessage of buffer.");
             }
         }
     }
