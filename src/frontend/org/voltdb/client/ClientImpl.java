@@ -790,52 +790,64 @@ public final class ClientImpl implements Client {
             }
         }
 
+        void retryConnectionCreationIfNeeded(int failCount) {
+            if (failCount == 0) {
+                try {
+                    m_distributer.setCreateConnectionsUponTopologyChangeComplete();
+                } catch (Exception e) {
+                    nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                }
+            } else {
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) { }
+                createConnectionsUponTopologyChange();
+            }
+        }
+
         /**
          * find all the host which have not been connected to the client via @SystemInformation
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            m_ex.execute(new Runnable() {
-                @Override
-                public void run() {
-                    int failCount = Integer.MAX_VALUE;
-                    //if there are connection creation failures, retry
-                    while (failCount != 0) {
-                        failCount = 0;
+            m_ex.execute(new CreateConnectionTask(this));
+        }
+    }
+
+    class CreateConnectionTask implements Runnable {
+        final InternalClientStatusListener listener;
+        public CreateConnectionTask(InternalClientStatusListener listener) {
+            this.listener = listener;
+        }
+        @Override
+        public void run() {
+            int failCount = 0;
+            try {
+                ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
+                if (resp.getStatus() == ClientResponse.SUCCESS) {
+                    Map<Integer, HostConfig> hosts = listener.buildUnconnectedHostConfigMap(resp.getResults()[0]);
+                    for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
+                        HostConfig config = entry.getValue();
                         try {
-                            ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
-                            if (resp.getStatus() == ClientResponse.SUCCESS) {
-                                Map<Integer, HostConfig> hosts = buildUnconnectedHostConfigMap(resp.getResults()[0]);
-                                for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
-                                    HostConfig config = entry.getValue();
-                                    try {
-                                        createConnection(config.m_ipAddress,config.getPort(m_useAdminPort));
-                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
-                                    } catch (Exception e) {
-                                        nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
-                                        failCount++;
-                                    }
-                                }
-                                m_distributer.updateClientAffinityPartitionsUponTopoChange();
-                            } else {
-                                nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
-                                failCount++;
-                            }
+                            createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
                         } catch (Exception e) {
-                            nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
                             failCount++;
                         }
-                        if (failCount == 0) return;
-                        //wait for 30 seconds and try again to ensure all nodes are connected.
-                        try {
-                            Thread.sleep(30000);
-                        } catch (InterruptedException e) { }
                     }
+                } else {
+                    listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    failCount++;
                 }
-            });
+            } catch (Exception e) {
+                listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                failCount++;
+            } finally {
+                listener.retryConnectionCreationIfNeeded(failCount);
+            }
         }
-}
-
+    }
      /****************************************************
                         Implementation
      ****************************************************/

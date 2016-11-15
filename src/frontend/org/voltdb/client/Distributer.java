@@ -1554,16 +1554,12 @@ class Distributer {
         m_createConnectionUponTopoChangeInProgress.set(false);
     }
 
-    boolean isHostConnected(Integer hostId) {
-        return m_hostIdToConnection.containsKey(hostId);
-    }
-
-    void updateClientAffinityPartitionsUponTopoChange() throws NoConnectionsException {
+    void setCreateConnectionsUponTopologyChangeComplete() throws NoConnectionsException {
+        m_createConnectionUponTopoChangeInProgress.set(false);
         ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
         queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
     }
-
-    ScheduledExecutorService getExecutorService() {
-        return m_ex;
+    boolean isHostConnected(Integer hostId) {
+        return m_hostIdToConnection.containsKey(hostId);
     }
 }
