@@ -452,7 +452,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        if (m_initiateTaskBuffer == null) {
+            m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        }
+        else {
+            m_initiateTaskBuffer.position(0);
+            m_initiateTaskBuffer.limit(initiateTask.getSerializedSize());
+        }
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
             m_initiateTaskBuffer.flip();
