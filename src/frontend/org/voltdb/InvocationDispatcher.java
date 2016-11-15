@@ -26,6 +26,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -80,19 +81,21 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.parser.SQLLexer;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -105,6 +108,22 @@ public final class InvocationDispatcher {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
+    public enum OverrideCheck {
+        NONE(false, false, false),
+        INVOCATION(false, false, true)
+        ;
+
+        final boolean skipAdmimCheck;
+        final boolean skipPermissionCheck;
+        final boolean skipInvocationCheck;
+
+        OverrideCheck(boolean skipAdminCheck, boolean skipPermissionCheck, boolean skipInvocationCheck) {
+            this.skipAdmimCheck = skipAdminCheck;
+            this.skipPermissionCheck = skipPermissionCheck;
+            this.skipInvocationCheck = skipInvocationCheck;
+        }
+    }
 
     /**
      * This reference is shared with the one in {@link ClientInterface}
@@ -258,7 +277,13 @@ public final class InvocationDispatcher {
         });
     }
 
-    public final ClientResponseImpl dispatch(StoredProcedureInvocation task, InvocationClientHandler handler, Connection ccxn, AuthUser user) {
+    public final ClientResponseImpl dispatch(
+            StoredProcedureInvocation task,
+            InvocationClientHandler handler,
+            Connection ccxn,
+            AuthUser user,
+            OverrideCheck bypass)
+    {
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
@@ -274,25 +299,27 @@ public final class InvocationDispatcher {
                             );
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
-        // Check for pause mode restrictions before proceeding any further
-        if (!allowPauseModeExecution(handler, catProc, task)) {
-            String msg = "Server is paused and is available in read-only mode - please try again later.";
-            if (VoltDB.instance().isShuttingdown()) {
-                msg = "Server shutdown in progress - new transactions are not processed.";
-            }
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg,task.clientHandle);
-         }
 
         ClientResponseImpl error = null;
+
+        // Check for pause mode restrictions before proceeding any further
+        if ((error = allowPauseModeExecution(handler, catProc, task)) != null) {
+            if (bypass == null || !bypass.skipAdmimCheck) {
+                return error;
+            }
+         }
         //Check permissions
         if ((error = m_permissionValidator.shouldAccept(procName, user, task, catProc)) != null) {
-            return error;
+            if (bypass == null || !bypass.skipPermissionCheck) {
+                return error;
+            }
         }
         //Check param deserialization policy for sysprocs
         if ((error = m_invocationValidator.shouldAccept(procName, user, task, catProc)) != null) {
-            return error;
+            if (bypass == null || !bypass.skipInvocationCheck) {
+                return error;
+            }
         }
-
         //Check individual query timeout value settings with privilege
         int batchTimeout = task.getBatchTimeout();
         if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
@@ -365,6 +392,9 @@ public final class InvocationDispatcher {
             else if ("@ExplainProc".equals(procName)) {
                 return dispatchExplainProcedure(task, handler, ccxn, user);
             }
+            else if ("@ExplainView".equals(procName)) {
+                return dispatchExplainView(task, ccxn);
+            }
             else if ("@AdHoc".equals(procName)) {
                 return dispatchAdHoc(task, handler, ccxn, false, user);
             }
@@ -420,11 +450,11 @@ public final class InvocationDispatcher {
                     return retval;
                 }
                 if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
-                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user);
+                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
             } else if ("@Shutdown".equals(procName)) {
                 if (task.getParams().size() == 1) {
-                    return takeShutdownSaveSnapshot(task, handler, ccxn, user);
+                    return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             }
             else if ("@Rebalance".equals(procName)) {
@@ -510,31 +540,46 @@ public final class InvocationDispatcher {
         return catProc;
     }
 
-    private final static boolean allowPauseModeExecution(InvocationClientHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
+    private final static ClientResponseImpl allowPauseModeExecution(
+            InvocationClientHandler handler,
+            Procedure procedure,
+            StoredProcedureInvocation task)
+    {
         final VoltDBInterface voltdb = VoltDB.instance();
 
-        //block transactions while shutting down
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
-            return false;
+            return serverUnavailableResponse(
+                    "Server is shutting down.",
+                    task.clientHandle);
         }
 
-        //@Statistics and  @Shutdown are allowed in pause/shutdown mode
+        if (voltdb.isShuttingdown() && procedure.getAllowedinshutdown()) {
+            return null;
+        }
+
         if (voltdb.isShuttingdown()) {
-            return procedure.getAllowedinshutdown();
+            return serverUnavailableResponse(
+                    "Server shutdown in progress - new transactions are not processed.",
+                    task.clientHandle);
         }
 
         if (voltdb.getMode() != OperationMode.PAUSED || handler.isAdmin()) {
-            return true;
+            return null;
         }
 
         // If we got here, instance is paused and handler is not admin.
+        final String procName = task.getProcName();
         if (procedure.getSystemproc() &&
-                ("@AdHoc".equals(invocation.getProcName()) || "@AdHocSpForTest".equals(invocation.getProcName()))) {
+                ("@AdHoc".equals(procName) || "@AdHocSpForTest".equals(procName))) {
             // AdHoc is handled after it is planned and we figure out if it is read-only or not.
-            return true;
-        } else {
-            return procedure.getReadonly();
+            return null;
+        } else if (!procedure.getReadonly()) {
+            return serverUnavailableResponse(
+                    "Server is paused and is available in read-only mode - please try again later.",
+                    task.clientHandle);
+
         }
+        return null;
     }
 
     private final static ClientResponseImpl dispatchGetPartitionKeys(StoredProcedureInvocation task) {
@@ -746,6 +791,57 @@ public final class InvocationDispatcher {
             hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    // Go to the catalog and fetch all the "explain plan" strings of the queries in the view.
+    private final ClientResponseImpl dispatchExplainView(StoredProcedureInvocation task, Connection ccxn) {
+        ParameterSet params = task.getParams();
+        /*
+         * TODO: We don't actually support multiple view names in an ExplainView call,
+         * so I THINK that the string is always a single view symbol and all this
+         * splitting and iterating is a no-op.
+         */
+        List<String> viewNames = SQLLexer.splitStatements((String)params.toArray()[0]);
+        int size = viewNames.size();
+        VoltTable[] vt = new VoltTable[size];
+        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+        for (int i = 0; i < size; i++) {
+            String viewName = viewNames.get(i);
+
+            // look in the catalog
+            // get the view table from the catalog
+            Table viewTable = tables.getIgnoreCase(viewName);
+            if (viewTable == null) {
+                return unexpectedFailureResponse("View " + viewName + " does not exist.", task.clientHandle);
+            }
+
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",           VoltType.STRING),
+                                  new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
+            try {
+                ArrayList<String[]> viewExplanation = ViewExplainer.explain(viewTable);
+                for (String[] row : viewExplanation) {
+                    vt[i].addRow(row[0], row[1]);
+                }
+            }
+            catch (Exception e) {
+                return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
+            }
+        }
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        vt,
+                        null);
+        response.setClientHandle( task.clientHandle );
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        ccxn.writeStream().enqueue(buf);
+        return null;
     }
 
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
@@ -1005,21 +1101,33 @@ public final class InvocationDispatcher {
     private final ClientResponseImpl takeShutdownSaveSnapshot(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user
+            final AuthUser user, OverrideCheck bypass
             )
     {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            return dispatch(task, handler, ccxn, user);
+            return dispatch(task, handler, ccxn, user, bypass);
         }
+
         Object p0 = task.getParams().getParam(0);
-        if (!(p0 instanceof Long)) {
+        final long zkTxnId;
+        if (p0 instanceof Long) {
+            zkTxnId = ((Long)p0).longValue();
+        } else if (p0 instanceof String) {
+            try {
+                zkTxnId = Long.parseLong((String)p0);
+            } catch (NumberFormatException e) {
+                return gracefulFailureResponse(
+                        "Incorrect argument type",
+                        task.clientHandle);
+            }
+        } else {
             return gracefulFailureResponse(
                     "Incorrect argument type",
                     task.clientHandle);
+
         }
-        final long zkTxnId = ((Long)p0).longValue();
         VoltDBInterface voltdb = VoltDB.instance();
 
         if (!voltdb.isShuttingdown()) {
@@ -1059,17 +1167,17 @@ public final class InvocationDispatcher {
             return null;
         }
 
-        PathSettings paths = m_catalogContext.get().getPaths();
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
         String snapshotJson = null;
         try {
             JSONWriter jss = new JSONStringer()
                     .object()
-                    .key(SnapshotUtil.JSON_URIPATH).value("file://" + paths.resolve(paths.getSnapshoth()).getPath())
-                    .key(SnapshotUtil.JSON_NONCE).value(SnapshotUtil.getShutdownSaveNonce(zkTxnId))
-                    .key(SnapshotUtil.JSON_TERMINUS).value(zkTxnId)
-                    .key(SnapshotUtil.JSON_BLOCK).value(true)
-                    .key(SnapshotUtil.JSON_PATH_TYPE).value(SnapshotPathType.SNAP_AUTO.toString())
-                    .key(SnapshotUtil.JSON_FORMAT).value(SnapshotFormat.NATIVE.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_URIPATH, "file://" + paths.resolve(paths.getSnapshoth()).getPath())
+                    .keySymbolValuePair(SnapshotUtil.JSON_NONCE, SnapshotUtil.getShutdownSaveNonce(zkTxnId))
+                    .keySymbolValuePair(SnapshotUtil.JSON_TERMINUS, zkTxnId)
+                    .keySymbolValuePair(SnapshotUtil.JSON_BLOCK, true)
+                    .keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString())
+                    .keySymbolValuePair(SnapshotUtil.JSON_FORMAT, SnapshotFormat.NATIVE.toString())
                     .endObject();
             snapshotJson = jss.toString();
         } catch (JSONException e) {
@@ -1144,7 +1252,7 @@ public final class InvocationDispatcher {
                 // remove parameter so it does not recurse infinitely
                 consoleLog.info("Snapshot taken successfully");
                 task.setParams();
-                dispatch(task, alternateHandler, alternateAdapter, user);
+                dispatch(task, alternateHandler, alternateAdapter, user, bypass);
             }
         },
         CoreUtils.SAMETHREADEXECUTOR);
@@ -1180,13 +1288,29 @@ public final class InvocationDispatcher {
         }
 
         voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
-        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user);
+        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user, bypass);
+    }
+
+    private final File getSnapshotCatalogFile(JSONObject snapJo) throws JSONException {
+        NodeSettings paths = m_catalogContext.get().getNodeSettings();
+        String catFN = snapJo.getString(SnapshotUtil.JSON_NONCE) + ".jar";
+        SnapshotPathType pathType = SnapshotPathType.valueOf(
+                snapJo.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.name()));
+        switch(pathType) {
+        case SNAP_AUTO:
+            return new File(paths.resolve(paths.getSnapshoth()), catFN);
+        case SNAP_CL:
+            return new File(paths.resolve(paths.getCommandLogSnapshot()), catFN);
+        default:
+            File snapDH = new VoltFile(snapJo.getString(SnapshotUtil.JSON_PATH));
+            return new File(snapDH, catFN);
+        }
     }
 
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
-            final AuthUser user
+            final AuthUser user, OverrideCheck bypass
             )
     {
         CatalogContext catalogContext = m_catalogContext.get();
@@ -1198,9 +1322,7 @@ public final class InvocationDispatcher {
         log.info("No schema found. Restoring schema and procedures from snapshot.");
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-            final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
-            final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new VoltFile(path, nonce + ".jar");
+            final File catalogFH = getSnapshotCatalogFile(jsObj);
 
             final byte[] catalog;
             try {
@@ -1279,7 +1401,7 @@ public final class InvocationDispatcher {
                         return;
                     }
                     m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                    dispatch(task, alternateHandler, alternateAdapter, user);
+                    dispatch(task, alternateHandler, alternateAdapter, user, bypass);
                 }
             },
             CoreUtils.SAMETHREADEXECUTOR);
@@ -1344,91 +1466,91 @@ public final class InvocationDispatcher {
         final ListenableFutureTask<?> ft = ListenableFutureTask.create(new Runnable() {
             @Override
             public void run() {
-                if (result.errorMsg == null) {
-                    if (result instanceof AdHocPlannedStmtBatch) {
-                        final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+                if (result.errorMsg != null) {
+                    ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(
+                                    (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
+                                    new VoltTable[0], result.errorMsg,
+                                    result.clientHandle);
+                    writeResponseToConnection(errorResponse);
+                    return;
+                }
+                Preconditions.checkState(
+                        result instanceof AdHocPlannedStmtBatch || result instanceof CatalogChangeResult,
+                        "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
 
-                        // assume all stmts have the same catalog version
-                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
-                        {
+                if (result instanceof AdHocPlannedStmtBatch) {
+                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                    ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
-                            /* The adhoc planner learns of catalog updates after the EE and the
-                               rest of the system. If the adhoc sql was planned against an
-                               obsolete catalog, re-plan. */
-                            LocalObjectMessage work = new LocalObjectMessage(
-                                    AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+                    // assume all stmts have the same catalog version
+                    if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
+                    {
 
-                            m_mailbox.send(m_plannerSiteId, work);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
-                            processExplainPlannedStmtBatch(plannedStmtBatch);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
-                            processExplainDefaultProc(plannedStmtBatch);
-                        }
-                        else {
-                            try {
-                                createAdHocTransaction(plannedStmtBatch, c);
-                            }
-                            catch (VoltTypeException vte) {
-                                String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
-                                writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
-                            }
-                        }
+                        /* The adhoc planner learns of catalog updates after the EE and the
+                           rest of the system. If the adhoc sql was planned against an
+                           obsolete catalog, re-plan. */
+                        LocalObjectMessage work = new LocalObjectMessage(
+                                AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+
+                        m_mailbox.send(m_plannerSiteId, work);
                     }
-                    else if (result instanceof CatalogChangeResult) {
-                        final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-
-                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
-                            ClientResponseImpl shortcutResponse =
-                                    new ClientResponseImpl(
-                                            ClientResponseImpl.SUCCESS,
-                                            new VoltTable[0], "Catalog update with no changes was skipped.",
-                                            result.clientHandle);
-                            writeResponseToConnection(shortcutResponse);
-                        }
-                        else {
-                            // create the execution site task
-                            StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
-
-                            ClientResponseImpl error = null;
-                            if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
-                                    SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-                                writeResponseToConnection(error);
-                            }
-                            else {
-                                /*
-                                 * Round trip the invocation to initialize it for command logging
-                                 */
-                                try {
-                                    task = MiscUtils.roundTripForCL(task);
-                                } catch (Exception e) {
-                                    hostLog.fatal(e);
-                                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                                }
-                                // initiate the transaction. These hard-coded values from catalog
-                                // procedure are horrible, horrible, horrible.
-                                createTransaction(changeResult.connectionId,
-                                        task, false, false, false, 0, task.getSerializedSize(),
-                                        System.nanoTime());
-                            }
-                        }
+                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                        processExplainPlannedStmtBatch(plannedStmtBatch);
+                    }
+                    else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+                        processExplainDefaultProc(plannedStmtBatch);
                     }
                     else {
-                        throw new RuntimeException(
-                                "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+                        try {
+                            createAdHocTransaction(plannedStmtBatch, c);
+                        }
+                        catch (VoltTypeException vte) {
+                            String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
+                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
+                        }
                     }
+                    // early return for @AdHocPlannedStmtBatch case
+                    return;
                 }
-                else {
-                    ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(
-                                (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
-                                new VoltTable[0], result.errorMsg,
-                                result.clientHandle);
-                    writeResponseToConnection(errorResponse);
+
+                // case for @CatalogChangeResult
+                final CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                    ClientResponseImpl shortcutResponse =
+                            new ClientResponseImpl(
+                                    ClientResponseImpl.SUCCESS,
+                                    new VoltTable[0], "Catalog update with no changes was skipped.",
+                                    result.clientHandle);
+                    writeResponseToConnection(shortcutResponse);
+                    return;
                 }
+
+                // create the execution site task
+                StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
+
+                ClientResponseImpl error = null;
+                if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
+                        SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
+                    writeResponseToConnection(error);
+                    return;
+                }
+
+                /*
+                 * Round trip the invocation to initialize it for command logging
+                 */
+                try {
+                    task = MiscUtils.roundTripForCL(task);
+                } catch (Exception e) {
+                    hostLog.fatal(e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
+                // initiate the transaction. These hard-coded values from catalog
+                // procedure are horrible, horrible, horrible.
+                createTransaction(changeResult.connectionId,
+                        task, false, false, false, 0, task.getSerializedSize(),
+                        System.nanoTime());
             }
 
             private final void writeResponseToConnection(ClientResponseImpl response) {
@@ -1703,7 +1825,6 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    @SuppressWarnings("unused")
     public  boolean createTransaction(
             final long connectionId,
             final long txnId,
@@ -1728,29 +1849,24 @@ public final class InvocationDispatcher {
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
-
         /*
          * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
          *
          * ReadLevel.SAFE:
-         * Send the read to the partition leader always (reads & writes)
-         *
-         * Someday could support per-transaction consistency for reads.
+         * Send the read to the partition leader only
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
-            }
-            if (initiatorHSId != null) {
                 isShortCircuitRead = true;
+                initiatorHSId = m_localReplicas.get().get(partition);
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
-            //Multi-part transactions go to the multi-part coordinator
+            // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool
@@ -1848,5 +1964,9 @@ public final class InvocationDispatcher {
 
     private final static ClientResponseImpl gracefulFailureResponse(String msg, long handle) {
         return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0], msg, handle);
+    }
+
+    private final static ClientResponseImpl serverUnavailableResponse(String msg, long handle) {
+        return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
     }
 }

@@ -62,11 +62,11 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     public void setRowData(AbstractExpression tableData) {
-        assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
+        assert(tableData instanceof VectorValueExpression ||
+                tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
 
-        m_outputExpression.setTypeSizeBytes(m_tableData.getValueType(), m_tableData.getValueSize(),
-                m_tableData.getInBytes());
+        m_outputExpression.setTypeSizeAndInBytes(m_tableData);
     }
 
     public void setSortDirection(SortDirectionType direction) {
@@ -115,11 +115,11 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
             m_outputSchema = new NodeSchema();
             // must produce a tuple value expression for the one column.
             m_outputSchema.addColumn(
-                new SchemaColumn(m_outputExpression.getTableName(),
-                                 m_outputExpression.getTableAlias(),
-                                 m_outputExpression.getColumnName(),
-                                 m_outputExpression.getColumnAlias(),
-                                 m_outputExpression));
+                m_outputExpression.getTableName(),
+                m_outputExpression.getTableAlias(),
+                m_outputExpression.getColumnName(),
+                m_outputExpression.getColumnAlias(),
+                m_outputExpression);
         }
     }
 
@@ -140,7 +140,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         stringer.endObject();
 
         if (m_sortDirection == SortDirectionType.DESC) {
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+            stringer.keySymbolValuePair(Members.SORT_DIRECTION.name(), m_sortDirection.toString());
         }
     }
 

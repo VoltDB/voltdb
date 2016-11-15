@@ -33,11 +33,12 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
- * System procedures extend VoltSystemProcedure and use its utility methods to
+ * System procedures extend VoltProcedure and use its utility methods to
  * create work in the system. This functionality is not available to standard
  * user procedures (which extend VoltProcedure).
  */
@@ -67,7 +68,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected ClusterSettings m_settings;
+    protected ClusterSettings m_clusterSettings;
+    protected NodeSettings m_nodeSettings;
     protected SiteProcedureConnection m_site;
     private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
@@ -106,12 +108,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     void initSysProc(SiteProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster,
-            ClusterSettings settings) {
+            ClusterSettings clusterSettings,
+            NodeSettings nodeSettings) {
 
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
-        m_settings = settings;
+        m_clusterSettings = clusterSettings;
+        m_nodeSettings = nodeSettings;
         m_loadedProcedureSet = loadedProcedureSet;
 
         init();

@@ -76,14 +76,14 @@ public class ExtensibleSnapshotDigestData {
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
-                stringer.key("exportTableName").value(entry.getKey());
+                stringer.keySymbolValuePair("exportTableName", entry.getKey());
 
                 stringer.key("sequenceNumberPerPartition").array();
                 for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.key("partition").value(sequenceNumber.getKey());
+                    stringer.keySymbolValuePair("partition", sequenceNumber.getKey());
                     //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                    stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
+                    stringer.keySymbolValuePair("exportSequenceNumber", sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();
@@ -134,10 +134,10 @@ public class ExtensibleSnapshotDigestData {
                     JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
                     Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
                     if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
-                        log.error("Found a mismatch in export sequence numbers of export table " + tableName +
+                        log.debug("Found a mismatch in export sequence numbers of export table " + tableName +
                                 " while recording snapshot metadata for partition " + partitionId +
-                                " the sequence number should be the same at all replicas, but one had " +
-                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber);
+                                ". This is expected only on replicated, write-to-file export streams (remote node reported " +
+                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber + ")");
                     }
                     existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
 
@@ -167,13 +167,13 @@ public class ExtensibleSnapshotDigestData {
                 stringer.key(e.getKey().toString());
                 stringer.object();
                 if (e.getKey() != MpInitiator.MP_INIT_PID) {
-                    stringer.key("sequenceNumber").value(e.getValue().partitionInfo.drId);
-                    stringer.key("spUniqueId").value(e.getValue().partitionInfo.spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().partitionInfo.mpUniqueId);
+                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
+                    stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
+                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
                 } else {
-                    stringer.key("sequenceNumber").value(e.getValue().replicatedInfo.drId);
-                    stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
+                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
+                    stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
+                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
                 }
                 stringer.endObject();
             }
@@ -183,7 +183,7 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj) throws JSONException {
+    private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
         JSONObject stateInfoMap;
         // clusterCreateTime should be same across the cluster
         long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
@@ -205,7 +205,19 @@ public class ExtensibleSnapshotDigestData {
                 partitionStateInfo = e.getValue().replicatedInfo;
             }
             JSONObject existingStateInfo = stateInfoMap.optJSONObject(partitionId);
-            if (existingStateInfo == null || partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+            boolean addEntry = false;
+            if (existingStateInfo == null) {
+                addEntry = true;
+            }
+            else if (partitionStateInfo.drId != existingStateInfo.getLong("sequenceNumber")) {
+                addEntry = true;
+                log.error("Found a mismatch in dr sequence numbers for partition " + partitionId +
+                        " the DRId should be the same at all replicas, but one node had " +
+                        DRLogSegmentId.getDebugStringFromDRId(existingStateInfo.getLong("sequenceNumber")) +
+                        " and the local node reported " + DRLogSegmentId.getDebugStringFromDRId(partitionStateInfo.drId));
+            }
+
+            if (addEntry) {
                 JSONObject stateInfo = new JSONObject();
                 stateInfo.put("sequenceNumber", partitionStateInfo.drId);
                 stateInfo.put("spUniqueId", partitionStateInfo.spUniqueId);
@@ -282,11 +294,11 @@ public class ExtensibleSnapshotDigestData {
     private void writeDRStateToSnapshot(JSONStringer stringer) throws IOException {
         try {
             long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
-            stringer.key("clusterCreateTime").value(clusterCreateTime);
+            stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
 
             Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
             if (iter.hasNext()) {
-                stringer.key("drVersion").value(iter.next().getValue().drVersion);
+                stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
             }
             writeDRTupleStreamInfoToSnapshot(stringer);
             stringer.key("drMixedClusterSizeConsumerState");
@@ -308,7 +320,7 @@ public class ExtensibleSnapshotDigestData {
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
         mergeExportSequenceNumbersToZK(jsonObj, log);
-        mergeDRTupleStreamInfoToZK(jsonObj);
+        mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
         mergeTerminusToZK(jsonObj);
     }

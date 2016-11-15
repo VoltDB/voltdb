@@ -739,15 +739,19 @@ public class CatalogDiffEngine {
      * @return
      */
     private String createViewDisallowedMessage(String viewName, String singleTableName) {
+        boolean singleTable = (singleTableName != null);
         return String.format(
-                "Unable to create %sview %s %sbecause it uses unsafe operations.",
-                ((singleTableName != null)
+                "Unable to create %sview %s %sbecause the view definition uses operations that cannot always be applied if %s.",
+                (singleTable
                         ? "single table "
                         : "multi-table "),
                 viewName,
-                ((singleTableName == null)
-                        ? ""
-                        : String.format("on table %s ", singleTableName)));
+                (singleTable
+                        ? String.format("on table %s ", singleTableName)
+                        : ""),
+                (singleTable
+                        ? "the table already contains data"
+                        : "all of the tables already contain data"));
     }
 
     /**

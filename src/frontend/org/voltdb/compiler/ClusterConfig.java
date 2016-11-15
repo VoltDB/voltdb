@@ -566,13 +566,13 @@ public class ClusterConfig
 
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        stringer.key("hostcount").value(m_hostCount);
-        stringer.key("kfactor").value(getReplicationFactor());
+        stringer.keySymbolValuePair("hostcount", m_hostCount);
+        stringer.keySymbolValuePair("kfactor", getReplicationFactor());
         stringer.key("host_id_to_sph").array();
         for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
             stringer.object();
-            stringer.key("host_id").value(entry.getKey());
-            stringer.key("sites_per_host").value(entry.getValue());
+            stringer.keySymbolValuePair("host_id", entry.getKey());
+            stringer.keySymbolValuePair("sites_per_host", entry.getValue());
             stringer.endObject();
         }
         stringer.endArray();
@@ -580,12 +580,12 @@ public class ClusterConfig
         for (int part = 0; part < partitionCount; part++)
         {
             stringer.object();
-            stringer.key("partition_id").value(part);
+            stringer.keySymbolValuePair("partition_id", part);
             // This two-line magic deterministically spreads the partition leaders
             // evenly across the cluster at startup.
             int index = part % (getReplicationFactor() + 1);
             int master = partToHosts.get(part).get(index);
-            stringer.key("master").value(master);
+            stringer.keySymbolValuePair("master", master);
             stringer.key("replicas").array();
             for (int host_pos : partToHosts.get(part)) {
                 stringer.value(host_pos);
@@ -702,13 +702,13 @@ public class ClusterConfig
 
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        stringer.key("hostcount").value(m_hostCount);
-        stringer.key("kfactor").value(getReplicationFactor());
+        stringer.keySymbolValuePair("hostcount", m_hostCount);
+        stringer.keySymbolValuePair("kfactor", getReplicationFactor());
         stringer.key("host_id_to_sph").array();
         for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
             stringer.object();
-            stringer.key("host_id").value(entry.getKey());
-            stringer.key("sites_per_host").value(entry.getValue());
+            stringer.keySymbolValuePair("host_id", entry.getKey());
+            stringer.keySymbolValuePair("sites_per_host", entry.getValue());
             stringer.endObject();
         }
         stringer.endArray();
@@ -716,8 +716,8 @@ public class ClusterConfig
         for (int part = 0; part < partitionCount; part++)
         {
             stringer.object();
-            stringer.key("partition_id").value(part);
-            stringer.key("master").value(partitions.get(part).m_master.m_hostId);
+            stringer.keySymbolValuePair("partition_id", part);
+            stringer.keySymbolValuePair("master", partitions.get(part).m_master.m_hostId);
             stringer.key("replicas").array();
             for (Node n : partitions.get(part).m_replicas) {
                 stringer.value(n.m_hostId);

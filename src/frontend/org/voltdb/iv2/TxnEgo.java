@@ -23,6 +23,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.voltcore.TransactionIdManager;
+
 /**
  * Encapsulates an Iv2 transaction id, timestamp and random number seed.
  */
@@ -37,28 +39,17 @@ final public class TxnEgo {
     static final long SEQUENCE_MAX_VALUE = (1L << SEQUENCE_BITS) - 1L;
     static final int PARTITIONID_MAX_VALUE = (1 << PARTITIONID_BITS) - 1;
 
-    // (Copy/Pasted (on purpose) from voltdb.TransactionIdManager)
     // The legacy transaction id included 40-bits of timestamp starting
     // from VOLT_EPOCH: time in millis since 1/1/2008 at 12am. Iv2 ids
     // are seeded from 12/31/2014 to guarantee uniqueness with previously
     // generated legacy ids.
-    static final long VOLT_EPOCH = getEpoch();
-    final public static long getEpoch() {
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(0);
-        c.set(2008, 0, 1, 0, 0, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        c.set(Calendar.ZONE_OFFSET, 0);
-        c.set(Calendar.DST_OFFSET, 0);
-        long retval = c.getTimeInMillis();
-        return retval;
-    }
+    static final long VOLT_EPOCH = TransactionIdManager.getEpoch();;
 
     // Create the starting SEQUENCE value. Must shift this left
     // to put the legacy transaction id seed in the most significant
     // 40-bits of the 49 bit sequence number (where it existed bit-wise
     // in the legacy id).
-    static public final long SEQUENCE_ZERO = (getSequenceZero() - getEpoch());
+    static public final long SEQUENCE_ZERO = (getSequenceZero() - VOLT_EPOCH);
     private final static long getSequenceZero() {
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(0);

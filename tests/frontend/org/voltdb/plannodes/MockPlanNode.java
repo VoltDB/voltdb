@@ -28,14 +28,12 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
-public class MockPlanNode extends AbstractPlanNode
-{
+public class MockPlanNode extends AbstractPlanNode {
     String m_tableName;
     String[] m_columnNames;
     boolean m_isOrderDeterministic = false;
 
-    MockPlanNode(String tableName, String[] columnNames)
-    {
+    MockPlanNode(String tableName, String[] columnNames) {
         super();
         m_nondeterminismDetail = "no ordering was asserted for Mock Plan Node";
         m_tableName = tableName;
@@ -43,34 +41,29 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         m_outputSchema = new NodeSchema();
         m_hasSignificantOutputSchema = true;
-        for (int i = 0; i < m_columnNames.length; ++i)
-        {
+        for (int i = 0; i < m_columnNames.length; ++i) {
+            String colName = m_columnNames[i];
             TupleValueExpression tve = new TupleValueExpression(m_tableName,
                                                                 m_tableName,
-                                                                m_columnNames[i],
-                                                                m_columnNames[i],
+                                                                colName,
+                                                                colName,
                                                                 i);
-            m_outputSchema.addColumn(new SchemaColumn(m_tableName,
-                                                      m_tableName,
-                                                      m_columnNames[i],
-                                                      m_columnNames[i],
-                                                      tve));
+            m_outputSchema.addColumn(m_tableName, m_tableName,
+                    colName, colName,
+                    tve);
         }
     }
 
     @Override
-    public PlanNodeType getPlanNodeType()
-    {
+    public PlanNodeType getPlanNodeType() {
         return null;
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
 
     }
 

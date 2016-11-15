@@ -4177,6 +4177,7 @@ public class ParserDQL extends ParserBase {
 
         // A VoltDB extension to avoid using exceptions for flow control.
         HsqlException e = null;
+        int prevParamCount = compileContext.parameters.size();
         try {
             e = readExpression(exprList, parseList, 0, parseList.length, false, false);
         } catch (HsqlException caught) {
@@ -4198,6 +4199,10 @@ public class ParserDQL extends ParserBase {
             }
 
             rewind(position);
+            // Discard parsed parameters along with the token rewinding.
+            for (int i = compileContext.parameters.size()-1; i >= prevParamCount; i--) {
+                compileContext.parameters.remove(i);
+            }
 
             parseList = function.parseListAlt;
             exprList  = new HsqlArrayList();

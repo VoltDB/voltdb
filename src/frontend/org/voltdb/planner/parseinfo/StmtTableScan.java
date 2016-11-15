@@ -24,6 +24,8 @@ import java.util.Set;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
 
@@ -42,8 +44,8 @@ public abstract class StmtTableScan {
     protected String m_tableAlias = null;
 
     // Store a unique list of scan columns.
-    protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
-    protected Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
+    private final List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
+    private final Set<Pair<String, Integer>> m_scanColumnNameSet = new HashSet<>();
 
     // Partitioning column info
     protected List<SchemaColumn> m_partitioningColumns = null;
@@ -75,20 +77,28 @@ public abstract class StmtTableScan {
         return m_stmtId;
     }
 
-    abstract public String getColumnName(int m_columnIndex);
+    abstract public String getColumnName(int columnIndex);
 
-    abstract public void processTVE(TupleValueExpression expr, String columnName);
+    abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
-    public void resolveTVE(TupleValueExpression expr) {
-        String columnName = expr.getColumnName();
-        processTVE(expr, columnName);
-        expr.setOrigStmtId(m_stmtId);
+    public AbstractExpression resolveTVE(TupleValueExpression tve) {
+        AbstractExpression resolvedExpr = processTVE(tve, tve.getColumnName());
 
-        Pair<String, Integer> setItem = Pair.of(columnName, expr.getDifferentiator());
-        if ( ! m_scanColumnNameSet.contains(setItem)) {
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(resolvedExpr);
+        for (TupleValueExpression subqTve : tves) {
+            resolveLeafTve(subqTve);
+        }
+        return resolvedExpr;
+    }
+
+    private void resolveLeafTve(TupleValueExpression subqTve) {
+        String columnName = subqTve.getColumnName();
+        subqTve.setOrigStmtId(m_stmtId);
+        Pair<String, Integer> setItem =
+                Pair.of(columnName, subqTve.getDifferentiator());
+        if (m_scanColumnNameSet.add(setItem)) {
             SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
-                    columnName, columnName, (TupleValueExpression) expr.clone());
-            m_scanColumnNameSet.add(setItem);
+                    columnName, columnName, subqTve);
             m_scanColumnsList.add(scol);
         }
     }

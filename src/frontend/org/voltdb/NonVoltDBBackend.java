@@ -32,6 +32,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,6 +68,32 @@ public abstract class NonVoltDBBackend {
      *  which an appropriate group value will be substituted. */
     protected static final Pattern groupNameVariables = Pattern.compile(
             "\\{(?<groupName>\\w+)(:(?<columnType>\\w+))?\\}");
+
+    // Used below, to define SELECT_TABLE_NAMES
+    private static final String TABLE_REFERENCE = "(?<table1>\\w+)(\\s+(AS\\s+)?\\w+)?";
+    private static final String COMMA_OR_JOIN_CLAUSE = "(,|\\s+((INNER|CROSS|((LEFT|RIGHT|FULL)\\s+)?OUTER)\\s+)?JOIN\\s)\\s*";
+    private static final String COMPARISON_OP = "\\s*(=|!=|<>|<|>|<=|>=|IS\\s+(NOT\\s+)?DISTINCT\\s+FROM)\\s+";
+    private static final String ON_OR_USING_CLAUSE = "\\s+((ON\\s+(\\w+\\.)?\\w+"+COMPARISON_OP+"(\\w+\\.)?\\w+"
+            + "|USING\\s+\\(\\w+(,\\s*\\w+\\s*)*\\)))?\\s*";
+
+    /** Pattern used to recognize the table names in a SELECT statement; will
+     *  recognize up to 4 table names. */
+    private static final Pattern SELECT_TABLE_NAMES = Pattern.compile(
+            "(?<!DISTINCT)\\s+FROM\\s+"+TABLE_REFERENCE+"\\s*"
+            + "(" + COMMA_OR_JOIN_CLAUSE + TABLE_REFERENCE.replace('1', '2') + ON_OR_USING_CLAUSE + ")?"
+            + "(" + COMMA_OR_JOIN_CLAUSE + TABLE_REFERENCE.replace('1', '3') + ON_OR_USING_CLAUSE + ")?"
+            + "(" + COMMA_OR_JOIN_CLAUSE + TABLE_REFERENCE.replace('1', '4') + ON_OR_USING_CLAUSE + ")?",
+            Pattern.CASE_INSENSITIVE);
+    private static final int MAX_NUM_TABLE_NAMES = 4;
+
+    /** Pattern used to recognize the table name in a SQL statement that is not
+     *  a SELECT statement, i.e., in an UPDATE, INSERT, UPSERT, or DELETE
+     *  statement (TRUNCATE and all DDL statements are omitted because they are
+     *  not relevant where this gets used, in determining column data types). */
+    private static final Pattern NON_SELECT_TABLE_NAME = Pattern.compile(
+            "\\*(UPDATE|(IN|UP)SERT\\s+INTO\\s+|DELETE\\s+FROM)\\s+(?<table1>\\w+)",
+            Pattern.CASE_INSENSITIVE);
+
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
@@ -118,6 +145,8 @@ public abstract class NonVoltDBBackend {
     protected enum ColumnType {
         /** Any integer column type, including TINYINT, SMALLINT, INTEGER, BIGINT, etc. */
         INTEGER,
+        /** Only a BIGINT column type, not of any of the smaller integer types. */
+        BIGINT,
         /** Any Geospatial column type, including GEOGRAPHY_POINT or GEOGRAPHY. */
         GEO
     }
@@ -147,6 +176,7 @@ public abstract class NonVoltDBBackend {
         private Integer m_minimum = null;
         private List<String> m_groups = new ArrayList<String>();
         private List<String> m_groupReplacementTexts = new ArrayList<String>();
+        private List<String> m_exclude = new ArrayList<String>();
         private boolean m_debugPrint = false;
 
         /**
@@ -279,6 +309,15 @@ public abstract class NonVoltDBBackend {
             return this;
         }
 
+        /** Specifies one or more strings whose appearance in the group means
+         *  that this group should not be changed (e.g. "TRUNC", so as not to
+         *  wrap TRUNC around the same group twice); default is default is an
+         *  empty list of strings, in which case it is ignored. */
+        protected QueryTransformer exclude(String ... texts) {
+            this.m_exclude.addAll(Arrays.asList(texts));
+            return this;
+        }
+
         /** Specifies whether or not to print debug info; default is <b>false</b>. */
         protected QueryTransformer debugPrint(boolean debugPrint) {
             this.m_debugPrint = debugPrint;
@@ -289,6 +328,40 @@ public abstract class NonVoltDBBackend {
         protected QueryTransformer debugPrint() {
             debugPrint(true);
             return this;
+        }
+
+        // Used by the toString() method.
+        private String getNonEmptyValue(String name, Object value) {
+            if (value == null) {
+                return "";
+            } else if (value instanceof Collection && ((Collection<?>)value).isEmpty()) {
+                return "";
+            } else if (value.toString().isEmpty()) {
+                return "";
+            } else {
+                return "\n    " + name + ": " + value;
+            }
+        }
+
+        // Useful for debugging
+        @Override
+        public String toString() {
+            String result = "Pattern: " + m_queryPattern
+                    + getNonEmptyValue("initialText", m_initialText)
+                    + getNonEmptyValue("prefix",      m_prefix)
+                    + getNonEmptyValue("suffix",      m_suffix)
+                    + getNonEmptyValue("altSuffix",   m_altSuffix)
+                    + getNonEmptyValue("useAltSuffixAfter", m_useAltSuffixAfter)
+                    + getNonEmptyValue("replacementText",   m_replacementText)
+                    + getNonEmptyValue("columnType", m_columnType)
+                    + getNonEmptyValue("multiplier", m_multiplier)
+                    + getNonEmptyValue("minimum", m_minimum)
+                    + getNonEmptyValue("exclude",  m_exclude)
+                    + getNonEmptyValue("groups",  m_groups)
+                    + getNonEmptyValue("groupReplacementTexts", m_groupReplacementTexts)
+                    + getNonEmptyValue("useWholeMatch", (m_useWholeMatch ? "true" : ""))
+                    + getNonEmptyValue("debugPrint",    (m_debugPrint    ? "true" : ""));
+            return result;
         }
 
     }
@@ -335,14 +408,43 @@ public abstract class NonVoltDBBackend {
         return columns;
     }
 
+    /** Returns the table (or view) names used in the specified SQL statement,
+     *  whether it is a SELECT query or something else, i.e., an UPDATE, INSERT,
+     *  UPSERT, or DELETE statement.<br>
+     *  Note: TRUNCATE and all DDL statements are omitted because they are
+     *  not relevant where this gets used, in determining column data types. */
+    protected List<String> getTableNames(String sql) {
+        Pattern[] patterns = {SELECT_TABLE_NAMES, NON_SELECT_TABLE_NAME};
+        List<String> result = new ArrayList<String>();
+        for (Pattern pattern : patterns) {
+            Matcher matcher = pattern.matcher(sql);
+            while (matcher.find()) {
+                for (int i=1; i <= MAX_NUM_TABLE_NAMES; i++) {
+                    String group = null;
+                    try {
+                        group = matcher.group("table"+i);
+                    } catch (IllegalArgumentException e) {
+                        // The two patterns have different numbers of groups
+                        // (table1, table2, etc.), so this may well happen
+                        break;
+                    }
+                    if (group != null) {
+                        result.add(group);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
     /** Returns true if the <i>columnName</i> is one of the specified
      *  <i>columnTypes</i>, e.g., one of the integer column types, or one of
      *  the Geospatial column types - for one or more of the <i>tableNames</i>,
      *  if specified; otherwise, for any table in the database schema. */
     private boolean isColumnType(List<String> columnTypes, String columnName,
-                                 String ... tableNames) {
-        if (tableNames == null || tableNames.length == 0) {
-            tableNames = new String[] {null};
+                                 List<String> tableNames) {
+        if (tableNames == null || tableNames.size() == 0) {
+            tableNames = Arrays.asList((String)null);
         }
         for (String tn : tableNames) {
             // Lower-case table and column names are required for PostgreSQL;
@@ -366,40 +468,46 @@ public abstract class NonVoltDBBackend {
         return false;
     }
 
-    /** Returns true if the <i>columnName</i> is an integer column (including
-     *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
-     *  comparison, non-VoltDB database); false otherwise. */
-    private boolean isIntegerColumn(String columnName, String... tableNames) {
-        List<String> intColumnTypes = Arrays.asList("TINYINT", "SMALLINT", "INTEGER", "BIGINT");
-        return isColumnType(intColumnTypes, columnName, tableNames);
-    }
-
-    /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e. a
-     *  GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column; false otherwise. */
-    private boolean isGeoColumn(String columnName, String... tableNames) {
+    /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e.,
+     *  a GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column, or equivalents
+     *  in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isGeoColumn(String columnName, List<String> tableNames) {
         List<String> geoColumnTypes = Arrays.asList("GEOGRAPHY", "GEOGRAPHY_POINT");
         return isColumnType(geoColumnTypes, columnName, tableNames);
     }
 
-    /** Returns the number of occurrences of the specified character in the specified String. */
-    static private int numOccurencesOfCharIn(String str, char ch) {
-        int num = 0;
-        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
-            num++;
-        }
-        return num;
+    /** Returns true if the <i>columnName</i> is of column type BIGINT, or
+     *  equivalents in a comparison, non-VoltDB database; false otherwise. */
+    private boolean isBigintColumn(String columnName, List<String> tableNames) {
+        List<String> bigintColumnTypes = Arrays.asList("BIGINT");
+        return isColumnType(bigintColumnTypes, columnName, tableNames);
     }
 
-    /** Returns the Nth occurrence of the specified character in the specified String. */
-    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
-        int index = -1;
-        for (int i=0; i < n; i++) {
-            index = str.indexOf(ch, index+1);
-            if (index < 0) {
-                return -1;
-            }
+    /** Returns true if the <i>columnName</i> is an integer column (including
+     *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
+     *  comparison, non-VoltDB database); false otherwise. */
+    private boolean isIntegerColumn(String columnName, List<String> tableNames) {
+        List<String> intColumnTypes = Arrays.asList("TINYINT", "SMALLINT", "INTEGER", "BIGINT");
+        return isColumnType(intColumnTypes, columnName, tableNames);
+    }
+
+    /** Returns true if the <i>columnOrConstant</i> is an integer constant;
+     *  false otherwise. */
+    private boolean isIntegerConstant(String columnOrConstant) {
+        try {
+            Integer.parseInt(columnOrConstant.trim());
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
         }
-        return index;
+    }
+
+    /** Returns true if the <i>columnOrConstant</i> is either an integer
+     *  constant or an integer column (including types TINYINT, SMALLINT,
+     *  INTEGER, BIGINT, or equivalents in a comparison, non-VoltDB database);
+     *  false otherwise. */
+    private boolean isInteger(String columnOrConstant, List<String> tableNames) {
+        return isIntegerConstant(columnOrConstant) || isIntegerColumn(columnOrConstant, tableNames);
     }
 
     /** Returns the column type name, in VoltDB, corresponding to the specified
@@ -411,6 +519,15 @@ public abstract class NonVoltDBBackend {
         return columnTypeName;
     }
 
+    /** This base version simply returns a String consisting of the <i>prefix</i>,
+     *  <i>group</i>, and <i>suffix</i> concatenated (in that order); however,
+     *  it may be overridden to do something more complicated, to make sure that
+     *  the prefix and suffix go in the right place, relative to any parentheses
+     *  found in the group. */
+    protected String handleParens(String group, String prefix, String suffix) {
+        return prefix + group + suffix;
+    }
+
     /** Potentially returns the specified String, after replacing certain
      *  "variables", such as {table} or {column:pk}, in a QueryTransformer's
      *  prefix, suffix or (group) replacement text, for which a corresponding
@@ -419,32 +536,8 @@ public abstract class NonVoltDBBackend {
      *  sub-classes, to determine appropriate changes for that non-VoltDB
      *  backend database. */
     protected String replaceGroupNameVariables(String str,
-            List<String> groupNames,List<String> groupValues) {
+            List<String> groupNames, List<String> groupValues) {
         return str;
-    }
-
-    /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
-     *  and <i>suffix</i> concatenated (in that order), but being careful not
-     *  to include more close-parentheses than open-parentheses: if the group
-     *  does contain more close-parens than open-parens, the <i>suffix</i> is
-     *  inserted just after the matching close-parens (i.e., after the number
-     *  of close-parens that equals the number of open-parens), instead of at
-     *  the very end; but if there are no open-parens, then the <i>suffix</i>
-     *  is inserted just before the first close-parens. */
-    static private String handleParens(String group, String prefix, String suffix) {
-        int numOpenParens  = numOccurencesOfCharIn(group, '(');
-        int numCloseParens = numOccurencesOfCharIn(group, ')');
-        if (numOpenParens >= numCloseParens || suffix.isEmpty()) {
-            return (prefix + group + suffix);
-        } else {  // numOpenParens < numCloseParens
-            int index;
-            if (numOpenParens == 0) {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
-            } else {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
-            }
-            return (prefix + group.substring(0, index) + suffix + group.substring(index));
-        }
     }
 
     /**
@@ -478,15 +571,7 @@ public abstract class NonVoltDBBackend {
             if (qt.m_debugPrint) {
                 if (count < 1) {
                     System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
-                    System.out.println("  queryPattern: " + qt.m_queryPattern);
-                    System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix; "
-                            + "replacementText; groupReplacementText(s):\n    '"
-                            + qt.m_initialText + "', '" + qt.m_prefix + "', '" + qt.m_suffix + "', '"
-                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "'\n    '"
-                            + qt.m_replacementText + "'; " + qt.m_groupReplacementTexts
-                            + "\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
-                            + qt.m_useWholeMatch + ", " + qt.m_columnType + ", " + qt.m_multiplier + ", "
-                            + qt.m_minimum + ", " + qt.m_debugPrint + "\n    " + qt.m_groups);
+                    System.out.println("  QueryTransformer:\n    " + qt);
                 }
                 System.out.println("  " + ++count + ".wholeMatch: " + wholeMatch);
             }
@@ -517,11 +602,63 @@ public abstract class NonVoltDBBackend {
                 System.out.println("    lastGroup : " + lastGroup);
             }
             if (qt.m_useWholeMatch) {
-                if (qt.m_columnType != null && (
-                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(lastGroup))
-                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(lastGroup)) )) {
-                    // Make no changes to query (when columnType is specified,
-                    // but does not match the column type found in this query)
+                boolean noChangesNeeded = false;
+                // If the matched string contains one of the strings in the
+                // (possibly empty) list of excluded strings, then no changes
+                // are needed
+                if (qt.m_exclude != null) {
+                    for (String excl : qt.m_exclude) {
+                        if (wholeMatch.contains(excl)) {
+                            noChangesNeeded = true;
+                        }
+                    }
+                }
+                // When columnType is specified, it means only modify queries
+                // that use that type; so if the relevant column(s) are not of
+                // the specified type, no changes are needed
+                if (!noChangesNeeded && qt.m_columnType != null) {
+                    // When columnType is GEO, check whether the last, and
+                    // presumably only, column is not of that type, in which
+                    // case no changes are needed
+                    if (qt.m_columnType == ColumnType.GEO && !isGeoColumn(lastGroup, null)) {
+                        noChangesNeeded = true;
+                    // When columnType is BIGINT, check whether any of the columns
+                    // are of BIGINT type, in which case changes *are* needed
+                    } else if (qt.m_columnType == ColumnType.BIGINT) {
+                        noChangesNeeded = true;
+                        List<String> tableNames = getTableNames(query);
+                        for (int i=0; i < groups.size(); i++) {
+                            String group = groups.get(i);
+                            if (group != null && isBigintColumn(group, tableNames)) {
+                                noChangesNeeded = false;
+                                break;
+                            }
+                        }
+                    // When columnType is INTEGER, check whether any of the
+                    // columns (or constants) are non-integer, in which case
+                    // no changes are needed
+                    } else if (qt.m_columnType == ColumnType.INTEGER) {
+                        for (int i=0; i < groups.size(); i++) {
+                            String group = groups.get(i);
+                            // Not specifying the table name(s) here (i.e., the
+                            // null second argument to isInteger) is deliberately
+                            // saying to treat anything that "looks" like an integer
+                            // (i.e., the column name is one that is normally used
+                            // for an integer column) like an integer; this solves
+                            // certain odd materialized view cases where PostgreSQL
+                            // decides that the SUM of BIGINT is a DECIMAL, but
+                            // VoltDB treats it as BIGINT
+                            if (group != null && !isInteger(group, null)) {
+                                noChangesNeeded = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (noChangesNeeded) {
+                    // Make no changes to the query, if one of the excluded
+                    // strings was found, or when the columnType is specified,
+                    // but does not match the column type(s) found in this query
                     replaceText.append(wholeMatch);
                 } else {
                     // Check for the case where the group (or the whole text) is to be replaced with replacementText

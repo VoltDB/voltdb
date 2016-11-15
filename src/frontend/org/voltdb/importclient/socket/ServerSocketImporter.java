@@ -87,7 +87,7 @@ public class ServerSocketImporter extends AbstractImporter {
                 ch.start();
             }
         } catch(IOException e) {
-           error(e, "Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort());
+           warn(e, "Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort());
         }
     }
 

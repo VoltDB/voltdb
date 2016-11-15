@@ -17,15 +17,16 @@
 
 package org.voltdb.sysprocs;
 
-import com.google_voltpatches.common.collect.ImmutableList;
+import java.util.Collection;
+import java.util.List;
+
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 
-import java.util.Collection;
-import java.util.List;
+import com.google_voltpatches.common.collect.ImmutableList;
 
 public class BalancePartitionsRequest implements JSONString {
     public static class PartitionPair {
@@ -73,8 +74,7 @@ public class BalancePartitionsRequest implements JSONString {
     }
 
     @Override
-    public String toJSONString()
-    {
+    public String toJSONString() {
         JSONStringer stringer = new JSONStringer();
 
         try {
@@ -84,10 +84,10 @@ public class BalancePartitionsRequest implements JSONString {
             for (PartitionPair pair : partitionPairs) {
                 stringer.object();
 
-                stringer.key("srcPartition").value(pair.srcPartition);
-                stringer.key("destPartition").value(pair.destPartition);
-                stringer.key("rangeStart").value(pair.rangeStart);
-                stringer.key("rangeEnd").value(pair.rangeEnd);
+                stringer.keySymbolValuePair("srcPartition", pair.srcPartition);
+                stringer.keySymbolValuePair("destPartition", pair.destPartition);
+                stringer.keySymbolValuePair("rangeStart", pair.rangeStart);
+                stringer.keySymbolValuePair("rangeEnd", pair.rangeEnd);
 
                 stringer.endObject();
             }
@@ -96,7 +96,8 @@ public class BalancePartitionsRequest implements JSONString {
             stringer.endObject();
 
             return stringer.toString();
-        } catch (JSONException e) {
+        }
+        catch (JSONException e) {
             return null;
         }
     }

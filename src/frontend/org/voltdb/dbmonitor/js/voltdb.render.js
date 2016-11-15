@@ -363,6 +363,23 @@ function alertNodeClicked(obj) {
             }
         };
 
+        this.GetCommandLogStatus = function(onInformationLoaded){
+            if (VoltDbAdminConfig.isAdmin || checkSecurity) {
+                VoltDBService.GetShortApiDeployment(function (connection) {
+                    var rawData;
+                    var isCmdLogEnabled = false;
+                    if (connection != null){
+                        rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+                        if(rawData.hasOwnProperty('commandlog') && rawData['commandlog'].hasOwnProperty('enabled')){
+                            isCmdLogEnabled = rawData['commandlog']['enabled'];
+                        }
+                    }
+                    onInformationLoaded(isCmdLogEnabled);
+                });
+            } else {
+                onInformationLoaded(false);
+            }
+        }
 
         this.GetExportProperties = function (onInformationLoaded) {
 
@@ -3051,22 +3068,27 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.shutdownCluster = function (onServerShutdown) {
+        this.shutdownCluster = function (onServerShutdown, zk_pause_txn_id) {
             VoltDBService.ShutdownClusterState(function (connection, status) {
                 if (status == 1) {
                     onServerShutdown(true);
                 }
-            });
+            }, zk_pause_txn_id);
         };
 
         this.prepareShutdownCluster = function (onPrepareServerShutdown) {
-            VoltDBService.PrepareShutdownCluster(function (connection, status) {
-                    var data = connection.Metadata['@PrepareShutdown_data']
-                    if(data == undefined)
-                        status = -1;
-                    else
-                        status = connection.Metadata['@PrepareShutdown_data']['data'][0][0]
-                    onPrepareServerShutdown(status);
+            VoltDBService.PrepareShutdownCluster(function (connection) {
+                var prepare_status = {}
+                var status = -1;
+                var zk_pause_txn_id = '0'
+                var data = connection.Metadata['@PrepareShutdown_data']
+                if(data != undefined){
+                    zk_pause_txn_id = connection.Metadata['@PrepareShutdown_data']['data'][0][0]
+                    status = parseInt(connection.Metadata['@PrepareShutdown_status'])
+                }
+                prepare_status.zk_pause_txn_id = zk_pause_txn_id;
+                prepare_status.status = status;
+                onPrepareServerShutdown(prepare_status);
             });
         };
 

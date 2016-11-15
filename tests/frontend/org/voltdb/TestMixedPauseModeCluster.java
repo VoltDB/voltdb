@@ -22,24 +22,26 @@
  */
 package org.voltdb;
 
-import java.io.IOException;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.fail;
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.MiscUtils;
-import static org.junit.Assert.assertTrue;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
-public class TestMixedPauseModeCluster {
+public class TestMixedPauseModeCluster extends JUnit4LocalClusterTest {
 
     static final int K = MiscUtils.isPro() ? 1 : 0;
 

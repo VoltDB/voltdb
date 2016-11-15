@@ -1198,7 +1198,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         List<Iv2InFlight> transactions =
-                cihm.removeHandlesForPartitionAndInitiator( partitionId, initiatorHSId);
+                cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
 
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
@@ -1209,7 +1209,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "Transaction dropped due to change in mastership. " +
                             "It is possible the transaction was committed");
-            response.setClientHandle( inFlight.m_clientHandle );
+            response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);
@@ -1360,7 +1360,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

@@ -661,6 +661,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     @Override
+    public String getTaskThreadName() {
+        return getName() + " - " + (m_topicAndPartition == null ? "Unknown" : m_topicAndPartition.toString());
+    }
+
+    @Override
     protected void stop()
     {
         // Nothing to stop. shouldRun() should take care of exiting the work loop.

@@ -55,7 +55,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -397,7 +397,7 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_paths),
+                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
@@ -594,8 +594,8 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.key("role").value(m_config.m_replicationRole.ordinal());
-                js.key("active").value(m_rvdb.getReplicationActive());
+                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
+                js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
@@ -748,7 +748,7 @@ public class Inits {
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
                 if (cl == null || !cl.getEnabled()) return;
-                PathSettings paths = m_rvdb.m_paths;
+                NodeSettings paths = m_rvdb.m_nodeSettings;
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
@@ -773,10 +773,8 @@ public class Inits {
                     m_statusTracker.setNodeState(NodeState.RECOVERING);
                 }
                 // if the restore agent found a catalog, set the following info
-                // so the right node can send it out to the others. In case the
-                // restore agent chooses a terminus snapshot, it lets the restore
-                // snapshot restore and if required upgrade the snapshot catalog
-                if (catalog != null && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                // so the right node can send it out to the others.
+                if (catalog != null) {
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
@@ -793,17 +791,26 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                VoltDB.crashLocalVoltDB(String.format(
-                                        "Unable to load version %s catalog \"%s\" "
-                                        + "from snapshot into a version %s server.",
-                                        catalogVersion, catalogPath, serverVersion), false, null);
+                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                    VoltDB.crashLocalVoltDB(String.format(
+                                            "Unable to load version %s catalog \"%s\" "
+                                                    + "from snapshot into a version %s server.",
+                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                    return;
+                                }
+                                // upgrade the catalog - the following will save the recpmpiled catalog
+                                // under voltdbroot/catalog-[serverVersion].jar
+                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes);
+                                NodeSettings pathSettings = m_rvdb.m_nodeSettings;
+                                File recoverCatalogFH = new File(pathSettings.getVoltDBRoot(), "catalog-" + serverVersion + ".jar");
+                                catalogPath = recoverCatalogFH.getPath();
                             }
                         }
                         catch (IOException e) {
                             // Make it non-fatal with no check performed.
                             hostLog.warn(String.format(
                                     "Unable to load catalog for version check due to exception: %s.",
-                                    e.getMessage()));
+                                    e.getMessage()), e);
                         }
                     }
                     if (hostLog.isDebugEnabled()) {

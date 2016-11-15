@@ -89,10 +89,13 @@ public class TestScanPlanNode extends TestCase
         int[] scan_col_indexes = { 1, 3 };
         ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
         for (int index : scan_col_indexes) {
-            TupleValueExpression tve = new TupleValueExpression(TABLE1, TABLE1, COLS[index], COLS[index]);
+            TupleValueExpression tve = new TupleValueExpression(TABLE1, TABLE1,
+                    COLS[index], COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1, COLS[index], COLS[index], tve);
+            SchemaColumn col = new SchemaColumn(TABLE1, TABLE1,
+                    COLS[index], COLS[index],
+                    tve);
             scanColumns.add(col);
         }
         AbstractScanPlanNode dut = SeqScanPlanNode.createDummyForTest(TABLE1, scanColumns);
@@ -130,9 +133,9 @@ public class TestScanPlanNode extends TestCase
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();
-        proj_schema.addColumn(new SchemaColumn("", "", "tuple_address",
-                                               "tuple_address",
-                                               col1_exp));
+        proj_schema.addColumn("", "",
+                "tuple_address", "tuple_address",
+                col1_exp);
         cols[0] = "tuple_address";
 
         // update column 1 with a parameter value
@@ -142,8 +145,7 @@ public class TestScanPlanNode extends TestCase
         col2_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
         // XXX I'm not sure what to do with the name for the updated column yet.
         // I think it should be an alias and not the original table name/col name
-        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[1], COLS[1],
-                                               col2_exp));
+        proj_schema.addColumn(TABLE1, TABLE1, COLS[1], COLS[1], col2_exp);
         cols[1] = COLS[1];
 
         // Update column 3 with a constant value
@@ -151,8 +153,7 @@ public class TestScanPlanNode extends TestCase
         col3_exp.setValueType(COLTYPES[3]);
         col3_exp.setValueSize(COLTYPES[3].getLengthInBytesForFixedTypes());
         col3_exp.setValue("3.14159");
-        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[3], COLS[3],
-                                               col3_exp));
+        proj_schema.addColumn(TABLE1, TABLE1, COLS[3], COLS[3], col3_exp);
         cols[2] = COLS[3];
 
         // update column 4 with a sum of columns 0 and 2
@@ -168,12 +169,10 @@ public class TestScanPlanNode extends TestCase
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
         col4_exp.setLeft(left);
         col4_exp.setRight(right);
-        proj_schema.addColumn(new SchemaColumn(TABLE1, TABLE1, COLS[4], "C1",
-                                               col4_exp));
+        proj_schema.addColumn(TABLE1, TABLE1, COLS[4], "C1", col4_exp);
         cols[3] = COLS[4];
 
-        ProjectionPlanNode proj_node = new ProjectionPlanNode();
-        proj_node.setOutputSchema(proj_schema);
+        ProjectionPlanNode proj_node = new ProjectionPlanNode(proj_schema);
         dut.addInlinePlanNode(proj_node);
 
         System.out.println("ProjSchema: " + proj_schema.toString());

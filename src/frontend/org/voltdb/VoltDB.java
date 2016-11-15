@@ -48,7 +48,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.settings.PathSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -694,7 +694,13 @@ public class VoltDB {
         public Map<String,String> asPathSettingsMap() {
             Settings.initialize(m_voltdbRoot);
             return ImmutableMap.<String, String>builder()
-                    .put(PathSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
+        public Map<String, String> asNodeSettingsMap() {
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_sitesperhost))
                     .build();
         }
 

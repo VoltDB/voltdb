@@ -27,7 +27,7 @@
 @Grapes([
     @Grab('com.google.guava:guava:19.0'),
     @Grab('log4j:log4j:1.2.17'),
-    @Grab('org.apache.kafka:kafka_2.10:0.8.2.1'),
+    @Grab('org.apache.kafka:kafka_2.11:0.8.2.2'),
     @GrabExclude('javax.mail:mail'),
     @GrabExclude('javax.jms:jms'),
     @GrabExclude('com.sun.jdmk:jmxtools')
@@ -149,7 +149,7 @@ ofstldr = new Attempter(brokers).attempt {
     chnl
 }
 
-printf("%-36s %4s %16s %16s %16s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED')
+printf("%-36s %4s %16s %16s %16s %12s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED','LAG')
 
 prtldrs.each { int p, Broker b ->
     cnsmr = new SimpleConsumer(b.host(), b.port(), SO_TIMEOUT, SO_BUFFSIZE, clientid)
@@ -190,7 +190,10 @@ prtldrs.each { int p, Broker b ->
         throw ErrorMapping.exceptionFor(code)
     }
 
-    printf("%-36s %4d %,16d %,16d %,16d\n",topic,p,earliest,latest,committed)
+    long lag = (committed <= 0 || committed < earliest) ? (latest-earliest) :
+        (committed > latest) ? 0L : (latest-committed)
+
+    printf("%-36s %4d %,16d %,16d %,16d %,12d\n",topic,p,earliest,latest,committed,lag)
 }
 
 ofstldr.disconnect()

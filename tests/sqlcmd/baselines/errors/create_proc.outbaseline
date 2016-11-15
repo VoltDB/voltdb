@@ -15,6 +15,7 @@ create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -59,6 +60,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -90,6 +92,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -161,6 +164,7 @@ create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -210,6 +214,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -267,6 +272,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -325,6 +331,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -382,6 +389,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    

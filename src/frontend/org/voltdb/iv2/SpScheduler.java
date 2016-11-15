@@ -169,7 +169,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
@@ -417,13 +417,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private long getMaxTaskedSpHandle() {
-        return m_pendingTasks.getMaxTaskedSpHandle();
-    }
-
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
-    public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
+    private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
@@ -694,7 +690,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     // Pass a response through the duplicate counters.
-    public void handleInitiateResponseMessage(InitiateResponseMessage message)
+    private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
@@ -888,9 +884,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
-            if (msg.getInitiateTask() != null) {
-                logThis = !msg.getInitiateTask().isReadOnly();
-            }
+
+            // Like SP, we should log writes and safe reads.
+            // Fast reads can be directly put on the task queue.
+            boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+            logThis = !shortcutRead;
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early
@@ -976,7 +974,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // Eventually, the master for a partition set will need to be able to dedupe
     // FragmentResponses from its replicas.
-    public void handleFragmentResponseMessage(FragmentResponseMessage message)
+    private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
@@ -1023,7 +1021,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
-    public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
+    private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
@@ -1059,10 +1057,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
             queueOrOfferMPTask(task);
+        } else {
+            // Generate a dummy response message when this site has not seen previous FragmentTaskMessage,
+            // the leader may have started to wait for replicas' response messages.
+            // This can happen in the early phase of site rejoin before replica receiving the snapshot initiation,
+            // it also means this CompleteTransactionMessage message will be dropped because it's after snapshot.
+            final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
+            resp.m_sourceHSId = m_mailbox.getHSId();
+            handleCompleteTransactionResponseMessage(resp);
         }
     }
 
-    public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
+    private void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
     {
         final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
         DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
@@ -1104,7 +1110,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * Should only receive these messages at replicas, when told by the leader
      */
-    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    private void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
         //call the internal log write with the provided SP handle and wait for the fault log IO to complete
         SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
@@ -1142,7 +1148,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void handleDumpMessage()
+    private void handleDumpMessage()
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         hostLog.warn("State dump for site: " + who);
@@ -1337,6 +1343,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    // This is for test only
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
         m_defaultConsistencyReadLevel = readLevel;
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {

@@ -26,7 +26,6 @@ import java.util.Set;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -201,7 +200,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            endKeys.add((AbstractExpression)ae.getRight().clone());
+            endKeys.add(ae.getRight().clone());
         }
 
         int indexSize = 0;
@@ -345,28 +344,19 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
-        stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
+        stringer.keySymbolValuePair(Members.LOOKUP_TYPE.name(), m_lookupType.toString());
+        stringer.keySymbolValuePair(Members.END_TYPE.name(), m_endType.toString());
+        stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
 
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if ( m_endkeyExpressions.isEmpty()) {
-            stringer.value(null);
-        } else {
-            stringer.array();
-            for (AbstractExpression ae : m_endkeyExpressions) {
-                assert (ae instanceof JSONString);
-                stringer.value(ae);
-            }
-            stringer.endArray();
+            stringer.valueNull();
+        }
+        else {
+            stringer.array(m_endkeyExpressions);
         }
 
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
+        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
 
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
