@@ -253,8 +253,8 @@ public final class InvocationDispatcher {
      * Populate the map in the background and it will be used to route
      * requests to local replicas once the info is available
      */
-    public void asynchronouslyDetermineLocalReplicas() {
-        VoltDB.instance().getSES(false).submit(new Runnable() {
+    public Future<?> asynchronouslyDetermineLocalReplicas() {
+        return VoltDB.instance().getSES(false).submit(new Runnable() {
 
             @Override
             public void run() {
