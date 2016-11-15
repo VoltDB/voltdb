@@ -456,6 +456,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_initiateTaskBuffer == null) {
             m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
         }
+        else {
+            m_initiateTaskBuffer.position(0);
+            m_initiateTaskBuffer.limit(initiateTask.getSerializedSize());
+        }
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
             m_initiateTaskBuffer.flip();
