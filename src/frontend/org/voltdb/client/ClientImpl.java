@@ -708,6 +708,7 @@ public final class ClientImpl implements Client {
         boolean m_useAdminPort = false;
         boolean m_adminPortChecked = false;
         boolean m_connectionSuccess = false;
+        AtomicInteger connectionTaskCount = new AtomicInteger(0);
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -789,7 +790,6 @@ public final class ClientImpl implements Client {
                         (host != null) ? host.m_clientPort : -1, status);
             }
         }
-
         void retryConnectionCreationIfNeeded(int failCount) {
             if (failCount == 0) {
                 try {
@@ -797,11 +797,9 @@ public final class ClientImpl implements Client {
                 } catch (Exception e) {
                     nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
                 }
-            } else {
-                try {
-                    Thread.sleep(10000);
-                } catch (InterruptedException e) { }
-                createConnectionsUponTopologyChange();
+            } else if (connectionTaskCount.get() < 2) {
+                //if there are tasks in the queue, do not need schedule again since all the tasks do the same job
+                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), 10, TimeUnit.SECONDS);
             }
         }
 
@@ -810,14 +808,17 @@ public final class ClientImpl implements Client {
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            m_ex.execute(new CreateConnectionTask(this));
+            m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
         }
     }
 
     class CreateConnectionTask implements Runnable {
         final InternalClientStatusListener listener;
-        public CreateConnectionTask(InternalClientStatusListener listener) {
+        final AtomicInteger connectionTaskCount;
+        public CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
             this.listener = listener;
+            this.connectionTaskCount = connectionTaskCount;
+            connectionTaskCount.incrementAndGet();
         }
         @Override
         public void run() {
@@ -844,6 +845,7 @@ public final class ClientImpl implements Client {
                 listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 failCount++;
             } finally {
+                connectionTaskCount.decrementAndGet();
                 listener.retryConnectionCreationIfNeeded(failCount);
             }
         }
