@@ -2266,6 +2266,10 @@ ul.helpSchemaList {
         font: 15px Arial, Helvetica, sans-serif;
     }
 
+.tableL2 {margin-bottom: 10px !important;}
+.primaryrow2 td:nth-child(2){
+     word-break: break-all;}
+
 .VDBQueryHelp {
 }
 
