@@ -77,7 +77,7 @@ def get_stats(runner, component):
         response = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
                                     voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0])
         status = response.status()
-        if status <> 1 and "timeout" in response.statusString:
+        if status <> 1 and "timeout" in response.response.statusString:
             if retry == 0:
                 runner.error("Unable to collect %s statistics from the cluster" % component)
             else:
@@ -235,6 +235,7 @@ def check_importer(runner):
 
 def check_dr_consumer(runner):
      runner.info('Completing outstanding DR consumer transactions...')
+     start = time.time()
      while True:
         resp = get_stats(runner, 'DRCONSUMER')
         outstanding = 0
@@ -250,6 +251,10 @@ def check_dr_consumer(runner):
                 runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
+        timelast = time.time() - start
+        #if the DR consumer stats are not cleaned in 15 min, return and warn user
+        if timelast > 900 :
+            raise TimeoutException('There are outstanding DR consumer transactions to be drained.')
         time.sleep(1)
 
 def check_command_log(runner):
@@ -273,3 +278,7 @@ def check_command_log(runner):
             return
         runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         time.sleep(1)
+
+class TimeoutException:
+    def __init__(self, message):
+        self.message = message
