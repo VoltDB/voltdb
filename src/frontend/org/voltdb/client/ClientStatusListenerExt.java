@@ -37,6 +37,18 @@ public class ClientStatusListenerExt {
     }
 
     /**
+     * Cause of the connection creation failure.
+     */
+    public static enum AutoConnectionStatus {
+        /**creation success*/
+        SUCCESS,
+        /**fail to creat */
+        UNABLE_TO_CONNECT,
+        /**could not get topology*/
+        UNABLE_TO_QUERY_TOPOLOGY;
+    }
+
+    /**
      * Notify listeners that a connection to a host was lost.
      * @param hostname Name of the host the connection was lost from.
      * @param port Port number of the connection to the lost host.
@@ -50,14 +62,11 @@ public class ClientStatusListenerExt {
      * When both client affinity and topology aware are enabled, connections to newly joined nodes or other unconnected nodes
      * within the cluster will be created. This method will be invoked to notify the client upon a new connection is created.
      * Client can override this method to keep track of the connections
-     * @param e The reason that the creation fails
      * @param hostname Name of the host the connection was created.
-     * @param ip  The IP address
      * @param port Port number of the connection to the node.
-     * @param status The creation status {@link ClientResponse}
-     * @param e The reason that the creation fails
+     * @param status The creation status
      */
-    public void connectionCreated(String hostname, String ip, int port, byte status, Throwable e) {}
+    public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {}
 
     /**
      * Called by the client API whenever backpressure starts/stops. Backpressure is a condition

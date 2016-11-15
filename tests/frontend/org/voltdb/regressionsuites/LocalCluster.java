@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Random;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -742,7 +743,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
                 }
-                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
+                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE, true);
             }
             catch (IOException ioe) {
                 throw new RuntimeException(ioe);
@@ -921,7 +922,7 @@ public class LocalCluster extends VoltServerConfig {
         m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getPath());
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, StartAction startAction)
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, StartAction startAction, boolean waitForReady)
     throws IOException {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -1090,7 +1091,7 @@ public class LocalCluster extends VoltServerConfig {
             assert (false);
         }
 
-        if (startAction == StartAction.JOIN || startAction == StartAction.PROBE) {
+        if (waitForReady && (startAction == StartAction.JOIN || startAction == StartAction.PROBE)) {
             waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
         }
 
@@ -1136,11 +1137,31 @@ public class LocalCluster extends VoltServerConfig {
             if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                 initLocalServer(hostId, true);
             }
-            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN);
+            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true);
         }
         catch (IOException ioe) {
             throw new RuntimeException(ioe);
         }
+    }
+
+    /**
+     * join multiple nodes to the cluster
+     * @param hostIds a set of new host ids
+     */
+    public void join(Set<Integer> hostIds) {
+        m_pipes.clear();
+        for (int hostId : hostIds) {
+            try {
+                if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                    initLocalServer(hostId, true);
+                }
+                startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, false);
+            }
+            catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+            }
+        }
+        waitForAllReady();
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {

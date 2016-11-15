@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -75,6 +78,8 @@ public final class ClientImpl implements Client {
     private int m_passwordHashCode = 0;
     final InternalClientStatusListener m_listener = new InternalClientStatusListener();
     ClientStatusListenerExt m_clientStatusListener = null;
+
+    private ScheduledExecutorService m_ex = null;
     /*
      * Username and password as set by the constructor.
      */
@@ -132,6 +137,9 @@ public final class ClientImpl implements Client {
         }
         m_username = username;
         m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
+        if (config.m_topologyChangeAware) {
+            m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+        }
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -612,6 +620,10 @@ public final class ClientImpl implements Client {
             m_reconnectStatusListener.close();
         }
 
+        if (m_ex != null) {
+            m_ex.shutdown();
+            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        }
         m_distributer.shutdown();
         ClientFactory.decreaseClientNum();
     }
@@ -695,6 +707,8 @@ public final class ClientImpl implements Client {
 
         boolean m_useAdminPort = false;
         boolean m_adminPortChecked = false;
+        boolean m_connectionSuccess = false;
+        AtomicInteger connectionTaskCount = new AtomicInteger(0);
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -766,16 +780,26 @@ public final class ClientImpl implements Client {
         }
 
         /**
-         * notify client upon a connection to a host is created.
+         * notify client upon a connection creation failure.
          * @param host HostConfig with IP address and port
          * @param status The status of connection creation
-         * @param e The reason that a connection to the host fails to be created.
          */
-        void nofifyClientConnectionCreation(HostConfig host, byte status, Throwable e) {
+        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
             if (m_clientStatusListener != null) {
                 m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
-                        (host != null) ? host.m_ipAddress : "",
-                        (host != null) ? host.m_clientPort : -1, status, e);
+                        (host != null) ? host.m_clientPort : -1, status);
+            }
+        }
+        void retryConnectionCreationIfNeeded(int failCount) {
+            if (failCount == 0) {
+                try {
+                    m_distributer.setCreateConnectionsUponTopologyChangeComplete();
+                } catch (Exception e) {
+                    nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                }
+            } else if (connectionTaskCount.get() < 2) {
+                //if there are tasks in the queue, do not need schedule again since all the tasks do the same job
+                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), 10, TimeUnit.SECONDS);
             }
         }
 
@@ -784,59 +808,48 @@ public final class ClientImpl implements Client {
          * and make connections
          */
         public void createConnectionsUponTopologyChange() {
-            m_distributer.getExecutorService().execute(new Runnable() {
-                @Override
-                public void run() {
-                    try{
-                        ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
-                        if (resp.getStatus() == ClientResponse.SUCCESS) {
-                            Map<Integer, HostConfig> hosts = buildUnconnectedHostConfigMap(resp.getResults()[0]);
-                            for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
-                                HostConfig config = entry.getValue();
-                                try {
-                                    connectToOneServerWithRetry(config.m_ipAddress,config.getPort(m_useAdminPort));
-                                    nofifyClientConnectionCreation(config, ClientResponse.SUCCESS, null);
-                                } catch (IOException e) {
-                                    nofifyClientConnectionCreation(config, ClientResponse.SERVER_UNAVAILABLE, e);
-                                }
-                            }
-                            m_distributer.updateClientAffinityPartitionsUponTopoChange();
-                        } else {
-                            nofifyClientConnectionCreation(null, resp.getStatus(), null);
-                        }
-                    } catch (Exception e) {
-                        nofifyClientConnectionCreation(null, ClientResponse.SERVER_UNAVAILABLE, e);
-                    }
-                }
-            });
-        }
-
-        /**
-         * Connect to a single server with retry. Limited exponential back off.
-         * if it's not able to connect.
-         * @param ipAddress host IP
-         * @param port port
-         */
-        private void connectToOneServerWithRetry(String ipAddress, int port) throws Exception {
-            long sleep = 1000;
-            final long maxSleep = 30000;
-            while (true) {
-                try {
-                    createConnection(ipAddress, port);
-                    break;
-                } catch (Exception e) {
-                    try { Thread.sleep(sleep);
-                    } catch (Exception ignored) { }
-                    if (sleep < maxSleep) {
-                        sleep = Math.min(sleep + sleep, maxSleep);
-                    } else {
-                        throw e;
-                    }
-                }
-            }
+            m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
         }
     }
 
+    class CreateConnectionTask implements Runnable {
+        final InternalClientStatusListener listener;
+        final AtomicInteger connectionTaskCount;
+        public CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+            this.listener = listener;
+            this.connectionTaskCount = connectionTaskCount;
+            connectionTaskCount.incrementAndGet();
+        }
+        @Override
+        public void run() {
+            int failCount = 0;
+            try {
+                ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
+                if (resp.getStatus() == ClientResponse.SUCCESS) {
+                    Map<Integer, HostConfig> hosts = listener.buildUnconnectedHostConfigMap(resp.getResults()[0]);
+                    for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
+                        HostConfig config = entry.getValue();
+                        try {
+                            createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
+                        } catch (Exception e) {
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            failCount++;
+                        }
+                    }
+                } else {
+                    listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    failCount++;
+                }
+            } catch (Exception e) {
+                listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                failCount++;
+            } finally {
+                connectionTaskCount.decrementAndGet();
+                listener.retryConnectionCreationIfNeeded(failCount);
+            }
+        }
+    }
      /****************************************************
                         Implementation
      ****************************************************/
