@@ -17,7 +17,6 @@
 
 package org.voltcore.network;
 
-import org.voltdb.common.Constants;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
-    private static AtomicLong m_globalConnectionCounter = new AtomicLong(0);
+    private static final AtomicLong m_globalConnectionCounter = new AtomicLong(0);
 
     /** The distinct exception class allows better logging of these unexpected errors. */
     class BadMessageLength extends IOException {
@@ -41,8 +40,9 @@ public abstract class VoltProtocolHandler implements InputHandler {
     private final long m_connectionId;
     private int m_nextLength;
 
-    private static int MAX_MESSAGE_LENGTH = 52428800;
-    private ByteBuffer m_sslHeaderBuff = ByteBuffer.allocate(5);
+    private static final int MAX_MESSAGE_LENGTH = 52428800;
+    private final ByteBuffer m_sslHeaderBuff = ByteBuffer.allocate(5);
+    private final byte[] m_twoBytes = new byte[2];
 
     public VoltProtocolHandler() {
         m_sequenceId = 0;
@@ -89,17 +89,14 @@ public abstract class VoltProtocolHandler implements InputHandler {
 
     @Override
     public boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer) {
-        if (m_nextLength == 0) {
-            if (inputStream.dataAvailable() >= 5) {
-                inputStream.getBytes(m_sslHeaderBuff);
-                m_sslHeaderBuff.position(3);
-                m_nextLength = (int) m_sslHeaderBuff.getShort();
-                m_sslHeaderBuff.flip();
-            } else {
-                return false;
-            }
+        if (m_nextLength == 0 && inputStream.dataAvailable() >= 5) {
+            inputStream.getBytes(m_sslHeaderBuff);
+            m_sslHeaderBuff.position(3);
+            m_sslHeaderBuff.get(m_twoBytes);
+            m_nextLength = ((m_twoBytes[0] & 0xff) << 8) | (m_twoBytes[1] & 0xff);
+            m_sslHeaderBuff.flip();
         }
-        if (inputStream.dataAvailable() >= m_nextLength) {
+        if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
             buffer.clear();
             buffer.limit(m_nextLength + 5);
             buffer.put(m_sslHeaderBuff);
@@ -108,9 +105,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
             m_nextLength = 0;
             m_sequenceId++;
             return true;
-        } else {
-            return false;
         }
+        return false;
     }
 
     @Override
