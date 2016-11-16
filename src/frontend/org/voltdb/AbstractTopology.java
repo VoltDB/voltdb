@@ -39,9 +39,24 @@ import org.json_voltpatches.JSONStringer;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Sets;
 
 public class AbstractTopology {
 
+    //Topology JSON keys
+    public final static String TOPO_PARTITIONS = "partitions";
+    public final static String TOPO_PARTITION_ID = "partition_id";
+    public final static String TOPO_MASTER = "master";
+    public final static String TOPO_REPLICA = "replicas";
+    public final static String TOPO_HOST_ID = "host_id";
+    public final static String TOPO_KFACTOR = "kfactor";
+    public final static String TOPO_VERSION = "version";
+    public final static String TOPO_HAGROUPS = "haGroups";
+    public final static String TOPO_HAGROUP = "haGroup";
+    public final static String TOPO_HOSTS = "hosts";
+    public final static String TOPO_HOST = "host";
+    public final static String TOPO_SPH = "targetSiteCount";
     public final long version;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
@@ -54,32 +69,32 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    public static class Partition {
+    public static class Partition implements Comparable<Partition>{
         public final int id;
         public final int k;
         public final int leaderHostId;
-        public final ImmutableSet<Integer> hostIds;
+        public final ImmutableSortedSet<Integer> hostIds;
 
         private Partition(int id, int k, int leaderHostId, Collection<Integer> hostIds) {
             this.id = id;
             this.k = k;
             this.leaderHostId = leaderHostId;
-            this.hostIds = ImmutableSet.copyOf(hostIds);
+            this.hostIds = ImmutableSortedSet.copyOf(hostIds);
             assert(k >= 0);
         }
 
         @Override
         public String toString() {
             String[] hostIdStrings = hostIds.stream().map(id -> String.valueOf(id)).toArray(String[]::new);
-            return String.format("Partition %d (leader %d, hosts %)", id, leaderHostId, String.join(",", hostIdStrings));
+            return String.format("Partition %d (leader %d, hosts %s)", id, leaderHostId, String.join(",", hostIdStrings));
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
-            stringer.key("id").value(id);
-            stringer.key("k").value(k);
-            stringer.key("leaderHostId").value(leaderHostId);
-            stringer.key("hostIds").array();
+            stringer.key(TOPO_PARTITION_ID).value(id);
+            stringer.key(TOPO_KFACTOR).value(k);
+            stringer.key(TOPO_MASTER).value(leaderHostId);
+            stringer.key(TOPO_REPLICA).array();
             for (Integer hostId : hostIds) {
                 stringer.value(hostId);
             }
@@ -88,27 +103,32 @@ public class AbstractTopology {
         }
 
         private static Partition fromJSON(JSONObject json) throws JSONException {
-            int id = json.getInt("id");
-            int k = json.getInt("k");
-            int leaderHostId = json.getInt("leaderHostId");
+            int id = json.getInt(TOPO_PARTITION_ID);
+            int k = json.getInt(TOPO_KFACTOR);
+            int leaderHostId = json.getInt(TOPO_MASTER);
 
             List<Integer> mutableHostIds = new ArrayList<>();
-            JSONArray jsonHostIds = json.getJSONArray("hostIds");
+            JSONArray jsonHostIds = json.getJSONArray(TOPO_REPLICA);
             for (int i = 0; i < jsonHostIds.length(); i++) {
                 mutableHostIds.add(jsonHostIds.getInt(i));
             }
             return new Partition(id, k, leaderHostId, mutableHostIds);
         }
+
+        @Override
+        public int compareTo(Partition o) {
+            return (this.id - o.id);
+        }
     }
 
-    public static class HAGroup {
+    public static class HAGroup implements Comparable<HAGroup> {
         public final String token;
-        public final ImmutableSet<Integer> hostIds;
+        public final ImmutableSortedSet<Integer> hostIds;
 
         private HAGroup(String token, int[] hostIds) {
             this.token = token;
             Integer[] hostIdsInteger = ArrayUtils.toObject(hostIds);
-            this.hostIds = ImmutableSet.copyOf(hostIdsInteger);
+            this.hostIds = ImmutableSortedSet.copyOf(hostIdsInteger);
         }
 
         @Override
@@ -120,7 +140,7 @@ public class AbstractTopology {
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
             stringer.key("token").value(token);
-            stringer.key("hostIds").array();
+            stringer.key(TOPO_HOST).array();
             for (int hostId : hostIds) {
                 stringer.value(hostId);
             }
@@ -130,20 +150,25 @@ public class AbstractTopology {
 
         private static HAGroup fromJSON(JSONObject json) throws JSONException {
             String token = json.getString("token");
-            JSONArray jsonHosts = json.getJSONArray("hostIds");
+            JSONArray jsonHosts = json.getJSONArray(TOPO_HOST);
             int[] hostIds = new int[jsonHosts.length()];
             for (int i = 0; i < jsonHosts.length(); i++) {
                 hostIds[i] = jsonHosts.getInt(i);
             }
             return new HAGroup(token, hostIds);
         }
+
+        @Override
+        public int compareTo(HAGroup o) {
+            return this.token.compareTo(o.token);
+        }
     }
 
-    public static class Host {
+    public static class Host implements Comparable<Host> {
         public final int id;
         public final int targetSiteCount;
         public final HAGroup haGroup;
-        public final ImmutableSet<Partition> partitions;
+        public final ImmutableSortedSet<Partition> partitions;
 
         private Host(int id, int targetSiteCount, HAGroup haGroup, Collection<Partition> partitions) {
             assert(id >= 0);
@@ -155,7 +180,7 @@ public class AbstractTopology {
             this.id = id;
             this.targetSiteCount = targetSiteCount;
             this.haGroup = haGroup;
-            this.partitions = ImmutableSet.copyOf(partitions);
+            this.partitions = ImmutableSortedSet.copyOf(partitions);
         }
 
         public List<Integer> getSortedPartitionIdList() {
@@ -168,16 +193,16 @@ public class AbstractTopology {
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
-            return String.format("Host %d tsph:%d ha:%s (Partitions %s)",
+            return String.format("Host %d sph:%d ha:%s (Partitions %s)",
                     id, targetSiteCount, haGroup.token, String.join(",", partitionIdStrings));
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
-            stringer.key("id").value(id);
-            stringer.key("targetSiteCount").value(targetSiteCount);
-            stringer.key("haGroup").value(haGroup.token);
-            stringer.key("partitions").array();
+            stringer.key(TOPO_HOST_ID).value(id);
+            stringer.key(TOPO_SPH).value(targetSiteCount);
+            stringer.key(TOPO_HAGROUP).value(haGroup.token);
+            stringer.key(TOPO_PARTITIONS).array();
             for (Partition partition : partitions) {
                 stringer.value(partition.id);
             }
@@ -191,17 +216,22 @@ public class AbstractTopology {
                 final Map<Integer, Partition> partitionsById)
                         throws JSONException
         {
-            int id = json.getInt("id");
-            int targetSiteCount = json.getInt("targetSiteCount");
-            String haGroupToken = json.getString("haGroup");
+            int id = json.getInt(TOPO_HOST_ID);
+            int targetSiteCount = json.getInt(TOPO_SPH);
+            String haGroupToken = json.getString(TOPO_HAGROUP);
             HAGroup haGroup = haGroupsByToken.get(haGroupToken);
-            JSONArray jsonPartitions = json.getJSONArray("partitions");
+            JSONArray jsonPartitions = json.getJSONArray(TOPO_PARTITIONS);
             ArrayList<Partition> partitions = new ArrayList<>();
             for (int i = 0; i < jsonPartitions.length(); i++) {
                 int partitionId = jsonPartitions.getInt(i);
                 partitions.add(partitionsById.get(partitionId));
             }
             return new Host(id, targetSiteCount, haGroup, partitions);
+        }
+
+        @Override
+        public int compareTo(Host o) {
+            return (this.id - o.id);
         }
     }
 
@@ -231,23 +261,28 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    private static class MutablePartition {
+    private static class MutablePartition implements Comparable<MutablePartition> {
         final int id;
         final int k;
-        final Set<MutableHost> hosts = new HashSet<>();
+        final Set<MutableHost> hosts = new TreeSet<>();
         MutableHost leader = null;
 
         MutablePartition(int id, int k) {
             this.id = id;
             this.k = k;
         }
+
+        @Override
+        public int compareTo(MutablePartition o) {
+            return (id - o.id);
+        }
     }
 
-    private static class MutableHost {
+    private static class MutableHost implements Comparable<MutableHost> {
         final int id;
         int targetSiteCount;
         HAGroup haGroup;
-        Set<MutablePartition> partitions = new HashSet<MutablePartition>();
+        Set<MutablePartition> partitions = new TreeSet<MutablePartition>();
 
         MutableHost(int id, int targetSiteCount, HAGroup haGroup) {
             this.id = id;
@@ -262,6 +297,11 @@ public class AbstractTopology {
         /** Count the number of partitions that consider this host a leader */
         int leaderCount() {
             return (int) partitions.stream().filter(p -> p.leader == this).count();
+        }
+
+        @Override
+        public int compareTo(MutableHost o) {
+            return (id - o.id);
         }
     }
 
@@ -299,8 +339,11 @@ public class AbstractTopology {
      * @param k
      * @return
      */
-    public static String validateLegacyClusterConfig(int hostCount, int sitesPerHost, int k) {
-        int totalSites = sitesPerHost * hostCount;
+    public static String validateLegacyClusterConfig(int hostCount, Map<Integer, Integer> sitesPerHostMap, int k) {
+        int totalSites = 0;
+        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
+            totalSites += entry.getValue();
+        }
 
         if (hostCount <= k) {
             return "Not enough nodes to ensure K-Safety.";
@@ -343,7 +386,7 @@ public class AbstractTopology {
                 .collect(Collectors.toMap(hd -> hd.hostId, hd -> hd));
 
         // build the full set of immutable hosts, using the HAGroups
-        Set<Host> fullHostSet = new HashSet<>();
+        Set<Host> fullHostSet = new TreeSet<>();
         for (HAGroup haGroup : haGroups) {
             for (int hostId : haGroup.hostIds) {
                 Host currentHost = currentTopology.hostsById.get(hostId);
@@ -359,7 +402,6 @@ public class AbstractTopology {
                 fullHostSet.add(newHost);
             }
         }
-
         return new AbstractTopology(currentTopology.version + 1, fullHostSet);
     }
 
@@ -428,9 +470,9 @@ public class AbstractTopology {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances = new HashMap<>();
+        Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances = new TreeMap<>();
         for (HAGroup haGroup1 : haGroups) {
-            Map<HAGroup, Integer> distances = new HashMap<>();
+            Map<HAGroup, Integer> distances = new TreeMap<>();
             haGroupDistances.put(haGroup1, distances);
             for (HAGroup haGroup2 : haGroups) {
                 int distance = computeHADistance(haGroup1.token, haGroup2.token);
@@ -574,6 +616,45 @@ public class AbstractTopology {
                 mutablePartitionMap);
     }
 
+    public static AbstractTopology mutateAddReplicaSite(AbstractTopology topology, int hostId, int partitionId) {
+
+        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
+        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
+
+        // create mutable hosts without partitions
+        for (Host host : topology.hostsById.values()) {
+            int sph = host.targetSiteCount;
+            if (host.id == hostId) {
+                assert(host.partitions.stream().filter(p->p.id == partitionId).collect(Collectors.toList()).isEmpty());
+                sph++;
+            }
+            final MutableHost mutableHost = new MutableHost(host.id, sph, host.haGroup);
+            mutableHostMap.put(host.id, mutableHost);
+        }
+
+        for (Partition partition : topology.partitionsById.values()) {
+            int k = partition.k;
+            if (partition.id == partitionId) {
+                assert(!(partition.hostIds.contains(hostId)));
+                k++;
+            }
+            MutablePartition mp = new MutablePartition(partition.id, k);
+            mutablePartitionMap.put(mp.id, mp);
+            for (Integer hId : partition.hostIds) {
+                final MutableHost mutableHost = mutableHostMap.get(hId);
+                mp.hosts.add(mutableHost);
+                mutableHost.partitions.add(mp);
+            }
+            mp.leader = mutableHostMap.get(partition.leaderHostId);
+            if (partition.id == partitionId) {
+                final MutableHost mutableHost = mutableHostMap.get(hostId);
+                mp.hosts.add(mutableHost);
+                mutableHost.partitions.add(mp);
+            }
+        }
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+    }
+
     /**
      * Get the total number of missing replicas across all partitions.
      * Note this doesn't say how many partitions are under-represented.
@@ -714,13 +795,12 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    public String topologyToJSON() throws JSONException {
+    public JSONObject topologyToJSON() throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
 
-        stringer.key("version").value(version);
-
-        stringer.key("haGroups").array();
+        stringer.keySymbolValuePair(TOPO_VERSION, version);
+        stringer.key(TOPO_HAGROUPS).array();
         List<HAGroup> haGroups = hostsById.values().stream()
                 .map(h -> h.haGroup)
                 .distinct()
@@ -730,13 +810,13 @@ public class AbstractTopology {
         }
         stringer.endArray();
 
-        stringer.key("partitions").array();
+        stringer.key(TOPO_PARTITIONS).array();
         for (Partition partition : partitionsById.values()) {
             partition.toJSON(stringer);
         }
         stringer.endArray();
 
-        stringer.key("hosts").array();
+        stringer.key(TOPO_HOSTS).array();
         for (Host host : hostsById.values()) {
             host.toJSON(stringer);
         }
@@ -744,7 +824,7 @@ public class AbstractTopology {
 
         stringer.endObject();
 
-        return new JSONObject(stringer.toString()).toString(4);
+        return new JSONObject(stringer.toString());
     }
 
     public static AbstractTopology topologyFromJSON(String jsonTopology) throws JSONException {
@@ -757,21 +837,21 @@ public class AbstractTopology {
         Map<String, HAGroup> haGroupsByToken = new TreeMap<>();
         List<Host> hosts = new ArrayList<>();
 
-        long version = jsonTopology.getLong("version");
+        long version = jsonTopology.getLong(TOPO_VERSION);
 
-        JSONArray haGroupsJSON = jsonTopology.getJSONArray("haGroups");
+        JSONArray haGroupsJSON = jsonTopology.getJSONArray(TOPO_HAGROUPS);
         for (int i = 0; i < haGroupsJSON.length(); i++) {
             HAGroup haGroup = HAGroup.fromJSON(haGroupsJSON.getJSONObject(i));
             haGroupsByToken.put(haGroup.token, haGroup);
         }
 
-        JSONArray partitionsJSON = jsonTopology.getJSONArray("partitions");
+        JSONArray partitionsJSON = jsonTopology.getJSONArray(TOPO_PARTITIONS);
         for (int i = 0; i < partitionsJSON.length(); i++) {
             Partition partition = Partition.fromJSON(partitionsJSON.getJSONObject(i));
             partitionsById.put(partition.id, partition);
         }
 
-        JSONArray hostsJSON = jsonTopology.getJSONArray("hosts");
+        JSONArray hostsJSON = jsonTopology.getJSONArray(TOPO_HOSTS);
         for (int i = 0; i < hostsJSON.length(); i++) {
             Host host = Host.fromJSON(hostsJSON.getJSONObject(i), haGroupsByToken, partitionsById);
             hosts.add(host);
@@ -1222,5 +1302,72 @@ public class AbstractTopology {
             }
 
         } while (foundAMove);
+    }
+
+    public static AbstractTopology getTopology(
+            Map<Integer, Integer> sitesPerHostMap,
+            Map<Integer, String> hostGroups,
+            int kfactor)
+    {
+        // host descriptions
+        HostDescription [] hosts = new HostDescription[sitesPerHostMap.size()];
+        int i = 0;
+        for (Map.Entry<Integer, Integer> e : sitesPerHostMap.entrySet()) {
+            int hostId = e.getKey();
+            int sitesCount = e.getValue();
+            hosts[i++] = new HostDescription(hostId, sitesCount, hostGroups.get(hostId));
+        }
+        // partition descriptions
+        int totalSites = 0;
+        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
+            totalSites += entry.getValue();
+        }
+        int partitionCount = totalSites / (kfactor + 1);
+        PartitionDescription[] partitions = new PartitionDescription[partitionCount];
+        for (int j = 0; j < partitionCount; j++) {
+            partitions[j] = new PartitionDescription(kfactor);
+        }
+
+        // get topology
+        AbstractTopology abstractTopo =
+                AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hosts);
+        abstractTopo = AbstractTopology.mutateAddPartitionsToEmptyHosts( abstractTopo, partitions);
+
+        return abstractTopo;
+    }
+
+    public int getHostCount() {
+        return hostsById.size();
+    }
+
+    public int getPartitionCount() {
+        return partitionsById.size();
+    }
+
+    /**
+     * get all the hostIds in the partition group where the host with the given host id belongs
+     * @param hostId the given hostId
+     * @return all the hostIds in the partition group
+     */
+    public Set<Integer> getPartitionGroupHostIds(int hostId) {
+        Set<Integer> partitionGroupHostIds = Sets.newHashSet();
+        for (Integer pid : getPartitionIdList(hostId)) {
+            Partition p = partitionsById.get(pid);
+            if (p != null) {
+                partitionGroupHostIds.addAll(p.hostIds);
+            }
+        }
+        return partitionGroupHostIds;
+    }
+
+    public List<Integer> getPartitionIdList(int hostId) {
+        Host h = hostsById.get(hostId);
+        return (h != null) ? h.getSortedPartitionIdList() : null;
+    }
+
+    public int getReplicationFactor() {
+        //assume all partitions have the same k factor.
+        Partition partition =  partitionsById.values().iterator().next();
+        return partition.k;
     }
 }

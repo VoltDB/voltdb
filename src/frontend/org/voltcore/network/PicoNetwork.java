@@ -280,7 +280,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         /*
          * Drain the write stream
          */
-        if (m_writeStream.swapAndSerializeQueuedWrites(m_pool) != 0) m_hadWork = true;
+        if (m_writeStream.serializeQueuedWrites(m_pool) != 0) m_hadWork = true;
         if (m_writeStream.drainTo(m_sc) > 0) m_hadWork = true;
         if (m_writeStream.isEmpty()) {
             disableWriteSelection();
