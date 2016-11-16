@@ -38,7 +38,7 @@ import org.voltdb.settings.NodeSettings;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
- * System procedures extend VoltSystemProcedure and use its utility methods to
+ * System procedures extend VoltProcedure and use its utility methods to
  * create work in the system. This functionality is not available to standard
  * user procedures (which extend VoltProcedure).
  */

@@ -942,11 +942,11 @@
 
         };
 
-        this.ShutdownClusterState = function (onConnectionAdded) {
+        this.ShutdownClusterState = function (onConnectionAdded, zk_pause_txn_id) {
             try {
                 var processName = "SYSTEMINFORMATION_SHUTDOWNCLUSTER";
                 var procedureNames = ['@Shutdown'];
-                var parameters = [undefined];
+                var parameters = [zk_pause_txn_id];
                 var values = [undefined];
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);

@@ -24,7 +24,7 @@ def check_exporter(runner):
     last_table_stat_time = check_export_stats(runner, export_tables_with_data, last_table_stat_time)
     if last_table_stat_time == 1:
         # there are no outstanding export transactions
-        runner.info('\tAll exporter transactions have been processed.')
+        runner.info('All exporter transactions have been processed.')
         return
     # after 10 seconds notify admin of what transactions have not drained
     notifyInterval = 10
@@ -36,7 +36,7 @@ def check_exporter(runner):
             if last_table_stat_time == 1 or curr_table_stat_time > last_table_stat_time:
                 # have a new sample from table stat cache or there are no tables
                 if not export_tables_with_data:
-                    runner.info('\tAll exporter transactions have been processed.')
+                    runner.info('All exporter transactions have been processed.')
                     return
             notifyInterval -= 1
             if notifyInterval == 0:
@@ -53,7 +53,7 @@ def check_dr_producer(runner):
     dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
     if not partition_min:
         # there are no outstanding export or dr transactions
-        runner.info('\tAll DR producer transactions have been processed.')
+        runner.info('All DR producer transactions have been processed.')
         return
     # after 10 seconds notify admin of what transactions have not drained
     notifyInterval = 10
@@ -63,7 +63,7 @@ def check_dr_producer(runner):
         if partition_min:
             dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
             if not partition_min:
-                runner.info('\tAll DR producer transactions have been processed.')
+                runner.info('All DR producer transactions have been processed.')
                 return
             notifyInterval -= 1
             if notifyInterval == 0:
@@ -204,7 +204,7 @@ def print_export_pending(runner, export_tables_with_data):
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
 
 def check_clients(runner):
-     runner.info('Completing outstanding client transactions.')
+     runner.info('Completing outstanding client transactions...')
      while True:
         resp = get_stats(runner, 'LIVECLIENTS')
         trans = 0
@@ -220,7 +220,7 @@ def check_clients(runner):
         time.sleep(1)
 
 def check_importer(runner):
-     runner.info('Completing outstanding importer requests.')
+     runner.info('Completing outstanding importer requests...')
      while True:
         resp = get_stats(runner, 'IMPORTER')
         outstanding = 0
@@ -247,7 +247,7 @@ def check_dr_consumer(runner):
         for r in resp.table(1).tuples():
             if r[7] <> r[8]:
                 outstanding += 1
-                runner.info('\tPartition %d on host %d has outstanding DR consumer transactions.' %(r[4], r[1]))
+                runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
         time.sleep(1)

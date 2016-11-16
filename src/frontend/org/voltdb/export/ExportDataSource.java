@@ -588,22 +588,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> closeAndDelete() {
-        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
-            @Override
-            public void run() {
-                try {
-                    m_committedBuffers.closeAndDelete();
-                } catch(IOException e) {
-                    exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
-                } finally {
-                    getLocalExecutorService().shutdown();
-                }
-            }
-        };
-        return stashOrSubmitTask(runnable, false, false);
-    }
-
     public long getGeneration() {
         return m_generation;
     }
@@ -656,6 +640,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
+        return stashOrSubmitTask(runnable, false, false);
+    }
+
+    public boolean isClosed() {
+        return m_closed;
+    }
+
+    public ListenableFuture<?> closeAndDelete() {
+        m_closed = true;
+        RunnableWithES runnable = new RunnableWithES("closeAndDelete") {
+            @Override
+            public void run() {
+                try {
+                    m_committedBuffers.closeAndDelete();
+                } catch(IOException e) {
+                    exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
+                } finally {
+                    getLocalExecutorService().shutdown();
+                }
+            }
+        };
         return stashOrSubmitTask(runnable, false, false);
     }
 

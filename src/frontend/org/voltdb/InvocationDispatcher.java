@@ -26,6 +26,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -67,9 +68,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.IndexRef;
-import org.voltdb.catalog.MaterializedViewHandlerInfo;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -83,6 +81,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.jni.ExecutionEngine;
@@ -92,12 +91,11 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -255,8 +253,8 @@ public final class InvocationDispatcher {
      * Populate the map in the background and it will be used to route
      * requests to local replicas once the info is available
      */
-    public void asynchronouslyDetermineLocalReplicas() {
-        VoltDB.instance().getSES(false).submit(new Runnable() {
+    public Future<?> asynchronouslyDetermineLocalReplicas() {
+        return VoltDB.instance().getSES(false).submit(new Runnable() {
 
             @Override
             public void run() {
@@ -814,90 +812,19 @@ public final class InvocationDispatcher {
             // get the view table from the catalog
             Table viewTable = tables.getIgnoreCase(viewName);
             if (viewTable == null) {
-                return unexpectedFailureResponse("Materialized view " + viewName + " does not exist.", task.clientHandle);
+                return unexpectedFailureResponse("View " + viewName + " does not exist.", task.clientHandle);
             }
 
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",       VoltType.STRING),
-                                  new VoltTable.ColumnInfo("RESOLUTION", VoltType.STRING));
-
-            MaterializedViewHandlerInfo mvHandlerInfo = viewTable.getMvhandlerinfo().get("mvHandlerInfo");
-            MaterializedViewInfo mvInfo = null;
-            CatalogMap<Statement> fallBackQueryStmts;
-            List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(viewTable.getColumns(), "index");
-
-            // Is this view single-table?
-            if (mvHandlerInfo == null) {
-                // If this is not a multi-table view, we need to go to its source table for metadata.
-                // (Legacy code for single table view uses a different model and code path)
-                if (viewTable.getMaterializer() == null) {
-                    // If we cannot find view metadata from both locations, this table is not a materialized view.
-                    return unexpectedFailureResponse("Table " + viewName + " is not a materialized view.", task.clientHandle);
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("TASK",           VoltType.STRING),
+                                  new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
+            try {
+                ArrayList<String[]> viewExplanation = ViewExplainer.explain(viewTable);
+                for (String[] row : viewExplanation) {
+                    vt[i].addRow(row[0], row[1]);
                 }
-                mvInfo = viewTable.getMaterializer().getViews().get(viewName);
-                fallBackQueryStmts = mvInfo.getFallbackquerystmts();
             }
-            else {
-                // For multi-table views we need to show the query plan for evaluating joins.
-                Statement createQuery = mvHandlerInfo.getCreatequery().get("createQuery");
-                vt[i].addRow("Join Evaluation",
-                             "Use the following execution plan with built-in delta tables:\n" +
-                             Encoder.hexDecodeToString(createQuery.getExplainplan()));
-                fallBackQueryStmts = mvHandlerInfo.getFallbackquerystmts();
-            }
-            // For each min/max column find out if an execution plan is used.
-            int minMaxAggIdx = 0;
-            for (int j = 0; j < destColumnArray.size(); j++) {
-                Column destColumn = destColumnArray.get(j);
-                ExpressionType aggType = ExpressionType.get(destColumn.getAggregatetype());
-                if (aggType == ExpressionType.AGGREGATE_MIN ||
-                    aggType == ExpressionType.AGGREGATE_MAX) {
-                    Statement fallBackQueryStmt = fallBackQueryStmts.get(String.valueOf(minMaxAggIdx));
-                    // How this min/max will be refreshed?
-                    String resolution = "";
-                    // For single-table views, check if we uses:
-                    // * built-in sequential scan
-                    // * built-in index scan
-                    // * execution plan
-                    if (mvHandlerInfo == null) {
-                        CatalogMap<IndexRef> hardCodedIndicesForSingleTableView = mvInfo.getIndexforminmax();
-                        String hardCodedIndexName = hardCodedIndicesForSingleTableView.get(String.valueOf(minMaxAggIdx)).getName();
-                        // getIndexesused() should give at most one index.
-                        String[] indicesUsedInPlan = fallBackQueryStmt.getIndexesused().split(",");
-                        assert(indicesUsedInPlan.length <= 1);
-                        for (String tableDotIndexPair : indicesUsedInPlan) {
-                            if (tableDotIndexPair.length() == 0) {
-                                continue;
-                            }
-                            String parts[] = tableDotIndexPair.split("\\.", 2);
-                            assert(parts.length == 2);
-                            if (parts.length != 2) {
-                                continue;
-                            }
-                            String indexNameUsedInPlan = parts[1];
-                            if (! indexNameUsedInPlan.equalsIgnoreCase(hardCodedIndexName)) {
-                                resolution = "Use the following execution plan:\n" +
-                                             Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
-                                break;
-                            }
-                        }
-                        // If we do not use execution plan, see which built-in method is used.
-                        if (resolution.equals("")) {
-                            if (hardCodedIndexName.equals("")) {
-                                resolution = "Use built-in sequential scan.";
-                            }
-                            else {
-                                resolution = "Use built-in index scan on index " + hardCodedIndexName + ".";
-                            }
-                        }
-                    }
-                    else {
-                        resolution = "Use the following execution plan:\n" +
-                                     Encoder.hexDecodeToString(fallBackQueryStmt.getExplainplan());
-                    }
-                    vt[i].addRow("Refresh " + (aggType == ExpressionType.AGGREGATE_MIN ? "MIN" : "MAX") +
-                                 " column \"" + destColumn.getName() + "\"", resolution);
-                    minMaxAggIdx++;
-                }
+            catch (Exception e) {
+                return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
             }
         }
 
@@ -1539,91 +1466,91 @@ public final class InvocationDispatcher {
         final ListenableFutureTask<?> ft = ListenableFutureTask.create(new Runnable() {
             @Override
             public void run() {
-                if (result.errorMsg == null) {
-                    if (result instanceof AdHocPlannedStmtBatch) {
-                        final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+                if (result.errorMsg != null) {
+                    ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(
+                                    (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
+                                    new VoltTable[0], result.errorMsg,
+                                    result.clientHandle);
+                    writeResponseToConnection(errorResponse);
+                    return;
+                }
+                Preconditions.checkState(
+                        result instanceof AdHocPlannedStmtBatch || result instanceof CatalogChangeResult,
+                        "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
 
-                        // assume all stmts have the same catalog version
-                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
-                        {
+                if (result instanceof AdHocPlannedStmtBatch) {
+                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                    ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
-                            /* The adhoc planner learns of catalog updates after the EE and the
-                               rest of the system. If the adhoc sql was planned against an
-                               obsolete catalog, re-plan. */
-                            LocalObjectMessage work = new LocalObjectMessage(
-                                    AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+                    // assume all stmts have the same catalog version
+                    if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (!plannedStmtBatch.getPlannedStatement(0).core.wasPlannedAgainstHash(m_catalogContext.get().getCatalogHash())))
+                    {
 
-                            m_mailbox.send(m_plannerSiteId, work);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
-                            processExplainPlannedStmtBatch(plannedStmtBatch);
-                        }
-                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
-                            processExplainDefaultProc(plannedStmtBatch);
-                        }
-                        else {
-                            try {
-                                createAdHocTransaction(plannedStmtBatch, c);
-                            }
-                            catch (VoltTypeException vte) {
-                                String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
-                                writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
-                            }
-                        }
+                        /* The adhoc planner learns of catalog updates after the EE and the
+                           rest of the system. If the adhoc sql was planned against an
+                           obsolete catalog, re-plan. */
+                        LocalObjectMessage work = new LocalObjectMessage(
+                                AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
+
+                        m_mailbox.send(m_plannerSiteId, work);
                     }
-                    else if (result instanceof CatalogChangeResult) {
-                        final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-
-                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
-                            ClientResponseImpl shortcutResponse =
-                                    new ClientResponseImpl(
-                                            ClientResponseImpl.SUCCESS,
-                                            new VoltTable[0], "Catalog update with no changes was skipped.",
-                                            result.clientHandle);
-                            writeResponseToConnection(shortcutResponse);
-                        }
-                        else {
-                            // create the execution site task
-                            StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
-
-                            ClientResponseImpl error = null;
-                            if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
-                                    SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
-                                writeResponseToConnection(error);
-                            }
-                            else {
-                                /*
-                                 * Round trip the invocation to initialize it for command logging
-                                 */
-                                try {
-                                    task = MiscUtils.roundTripForCL(task);
-                                } catch (Exception e) {
-                                    hostLog.fatal(e);
-                                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                                }
-                                // initiate the transaction. These hard-coded values from catalog
-                                // procedure are horrible, horrible, horrible.
-                                createTransaction(changeResult.connectionId,
-                                        task, false, false, false, 0, task.getSerializedSize(),
-                                        System.nanoTime());
-                            }
-                        }
+                    else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                        processExplainPlannedStmtBatch(plannedStmtBatch);
+                    }
+                    else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+                        processExplainDefaultProc(plannedStmtBatch);
                     }
                     else {
-                        throw new RuntimeException(
-                                "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+                        try {
+                            createAdHocTransaction(plannedStmtBatch, c);
+                        }
+                        catch (VoltTypeException vte) {
+                            String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
+                            writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
+                        }
                     }
+                    // early return for @AdHocPlannedStmtBatch case
+                    return;
                 }
-                else {
-                    ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(
-                                (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
-                                new VoltTable[0], result.errorMsg,
-                                result.clientHandle);
-                    writeResponseToConnection(errorResponse);
+
+                // case for @CatalogChangeResult
+                final CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                    ClientResponseImpl shortcutResponse =
+                            new ClientResponseImpl(
+                                    ClientResponseImpl.SUCCESS,
+                                    new VoltTable[0], "Catalog update with no changes was skipped.",
+                                    result.clientHandle);
+                    writeResponseToConnection(shortcutResponse);
+                    return;
                 }
+
+                // create the execution site task
+                StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
+
+                ClientResponseImpl error = null;
+                if ((error = m_permissionValidator.shouldAccept(task.getProcName(), result.user, task,
+                        SystemProcedureCatalog.listing.get(task.getProcName()).asCatalogProcedure())) != null) {
+                    writeResponseToConnection(error);
+                    return;
+                }
+
+                /*
+                 * Round trip the invocation to initialize it for command logging
+                 */
+                try {
+                    task = MiscUtils.roundTripForCL(task);
+                } catch (Exception e) {
+                    hostLog.fatal(e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
+                // initiate the transaction. These hard-coded values from catalog
+                // procedure are horrible, horrible, horrible.
+                createTransaction(changeResult.connectionId,
+                        task, false, false, false, 0, task.getSerializedSize(),
+                        System.nanoTime());
             }
 
             private final void writeResponseToConnection(ClientResponseImpl response) {
@@ -1898,7 +1825,6 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    @SuppressWarnings("unused")
     public  boolean createTransaction(
             final long connectionId,
             final long txnId,
@@ -1923,29 +1849,24 @@ public final class InvocationDispatcher {
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
-
         /*
          * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
          *
          * ReadLevel.SAFE:
-         * Send the read to the partition leader always (reads & writes)
-         *
-         * Someday could support per-transaction consistency for reads.
+         * Send the read to the partition leader only
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
-            }
-            if (initiatorHSId != null) {
                 isShortCircuitRead = true;
+                initiatorHSId = m_localReplicas.get().get(partition);
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
-            //Multi-part transactions go to the multi-part coordinator
+            // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool

@@ -65,7 +65,7 @@ class SqlQueriesTabTest extends SqlQueriesTestBase {
 
        // println(page.getIdOfQueryBox(2))
         when: 'Insert some gibberish in the Query box'
-        $(page.getIdOfQueryBox(2)).value(gibberishQuery)
+        $(page.getIdOfQueryBox(2)).jquery.html(gibberishQuery)
         then: 'Click on Save button'
         $(page.getIdOfSaveButton(2)).click()
 

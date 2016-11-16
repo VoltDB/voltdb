@@ -329,21 +329,17 @@ public class AsyncCompilerAgent {
 
     private void dispatchCatalogChangeWork(CatalogChangeWork work)
     {
-        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
-        if (result.errorMsg != null) {
+        final CatalogChangeResult ccr = m_helper.prepareApplicationCatalogDiff(work);
+        if (ccr.errorMsg != null) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
         }
         // Log something useful about catalog upgrades when they occur.
-        if (result instanceof CatalogChangeResult) {
-            CatalogChangeResult ccr = (CatalogChangeResult)result;
-            if (ccr.upgradedFromVersion != null) {
-                hostLog.info(String.format(
-                            "In order to update the application catalog it was "
-                            + "automatically upgraded from version %s.",
-                            ccr.upgradedFromVersion));
-            }
+        if (ccr.upgradedFromVersion != null) {
+            hostLog.info(String.format("In order to update the application catalog it was "
+                    + "automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
         }
-        work.completionHandler.onCompletion(result);
+        work.completionHandler.onCompletion(ccr);
     }
 
     public static final String AdHocErrorResponseMessage =

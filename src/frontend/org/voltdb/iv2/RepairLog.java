@@ -295,7 +295,7 @@ public class RepairLog
                         TheHashinator.getCurrentVersionedConfigCooked());
         responses.add(hheader);
 
-        int seq = responses.size();
+        int seq = responses.size(); // = 1, as the first sequence
 
         Iterator<Item> itemator = items.iterator();
         while (itemator.hasNext()) {
