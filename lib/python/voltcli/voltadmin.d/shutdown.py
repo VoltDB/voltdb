@@ -51,7 +51,7 @@ def shutdown(runner):
             runner.info('All transactions have been made durable.')
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
-               shutdown_params =  [zk_pause_txnid]
+               shutdown_params = [zk_pause_txnid]
                #save option, check more stats
                try:
                    checkstats.check_dr_consumer(runner)

@@ -252,8 +252,8 @@ def check_dr_consumer(runner):
         if outstanding == 0:
             return
         timelast = time.time() - start
-        #if the DR consumer stats are not cleaned in 15 min, return and warn user
-        if timelast > 900 :
+        #if the DR consumer stats are not cleaned in 2 seconds, return and warn user
+        if timelast > 2 :
             raise TimeoutException('There are outstanding DR consumer transactions to be drained.')
         time.sleep(1)
 
