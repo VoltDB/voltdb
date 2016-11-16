@@ -1556,7 +1556,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void startAcceptingConnections() throws IOException {
-        m_dispatcher.asynchronouslyDetermineLocalReplicas();
+        Future<?> replicaFuture = m_dispatcher.asynchronouslyDetermineLocalReplicas();
 
         /*
          * Periodically check the limit on the number of open files
@@ -1578,6 +1578,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         mayActivateSnapshotDaemon();
         m_notifier.start();
+
+        try {
+            replicaFuture.get();
+        } catch (InterruptedException e) {
+            throw new IOException("Interrupted while determining local replicas",e);
+        } catch (ExecutionException e) {
+            throw new IOException("Failed to determine local replicas", e.getCause());
+        }
 
         m_isAcceptingConnections.compareAndSet(false, true);
     }

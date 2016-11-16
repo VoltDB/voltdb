@@ -56,6 +56,7 @@ public class ClientConfig {
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
+    boolean m_topologyChangeAware = false;
 
 
     final static String getUserNameFromSubject(Subject subject) {
@@ -323,6 +324,15 @@ public class ClientConfig {
      */
     public void setClientAffinity(boolean on) {
         m_useClientAffinity = on;
+    }
+
+    /**
+     * <p>Attempts to connect to all nodes in the cluster</p>
+     * <p>Defaults to false.</p>
+     * @param enabled Enable or disable the topology awareness feature.
+     */
+    public void setTopologyChangeAware(boolean enabled) {
+        m_topologyChangeAware = enabled;
     }
 
     /**
