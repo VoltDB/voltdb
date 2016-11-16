@@ -28,7 +28,6 @@ import java.nio.ByteBuffer;
 public class SSLBufferDecrypter {
 
     private final SSLEngine m_sslEngine;
-    private final ByteBuffer m_srcBuffer;
     private ByteBuffer m_dstBuffer;
     private final ByteBuffer m_partialLength;
     private int m_currentMessageLength;
@@ -36,42 +35,30 @@ public class SSLBufferDecrypter {
 
     public SSLBufferDecrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-        this.m_srcBuffer = ByteBuffer.allocateDirect(Constants.SSL_CHUNK_SIZE + 128);
         this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
         this.m_partialLength = ByteBuffer.allocate(4);
         m_currentMessageLength = -1;
         m_currentMessageStart = -1;
     }
 
-    /**
-     * Returns the read buffer.
-     * @return  The read buffer.
-     */
-    public ByteBuffer getSrcBuffer() {
-        return m_srcBuffer;
-    }
+    public int decrypt(ByteBuffer srcBuffer) throws IOException {
+        srcBuffer.flip();
 
-    public int decrypt() throws IOException {
-        if (m_srcBuffer.position() > 0) {
-            m_srcBuffer.flip();
-
-            // if not in the middle of a message, clear the dst buffer.
-            if (m_currentMessageLength == -1) {
-                m_dstBuffer.clear();
+        // if not in the middle of a message, clear the dst buffer.
+        if (m_currentMessageLength == -1) {
+            m_dstBuffer.clear();
+        } else {
+            // move the current message to the start of the dst buffer.
+            if (m_currentMessageStart != 0) {
+                m_dstBuffer.position(m_currentMessageStart);
+                m_dstBuffer.compact();
+                m_currentMessageStart = 0;
             } else {
-                // move the current message to the start of the dst buffer.
-                if (m_currentMessageStart != 0) {
-                    m_dstBuffer.position(m_currentMessageStart);
-                    m_dstBuffer.compact();
-                    m_currentMessageStart = 0;
-                } else {
-                    m_dstBuffer.limit(m_dstBuffer.capacity());
-                }
+                m_dstBuffer.limit(m_dstBuffer.capacity());
             }
-
-            return unwrap();
         }
-        return 0;
+
+        return unwrap(srcBuffer);
     }
 
     public ByteBuffer message() {
@@ -128,25 +115,20 @@ public class SSLBufferDecrypter {
     }
 
     // returns bytes consumed
-    private int unwrap() throws IOException {
+    private int unwrap(ByteBuffer srcBuffer) throws IOException {
         // save initial state of dst buffer in case of underflow.
         int initialDstPos = m_dstBuffer.position();
-        int initialDstLim = m_dstBuffer.limit();
 
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(m_srcBuffer, m_dstBuffer.slice());
+            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, m_dstBuffer.slice());
             switch (result.getStatus()) {
                 case OK:
-                    if (m_srcBuffer.hasRemaining()) {
-                        m_srcBuffer.compact();
-                    } else {
-                        m_srcBuffer.clear();
-                    }
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
                     m_dstBuffer.limit(m_dstBuffer.position() + result.bytesProduced());
                     return result.bytesConsumed();
                 case BUFFER_OVERFLOW:
-                    // not sure if overflow messes with the pointers, need to check.
+                    // the dst buffer holds partial volt messages, so its state needs to
+                    // be retained on overflow.
                     ByteBuffer tmp = ByteBuffer.allocateDirect(m_dstBuffer.capacity() << 1);
                     m_dstBuffer.position(0);
                     tmp.put(m_dstBuffer);
@@ -154,13 +136,8 @@ public class SSLBufferDecrypter {
                     m_dstBuffer = tmp;
                     break;
                 case BUFFER_UNDERFLOW:
-                    // on underflow, want to read again.  There are unprocessed bytes up to limit.
-                    // reset the buffers to their state prior to the underflow.
-                    m_srcBuffer.position(m_srcBuffer.limit());
-                    m_srcBuffer.limit(m_srcBuffer.capacity());
-                    m_dstBuffer.position(initialDstPos);
-                    m_dstBuffer.limit(initialDstLim);
-                    return 0;
+                    // Should never underflow as we know the size of the incoming frame.
+                    throw new IOException("Unexpected underflow when unwrappling an ssl frame.");
                 case CLOSED:
                     throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
             }

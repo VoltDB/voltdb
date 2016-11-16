@@ -42,6 +42,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
     private int m_nextLength;
 
     private static int MAX_MESSAGE_LENGTH = 52428800;
+    private ByteBuffer m_sslHeaderBuff = ByteBuffer.allocate(5);
 
     public VoltProtocolHandler() {
         m_sequenceId = 0;
@@ -87,12 +88,28 @@ public abstract class VoltProtocolHandler implements InputHandler {
     }
 
     @Override
-    public int fillBufferFromInputStream(NIOReadStream inputStream, ByteBuffer buffer) {
-        if (inputStream.dataAvailable() > 0) {
-            int bytes = inputStream.getBytes(buffer);
-            return bytes;
+    public boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer) {
+        if (m_nextLength == 0) {
+            if (inputStream.dataAvailable() >= 5) {
+                inputStream.getBytes(m_sslHeaderBuff);
+                m_sslHeaderBuff.position(3);
+                m_nextLength = (int) m_sslHeaderBuff.getShort();
+                m_sslHeaderBuff.flip();
+            } else {
+                return false;
+            }
+        }
+        if (inputStream.dataAvailable() >= m_nextLength) {
+            buffer.clear();
+            buffer.limit(m_nextLength + 5);
+            buffer.put(m_sslHeaderBuff);
+            m_sslHeaderBuff.clear();
+            inputStream.getBytes(buffer);
+            m_nextLength = 0;
+            m_sequenceId++;
+            return true;
         } else {
-            return 0;
+            return false;
         }
     }
 

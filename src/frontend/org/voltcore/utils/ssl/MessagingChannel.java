@@ -76,14 +76,14 @@ public class MessagingChannel {
     }
 
     private ByteBuffer readEncrypted() throws IOException {
-        ByteBuffer readBuffer = m_sslBufferDescrypter.getSrcBuffer();
+        m_encBuffer.clear();
         int read;
-        read = m_socketChannel.read(readBuffer);
+        read = m_socketChannel.read(m_encBuffer);
         if (read == -1) {
             throw new IOException("Failed to read message");
         }
         // there will always be a length, need to have more than four bytes to have a message
-        if (read > 4 && m_sslBufferDescrypter.decrypt() > 0) {
+        if (read > 4 && m_sslBufferDescrypter.decrypt(m_encBuffer) > 0) {
             return m_sslBufferDescrypter.message();
         }
         return null;

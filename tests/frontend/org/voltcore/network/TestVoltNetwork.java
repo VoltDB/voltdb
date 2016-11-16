@@ -73,9 +73,9 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
-        public int fillBufferFromInputStream(NIOReadStream inputStream, ByteBuffer buffer) {
+        public boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer) {
             // TODO Auto-generated method stub
-            return 0;
+            return false;
         }
 
         @Override

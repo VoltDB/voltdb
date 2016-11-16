@@ -23,12 +23,12 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
+import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
 
@@ -92,6 +92,7 @@ public class VoltPort implements Connection
 
     private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_sslBufferDecrypter;
+    private final ByteBuffer m_sslSrcBuffer;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
@@ -107,8 +108,15 @@ public class VoltPort implements Connection
         m_pool = pool;
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
-        m_sslEngine = sslEngine;
-        m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
+        if (sslEngine != null) {
+            m_sslEngine = sslEngine;
+            m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
+            m_sslSrcBuffer = ByteBuffer.allocateDirect(Constants.SSL_CHUNK_SIZE + 128);
+        } else {
+            m_sslEngine = null;
+            m_sslBufferDecrypter = null;
+            m_sslSrcBuffer = null;
+        }
     }
 
     /**
@@ -191,13 +199,13 @@ public class VoltPort implements Connection
                                 m_messagesRead++;
                             }
                         } else {
+                            int messageLength;
                             ByteBuffer message;
-                            while ((m_handler.fillBufferFromInputStream( readStream(), m_sslBufferDecrypter.getSrcBuffer() )) > 0) {
-                                while (m_sslBufferDecrypter.decrypt() > 0) {
-                                    while ((message = m_sslBufferDecrypter.message()) != null) {
-                                        m_handler.handleMessage(message, this);
-                                        m_messagesRead++;
-                                    }
+                            while (m_handler.retrieveNextSSLMessage(readStream(), m_sslSrcBuffer)) {
+                                m_sslBufferDecrypter.decrypt(m_sslSrcBuffer);
+                                while ((message = m_sslBufferDecrypter.message()) != null) {
+                                    m_handler.handleMessage(message, this);
+                                    m_messagesRead++;
                                 }
                             }
                         }
