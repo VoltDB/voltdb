@@ -17,15 +17,16 @@
 
 package org.voltcore.utils.ssl;
 
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.security.KeyStore;
-import java.security.SecureRandom;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
@@ -60,14 +61,17 @@ public class SSLConfiguration {
 
     public static SSLContext initializeSslContext(SslConfig sslConfig)
             throws Exception {
-
-        KeyStore ks = KeyStore.getInstance("JKS");
-        ks.load(new FileInputStream(sslConfig.keyStorePath), sslConfig.keyStorePassword.toCharArray());
-        KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-        kmf.init(ks, sslConfig.keyStorePassword.toCharArray());
         SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword),
-                createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword), new SecureRandom());
+        KeyManager[] keyManagers = null;
+        TrustManager[] trustManagers = null;
+        if (sslConfig.keyStorePath != null && sslConfig.keyStorePassword != null) {
+            keyManagers = createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword);
+        }
+        if (sslConfig.trustStorePath != null && sslConfig.trustStorePath != null) {
+            trustManagers = createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+        }
+
+        sslContext.init(keyManagers,trustManagers, new SecureRandom());
         return sslContext;
     }
 
@@ -164,7 +168,8 @@ public class SSLConfiguration {
         }
 
         public boolean isConfigured() {
-            return (keyStorePath != null && keyStorePassword != null && trustStorePath != null && trustStorePassword != null);
+            return (keyStorePath != null && keyStorePassword != null && trustStorePath != null && trustStorePassword != null) ||
+                   (keyStorePath == null && keyStorePassword == null && trustStorePath != null && trustStorePassword != null);
         }
     }
 }
