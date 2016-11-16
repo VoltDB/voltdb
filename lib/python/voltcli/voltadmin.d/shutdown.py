@@ -57,7 +57,7 @@ def shutdown(runner):
                    checkstats.check_dr_consumer(runner)
                except TimeoutException as error:
                    runner.warning(error.message)
-                   runner.warning('The snapshot saved may not contain all the data')
+                   runner.warning('The snapshot saved may not contain all the data.')
                runner.info('Starting resolution of external commitments...')
                checkstats.check_exporter(runner)
                checkstats.check_dr_producer(runner)
