@@ -299,7 +299,7 @@ class FastSerializer:
 
                 for c in pk.cert_chain:
                     write_pem(c[1], "CERTIFICATE", certfile)
-                useKeyAndCert = True
+                use_key_cert = True
             keyfile.close()
             certfile.close()
             if use_key_cert:
