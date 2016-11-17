@@ -4940,10 +4940,20 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
     top: 6px;
     right: 10px;}
 
+
   }
+
+  @media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:portrait)
+   {
+     #a{width:100% !important;}
+   }
+
 @media (width: 1024px)
 {
-.queryInput { width:580px!important; }
+/*.queryInput { width:580px!important; }*/
 .queryStatus {position:relative;top:212px; right:0; padding:0;}
 .blockWrapper h1.theHeading{ padding:0;  }
 .queryResultStyle{position: relative;top: 17px;}
@@ -4952,6 +4962,14 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 
 
 }
+
+@media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:landscape)
+   {
+     .split.split-horizontal{height:99% !important;}
+   }
 
 
 
