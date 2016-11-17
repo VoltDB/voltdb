@@ -1388,6 +1388,8 @@ JAVA COMPILATION
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
             <include name="**/keystore"/>
+            <include name="**/ssl-config"/>
+            <include name="**/ssl-config-invalid"/>
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.testproc.dir}'>

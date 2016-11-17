@@ -44,13 +44,15 @@ public class ClientConfig {
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
     static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
+    private boolean isSslEnable = Boolean.valueOf(System.getenv("Enable_SSL") == null ? "false" : System.getenv("Enable_SSL"));
+    private String m_sslPropsFile;
     final ClientAuthScheme m_hashScheme;
     final String m_username;
     final String m_password;
     final boolean m_cleartext;
     final ClientStatusListenerExt m_listener;
-    final String m_sslPropsFile;
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
@@ -93,7 +95,13 @@ public class ClientConfig {
         m_listener = null;
         m_cleartext = true;
         m_hashScheme = ClientAuthScheme.HASH_SHA256;
-        m_sslPropsFile = null;
+            try {
+                enableSSL();
+            } catch (Exception exc) {
+                System.err.println(exc.getMessage());
+                System.exit(-1);
+            }
+
     }
 
 
@@ -223,6 +231,12 @@ public class ClientConfig {
         m_cleartext = cleartext;
         m_hashScheme = scheme;
         m_sslPropsFile = sslPropsFile;
+        try {
+            enableSSL();
+        } catch (Exception exc) {
+            System.err.println(exc.getMessage());
+            System.exit(-1);
+        }
     }
 
     /**
@@ -460,6 +474,9 @@ public class ClientConfig {
      * Configure ssl from the provided properties file.
      */
     public void enableSSL() throws Exception {
+        if (isSslEnable && m_sslPropsFile == null) {
+            m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
+        }
         if (m_sslPropsFile == null) {
             m_sslContext = null;
             return;

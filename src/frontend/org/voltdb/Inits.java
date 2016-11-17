@@ -479,14 +479,16 @@ public class Inits {
         public void run() {
             SslType sslType = m_deployment.getSsl();
             if (sslType != null && sslType.isEnabled()) {
-                try {
-                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                    m_config.m_sslContextFactory.start();
-                    if (sslType.isExternal()) {
+                if (sslType.isExternal()) {
+                    try {
+                        m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                        m_config.m_sslContextFactory.start();
+                        hostLog.info("Enabled HTTPS.");
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                        hostLog.info("Enabled SSL on admin and client port.");
+                    } catch (Exception e) {
+                        hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
                     }
-                } catch (Exception e) {
-                    hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
                 }
             }
         }
@@ -511,24 +513,25 @@ public class Inits {
             }
             sslContextFactory.setKeyStorePassword(keyStorePassword);
 
-            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-                hostLog.fatal("A path for the SSL truststore file was not specified.");
-                System.exit(-1);
-            }
-            if (! new File(trustStorePath).exists()) {
-                hostLog.fatal("The specified SSL truststore file was not found.");
-                System.exit(-1);
-            }
-            sslContextFactory.setTrustStorePath(trustStorePath);
+            if (sslType.isExternal()) {
+                String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+                if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                    hostLog.fatal("A path for the SSL truststore file was not specified.");
+                    System.exit(-1);
+                }
+                if (! new File(trustStorePath).exists()) {
+                    hostLog.fatal("The specified SSL truststore file was not found.");
+                    System.exit(-1);
+                }
+                sslContextFactory.setTrustStorePath(trustStorePath);
 
-            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-            if (trustStorePassword == null) {
-                hostLog.fatal("An SSL truststore password was not specified.");
-                System.exit(-1);
+                String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+                if (trustStorePassword == null) {
+                    hostLog.fatal("An SSL truststore password was not specified.");
+                    System.exit(-1);
+                }
+                sslContextFactory.setTrustStorePassword(trustStorePassword);
             }
-            sslContextFactory.setTrustStorePassword(trustStorePassword);
-
             // exclude weak ciphers
             sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                     "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
