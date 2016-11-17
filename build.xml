@@ -794,6 +794,7 @@ DISTRIBUTION
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
             <include name="toolrunner.py" />
+            <include name="watch_performance.py" />
             <include name="voltify" />
             <include name="voltify-README.md" />
             <include name="voltify.d/**" />
@@ -1387,6 +1388,8 @@ JAVA COMPILATION
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
             <include name="**/keystore"/>
+            <include name="**/ssl-config"/>
+            <include name="**/ssl-config-invalid"/>
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.testproc.dir}'>

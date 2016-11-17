@@ -39,12 +39,12 @@ public interface InputHandler {
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
-     * Read from the inputStream into the buffer.
+     * Read an SSL frame from the inputStream into the buffer.
      * @param inputStream  The inputStream
      * @param buffer       The buffer
-     * @return the number of bytes read into the buffer.
+     * @return whether or not a full frame was read.
      */
-    int fillBufferFromInputStream(NIOReadStream inputStream, ByteBuffer buffer);
+    boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer);
 
     /**
      * Handle the incoming message produced by retrieve next message
