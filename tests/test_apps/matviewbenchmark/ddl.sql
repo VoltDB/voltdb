@@ -1,81 +1,81 @@
 CREATE TABLE ids
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMatView
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMinMatView
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMinMatViewOpt
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWith4MinMatView
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  v1 bigint,
-  v2 bigint,
-  v3 bigint,
-  v4 bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  v1 BIGINT,
+  v2 BIGINT,
+  v3 BIGINT,
+  v4 BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWith4MinMatViewOpt
 (
-  id bigint NOT NULL,
-  group_id bigint,
-  v1 bigint,
-  v2 bigint,
-  v3 bigint,
-  v4 bigint,
+  id BIGINT NOT NULL,
+  group_id BIGINT,
+  v1 BIGINT,
+  v2 BIGINT,
+  v3 BIGINT,
+  v4 BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMultiGroupsMinMatView
 (
-  id bigint NOT NULL,
-  group_id_1 bigint,
-  group_id_2 bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id_1 BIGINT,
+  group_id_2 BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMultiGroupsMinMatViewOpt
 (
-  id bigint NOT NULL,
-  group_id_1 bigint,
-  group_id_2 bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id_1 BIGINT,
+  group_id_2 BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
 CREATE TABLE idsWithMultiGroupsMinMatViewBestOpt
 (
-  id bigint NOT NULL,
-  group_id_1 bigint,
-  group_id_2 bigint,
-  value bigint,
+  id BIGINT NOT NULL,
+  group_id_1 BIGINT,
+  group_id_2 BIGINT,
+  value BIGINT,
   PRIMARY KEY (id)
 );
 
@@ -89,77 +89,75 @@ PARTITION TABLE idsWithMultiGroupsMinMatView ON COLUMN id;
 PARTITION TABLE idsWithMultiGroupsMinMatViewOpt ON COLUMN id;
 PARTITION TABLE idsWithMultiGroupsMinMatViewBestOpt ON COLUMN id;
 
-CREATE PROCEDURE ids_insert AS
+CREATE PROCEDURE ids_insert
+  PARTITION ON TABLE ids COLUMN id AS
   INSERT INTO ids VALUES (?,?,?);
-CREATE PROCEDURE idsWithMatView_insert AS
+CREATE PROCEDURE idsWithMatView_insert
+  PARTITION ON TABLE idsWithMatView COLUMN id AS
   INSERT INTO idsWithMatView VALUES (?,?,?);
-CREATE PROCEDURE idsWithMinMatView_insert AS
+CREATE PROCEDURE idsWithMinMatView_insert
+  PARTITION ON TABLE idsWithMinMatView COLUMN id AS
   INSERT INTO idsWithMinMatView VALUES (?,?,?);
-CREATE PROCEDURE idsWithMinMatViewOpt_insert AS
+CREATE PROCEDURE idsWithMinMatViewOpt_insert
+  PARTITION ON TABLE idsWithMinMatViewOpt COLUMN id AS
   INSERT INTO idsWithMinMatViewOpt VALUES (?,?,?);
-CREATE PROCEDURE idsWith4MinMatView_insert AS
+CREATE PROCEDURE idsWith4MinMatView_insert
+  PARTITION ON TABLE idsWith4MinMatView COLUMN id AS
   INSERT INTO idsWith4MinMatView VALUES (?,?,?,?,?,?);
-CREATE PROCEDURE idsWith4MinMatViewOpt_insert AS
+CREATE PROCEDURE idsWith4MinMatViewOpt_insert
+  PARTITION ON TABLE idsWith4MinMatViewOpt COLUMN id AS
   INSERT INTO idsWith4MinMatViewOpt VALUES (?,?,?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatView_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatView_insert
+  PARTITION ON TABLE idsWithMultiGroupsMinMatView COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatView VALUES (?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert
+  PARTITION ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatViewOpt VALUES (?,?,?,?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert
+  PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatViewBestOpt VALUES (?,?,?,?);
 
-PARTITION PROCEDURE ids_insert ON TABLE ids COLUMN id;
-PARTITION PROCEDURE idsWithMatView_insert ON TABLE idsWithMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatView_insert ON TABLE idsWithMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatViewOpt_insert ON TABLE idsWithMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatView_insert ON TABLE idsWith4MinMatView COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatViewOpt_insert ON TABLE idsWith4MinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatView_insert ON TABLE idsWithMultiGroupsMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id;
-
-CREATE PROCEDURE ids_group_id_update AS
+CREATE PROCEDURE ids_group_id_update
+  PARTITION ON TABLE ids COLUMN id AS
   UPDATE ids SET group_id = ? WHERE id = ?;
-CREATE PROCEDURE idsWithMatView_group_id_update AS
+CREATE PROCEDURE idsWithMatView_group_id_update
+  PARTITION ON TABLE idsWithMatView COLUMN id AS
   UPDATE idsWithMatView SET group_id = ? WHERE id = ?;
-PARTITION PROCEDURE ids_group_id_update ON TABLE ids COLUMN id;
-PARTITION PROCEDURE idsWithMatView_group_id_update ON TABLE idsWithMatView COLUMN id;
 
-CREATE PROCEDURE ids_value_update AS
+CREATE PROCEDURE ids_value_update
+  PARTITION ON TABLE ids COLUMN id AS
   UPDATE ids SET value = ? WHERE id = ?;
-CREATE PROCEDURE idsWithMatView_value_update AS
+CREATE PROCEDURE idsWithMatView_value_update
+  PARTITION ON TABLE idsWithMatView COLUMN id AS
   UPDATE idsWithMatView SET value = ? WHERE id = ?;
-PARTITION PROCEDURE ids_value_update ON TABLE ids COLUMN id;
-PARTITION PROCEDURE idsWithMatView_value_update ON TABLE idsWithMatView COLUMN id;
 
-CREATE PROCEDURE ids_delete AS
+CREATE PROCEDURE ids_delete
+  PARTITION ON TABLE ids COLUMN id AS
   DELETE FROM ids WHERE (id = ?);
-CREATE PROCEDURE idsWithMatView_delete AS
+CREATE PROCEDURE idsWithMatView_delete
+  PARTITION ON TABLE idsWithMatView COLUMN id AS
   DELETE FROM idsWithMatView WHERE (id = ?);
-CREATE PROCEDURE idsWithMinMatView_delete AS
+CREATE PROCEDURE idsWithMinMatView_delete
+  PARTITION ON TABLE idsWithMinMatView COLUMN id AS
   DELETE FROM idsWithMinMatView WHERE (id = ?);
-CREATE PROCEDURE idsWithMinMatViewOpt_delete AS
+CREATE PROCEDURE idsWithMinMatViewOpt_delete
+  PARTITION ON TABLE idsWithMinMatViewOpt COLUMN id AS
   DELETE FROM idsWithMinMatViewOpt WHERE (id = ?);
-CREATE PROCEDURE idsWith4MinMatView_delete AS
+CREATE PROCEDURE idsWith4MinMatView_delete
+  PARTITION ON TABLE idsWith4MinMatView COLUMN id AS
   DELETE FROM idsWith4MinMatView WHERE (id = ?);
-CREATE PROCEDURE idsWith4MinMatViewOpt_delete AS
+CREATE PROCEDURE idsWith4MinMatViewOpt_delete
+  PARTITION ON TABLE idsWith4MinMatViewOpt COLUMN id AS
   DELETE FROM idsWith4MinMatViewOpt WHERE (id = ?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatView_delete AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatView_delete
+  PARTITION ON TABLE idsWithMultiGroupsMinMatView COLUMN id AS
   DELETE FROM idsWithMultiGroupsMinMatView WHERE (id = ?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_delete AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_delete
+  PARTITION ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id AS
   DELETE FROM idsWithMultiGroupsMinMatViewOpt WHERE (id = ?);
-CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_delete AS
+CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_delete
+  PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
   DELETE FROM idsWithMultiGroupsMinMatViewBestOpt WHERE (id = ?);
-
-PARTITION PROCEDURE ids_delete ON TABLE ids COLUMN id;
-PARTITION PROCEDURE idsWithMatView_delete ON TABLE idsWithMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatView_delete ON TABLE idsWithMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMinMatViewOpt_delete ON TABLE idsWithMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatView_delete ON TABLE idsWith4MinMatView COLUMN id;
-PARTITION PROCEDURE idsWith4MinMatViewOpt_delete ON TABLE idsWith4MinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatView_delete ON TABLE idsWithMultiGroupsMinMatView COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewOpt_delete ON TABLE idsWithMultiGroupsMinMatViewOpt COLUMN id;
-PARTITION PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_delete ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id;
 
 CREATE VIEW id_count (
   group_id,
