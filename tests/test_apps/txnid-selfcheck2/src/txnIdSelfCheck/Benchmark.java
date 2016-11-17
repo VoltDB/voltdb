@@ -176,6 +176,9 @@ public class Benchmark {
         String disabledthreads = "none";
         ArrayList<String> disabledThreads = null;
 
+        @Option(desc = "Enable topology awareness")
+        boolean topologyaware = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -351,6 +354,9 @@ public class Benchmark {
 
         StatusListener statusListener = new StatusListener();
         ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        if (config.topologyaware) {
+            clientConfig.setTopologyChangeAware(true);
+        }
         client = ClientFactory.createClient(clientConfig);
     }
 
@@ -387,20 +393,24 @@ public class Benchmark {
     private void connect() throws InterruptedException {
         log.info("Connecting to VoltDB...");
 
-        final CountDownLatch connections = new CountDownLatch(1);
+        if (config.topologyaware) {
+            connectToOneServerWithRetry(config.parsedServers[0]);
+        } else {
+            final CountDownLatch connections = new CountDownLatch(1);
 
-        // use a new thread to connect to each server
-        for (final String server : config.parsedServers) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server);
-                    connections.countDown();
-                }
-            }).start();
+            // use a new thread to connect to each server
+            for (final String server : config.parsedServers) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server);
+                        connections.countDown();
+                    }
+                }).start();
+            }
+            // block until at least one connection is established
+            connections.await();
         }
-        // block until at least one connection is established
-        connections.await();
     }
 
     /**
