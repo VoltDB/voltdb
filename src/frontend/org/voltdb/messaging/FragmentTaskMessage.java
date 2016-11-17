@@ -453,7 +453,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        // this function may be called for the same instance twice, with slightly different
+        // but same size initiateTask. The second call is intended to update the spHandle in
+        // the initiateTask to a new value and update the corresponding buffer, therefore it
+        // only change the spHandle which takes a fixed amount of bytes, the only component
+        // that can change size, which is the StoredProcedureInvocation, isn't changed at all.
+        // Because of these, the serialized size will be the same for the two calls and the
+        // buffer only needs to be allocated once. When this function is called the second
+        // time, just reset the position and limit and reserialize the updated content to the
+        // existing ByteBuffer so we can save an allocation.
+        if (m_initiateTaskBuffer == null) {
+            m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        }
+        else {
+            m_initiateTaskBuffer.position(0);
+            m_initiateTaskBuffer.limit(initiateTask.getSerializedSize());
+        }
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
             m_initiateTaskBuffer.flip();

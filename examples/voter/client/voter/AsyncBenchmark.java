@@ -137,6 +137,9 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @Option(desc = "Enable topology awareness")
+        boolean topologyaware = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -173,6 +176,10 @@ public class AsyncBenchmark {
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+
+        if (config.topologyaware) {
+            clientConfig.setTopologyChangeAware(true);
+        }
 
         client = ClientFactory.createClient(clientConfig);
 
@@ -225,20 +232,24 @@ public class AsyncBenchmark {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
-        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+        if (config.topologyaware) {
+            connectToOneServerWithRetry(serverArray[0]);
+        } else {
+            final CountDownLatch connections = new CountDownLatch(serverArray.length);
 
-        // use a new thread to connect to each server
-        for (final String server : serverArray) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server);
-                    connections.countDown();
-                }
-            }).start();
+            // use a new thread to connect to each server
+            for (final String server : serverArray) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server);
+                        connections.countDown();
+                    }
+                }).start();
+            }
+            // block until all have connected
+            connections.await();
         }
-        // block until all have connected
-        connections.await();
     }
 
     /**
