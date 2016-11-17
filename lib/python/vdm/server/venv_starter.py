@@ -175,15 +175,21 @@ def install_required_packages(pip=''):
 
         for package_name in packages:
             if package_name != '' and '#' not in package_name:
-                run_cmd(pip, '--quiet', 'install', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
+                if package_name not in sys.modules:
+                    run_cmd(pip, '--quiet', 'install', '--user', os.path.join(G.base_dir, 'third_party/python/packages', package_name))
     else:
         if pip == '':
             info('Installing the python dependencies.')
         if sys.version_info[:2] >= (2, 7):
-            packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
+            packages = [line.rstrip('\n') for line in open(os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt'))]
         else:
-            packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements_python_2.6.txt')
-        run_cmd(pip, '--quiet', 'install', '-r', packages)
+            packages = [line.rstrip('\n') for line in open(os.path.join(G.base_dir, 'lib/python/vdm/requirements_python_2.6.txt'))]
+
+        for package_name in packages:
+            if package_name != '' and '#' not in package_name:
+                if package_name not in sys.modules:
+                    print "pip --quiet install --user", package_name
+                    run_cmd(pip, '--quiet', 'install', '--user', package_name)
 
 def create_data_config_path(path, con_path):
     org_wd = os.getcwd()

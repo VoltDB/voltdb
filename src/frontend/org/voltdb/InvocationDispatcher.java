@@ -1859,8 +1859,10 @@ public final class InvocationDispatcher {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                isShortCircuitRead = true;
                 initiatorHSId = m_localReplicas.get().get(partition);
+            }
+            if (initiatorHSId != null) {
+                isShortCircuitRead = true;
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
