@@ -78,17 +78,18 @@ def get_stats(runner, component):
         resp = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
                                     voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0], False)
         status = resp.status()
-        if status <> 1 and "timeout" in resp.response.statusString:
-            if retry == 0:
-                #abort here after 5 try
-                raise StatisticsError("Unable to collect %s statistics from the cluster" % component)
-            else:
-                time.sleep(1)
-                retry -= 1
-                continue
-        if status <> 1:
-            raise StatisticsError("Unexpected response to @Statistics %s: %s" % (component, resp))
-        return resp
+        if status == 1:
+            return resp
+
+        if retry == 0:
+            raise StatisticsError("Unable to collect statistics for %s after 5 attempts." % component)
+        retry -= 1
+
+        #timeout situation
+        if status == -6:
+            time.sleep(1)
+        else:
+            raise StatisticsError("Unexpected errors to collect statistics for %s: %s." % (component, resp))
 
 def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
     resp = get_stats(runner, 'DRPRODUCER')

@@ -16,7 +16,7 @@
 
 import time
 from voltcli import checkstats
-
+from voltcli.checkstats import StatisticsError
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Pause the VoltDB cluster and switch it to admin mode.',
@@ -42,6 +42,9 @@ def pause(runner):
         try:
             checkstats.check_exporter(runner)
             checkstats.check_dr_producer(runner)
+        except StatisticsError as error:
+            runner.info('The pause process has stopped. The cluster is in a paused state.')
+            runner.abort(error.message)
         except (KeyboardInterrupt, SystemExit):
             runner.info('The pause process has stopped. The cluster is in a paused state.')
             runner.abort('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')

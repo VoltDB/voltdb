@@ -60,6 +60,7 @@ def shutdown(runner):
             else:
                 runner.info('Shutting down the cluster...')
         except StatisticsError as error:
+            runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort(error.message)
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
