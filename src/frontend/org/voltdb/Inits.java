@@ -479,14 +479,16 @@ public class Inits {
         public void run() {
             SslType sslType = m_deployment.getSsl();
             if (sslType != null && sslType.isEnabled()) {
-                try {
-                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                    m_config.m_sslContextFactory.start();
-                    if (sslType.isExternal()) {
+                if (sslType.isExternal()) {
+                    try {
+                        m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                        m_config.m_sslContextFactory.start();
+                        hostLog.info("Enabled HTTPS.");
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                        hostLog.info("Enabled SSL on admin and client port.");
+                    } catch (Exception e) {
+                        hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
                     }
-                } catch (Exception e) {
-                    hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
                 }
             }
         }

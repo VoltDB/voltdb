@@ -153,6 +153,12 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
+    private boolean isSslEnable = Boolean.valueOf(System.getenv("Enable_SSL") == null ? "false" : System.getenv("Enable_SSL"));
+    public boolean isSslEnable() { return isSslEnable; };
+    public void setSslEnable(boolean flag) {
+        isSslEnable = flag;
+    };
+
     private String m_prefix = null;
     private boolean m_isPaused = false;
 
@@ -387,6 +393,9 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
+        if (isSslEnable) {
+            builder.enableSSL();
+        }
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId) != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
@@ -397,6 +406,9 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
+        if (isSslEnable) {
+            builder.enableSSL();
+        }
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId) != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
@@ -407,6 +419,9 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
+        if (isSslEnable) {
+            builder.enableSSL();
+        }
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
                     null, m_clusterId, true, snapshotPath, ppdPrefix);
@@ -424,6 +439,9 @@ public class LocalCluster extends VoltServerConfig {
         // and then resetting it after tests to the usual default.
         if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
             return false;
+        }
+        if (isSslEnable) {
+            builder.enableSSL();
         }
 
         if (!m_compiled) {

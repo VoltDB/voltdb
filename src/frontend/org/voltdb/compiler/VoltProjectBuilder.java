@@ -58,7 +58,6 @@ import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
@@ -74,6 +73,7 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -263,6 +263,8 @@ public class VoltProjectBuilder {
     boolean m_jsonApiEnabled = true;
     boolean m_sslEnabled = false;
     boolean m_sslExternal = false;
+    private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+    private static final String DEFAULT_KEYSTORE_PASSWD = "password";
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -599,12 +601,12 @@ public class VoltProjectBuilder {
     }
 
     public void setKeyStoreInfo(final String path, final String password) {
-        m_keystore = path;
+        m_keystore = getResourcePath(path);
         m_keystorePassword = password;
     }
 
     public void setCertStoreInfo(final String path, final String password) {
-        m_certstore = path;
+        m_certstore = getResourcePath(path);;
         m_certstorePassword = password;
     }
 
@@ -1348,6 +1350,18 @@ public class VoltProjectBuilder {
         List<String> result = m_diagnostics;
         m_diagnostics = null;
         return result;
+    }
+
+    public void enableSSL() {
+        setSslEnabled(true);
+        setSslExternal(true);
+        setKeyStoreInfo(DEFAULT_KEYSTORE_RESOURCE, DEFAULT_KEYSTORE_PASSWD);
+        setCertStoreInfo(DEFAULT_KEYSTORE_RESOURCE, DEFAULT_KEYSTORE_PASSWD);
+    }
+
+    private String getResourcePath(String resource) {
+        URL res = this.getClass().getResource(resource);
+        return res == null ? resource : res.getPath();
     }
 
 }
