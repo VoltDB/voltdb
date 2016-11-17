@@ -3604,17 +3604,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
-                        String.class,
                         ClientInterface.class,
                         Cartographer.class,
                         HostMessenger.class,
+                        byte.class,
                         byte.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
-                        drProducerHost,
                         m_clientInterface,
                         m_cartographer,
                         m_messenger,
-                        drConsumerClusterId);
+                        drConsumerClusterId,
+                        m_config.m_datasourceClusterId);
                 m_globalServiceElector.registerService(m_consumerDRGateway);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);

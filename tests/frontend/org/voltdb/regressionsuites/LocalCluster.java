@@ -355,6 +355,10 @@ public class LocalCluster extends VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
+    public CommandLine getTemplateCommandLine() {
+        return templateCmdLine;
+    }
+
     public void setToStartPaused() {
        m_isPaused = true;
     }

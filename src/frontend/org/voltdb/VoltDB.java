@@ -305,6 +305,9 @@ public class VoltDB {
         /** apply safe mode strategy when recovering */
         public boolean m_safeMode = false;
 
+        /** datasource cluster for multicluster DR */
+        public byte m_datasourceClusterId = -1;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
         }
@@ -613,8 +616,13 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
-                }
-                else {
+                } else if (arg.equalsIgnoreCase("datasourcecluster")) {
+                    m_datasourceClusterId = Byte.parseByte(args[++i]);
+                    if (m_datasourceClusterId < 0) {
+                        throw new IllegalArgumentException("Invalid data cluster id value: " +
+                            m_datasourceClusterId + ". Data source cluster id must be >= 0");
+                    }
+                } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
