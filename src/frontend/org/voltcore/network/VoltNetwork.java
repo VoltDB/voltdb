@@ -171,8 +171,8 @@ class VoltNetwork implements Runnable, IOStatsIntf
         Callable<Connection> registerTask = new Callable<Connection>() {
             @Override
             public Connection call() throws Exception {
-                final VoltPort port =
-                        new VoltPort(
+                final VoltPort port = getVoltPort(
+                                channel,
                                 VoltNetwork.this,
                                 handler,
                                 (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
@@ -218,6 +218,28 @@ class VoltNetwork implements Runnable, IOStatsIntf
             return ft.get();
         } catch (Exception e) {
             throw new IOException(e);
+        }
+    }
+
+    private VoltPort getVoltPort(final SocketChannel channel,
+                                 final VoltNetwork network,
+                                 final InputHandler handler,
+                                 final InetSocketAddress remoteAddress,
+                                 final NetworkDBBPool pool,
+                                 final SSLEngine sslEngine) {
+        if (sslEngine == null) {
+            return new VoltPort(
+                    VoltNetwork.this,
+                    handler,
+                    (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
+                    m_pool);
+        } else {
+            return new SSLVoltPort(
+                    VoltNetwork.this,
+                    handler,
+                    (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
+                    m_pool,
+                    sslEngine);
         }
     }
 

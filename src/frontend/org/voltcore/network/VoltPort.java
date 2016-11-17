@@ -40,13 +40,15 @@ public class VoltPort implements Connection
 
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
+    private static final int MAX_MESSAGE_LENGTH = 52428800;
+
     private final NetworkDBBPool m_pool;
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
 
     /** The operations the port wishes to have installed */
-    private volatile int m_interestOps = 0;
+    protected volatile int m_interestOps = 0;
 
     /** True when the port is executing  VoltNetwork dispatch */
     volatile boolean m_running = false;
@@ -69,13 +71,13 @@ public class VoltPort implements Connection
     protected SelectionKey m_selectionKey;
 
     /** The channel this port wraps */
-    private SocketChannel m_channel;
+    protected SocketChannel m_channel;
 
-    private final InputHandler m_handler;
+    protected final InputHandler m_handler;
 
-    private NIOReadStream m_readStream;
-    private NIOWriteStream m_writeStream;
-    private long m_messagesRead = 0;
+    protected NIOReadStream m_readStream;
+    protected NIOWriteStream m_writeStream;
+    protected long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
 
     /*
@@ -90,17 +92,12 @@ public class VoltPort implements Connection
     private volatile String m_remoteHostAndAddressAndPort;
     private String m_toString = null;
 
-    private final SSLEngine m_sslEngine;
-    private final SSLBufferDecrypter m_sslBufferDecrypter;
-    private final ByteBuffer m_sslSrcBuffer;
-
     /** Wrap a socket with a VoltPort */
     public VoltPort(
             VoltNetwork network,
             InputHandler handler,
             InetSocketAddress remoteAddress,
-            NetworkDBBPool pool,
-            SSLEngine sslEngine) {
+            NetworkDBBPool pool) {
         m_network = network;
         m_handler = handler;
         m_remoteSocketAddress = remoteAddress;
@@ -108,15 +105,6 @@ public class VoltPort implements Connection
         m_pool = pool;
         m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
-        if (sslEngine != null) {
-            m_sslEngine = sslEngine;
-            m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
-            m_sslSrcBuffer = ByteBuffer.allocateDirect(Constants.SSL_CHUNK_SIZE + 128);
-        } else {
-            m_sslEngine = null;
-            m_sslBufferDecrypter = null;
-            m_sslSrcBuffer = null;
-        }
     }
 
     /**
@@ -151,7 +139,7 @@ public class VoltPort implements Connection
         }
     }
 
-    void setKey (SelectionKey key) {
+    protected void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
         m_readStream = new NIOReadStream();
@@ -159,8 +147,7 @@ public class VoltPort implements Connection
                 this,
                 m_handler.offBackPressure(),
                 m_handler.onBackPressure(),
-                m_handler.writestreamMonitor(),
-                m_sslEngine);
+                m_handler.writestreamMonitor());
         m_interestOps = key.interestOps();
     }
 
@@ -192,22 +179,7 @@ public class VoltPort implements Connection
                      * and pass them off to the input handler.
                      */
                     try {
-                        if (m_sslEngine == null) {
-                            ByteBuffer message;
-                            while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-                                m_handler.handleMessage( message, this);
-                                m_messagesRead++;
-                            }
-                        } else {
-                            while (m_handler.retrieveNextSSLMessage(readStream(), m_sslSrcBuffer)) {
-                                m_sslBufferDecrypter.decrypt(m_sslSrcBuffer);
-                                ByteBuffer message;
-                                while ((message = m_sslBufferDecrypter.message()) != null) {
-                                    m_handler.handleMessage(message, this);
-                                    m_messagesRead++;
-                                }
-                            }
-                        }
+                        processNextMessage();
                     }
                     catch (VoltProtocolHandler.BadMessageLength e) {
                         networkLog.error("Bad message length exception", e);
@@ -226,6 +198,14 @@ public class VoltPort implements Connection
                 assert(m_running == true);
                 m_running = false;
             }
+        }
+    }
+
+    protected void processNextMessage() throws IOException {
+        ByteBuffer message;
+        while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
+            m_handler.handleMessage( message, this);
+            m_messagesRead++;
         }
     }
 

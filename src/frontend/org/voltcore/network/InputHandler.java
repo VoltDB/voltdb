@@ -22,6 +22,14 @@ import java.nio.ByteBuffer;
 
 public interface InputHandler {
 
+    /** The distinct exception class allows better logging of these unexpected errors. */
+    class BadMessageLength extends IOException {
+        private static final long serialVersionUID = 8547352379044459911L;
+        public BadMessageLength(String string) {
+            super(string);
+        }
+    }
+
     /**
      * Retrieve the maximum number of bytes this input handler is willing to
      * read from the connection. If set to zero, no data will be read.
@@ -39,12 +47,41 @@ public interface InputHandler {
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
-     * Read an SSL frame from the inputStream into the buffer.
+     * Retrieves a message header into the given buffer from the connection,
+     * through the given inputStream.
+     * @param inputStream
+     * @param header
+     * @return  True if the header buffer was filled, false if not.
+     */
+    boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header);
+
+    /**
+     * Read a message from the inputStream into the buffer.  Returns true if the
+     * input stream had enough bytes to read the message.
      * @param inputStream  The inputStream
      * @param buffer       The buffer
-     * @return whether or not a full frame was read.
+     * @return true If the message was retrieved.
      */
-    boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer);
+    boolean retrieveNextMessage(NIOReadStream inputStream, ByteBuffer buffer);
+
+    /**
+     * Checks the validity of the given message length.
+     * @param messageLength
+     * @throws BadMessageLength
+     */
+    void checkMessageLength(int messageLength) throws BadMessageLength;
+
+    /**
+     * Get the length of the next message.
+     * @return The length of the next message.
+     */
+    int getNextMessageLength();
+
+    /**
+     * Set the length of the next message.
+     * @param nextMessageLength
+     */
+    void setNextMessageLength(int nextMessageLength);
 
     /**
      * Handle the incoming message produced by retrieve next message
