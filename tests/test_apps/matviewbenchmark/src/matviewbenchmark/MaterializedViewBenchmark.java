@@ -306,18 +306,12 @@ public class MaterializedViewBenchmark {
      */
     public void runPhase(MatViewBchmkPhase phase, FileWriter fw) throws Exception {
         resetStats();
-        int grp = 1;
         // Run the benchmark for the requested duration.
         // -1- Insert data
         System.out.println("\n\nInserting into table " + phase.getSystemString() + " materialized view...\n");
         if (config.group > 0) {
             for (int i = 0; i < config.txn; i++) {
-                phase.insert(i, grp);
-                if (grp == config.group) {
-                    grp = 1;
-                } else {
-                    grp++;
-                }
+                phase.insert(i, i / config.group + 1);
             }
         } else {
             for (int i = 0; i < config.txn; i++) {
@@ -336,17 +330,11 @@ public class MaterializedViewBenchmark {
         if (! phase.isMinMatViewCase()) {
             // -2- Update group
             // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
-            grp = 2;
             resetStats();
             System.out.println("\n\nUpdating grouping column in table " + phase.getSystemString() + " materialized view...\n");
             if (config.group > 0) {
                 for (int i = 0; i < config.txn; i++) {
-                    phase.updateGroup(grp, i);
-                    if (grp == (config.group + 1)) {
-                        grp = 2;
-                    } else {
-                        grp++;
-                    }
+                    phase.updateGroup(i / config.group + 2, i);
                 }
             } else {
                 for (int i = 0; i < config.txn; i++) {
@@ -403,15 +391,18 @@ public class MaterializedViewBenchmark {
         benchmarkActive = true;
         MatViewBchmkPhase[] benchmarkPhases =
         {
-            new MVBchmkWithView(client),
-            new MVBchmkWithoutView(client),
-            new MVBchmkMinMax(client),
-            new MVBchmkMinMaxOpt(client),
-            new MVBchmk4MinMax(client),
-            new MVBchmk4MinMaxOpt(client),
-            new MVBchmkMultiGroupsMin(client),
-            new MVBchmkMultiGroupsMinOpt(client),
-            new MVBchmkMultiGroupsMinBestOpt(client)
+            // new MVBchmkWithView(client),
+            // new MVBchmkWithoutView(client),
+            // new MVBchmkMinMax(client),
+            // new MVBchmkMinMaxOpt(client),
+            // new MVBchmk4MinMax(client),
+            // new MVBchmk4MinMaxOpt(client),
+            // new MVBchmkMultiGroupsMin(client),
+            // new MVBchmkMultiGroupsMinOpt(client),
+            // new MVBchmkMultiGroupsMinBestOpt(client),
+            new MVBchmk2TWithoutView(client),
+            new MVBchmk2TViewIdx(client, config, 0),
+            new MVBchmk2TViewIdx(client, config, 1)
         };
 
         // Run the benchmark loop for the requested warmup time

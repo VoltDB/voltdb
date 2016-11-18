@@ -79,6 +79,32 @@ CREATE TABLE idsWithMultiGroupsMinMatViewBestOpt
   PRIMARY KEY (id)
 );
 
+CREATE TABLE noJoinViewSrc1 (
+  id BIGINT NOT NULL PRIMARY KEY,
+  G0 BIGINT DEFAULT '0' NOT NULL,
+  G1 BIGINT DEFAULT '0' NOT NULL,
+  C2 BIGINT DEFAULT '0' NOT NULL,
+  C3 BIGINT DEFAULT '0' NOT NULL,
+  C8 BIGINT DEFAULT '0' NOT NULL
+);
+
+CREATE TABLE noJoinViewSrc2 (
+  G0 BIGINT NOT NULL PRIMARY KEY
+);
+
+CREATE TABLE joinViewIdxSrc1 (
+  id BIGINT NOT NULL PRIMARY KEY,
+  G0 BIGINT DEFAULT '0' NOT NULL,
+  G1 BIGINT DEFAULT '0' NOT NULL,
+  C2 BIGINT DEFAULT '0' NOT NULL,
+  C3 BIGINT DEFAULT '0' NOT NULL,
+  C8 BIGINT DEFAULT '0' NOT NULL
+);
+
+CREATE TABLE joinViewIdxSrc2 (
+  G0 BIGINT NOT NULL PRIMARY KEY
+);
+
 PARTITION TABLE ids ON COLUMN id;
 PARTITION TABLE idsWithMatView ON COLUMN id;
 PARTITION TABLE idsWithMinMatView ON COLUMN id;
@@ -88,6 +114,8 @@ PARTITION TABLE idsWith4MinMatViewOpt ON COLUMN id;
 PARTITION TABLE idsWithMultiGroupsMinMatView ON COLUMN id;
 PARTITION TABLE idsWithMultiGroupsMinMatViewOpt ON COLUMN id;
 PARTITION TABLE idsWithMultiGroupsMinMatViewBestOpt ON COLUMN id;
+PARTITION TABLE noJoinViewSrc1 ON COLUMN id;
+PARTITION TABLE joinViewIdxSrc1 ON COLUMN id;
 
 CREATE PROCEDURE ids_insert
   PARTITION ON TABLE ids COLUMN id AS
@@ -116,6 +144,16 @@ CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_insert
 CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_insert
   PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
   INSERT INTO idsWithMultiGroupsMinMatViewBestOpt VALUES (?,?,?,?);
+CREATE PROCEDURE noJoinViewSrc1_insert
+  PARTITION ON TABLE noJoinViewSrc1 COLUMN id AS
+  INSERT INTO noJoinViewSrc1 VALUES (?,?,?,?,?,?);
+CREATE PROCEDURE noJoinViewSrc2_insert AS
+  INSERT INTO noJoinViewSrc2 VALUES (?);
+CREATE PROCEDURE joinViewIdxSrc1_insert
+  PARTITION ON TABLE joinViewIdxSrc1 COLUMN id AS
+  INSERT INTO joinViewIdxSrc1 VALUES (?,?,?,?,?,?);
+CREATE PROCEDURE joinViewIdxSrc2_insert AS
+  INSERT INTO joinViewIdxSrc2 VALUES (?);
 
 CREATE PROCEDURE ids_group_id_update
   PARTITION ON TABLE ids COLUMN id AS
@@ -158,6 +196,16 @@ CREATE PROCEDURE idsWithMultiGroupsMinMatViewOpt_delete
 CREATE PROCEDURE idsWithMultiGroupsMinMatViewBestOpt_delete
   PARTITION ON TABLE idsWithMultiGroupsMinMatViewBestOpt COLUMN id AS
   DELETE FROM idsWithMultiGroupsMinMatViewBestOpt WHERE (id = ?);
+CREATE PROCEDURE noJoinViewSrc1_delete
+  PARTITION ON TABLE noJoinViewSrc1 COLUMN id AS
+  DELETE FROM noJoinViewSrc1 WHERE (id = ?);
+CREATE PROCEDURE noJoinViewSrc2_delete AS
+  DELETE FROM noJoinViewSrc2 WHERE (G0 = ?);
+CREATE PROCEDURE joinViewIdxSrc1_delete
+  PARTITION ON TABLE joinViewIdxSrc1 COLUMN id AS
+  DELETE FROM joinViewIdxSrc1 WHERE (id = ?);
+CREATE PROCEDURE joinViewIdxSrc2_delete AS
+  DELETE FROM joinViewIdxSrc2 WHERE (G0 = ?);
 
 CREATE VIEW id_count (
   group_id,
@@ -281,3 +329,10 @@ CREATE VIEW id_multi_group_min_best_opt (
   MIN(id)
 FROM idsWithMultiGroupsMinMatViewBestOpt GROUP BY group_id_1, group_id_2;
 CREATE INDEX idsWithMultiGroupsMinMatViewBestOpt_idx ON idsWithMultiGroupsMinMatViewBestOpt (group_id_1, group_id_2, id, value);
+
+CREATE VIEW joinViewIdx (G1, CNT, C2, SUMC2, C3, CNTC8) AS
+SELECT T1.G1, COUNT(*), MAX(T1.C2), SUM(T1.C2),
+                        MIN(T1.C3), COUNT(T1.C8)
+FROM joinViewIdxSrc1 T1 JOIN joinViewIdxSrc2 T2 ON T1.G0 = T2.G0
+GROUP BY T1.G1;
+CREATE INDEX IDXjoinViewIdxSrc1 ON joinViewIdxSrc1(G0, C3);

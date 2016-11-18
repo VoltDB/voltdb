@@ -26,7 +26,6 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-
 // Defines the calls to finish one phase of the benchmark.
 public abstract class MatViewBchmkPhase {
 
@@ -123,5 +122,36 @@ public abstract class MatViewBchmkPhase {
 
     public final boolean isMinMatViewCase() {
         return m_isMinMatViewCase;
+    }
+
+    // minMaxRecalcFreq = 2, nrow = 100
+    // idx      1  2  3  4  5  6  7  8  9 10 11 ...
+    // minCol   1  2 10  9  8  7  6  5  4  3 11...
+    // maxCol 100 99 91 92 93 94 95 96 97 98 90 ...
+    // Delete from left to right, then min / max will only be updated for 20% of the time.
+    static int getSkewedMinColValue(int txnid, int minMaxRecalcFreq) {
+        if (minMaxRecalcFreq == 0) {
+            return -txnid;
+        }
+        int txnidm1 = txnid - 1;
+        if (txnidm1 % 10 < minMaxRecalcFreq) {
+            return txnid;
+        }
+        else {
+            return (txnidm1 / 10 + 1) * 10 + minMaxRecalcFreq - txnidm1 % 10;
+        }
+    }
+
+    static int getSkewedMaxColValue(int txn, int txnid, int minMaxRecalcFreq) {
+        if (minMaxRecalcFreq == 0) {
+            return txnid;
+        }
+        int txnidm1 = txnid - 1;
+        if (txnidm1 % 10 < minMaxRecalcFreq) {
+            return txn - txnidm1;
+        }
+        else {
+            return txn - (txnidm1 / 10 + 1) * 10 + txnidm1 % 10 - 1;
+        }
     }
 }
