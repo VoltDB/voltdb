@@ -233,8 +233,8 @@ def read_pid_file(pidfile):
             pf = file(pidfile,'r')
             pid = int(pf.read().strip())
             pf.close()
-        except IOError:
-            pass
+        except (IOError, ValueError), e:
+            pid = -1
     return pid
 
 def get_status(pidfile):
