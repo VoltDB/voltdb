@@ -100,12 +100,11 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testBoolOperation(client, op, true);
     }
 
-
-
     private void populateSafeTables(Client client) throws Exception {
         client.callProcedure("SAFETESTFULL.insert", 300, "mumble", 301, "marble");
     }
-    public void notestSafeOperations() throws Exception {
+
+    public void testSafeOperations() throws Exception {
         Client client = getClient();
         populateSafeTables(client);
         //
@@ -247,6 +246,65 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", sql);
         assertEquals("View creation on empty tables should always succeed.",
                      ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    public void testDropView() throws Exception {
+        // Regression test for ENG-11497
+        Client client = getClient();
+        String ddl =
+                "CREATE TABLE T_ENG_11497_1 (\n"
+                        + "   AID integer NOT NULL,\n"
+                        + "   USD float DEFAULT '0.0' NOT NULL,\n"
+                        + "   PRIMARY KEY (AID)\n"
+                        + ");\n"
+                        + "PARTITION TABLE T_ENG_11497_1 ON COLUMN AID;\n"
+
+                        + "CREATE TABLE T_ENG_11497_2 (\n"
+                        + "   AID integer NOT NULL,\n"
+                        + "   USD float DEFAULT '0.0' NOT NULL,\n"
+                        + "   PRIMARY KEY (AID)\n"
+                        + ");\n"
+                        + "PARTITION TABLE T_ENG_11497_2 ON COLUMN AID;\n"
+
+                        + "CREATE VIEW T_ENG_11497_1_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        AID,\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        SUM(CAST(USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1\n"
+                        + "GROUP BY\n"
+                        + "      AID;\n"
+
+                        + "CREATE VIEW T_ENG_11497_2_VIEW\n"
+                        + "AS\n"
+                        + "   SELECT\n"
+                        + "        t1.AID,\n"
+                        + "        COUNT(*) AS IGNOREME,\n"
+                        + "        SUM(CAST(t1.USD AS DECIMAL)) AS USD\n"
+                        + "FROM T_ENG_11497_1 as t1 inner join T_ENG_11497_2 as t2\n"
+                        + "  ON t1.AID = t2.AID\n"
+                        + "GROUP BY\n"
+                        + "      t1.AID;\n"
+                        ;
+
+        // Create some tables and some views
+        client.callProcedure("@AdHoc", ddl);
+
+        // Insert into the source tables so they're non-empty
+        client.callProcedure("@AdHoc", "insert into T_ENG_11497_1 values (0, 10.0);\n");
+        client.callProcedure("@AdHoc", "insert into T_ENG_11497_1 values (1, 10.0);\n");
+        client.callProcedure("@AdHoc", "insert into T_ENG_11497_2 values (0, 10.0);\n");
+        client.callProcedure("@AdHoc", "insert into T_ENG_11497_2 values (1, 10.0);\n");
+
+        ClientResponse cr;
+
+        // Make sure it's possible to drop the views
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_1_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "drop view T_ENG_11497_2_VIEW;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     private void populateTables(Client client) throws IOException, NoConnectionsException, ProcCallException {
