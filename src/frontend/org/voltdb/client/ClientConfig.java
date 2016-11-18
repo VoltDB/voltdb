@@ -96,13 +96,12 @@ public class ClientConfig {
         m_listener = null;
         m_cleartext = true;
         m_hashScheme = ClientAuthScheme.HASH_SHA256;
-            try {
-                enableSSL();
-            } catch (Exception exc) {
-                System.err.println(exc.getMessage());
-                System.exit(-1);
-            }
-
+        try {
+            enableSSL();
+        } catch (Exception exc) {
+            System.err.println(exc.getMessage());
+            System.exit(-1);
+        }
     }
 
 
@@ -536,5 +535,9 @@ public class ClientConfig {
         } else {
             m_sslContext = null;
         }
+    }
+
+    public SSLContext getSslContext() {
+        return m_sslContext;
     }
 }
