@@ -165,6 +165,15 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testCreateView(client,
                        "create view vv2 as select alpha.a, count(*), max(beta.b + alpha.b) from alpha, beta group by alpha.a",
                        UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv2 as select alpha.a, count(*) from alpha join beta on alpha.a / alpha.a < 1 group by alpha.a;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv2 as select alpha.a, count(*) from alpha, beta where alpha.a / alpha.a < 1 group by alpha.a;",
+                       UNSAFE_OPS_STRING);
+        testCreateView(client,
+                       "create view vv2 as select alpha.a/beta.b, count(*) from alpha, beta group by alpha.a/beta.b;",
+                       UNSAFE_OPS_STRING);
         // This should succeed always, since the table empty is always
         // empty.
         testCreateView(client,
@@ -198,7 +207,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                                 String sql,
                                 String expectedDiagnostic)
             throws IOException, NoConnectionsException, ProcCallException {
-        ClientResponse cr;
+        ClientResponse cr = null;
         assertTrue("sql string should start with \"create view \"",
                    sql.startsWith("create view "));
         int pos = sql.indexOf(" ", 12);
@@ -210,7 +219,11 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         truncateTables(client, TABLE_NAMES);
         // Now try to create the view with empty tables.
         // This should always succeed.
-        cr = client.callProcedure("@AdHoc", sql);
+        try {
+            cr = client.callProcedure("@AdHoc", sql);
+        } catch (Exception ex) {
+            fail("Unexpected exception: \"" + ex.getMessage() + "\"");
+        }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Drop the view and populate the tables.

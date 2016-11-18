@@ -108,8 +108,8 @@ public class BranchNode extends JoinNode {
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> joinList = new ArrayList<>();
+        ArrayList<AbstractExpression> whereList = new ArrayList<>();
 
         // Collect node's own join and where expressions
         joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
@@ -448,5 +448,12 @@ public class BranchNode extends JoinNode {
         return m_joinType == JoinType.INNER &&
                (m_leftNode == null || m_leftNode.allInnerJoins()) &&
                (m_rightNode == null || m_rightNode.allInnerJoins());
+    }
+
+    @Override
+    public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
+        super.gatherJoinExpressions(checkExpressions);
+        m_leftNode.gatherJoinExpressions(checkExpressions);
+        m_rightNode.gatherJoinExpressions(checkExpressions);
     }
 }
