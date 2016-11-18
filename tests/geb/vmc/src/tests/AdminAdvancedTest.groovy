@@ -832,9 +832,7 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
-        page.overview.diskLimitEdit.click()
-        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
+        page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -895,9 +893,7 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
-        page.overview.diskLimitEdit.click()
-        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
+        page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -958,9 +954,7 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
-        page.overview.diskLimitEdit.click()
-        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
+        page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -1021,11 +1015,7 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) {
-            page.overview.diskLimitEdit.isDisplayed()
-            page.overview.diskLimitEdit.click()
-        }
-        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
+        page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -1086,9 +1076,7 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
-        page.overview.diskLimitEdit.click()
-        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
+        page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
