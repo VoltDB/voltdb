@@ -486,7 +486,6 @@ public class CatalogDiffEngine {
                 m_newTablesForExport.add(tbl.getTypeName());
             }
 
-
             String viewName = null;
             String sourceTableName = null;
             // If this is a materialized view, and it's not safe for non-empty
