@@ -67,8 +67,8 @@
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
+#include "plannodes/windowfunctionnode.h"
 #include <sstream>
-#include "windowfunctionnode.h"
 
 namespace plannodeutil {
 

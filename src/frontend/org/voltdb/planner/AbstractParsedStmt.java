@@ -49,7 +49,7 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -540,14 +540,14 @@ public abstract class AbstractParsedStmt {
     // It turns out to be interesting to store this as a list.  We
     // really only want one of them, but it helps to check for multiple
     // windowed expressions in a different place than parsing.
-    protected List<WindowedExpression> m_windowedExpressions = new ArrayList<>();
+    protected List<WindowFunctionExpression> m_windowFunctionExpressions = new ArrayList<>();
 
-    public List<WindowedExpression> getWindowedExpressions() {
-        return m_windowedExpressions;
+    public List<WindowFunctionExpression> getWindowFunctionExpressions() {
+        return m_windowFunctionExpressions;
     }
     /**
      * Parse the rank expression.  This actually just returns a TVE.  The
-     * Windowed Expression is squirreled away in the m_windowedExpression
+     * WindowFunctionExpression is squirreled away in the m_windowFunctionExpressions
      * object, though, because we will need it later.
      *
      * @param exprNode
@@ -564,8 +564,8 @@ public abstract class AbstractParsedStmt {
         // If this is not in the display column list, and the id is not the id of
         // the windowed expression, then this is an error.
         if (!m_parsingInDisplayColumns) {
-            if (m_windowedExpressions.size() > 0) {
-                WindowedExpression we = m_windowedExpressions.get(0);
+            if (m_windowFunctionExpressions.size() > 0) {
+                WindowFunctionExpression we = m_windowFunctionExpressions.get(0);
                 if (we.getXMLID() == id) {
                     // This is the same as a windowed expression we saw in the
                     // display list.  This can happen if we see an alias for
@@ -622,7 +622,7 @@ public abstract class AbstractParsedStmt {
         if (exprNode.attributes.containsKey("alias")) {
             alias = exprNode.attributes.get("alias");
         }
-        WindowedExpression rankExpr = new WindowedExpression(optype,
+        WindowFunctionExpression rankExpr = new WindowFunctionExpression(optype,
                                                              partitionbyExprs,
                                                              orderbyExprs,
                                                              orderbyDirs,
@@ -630,8 +630,8 @@ public abstract class AbstractParsedStmt {
                                                              id);
         ExpressionUtil.finalizeValueTypes(rankExpr);
         // Only offset 0 is useful.  But we keep the index anyway.
-        int offset = m_windowedExpressions.size();
-        m_windowedExpressions.add(rankExpr);
+        int offset = m_windowFunctionExpressions.size();
+        m_windowFunctionExpressions.add(rankExpr);
         TupleValueExpression tve = new TupleValueExpression(
                 TEMP_TABLE_NAME, TEMP_TABLE_NAME,
                 alias, alias,
@@ -759,7 +759,7 @@ public abstract class AbstractParsedStmt {
             return null;
         }
         // No windowed aggregate functions like RANK.
-        if (selectSubquery.hasWindowedExpression()) {
+        if (selectSubquery.hasWindowFunctionExpression()) {
             return null;
         }
         // No LIMIT/OFFSET

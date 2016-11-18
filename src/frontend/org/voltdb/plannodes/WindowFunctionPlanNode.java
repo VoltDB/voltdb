@@ -28,7 +28,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -63,21 +63,21 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     protected List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     // This is the list of TVEs for the window functions.  There
     // will only be one of them for now.
-    private List<TupleValueExpression> m_tve = new ArrayList<>();
+    private List<TupleValueExpression> m_outputTVEs = new ArrayList<>();
 
-    // List of the lists of order by expressions.  If there
+    // List of the order by expressions.  If there
     // are no order by expressions in one aggregate the list
     // is empty, not null.
     protected List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
 
-    private int getNumberAggregateFunctions() {
+    private int getAggregateFunctionCount() {
         return m_aggregateTypes.size();
     }
 
     @Override
     public void generateOutputSchema(Database db) {
         // We only expect one window function here.
-        assert(getNumberAggregateFunctions() == 1);
+        assert(getAggregateFunctionCount() == 1);
         if (m_outputSchema == null) {
             m_outputSchema = new NodeSchema();
         }
@@ -88,8 +88,8 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         m_children.get(0).generateOutputSchema(db);
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
         // We already created the TVE for this expression.
-        for (int ii = 0; ii < getNumberAggregateFunctions(); ii += 1) {
-            TupleValueExpression tve = m_tve.get(ii);
+        for (int ii = 0; ii < getAggregateFunctionCount(); ii += 1) {
+            TupleValueExpression tve = m_outputTVEs.get(ii);
             getOutputSchema().addColumn(
                     tve.getTableName(), tve.getTableAlias(),
                     tve.getColumnName(), tve.getColumnAlias(),
@@ -102,12 +102,12 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
     }
 
-    public final void setWindowedExpression(WindowedExpression winExpr) {
+    public final void setWindowFunctionExpression(WindowFunctionExpression winExpr) {
         // Currently, we can have only one window function in this kind of a
         // plan node.  So, if we are adding one here, we can't have
         // any already.
-        assert(getNumberAggregateFunctions() == 0);
-        m_aggregateOutputColumns.add(getNumberAggregateFunctions());
+        assert(getAggregateFunctionCount() == 0);
+        m_aggregateOutputColumns.add(getAggregateFunctionCount());
         m_aggregateTypes.add(winExpr.getExpressionType());
         m_aggregateDistinct.add(winExpr.getIsDistinct());
         if (winExpr.getAggregateArguments().size() > 0) {
@@ -118,7 +118,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         }
         m_partitionByExpressions = winExpr.getPartitionByExpressions();
         m_orderByExpressions = winExpr.getOrderByExpressions();
-        m_tve.add(winExpr.getDisplayListExpression());
+        m_outputTVEs.add(winExpr.getDisplayListExpression());
     }
 
     /**
@@ -133,10 +133,10 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
                 .array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
-            stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
+            stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
             boolean isDistinct = m_aggregateDistinct.get(ii);
-            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(isDistinct ? 1 : 0);
-            stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), isDistinct ? 1 : 0);
+            stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
             AbstractExpression.toJSONArray(stringer,
                                            Members.AGGREGATE_EXPRESSIONS.name(),
                                            m_aggregateExpressions.get(ii));

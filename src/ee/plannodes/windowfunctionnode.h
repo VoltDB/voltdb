@@ -26,18 +26,6 @@ public:
                                const std::string &spacer,
                                const std::string &label,
                                const OwningExpressionVector & exprs) const;
-private:
-    std::vector<ExpressionType> m_aggregates;
-    std::vector<bool> m_distinctAggregates;
-    std::vector<int> m_aggregateOutputColumns;
-    AggregateExpressionList m_aggregateInputExpressions;
-    //
-    // What columns to partition.
-    //
-    OwningExpressionVector m_partitionByExpressions;
-    // What columns to sort.
-    OwningExpressionVector m_orderByExpressions;
-public:
     WindowFunctionPlanNode()
         : AbstractPlanNode() {}
     virtual ~WindowFunctionPlanNode();
@@ -68,6 +56,17 @@ public:
     void collectOutputExpressions(std::vector<AbstractExpression *>&columnExpressions) const;
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
+private:
+    std::vector<ExpressionType> m_aggregates;
+    std::vector<bool> m_distinctAggregates;
+    std::vector<int> m_aggregateOutputColumns;
+    AggregateExpressionList m_aggregateInputExpressions;
+    //
+    // What columns to partition.
+    //
+    OwningExpressionVector m_partitionByExpressions;
+    // What columns to sort.
+    OwningExpressionVector m_orderByExpressions;
 };
 }
 #endif /* SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_ */

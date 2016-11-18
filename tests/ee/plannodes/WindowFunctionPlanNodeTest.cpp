@@ -246,7 +246,7 @@ TEST_F(WindowFunctionPlanNodeTest, TestJSON)
         EXPECT_EQ(jsonDescr->nPartitionByExprs, pn->getPartitionByExpressions().size());
         EXPECT_EQ(jsonDescr->nOrderByExprs, pn->getOrderByExpressions().size());
         EXPECT_EQ(jsonDescr->nOutputColumns, pn->getOutputSchema().size());
-    EXPECT_EQ(jsonDescr->nOutputColumns, jsonDescr->colDescriptions.getNumColumns());
+        EXPECT_EQ(jsonDescr->nOutputColumns, jsonDescr->colDescriptions.getNumColumns());
         auto columns = jsonDescr->colDescriptions.getColumns();
         for (int ocIdx = 0; ocIdx < jsonDescr->nOutputColumns; ocIdx += 1) {
             EXPECT_EQ(columns[ocIdx],

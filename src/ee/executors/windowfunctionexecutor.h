@@ -23,84 +23,8 @@
 namespace voltdb {
 
 class ProgressMonitorProxy;
-/**
- * A WindowAggregate is used to calculate one kind of
- * window function.  The algorithm
- */
-class WindowAggregate {
-public:
-    virtual ~WindowAggregate() {
-
-    }
-    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
-    void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
-    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
-
-    virtual void advance(const AbstractPlanNode::OwningExpressionVector &val,
-                         const TableTuple &nextTuple,
-                         bool newOrderByGroup) = 0;
-
-    void advanceOrderBy(const TableTuple &nextOrderByTuple);
-
-    virtual NValue finalize(ValueType type)
-    {
-        m_value.castAs(type);
-        return m_value;
-    }
-
-    virtual void resetAgg()
-    {
-        m_value.setNull();
-    }
-protected:
-    NValue m_value;
-};
-
-/**
- * This class is fancification of a C array of pointers to
- * WindowAgg.  It has a pass through tuple and at the end has a
- * bunch of pointers to WindowAggregate objects.  These latter
- * calculate the actual aggregate values.
- *
- * Don't define anything which needs virtuality here, or awful things will happen.
- */
-class WindowAggregateRow {
-public:
-    WindowAggregateRow(const TupleSchema *inputSchema, Pool &pool)
-        : m_passThroughTuple(m_passThroughStorage) {
-        m_passThroughStorage.init(inputSchema, &pool);
-        m_passThroughStorage.allocateActiveTuple();
-    }
-    void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
-    {
-      return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
-    }
-    void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
-    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
-
-    void resetAggs()
-    {
-        // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
-        for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
-            m_aggregates[ii]->resetAgg();
-        }
-    }
-
-    WindowAggregate **getAggregates() {
-        return &(m_aggregates[0]);
-    }
-    void recordPassThroughTuple(const TableTuple &nextTuple) {
-        m_passThroughTuple.copy(nextTuple);
-    }
-    TableTuple &getPassThroughTuple() {
-        return m_passThroughTuple;
-    }
-private:
-    PoolBackedTupleStorage  m_passThroughStorage;
-    TableTuple             &m_passThroughTuple;
-    WindowAggregate *m_aggregates[0];
-};
-
+class WindowAggregate;
+class WindowAggregateRow;
 /**
  * This is the executor for a WindowFunctionPlanNode.
  */
@@ -117,10 +41,6 @@ public:
         m_pmp(NULL),
         m_orderByKeySchema(NULL),
         m_partitionByKeySchema(NULL),
-        m_inProgressPartitionByKeyTuple(m_inProgressPartitionByKeyStorage),
-        m_lastPartitionByKeyTuple(m_lastPartitionByKeyStorage),
-        m_inProgressOrderByKeyTuple(m_inProgressOrderByKeyStorage),
-        m_lastOrderByKeyTuple(m_lastOrderByKeyStorage),
         m_inputSchema(NULL),
         m_aggregateRow(NULL)
         {
@@ -250,7 +170,7 @@ private:
 
     void insertOutputTuple(WindowAggregateRow* winFunRow);
 
-    TupleSchema* constructSomethingBySchema(const AbstractPlanNode::OwningExpressionVector &exprs);
+    TupleSchema* constructSchemaFromExpressionVector(const AbstractPlanNode::OwningExpressionVector &exprs);
 
     int compareTuples(const TableTuple &tuple1,
                       const TableTuple &tuple2) const;
@@ -318,7 +238,9 @@ private:
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressPartitionByKeyStorage;
-    TableTuple             &m_inProgressPartitionByKeyTuple;
+    TableTuple  & getInProgressPartitionByKeyTuple() {
+        return m_inProgressPartitionByKeyStorage;
+    }
     /**
      * This holds the evaluations for the next row.
      * Before we evaluate the expressions, on the next tuple,
@@ -335,7 +257,9 @@ private:
      * associated with this executor.
      */
     PoolBackedTupleStorage  m_lastPartitionByKeyStorage;
-    TableTuple             &m_lastPartitionByKeyTuple;
+    TableTuple & getLastPartitionByKeyTuple() {
+        return m_lastPartitionByKeyStorage;
+    }
     /**
      * This holds the evaluations for the current order by expressions.
      * Note that this is essentially a TableTuple, but that it
@@ -343,13 +267,17 @@ private:
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressOrderByKeyStorage;
-    TableTuple             &m_inProgressOrderByKeyTuple;
+    TableTuple & getInProgressOrderByKeyTuple() {
+        return m_inProgressOrderByKeyStorage;
+    }
     /**
      * This holds the result of evaluating the order by
      * expressions.
      */
     PoolBackedTupleStorage  m_lastOrderByKeyStorage;
-    TableTuple             &m_lastOrderByKeyTuple;
+    TableTuple & getLastOrderByKeyTuple() {
+        return m_lastOrderByKeyStorage;
+    }
     /**
      * This is the schema of the input table.
      */

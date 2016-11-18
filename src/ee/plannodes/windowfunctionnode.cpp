@@ -135,7 +135,7 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
         m_orderByExpressions.clear();
         loadSortListFromJSONObject(obj, &m_orderByExpressions, NULL);
     }
-    if(!(containsPartitionExpressions && containsOrderByExpressions)) {
+    if (!(containsPartitionExpressions && containsOrderByExpressions)) {
         std::ostringstream buffer;
         std::string sep = "";
         if (!containsPartitionExpressions) {

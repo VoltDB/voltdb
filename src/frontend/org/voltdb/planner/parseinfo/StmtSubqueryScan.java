@@ -364,7 +364,7 @@ public class StmtSubqueryScan extends StmtTableScan {
                 return false;
             }
         }
-        if ( ! selectStmt.hasPartitionColumnInWindowedExpression()) {
+        if ( ! selectStmt.hasPartitionColumnInWindowFunctionExpression()) {
             return false;
         }
 
