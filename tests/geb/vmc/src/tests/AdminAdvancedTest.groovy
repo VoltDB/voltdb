@@ -1021,8 +1021,10 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
-        page.overview.diskLimitEdit.click()
+        waitFor(30) {
+            page.overview.diskLimitEdit.isDisplayed()
+            page.overview.diskLimitEdit.click()
+        }
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
 
         then:"check elements"
