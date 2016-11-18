@@ -2435,16 +2435,6 @@ public final class DRAgent {
      * <code>optional int32 protocolVersion = 3;</code>
      */
     int getProtocolVersion();
-
-    // optional fixed64 clusterRecoveryId = 4;
-    /**
-     * <code>optional fixed64 clusterRecoveryId = 4;</code>
-     */
-    boolean hasClusterRecoveryId();
-    /**
-     * <code>optional fixed64 clusterRecoveryId = 4;</code>
-     */
-    long getClusterRecoveryId();
   }
   /**
    * Protobuf type {@code pmsg.Connect}
@@ -2510,11 +2500,6 @@ public final class DRAgent {
             case 24: {
               bitField0_ |= 0x00000004;
               protocolVersion_ = input.readInt32();
-              break;
-            }
-            case 33: {
-              bitField0_ |= 0x00000008;
-              clusterRecoveryId_ = input.readFixed64();
               break;
             }
           }
@@ -2605,27 +2590,10 @@ public final class DRAgent {
       return protocolVersion_;
     }
 
-    // optional fixed64 clusterRecoveryId = 4;
-    public static final int CLUSTERRECOVERYID_FIELD_NUMBER = 4;
-    private long clusterRecoveryId_;
-    /**
-     * <code>optional fixed64 clusterRecoveryId = 4;</code>
-     */
-    public boolean hasClusterRecoveryId() {
-      return ((bitField0_ & 0x00000008) == 0x00000008);
-    }
-    /**
-     * <code>optional fixed64 clusterRecoveryId = 4;</code>
-     */
-    public long getClusterRecoveryId() {
-      return clusterRecoveryId_;
-    }
-
     private void initFields() {
       clusterId_ = 0;
       clusterCreationId_ = 0L;
       protocolVersion_ = 0;
-      clusterRecoveryId_ = 0L;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2648,9 +2616,6 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         output.writeInt32(3, protocolVersion_);
       }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        output.writeFixed64(4, clusterRecoveryId_);
-      }
       getUnknownFields().writeTo(output);
     }
 
@@ -2671,10 +2636,6 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt32Size(3, protocolVersion_);
-      }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeFixed64Size(4, clusterRecoveryId_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2798,8 +2759,6 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000002);
         protocolVersion_ = 0;
         bitField0_ = (bitField0_ & ~0x00000004);
-        clusterRecoveryId_ = 0L;
-        bitField0_ = (bitField0_ & ~0x00000008);
         return this;
       }
 
@@ -2840,10 +2799,6 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000004;
         }
         result.protocolVersion_ = protocolVersion_;
-        if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
-          to_bitField0_ |= 0x00000008;
-        }
-        result.clusterRecoveryId_ = clusterRecoveryId_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2868,9 +2823,6 @@ public final class DRAgent {
         }
         if (other.hasProtocolVersion()) {
           setProtocolVersion(other.getProtocolVersion());
-        }
-        if (other.hasClusterRecoveryId()) {
-          setClusterRecoveryId(other.getClusterRecoveryId());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2994,39 +2946,6 @@ public final class DRAgent {
       public Builder clearProtocolVersion() {
         bitField0_ = (bitField0_ & ~0x00000004);
         protocolVersion_ = 0;
-        onChanged();
-        return this;
-      }
-
-      // optional fixed64 clusterRecoveryId = 4;
-      private long clusterRecoveryId_ ;
-      /**
-       * <code>optional fixed64 clusterRecoveryId = 4;</code>
-       */
-      public boolean hasClusterRecoveryId() {
-        return ((bitField0_ & 0x00000008) == 0x00000008);
-      }
-      /**
-       * <code>optional fixed64 clusterRecoveryId = 4;</code>
-       */
-      public long getClusterRecoveryId() {
-        return clusterRecoveryId_;
-      }
-      /**
-       * <code>optional fixed64 clusterRecoveryId = 4;</code>
-       */
-      public Builder setClusterRecoveryId(long value) {
-        bitField0_ |= 0x00000008;
-        clusterRecoveryId_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional fixed64 clusterRecoveryId = 4;</code>
-       */
-      public Builder clearClusterRecoveryId() {
-        bitField0_ = (bitField0_ & ~0x00000008);
-        clusterRecoveryId_ = 0L;
         onChanged();
         return this;
       }
@@ -15692,59 +15611,58 @@ public final class DRAgent {
       "RowLatencyNanos\030\003 \001(\006\"\034\n\013SnapshotReq\022\r\n\005" +
       "nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitionId\030\001 \001(" +
       "\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n\013partiti" +
-      "onId\030\001 \001(\005\"k\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
+      "onId\030\001 \001(\005\"P\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
       "\022\031\n\021clusterCreationId\030\002 \001(\006\022\027\n\017protocolV" +
-      "ersion\030\003 \001(\005\022\031\n\021clusterRecoveryId\030\004 \001(\006\"" +
-      "t\n\tSubscribe\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttim",
-      "estamp\030\002 \001(\006\022\022\n\nisCovering\030\003 \001(\010\022\030\n\020rewi" +
-      "ndToUniqueId\030\004 \001(\006\022\021\n\tisSyncing\030\005 \001(\010\"#\n" +
-      "\005Query\022\032\n\013includeMesh\030\001 \001(\010:\005false\"\231\004\n\010R" +
-      "esponse\022\026\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030" +
-      "\002 \001(\0162\036.pmsg.Response.ReplicationMode\022\031\n" +
-      "\021snapshotTimestamp\030\003 \001(\006\022\026\n\016instanceIdHa" +
-      "sh\030\004 \001(\006\022\017\n\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 " +
-      "\003(\0132\016.pmsg.NodeInfo\022\034\n\024globalPartitionCo" +
-      "unt\030\007 \001(\005\022*\n\rpartitionInfo\030\010 \003(\0132\023.pmsg." +
-      "PartitionInfo\022\021\n\006status\030\t \001(\005:\0010\022%\n\004type",
-      "\030\n \001(\0162\027.pmsg.CtrlEnvelope.Type\022\022\n\ncatal" +
-      "ogCRC\030\013 \001(\006\022\030\n\020catalogSignature\030\014 \001(\t\022\024\n" +
-      "\014failureCause\030\r \001(\t\022\025\n\risEndOfStream\030\016 \001" +
-      "(\010\022\027\n\017protocolVersion\030\017 \001(\005\"i\n\017Replicati" +
-      "onMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED\020\002" +
-      "\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n" +
-      "\013UNAVAILABLE\020\005\"\377\001\n\021CtrlProtoResponse\022\026\n\002" +
-      "id\030\001 \002(\0132\n.pmsg.UUID\022%\n\004type\030\002 \001(\0162\027.pms" +
-      "g.CtrlEnvelope.Type\022\021\n\006status\030\003 \001(\005:\0010\022\024" +
-      "\n\014failureCause\030\004 \001(\t\022.\n\017connectResponse\030",
-      "\005 \001(\0132\025.pmsg.ConnectResponse\022*\n\rqueryRes" +
-      "ponse\030\006 \001(\0132\023.pmsg.QueryResponse\022&\n\013ackR" +
-      "esponse\030\007 \001(\0132\021.pmsg.AckResponse\"$\n\013AckR" +
-      "esponse\022\025\n\risEndOfStream\030\001 \001(\010\"\200\001\n\017Conne" +
-      "ctResponse\022\022\n\ncatalogCRC\030\001 \001(\006\022\030\n\020catalo" +
-      "gSignature\030\002 \001(\t\022\027\n\017protocolVersion\030\003 \001(" +
-      "\005\022&\n\013clusterInfo\030\004 \003(\0132\021.pmsg.ClusterInf" +
-      "o\"4\n\rQueryResponse\022#\n\010clusters\030\001 \003(\0132\021.p" +
-      "msg.ClusterInfo\"\265\001\n\013ClusterInfo\022\021\n\tclust" +
-      "erId\030\001 \002(\005\022\022\n\ncreationId\030\002 \002(\006\022\023\n\013recove",
-      "rTime\030\003 \001(\006\022\034\n\024globalPartitionCount\030\004 \001(" +
-      "\005\022 \n\010nodeInfo\030\005 \003(\0132\016.pmsg.NodeInfo\022*\n\rp" +
-      "artitionInfo\030\006 \003(\0132\023.pmsg.PartitionInfo\"" +
-      ":\n\010NodeInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030" +
-      "\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPartitionInfo\022\023\n\013" +
-      "partitionId\030\001 \001(\005\022\024\n\014nextUniqueId\030\n \001(\003\"" +
-      "\330\003\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.Ct" +
-      "rlEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022" +
-      "\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013" +
-      ".pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022",
-      " \n\010response\030\006 \001(\0132\016.pmsg.Response\022&\n\013sna" +
-      "pshotReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsub" +
-      "scribe\030\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect" +
-      "\030\n \001(\0132\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.p" +
-      "msg.Query\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t" +
-      "\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SN" +
-      "APSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_" +
-      "SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017or" +
-      "g.voltdb.pmsgB\007DRAgent"
+      "ersion\030\003 \001(\005\"t\n\tSubscribe\022\023\n\013partitionId" +
+      "\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\nisCovering\030",
+      "\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 \001(\006\022\021\n\tisSyn" +
+      "cing\030\005 \001(\010\"#\n\005Query\022\032\n\013includeMesh\030\001 \001(\010" +
+      ":\005false\"\231\004\n\010Response\022\026\n\002id\030\001 \002(\0132\n.pmsg." +
+      "UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Response.Repli" +
+      "cationMode\022\031\n\021snapshotTimestamp\030\003 \001(\006\022\026\n" +
+      "\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030\005 \001(\t\022 " +
+      "\n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024glob" +
+      "alPartitionCount\030\007 \001(\005\022*\n\rpartitionInfo\030" +
+      "\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006status\030\t \001" +
+      "(\005:\0010\022%\n\004type\030\n \001(\0162\027.pmsg.CtrlEnvelope.",
+      "Type\022\022\n\ncatalogCRC\030\013 \001(\006\022\030\n\020catalogSigna" +
+      "ture\030\014 \001(\t\022\024\n\014failureCause\030\r \001(\t\022\025\n\risEn" +
+      "dOfStream\030\016 \001(\010\022\027\n\017protocolVersion\030\017 \001(\005" +
+      "\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING" +
+      "_REPLICATED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n" +
+      "\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"\377\001\n\021CtrlProt" +
+      "oResponse\022\026\n\002id\030\001 \002(\0132\n.pmsg.UUID\022%\n\004typ" +
+      "e\030\002 \001(\0162\027.pmsg.CtrlEnvelope.Type\022\021\n\006stat" +
+      "us\030\003 \001(\005:\0010\022\024\n\014failureCause\030\004 \001(\t\022.\n\017con" +
+      "nectResponse\030\005 \001(\0132\025.pmsg.ConnectRespons",
+      "e\022*\n\rqueryResponse\030\006 \001(\0132\023.pmsg.QueryRes" +
+      "ponse\022&\n\013ackResponse\030\007 \001(\0132\021.pmsg.AckRes" +
+      "ponse\"$\n\013AckResponse\022\025\n\risEndOfStream\030\001 " +
+      "\001(\010\"\200\001\n\017ConnectResponse\022\022\n\ncatalogCRC\030\001 " +
+      "\001(\006\022\030\n\020catalogSignature\030\002 \001(\t\022\027\n\017protoco" +
+      "lVersion\030\003 \001(\005\022&\n\013clusterInfo\030\004 \003(\0132\021.pm" +
+      "sg.ClusterInfo\"4\n\rQueryResponse\022#\n\010clust" +
+      "ers\030\001 \003(\0132\021.pmsg.ClusterInfo\"\265\001\n\013Cluster" +
+      "Info\022\021\n\tclusterId\030\001 \002(\005\022\022\n\ncreationId\030\002 " +
+      "\002(\006\022\023\n\013recoverTime\030\003 \001(\006\022\034\n\024globalPartit",
+      "ionCount\030\004 \001(\005\022 \n\010nodeInfo\030\005 \003(\0132\016.pmsg." +
+      "NodeInfo\022*\n\rpartitionInfo\030\006 \003(\0132\023.pmsg.P" +
+      "artitionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001 \001" +
+      "(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPart" +
+      "itionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014nextUn" +
+      "iqueId\030\n \001(\003\"\330\003\n\014CtrlEnvelope\022%\n\004type\030\001 " +
+      "\002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(\013" +
+      "2\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005" +
+      "reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\0132" +
+      "\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.Re",
+      "sponse\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Snaps" +
+      "hotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscri" +
+      "be\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect\022\032\n\005qu" +
+      "ery\030\013 \001(\0132\013.pmsg.Query\"\216\001\n\004Type\022\007\n\003ACK\020\001" +
+      "\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RES" +
+      "PONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TE" +
+      "RM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBS" +
+      "CRIBE\020\nB\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -15786,7 +15704,7 @@ public final class DRAgent {
           internal_static_pmsg_Connect_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Connect_descriptor,
-              new java.lang.String[] { "ClusterId", "ClusterCreationId", "ProtocolVersion", "ClusterRecoveryId", });
+              new java.lang.String[] { "ClusterId", "ClusterCreationId", "ProtocolVersion", });
           internal_static_pmsg_Subscribe_descriptor =
             getDescriptor().getMessageTypes().get(6);
           internal_static_pmsg_Subscribe_fieldAccessorTable = new

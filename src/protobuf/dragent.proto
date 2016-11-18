@@ -30,7 +30,6 @@ message Connect {
     optional int32 clusterId = 1;
     optional fixed64 clusterCreationId = 2;
     optional int32 protocolVersion = 3;
-    optional fixed64 clusterRecoveryId = 4;
 }
 
 message Subscribe {
