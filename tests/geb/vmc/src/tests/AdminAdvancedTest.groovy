@@ -832,7 +832,9 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(waitTime) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -893,7 +895,9 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(waitTime) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -954,7 +958,9 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(waitTime) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
@@ -1078,7 +1084,9 @@ class AdminAdvancedTest extends TestBase {
         //snapShotName.text().equals("SNAPSHOTS")
 
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(waitTime) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
 
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
