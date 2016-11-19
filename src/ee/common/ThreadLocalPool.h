@@ -34,6 +34,12 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
+    /**
+     * Releases all allocations that are pending release, and returns
+     * to normal, "immediate release" mode.
+     */
+    static void releaseAllFreedRelocatables();
+
     /// The layout of an allocation segregated by size,
     /// including overhead to help identify the size-specific
     /// pool from which the allocation must be freed.

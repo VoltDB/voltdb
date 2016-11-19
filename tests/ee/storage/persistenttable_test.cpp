@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <iostream>
 #include <vector>
 #include <string>
 
@@ -28,6 +29,7 @@
 
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/SimpleTimer.hpp"
 
 #include "common/tabletuple.h"
 #include "common/types.h"
@@ -46,12 +48,14 @@ using voltdb::Table;
 using voltdb::TableFactory;
 using voltdb::TableIterator;
 using voltdb::TableTuple;
+using voltdb::TupleSchema;
 using voltdb::TupleSchemaBuilder;
 using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
 using voltdb::ValueFactory;
 using voltdb::VoltDBEngine;
 using voltdb::tableutil;
+
 
 class PersistentTableTest : public Test {
 public:
@@ -60,6 +64,8 @@ public:
         , m_undoToken(0)
         , m_uniqueId(0)
     {
+        std::srand(888);
+
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
@@ -98,12 +104,14 @@ protected:
         m_engine->releaseUndoToken(m_undoToken);
         ++m_undoToken;
         m_engine->setUndoToken(m_undoToken);
+        m_engine->getStringPool()->purge();
     }
 
     void rollback() {
         m_engine->undoUndoToken(m_undoToken);
         ++m_undoToken;
         m_engine->setUndoToken(m_undoToken);
+        m_engine->getStringPool()->purge();
     }
 
     static const std::string& catalogPayload() {
@@ -166,6 +174,119 @@ protected:
         return payload;
     }
 
+    static const std::string& catalogPayloadForTableWithManyObjects() {
+        static const std::string payload =
+            "add / clusters cluster\n"
+            "set /clusters#cluster localepoch 1199145600\n"
+            "set $PREV securityEnabled false\n"
+            "set $PREV httpdportno 0\n"
+            "set $PREV jsonapi false\n"
+            "set $PREV networkpartition false\n"
+            "set $PREV voltRoot \"\"\n"
+            "set $PREV exportOverflow \"\"\n"
+            "set $PREV drOverflow \"\"\n"
+            "set $PREV adminport 0\n"
+            "set $PREV adminstartup false\n"
+            "set $PREV heartbeatTimeout 0\n"
+            "set $PREV useddlschema false\n"
+            "set $PREV drConsumerEnabled false\n"
+            "set $PREV drProducerEnabled false\n"
+            "set $PREV drClusterId 0\n"
+            "set $PREV drProducerPort 0\n"
+            "set $PREV drMasterHost \"\"\n"
+            "set $PREV drFlushInterval 0\n"
+            "add /clusters#cluster databases database\n"
+            "set /clusters#cluster/databases#database schema \"eJxtjDsOwzAMQ/eexiZt0lqTNvc/UmmgQwpk0IfiE0VDU91DEy29Czp/+zQ95nW/Yqk00KJLTn0c5eat38mBK+6R38IZJwkGezZtV9TaE4uDjUXhzuGBW+zh8MfxgevJw04NWTxeX5X3LS8=\"\n"
+            "set $PREV isActiveActiveDRed false\n"
+            "set $PREV securityprovider \"\"\n"
+            "add /clusters#cluster/databases#database groups administrator\n"
+            "set /clusters#cluster/databases#database/groups#administrator admin true\n"
+            "set $PREV defaultproc true\n"
+            "set $PREV defaultprocread true\n"
+            "set $PREV sql true\n"
+            "set $PREV sqlread true\n"
+            "set $PREV allproc true\n"
+            "add /clusters#cluster/databases#database groups user\n"
+            "set /clusters#cluster/databases#database/groups#user admin false\n"
+            "set $PREV defaultproc true\n"
+            "set $PREV defaultprocread true\n"
+            "set $PREV sql true\n"
+            "set $PREV sqlread true\n"
+            "set $PREV allproc true\n"
+            "add /clusters#cluster/databases#database tables TEST_TABLE\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE isreplicated true\n"
+            "set $PREV partitioncolumn null\n"
+            "set $PREV estimatedtuplecount 0\n"
+            "set $PREV materializer null\n"
+            "set $PREV signature \"TEST_TABLE|bvvv\"\n"
+            "set $PREV tuplelimit 2147483647\n"
+            "set $PREV isDRed false\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE columns ID\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/columns#ID index 0\n"
+            "set $PREV type 6\n"
+            "set $PREV size 8\n"
+            "set $PREV nullable true\n"
+            "set $PREV name \"ID\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE columns STR1\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/columns#STR1 index 1\n"
+            "set $PREV type 9\n"
+            "set $PREV size 4096\n"
+            "set $PREV nullable true\n"
+            "set $PREV name \"STR1\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE columns STR2\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/columns#STR2 index 2\n"
+            "set $PREV type 9\n"
+            "set $PREV size 8192\n"
+            "set $PREV nullable true\n"
+            "set $PREV name \"STR2\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE columns STR3\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/columns#STR3 index 3\n"
+            "set $PREV type 9\n"
+            "set $PREV size 10240\n"
+            "set $PREV nullable true\n"
+            "set $PREV name \"STR3\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE indexes VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/indexes#VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID unique true\n"
+            "set $PREV assumeUnique false\n"
+            "set $PREV countable true\n"
+            "set $PREV type 1\n"
+            "set $PREV expressionsjson \"\"\n"
+            "set $PREV predicatejson \"\"\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE/indexes#VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID columns ID\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/indexes#VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID/columns#ID index 0\n"
+            "set $PREV column /clusters#cluster/databases#database/tables#TEST_TABLE/columns#ID\n"
+            "add /clusters#cluster/databases#database/tables#TEST_TABLE constraints VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID\n"
+            "set /clusters#cluster/databases#database/tables#TEST_TABLE/constraints#VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID type 4\n"
+            "set $PREV oncommit \"\"\n"
+            "set $PREV index /clusters#cluster/databases#database/tables#TEST_TABLE/indexes#VOLTDB_AUTOGEN_IDX_PK_TEST_TABLE_ID\n"
+            "set $PREV foreignkeytable null\n";
+        return payload;
+    }
+
 private:
     boost::scoped_ptr<VoltDBEngine> m_engine;
     int64_t m_undoToken;
@@ -189,16 +310,18 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     voltdb::StandAloneTupleStorage storage(schema);
     TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
 
-    NValue bigintNValues[] = {
+    std::vector<NValue> bigintNValues {
         ValueFactory::getBigIntValue(1900),
         ValueFactory::getBigIntValue(1901),
         ValueFactory::getBigIntValue(1902)
     };
 
-    NValue stringNValues[] = {
-        ValueFactory::getTempStringValue("Je me souviens"),
-        ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
-        ValueFactory::getTempStringValue("Splendor sine occasu")
+    // These cannot be temp strings, since we need to commit transactions
+    // in this test.
+    std::vector<NValue> stringNValues {
+        ValueFactory::getStringValue("Je me souviens"),
+        ValueFactory::getStringValue("Ut Incepit Fidelis Sic Permanet"),
+        ValueFactory::getStringValue("Splendor sine occasu")
     };
 
     // Let's do some inserts into the table.
@@ -280,6 +403,10 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
         ++i;
     }
+
+    BOOST_FOREACH(NValue& nval, stringNValues) {
+        nval.free();
+    }
 }
 
 TEST_F(PersistentTableTest, TruncateTableTest) {
@@ -310,6 +437,79 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
+}
+
+/**
+ * This test creates a table with several non-inline string columns,
+ * and fills it with data.  Then it updates the table a bunch of times,
+ * creating and deleting non-inline string column values.
+ * Finally, it truncates the table.
+ *
+ * For each operation, print out how long it took.
+ *
+ * The purpose of this test is measure performance of the truncation
+ * operation, which must free all the allocated strings.
+ */
+TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
+
+    getEngine()->loadCatalog(0, catalogPayloadForTableWithManyObjects());
+    PersistentTable *table = dynamic_cast<PersistentTable*>(
+        getEngine()->getTable("TEST_TABLE"));
+    ASSERT_NE(NULL, table);
+
+    const int NUMROWS = 10000;
+    const TupleSchema* schema = table->schema();
+    std::vector<uint32_t> varcharColLengths {
+        schema->getColumnInfo(1)->length,
+        schema->getColumnInfo(2)->length,
+        schema->getColumnInfo(3)->length
+    };
+
+    std::cout << "\n           Loading table...";
+    SimpleTimer timer;
+    TableTuple tempTuple = table->tempTuple();
+    for (int i = 0; i < NUMROWS; ++i) {
+        char fillChar = (i % 26) + 'A';
+
+        tempTuple.setNValue(0, ValueFactory::getIntegerValue(i));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(varcharColLengths[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(varcharColLengths[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(varcharColLengths[2], fillChar)));
+
+        table->insertTuple(tempTuple);
+        commit();
+    }
+
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           Updating tuples...";
+    timer.reset();
+    for (int i = 0; i < NUMROWS; ++i) {
+        char fillChar = (i % 26) + 'a';
+
+        int64_t whichRow = std::rand() % NUMROWS;
+        tempTuple.setNValue(0, ValueFactory::getIntegerValue(whichRow));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(varcharColLengths[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(varcharColLengths[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(varcharColLengths[2], fillChar)));
+
+        TableTuple tupleToUpdate = table->lookupTupleByValues(tempTuple);
+        ASSERT_FALSE(tupleToUpdate.isNullTuple());
+
+        beginWork();
+        table->updateTuple(tupleToUpdate, tempTuple);
+        commit();
+    }
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           Truncating table...";
+    timer.reset();
+    beginWork();
+    table->truncateTable(getEngine(), true);
+    commit();
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           ";
 }
 
 int main() {

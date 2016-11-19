@@ -165,7 +165,12 @@ int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
 }
 
 void ThreadLocalPool::freeRelocatable(Sized* data)
-{ delete [] reinterpret_cast<char*>(data); }
+{
+    delete [] reinterpret_cast<char*>(data);
+}
+
+void ThreadLocalPool::releaseAllFreedRelocatables() {
+}
 
 #else // not MEMCHECK
 
@@ -232,8 +237,15 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
                             alloc_size);
     }
-    // Free the raw allocation from the found pool.
-    iter->second->free(sized);
+
+    iter->second->markAllocationAsPendingRelease(sized);
+}
+
+void ThreadLocalPool::releaseAllFreedRelocatables() {
+    auto& poolMap = getStringPoolMap();
+    BOOST_FOREACH(auto entry, poolMap) {
+        entry.second->freePendingAllocations();
+    }
 }
 
 #endif

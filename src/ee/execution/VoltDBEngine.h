@@ -371,6 +371,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             if (m_executorContext->drReplicatedStream()) {
                 m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
             }
+            ThreadLocalPool::releaseAllFreedRelocatables();
         }
 
         void undoUndoToken(int64_t undoToken)
@@ -378,6 +379,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_currentUndoQuantum = NULL;
             m_executorContext->setupForPlanFragments(NULL);
             m_undoLog.undo(undoToken);
+            ThreadLocalPool::releaseAllFreedRelocatables();
         }
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
