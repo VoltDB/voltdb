@@ -114,6 +114,13 @@ protected:
         m_engine->getStringPool()->purge();
     }
 
+    // SET DR = ACTIVE;
+    // CREATE TABLE T (
+    //   PK BIGINT NOT NULL,
+    //   DATA VARCHAR(256),
+    //   PRIMARY KEY (PK)
+    // );
+    // DR TABLE T;
     static const std::string& catalogPayload() {
         static const std::string payload(
             "add / clusters cluster\n"
@@ -174,6 +181,13 @@ protected:
         return payload;
     }
 
+    // CREATE TABLE TEST_TABLE (
+    //   ID BIGINT,
+    //   STR1 VARCHAR(4096),
+    //   STR2 VARCHAR(8192),
+    //   STR3 VARCHAR(10240),
+    //   PRIMARY KEY (id)
+    // );
     static const std::string& catalogPayloadForTableWithManyObjects() {
         static const std::string payload =
             "add / clusters cluster\n"
