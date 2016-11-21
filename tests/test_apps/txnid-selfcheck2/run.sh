@@ -71,7 +71,7 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function aysnc-benchmark-help() {
+function async-benchmark-help() {
     jars-ifneeded
     java -classpath $CLASSPATH:txnid.jar txnIdSelfCheck.Benchmark --help
 }
@@ -104,7 +104,7 @@ function init() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|init|server|async-benchmark|aysnc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|jars|init|server|async-benchmark|async-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
