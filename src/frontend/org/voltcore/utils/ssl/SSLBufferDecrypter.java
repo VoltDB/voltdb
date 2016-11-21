@@ -17,8 +17,6 @@
 
 package org.voltcore.utils.ssl;
 
-import org.voltdb.common.Constants;
-
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
@@ -29,20 +27,30 @@ public class SSLBufferDecrypter {
 
     private final SSLEngine m_sslEngine;
     private ByteBuffer m_dstBuffer;
-    private final ByteBuffer m_partialLength;
+    private final ByteBuffer m_partialMessageLength;
     private int m_currentMessageLength;
     private int m_currentMessageStart;
 
     public SSLBufferDecrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
         this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
-        this.m_partialLength = ByteBuffer.allocate(4);
-        m_currentMessageLength = -1;
-        m_currentMessageStart = -1;
+        // newly decrypted data is held in the dst buffer between
+        // position and limit.  Initially, there is no decrypted
+        // data in the buffer and so the limit should be the same as
+        // the position.
+        m_dstBuffer.limit(m_dstBuffer.position());
+        this.m_partialMessageLength = ByteBuffer.allocate(4);
+        this.m_currentMessageLength = -1;
+        this.m_currentMessageStart = -1;
     }
 
     public int decrypt(ByteBuffer srcBuffer) throws IOException {
-        srcBuffer.flip();
+        if (srcBuffer.position() > 0) {
+            srcBuffer.flip();
+        } else {
+            // won't be able to decrypt is the src buffer is empty.
+            return 0;
+        }
 
         // if not in the middle of a message, clear the dst buffer.
         if (m_currentMessageLength == -1) {
@@ -58,17 +66,17 @@ public class SSLBufferDecrypter {
             }
         }
 
-        return unwrap(srcBuffer);
+        return unwrap(srcBuffer, m_dstBuffer);
     }
 
-    public ByteBuffer message() {
+    public ByteBuffer message(ByteBuffer messagesBuf) {
 
         // all the newly descrypted data has been processeed.
-        if (m_dstBuffer.limit() == m_dstBuffer.position()) {
+        if (messagesBuf.limit() == messagesBuf.position()) {
             return null;
         }
 
-        if (m_partialLength.position() != 0) {
+        if (m_partialMessageLength.position() != 0) {
             if (!startMessage()) {
                 return null;
             }
@@ -78,66 +86,75 @@ public class SSLBufferDecrypter {
             }
         }
 
-        int remainingInMessage = m_currentMessageLength - (m_dstBuffer.position() - m_currentMessageStart);
-        if (m_dstBuffer.remaining() >= remainingInMessage) {
-            int oldLimit = m_dstBuffer.limit();
-            m_dstBuffer.position(m_currentMessageStart);
-            m_dstBuffer.limit(m_dstBuffer.position() + m_currentMessageLength);
+        int remainingInMessage = m_currentMessageLength - (messagesBuf.position() - m_currentMessageStart);
+        if (messagesBuf.remaining() >= remainingInMessage) {
+            int oldLimit = messagesBuf.limit();
+            messagesBuf.position(m_currentMessageStart);
+            messagesBuf.limit(messagesBuf.position() + m_currentMessageLength);
 
             ByteBuffer message = ByteBuffer.allocate(m_currentMessageLength);
-            message.put(m_dstBuffer);
+            message.put(messagesBuf);
             message.flip();
-            m_dstBuffer.limit(oldLimit);
+            messagesBuf.limit(oldLimit);
             m_currentMessageLength = -1;
             return message;
         } else {
             // newly decrypted bytes are part of the existing message
-            m_dstBuffer.position(m_dstBuffer.limit());
+            messagesBuf.position(messagesBuf.limit());
             return null;
         }
     }
 
     private boolean startMessage() {
-        if (m_dstBuffer.remaining() >= m_partialLength.remaining()) {
+        if (m_dstBuffer.remaining() >= m_partialMessageLength.remaining()) {
             int oldLimit = m_dstBuffer.limit();
-            m_dstBuffer.limit(m_dstBuffer.position() + m_partialLength.remaining());
-            m_partialLength.put(m_dstBuffer);
+            m_dstBuffer.limit(m_dstBuffer.position() + m_partialMessageLength.remaining());
+            m_partialMessageLength.put(m_dstBuffer);
             m_dstBuffer.limit(oldLimit);
-            m_partialLength.flip();
-            m_currentMessageLength = m_partialLength.getInt();
-            m_partialLength.clear();
+            m_partialMessageLength.flip();
+            m_currentMessageLength = m_partialMessageLength.getInt();
+            m_partialMessageLength.clear();
             m_currentMessageStart = m_dstBuffer.position();
             return true;
         } else {
-            m_partialLength.put(m_dstBuffer);
+            m_partialMessageLength.put(m_dstBuffer);
             return false;
         }
     }
 
     // returns bytes consumed
-    private int unwrap(ByteBuffer srcBuffer) throws IOException {
+    public int unwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
         // save initial state of dst buffer in case of underflow.
-        int initialDstPos = m_dstBuffer.position();
-
+        int initialDstPos = dstBuffer.position();
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, m_dstBuffer.slice());
+            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, dstBuffer.slice());
             switch (result.getStatus()) {
                 case OK:
+                    if (srcBuffer.hasRemaining()) {
+                        srcBuffer.compact();
+                    } else {
+                        srcBuffer.clear();
+                    }
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    m_dstBuffer.limit(m_dstBuffer.position() + result.bytesProduced());
+                    dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
                     return result.bytesConsumed();
                 case BUFFER_OVERFLOW:
                     // the dst buffer holds partial volt messages, so its state needs to
                     // be retained on overflow.
-                    ByteBuffer tmp = ByteBuffer.allocateDirect(m_dstBuffer.capacity() << 1);
-                    m_dstBuffer.position(0);
+                    ByteBuffer tmp = ByteBuffer.allocateDirect(dstBuffer.capacity() << 1);
+                    dstBuffer.position(0);
                     tmp.put(m_dstBuffer);
                     tmp.position(initialDstPos);
-                    m_dstBuffer = tmp;
+                    dstBuffer = tmp;
                     break;
                 case BUFFER_UNDERFLOW:
-                    // Should never underflow as we know the size of the incoming frame.
-                    throw new IOException("Unexpected underflow when unwrappling an ssl frame.");
+                    // on underflow, want to read again.  There are unprocessed bytes up to limit.
+                    // reset the buffers to their state prior to the underflow.
+                    srcBuffer.position(srcBuffer.limit());
+                    srcBuffer.limit(srcBuffer.capacity());
+                    dstBuffer.position(initialDstPos);
+                    dstBuffer.limit(initialDstPos);
+                    return 0;
                 case CLOSED:
                     throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
             }

@@ -56,13 +56,13 @@ public interface InputHandler {
     boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header);
 
     /**
-     * Read a message from the inputStream into the buffer.  Returns true if the
-     * input stream had enough bytes to read the message.
+     * Fill the buffer from the read stream.  Writes into the buffer
+     * until either the buffer is full of the read stream is empty.
      * @param inputStream  The inputStream
      * @param buffer       The buffer
-     * @return true If the message was retrieved.
+     * @return the number of bytes copied into the buffer.
      */
-    boolean retrieveNextMessage(NIOReadStream inputStream, ByteBuffer buffer);
+    int fillBuffer(NIOReadStream inputStream, ByteBuffer buffer);
 
     /**
      * Checks the validity of the given message length.

@@ -77,8 +77,8 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
-        public boolean retrieveNextMessage(NIOReadStream inputStream, ByteBuffer buffer) {
-            return true;
+        public int fillBuffer(NIOReadStream inputStream, ByteBuffer buffer) {
+            return 0;
         }
 
         @Override

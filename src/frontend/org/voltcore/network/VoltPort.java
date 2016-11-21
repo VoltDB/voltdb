@@ -27,10 +27,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.ssl.SSLBufferDecrypter;
-import org.voltdb.common.Constants;
-
-import javax.net.ssl.SSLEngine;
 
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
@@ -38,7 +34,7 @@ public class VoltPort implements Connection
     /** The network this port participates in */
     private final VoltNetwork m_network;
 
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private static final int MAX_MESSAGE_LENGTH = 52428800;
 
@@ -61,7 +57,7 @@ public class VoltPort implements Connection
      *  External writers (like a foreign host, for example),
      *  must be able to register network writes to a port
      *  that's running. This requires synchronization. */
-    private final Object m_lock = new Object();
+    protected final Object m_lock = new Object();
 
     // BUG: should be final but currently VoltNetwork.register(), which
     // generates the selection key, takes the port as a parameter. catch-22.
@@ -172,18 +168,18 @@ public class VoltPort implements Connection
             if (readyForRead()) {
                 final int maxRead = m_handler.getMaxRead();
                 if (maxRead > 0) {
-                    fillReadStream( maxRead);
-
-                    /*
-                     * Process all the buffered bytes and retrieve as many messages as possible
-                     * and pass them off to the input handler.
-                     */
-                    try {
-                        processNextMessage();
-                    }
-                    catch (VoltProtocolHandler.BadMessageLength e) {
-                        networkLog.error("Bad message length exception", e);
-                        throw e;
+                    int read = fillReadStream(maxRead);
+                    if (read > 0) {
+                        try {
+                            ByteBuffer message;
+                            while ((message = m_handler.retrieveNextMessage(readStream())) != null) {
+                                m_handler.handleMessage(message, this);
+                                m_messagesRead++;
+                            }
+                        } catch (VoltProtocolHandler.BadMessageLength e) {
+                            networkLog.error("Bad message length exception", e);
+                            throw e;
+                        }
                     }
                 }
             }
@@ -201,15 +197,7 @@ public class VoltPort implements Connection
         }
     }
 
-    protected void processNextMessage() throws IOException {
-        ByteBuffer message;
-        while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
-            m_handler.handleMessage( message, this);
-            m_messagesRead++;
-        }
-    }
-
-    private final int fillReadStream(int maxBytes) throws IOException {
+    protected final int fillReadStream(int maxBytes) throws IOException {
         if ( maxBytes == 0 || m_isShuttingDown)
             return 0;
 
@@ -237,7 +225,7 @@ public class VoltPort implements Connection
         return read;
     }
 
-    private final void drainWriteStream() throws IOException {
+    protected final void drainWriteStream() throws IOException {
         //Safe to do this with a separate embedded synchronization because no interest ops are modded
         m_writeStream.swapAndSerializeQueuedWrites(m_pool);
 

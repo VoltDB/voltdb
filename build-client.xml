@@ -115,6 +115,7 @@
                   org/voltcore/utils/CompressionStrategy.java
                   org/voltcore/utils/VoltTypeUtil.java
                   org/voltcore/utils/ssl/MessagingChannel.java
+                  org/voltcore/utils/ssl/SSLMessageParser.java
                   org/voltcore/utils/ssl/SSLBufferDecrypter.java
                   org/voltcore/utils/ssl/SSLBufferEncrypter.java
                   org/voltcore/utils/ssl/SSLConfiguration.java

@@ -92,14 +92,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
     }
 
     @Override
-    public boolean retrieveNextMessage(NIOReadStream inputStream, ByteBuffer message) {
-        if (inputStream.dataAvailable() < message.remaining()) {
-            return false;
-        }
-        inputStream.getBytes(message);
-        m_nextLength = 0;
-        m_sequenceId++;
-        return true;
+    public int fillBuffer(NIOReadStream inputStream, ByteBuffer message) {
+        return inputStream.getBytes(message);
     }
 
     @Override

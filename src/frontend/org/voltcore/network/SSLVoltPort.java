@@ -17,7 +17,9 @@
 
 package org.voltcore.network;
 
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
+import org.voltcore.utils.ssl.SSLMessageParser;
 import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
@@ -26,21 +28,34 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
 
 public class SSLVoltPort extends VoltPort {
 
     private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_sslBufferDecrypter;
-    private final ByteBuffer m_sslSrcBuffer;
-    private final ByteBuffer m_messageHeader;
+    private ByteBuffer m_dstBuffer;
+    private final SSLMessageParser m_sslMessageParser;
+
+    private ByteBuffer m_frameHeader;
     private final byte[] m_twoBytes = new byte[2];
+
+    private int m_nextFrameLength = 0;
+    private DBBPool.BBContainer m_nextFrameCon;
+
+    // will be a list of futures, for now a list of frames
+    private List<DBBPool.BBContainer> frames = new ArrayList<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
         this.m_sslEngine = sslEngine;
         m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
-        m_sslSrcBuffer = ByteBuffer.allocateDirect(Constants.SSL_CHUNK_SIZE + 128);
-        m_messageHeader = ByteBuffer.allocate(5);
+        m_sslMessageParser = new SSLMessageParser();
+        m_frameHeader = ByteBuffer.allocate(5);
+
+        this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
     }
 
     protected void setKey (SelectionKey key) {
@@ -56,34 +71,83 @@ public class SSLVoltPort extends VoltPort {
         m_interestOps = key.interestOps();
     }
 
-    protected void processNextMessage() throws InputHandler.BadMessageLength, IOException {
-        while (true) {
-            int nextMessageLength = m_handler.getNextMessageLength();
-            if (nextMessageLength == 0) {
-                if (!m_handler.retrieveNextMessageHeader(readStream(), m_messageHeader)) {
-                    break;
+    public void run() throws IOException {
+        try {
+            if (readyForRead()) {
+                final int maxRead = m_handler.getMaxRead();
+                if (maxRead > 0) {
+                    fillReadStream(maxRead);
                 }
-                m_messageHeader.flip();
-                m_sslSrcBuffer.clear();
-                m_sslSrcBuffer.put(m_messageHeader);
-                nextMessageLength = getMessageLengthFromHeader(m_messageHeader);
-                m_handler.checkMessageLength(nextMessageLength);
-                m_handler.setNextMessageLength(nextMessageLength);
-                m_sslSrcBuffer.limit(m_sslSrcBuffer.position() + nextMessageLength);
+
+                int read;
+                while (true) {
+                    // if in the middle of a message...
+                    if (m_nextFrameCon != null) {
+                        ByteBuffer frame = m_nextFrameCon.b();
+                        read = readStream().getBytes(frame);
+                        if (!frame.hasRemaining()) {
+                            frames.add(m_nextFrameCon);
+                            m_nextFrameCon = null;
+                            m_nextFrameLength = 0;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (m_nextFrameLength == 0) {
+                        read = readStream().getBytes(m_frameHeader);
+                        if (m_frameHeader.hasRemaining()) {
+                            break;
+                        }
+                        m_frameHeader.flip();
+                        m_frameHeader.position(3);
+                        m_frameHeader.get(m_twoBytes);
+                        m_nextFrameLength = ((m_twoBytes[0] & 0xff) << 8) | (m_twoBytes[1] & 0xff);
+                        m_nextFrameCon = DBBPool.allocateDirectAndPool(m_nextFrameLength + 5);
+                        ByteBuffer frame = m_nextFrameCon.b();
+                        frame.limit(m_nextFrameLength + 5);
+                        m_frameHeader.flip();
+                        frame.put(m_frameHeader);
+                        m_frameHeader.clear();
+                    }
+                }
+
+                for (int i = 0; i < frames.size(); i++) {
+                    DBBPool.BBContainer frameCont = frames.get(i);
+                    ByteBuffer frame = frameCont.b();
+
+                    if (decrypt(frame, m_dstBuffer) > 0) {
+                        ByteBuffer message;
+                        while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
+                            m_handler.handleMessage(message, this);
+                            m_messagesRead++;
+                        }
+                        frameCont.discard();
+                    }
+                }
+                frames.clear();
             }
-            m_messageHeader.clear();
-            if (!m_handler.retrieveNextMessage(readStream(), m_sslSrcBuffer)) {
-                break;
-            }
-            m_handler.setNextMessageLength(0);
-            m_sslBufferDecrypter.decrypt(m_sslSrcBuffer);
-            m_sslSrcBuffer.clear();
-            ByteBuffer message;
-            while ((message = m_sslBufferDecrypter.message()) != null) {
-                m_handler.handleMessage(message, this);
-                m_messagesRead++;
+
+            // On readiness selection, optimistically assume that write will succeed,
+            // in the common case it will
+            drainWriteStream();
+        } finally {
+            synchronized (m_lock) {
+                assert (m_running == true);
+                m_running = false;
             }
         }
+    }
+
+    public int decrypt(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
+        if (srcBuffer.position() > 0) {
+            srcBuffer.flip();
+        } else {
+            // won't be able to decrypt is the src buffer is empty.
+            return 0;
+        }
+        dstBuffer.limit(dstBuffer.capacity());
+        return m_sslBufferDecrypter.unwrap(srcBuffer, dstBuffer);
     }
 
     protected int getMessageLengthFromHeader(ByteBuffer header) {
