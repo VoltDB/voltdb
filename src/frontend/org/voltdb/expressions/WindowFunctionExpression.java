@@ -33,13 +33,13 @@ import org.voltdb.types.SortDirectionType;
  *   <li>A sequence of pairs of order by expressions and sort directions.</li>
  *   <li> An aggregate operation.
  * </ol>
- * The aggregate operation is sotred in the AbstractExpression base class.
+ * The aggregate operation is sorted in the AbstractExpression base class.
  *
  * There will be a fast path which will need an index and a single
  * table, as well as perhaps some other metadata.  But we currently just
  * implement the slow path.
  */
-public class WindowedExpression extends AbstractExpression {
+public class WindowFunctionExpression extends AbstractExpression {
     public enum Members {
         PARTITION_BY_EXPRESSIONS
     }
@@ -58,14 +58,16 @@ public class WindowedExpression extends AbstractExpression {
 
     private int m_xmlID = -1;
 
-    public WindowedExpression() {
+    private boolean m_isDistinct = false;
+
+    public WindowFunctionExpression() {
         //
         // This is needed for serialization
         //
         super();
     }
 
-    public WindowedExpression(
+    public WindowFunctionExpression(
             ExpressionType operationType,  // RANK, MAX, etc.
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
@@ -110,8 +112,8 @@ public class WindowedExpression extends AbstractExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (super.equals(obj) && obj instanceof WindowedExpression) {
-            WindowedExpression oWindow = (WindowedExpression)obj;
+        if (super.equals(obj) && obj instanceof WindowFunctionExpression) {
+            WindowFunctionExpression oWindow = (WindowFunctionExpression)obj;
             if (m_orderByExpressions.equals(oWindow.getOrderByExpressions())
                     && m_orderByDirections.equals(oWindow.getOrderByDirections())
                     && m_partitionByExpressions.equals(oWindow.getPartitionByExpressions())) {
@@ -218,6 +220,11 @@ public class WindowedExpression extends AbstractExpression {
      */
     public final int getXMLID() {
         return m_xmlID;
+    }
+
+    public boolean getIsDistinct() {
+        // TODO Auto-generated method stub
+        return m_isDistinct;
     }
 }
 
