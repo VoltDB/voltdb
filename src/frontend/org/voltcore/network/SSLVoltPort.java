@@ -20,7 +20,6 @@ package org.voltcore.network;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
 import org.voltcore.utils.ssl.SSLMessageParser;
-import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
 import java.io.IOException;
@@ -43,10 +42,9 @@ public class SSLVoltPort extends VoltPort {
     private final byte[] m_twoBytes = new byte[2];
 
     private int m_nextFrameLength = 0;
-    private DBBPool.BBContainer m_nextFrameCon;
 
     // will be a list of futures, for now a list of frames
-    private List<DBBPool.BBContainer> frames = new ArrayList<>();
+    private final List<Callable<ByteBuffer>> m_decCallables = new ArrayList<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
@@ -81,51 +79,49 @@ public class SSLVoltPort extends VoltPort {
 
                 int read;
                 while (true) {
-                    // if in the middle of a message...
-                    if (m_nextFrameCon != null) {
-                        ByteBuffer frame = m_nextFrameCon.b();
-                        read = readStream().getBytes(frame);
-                        if (!frame.hasRemaining()) {
-                            frames.add(m_nextFrameCon);
-                            m_nextFrameCon = null;
-                            m_nextFrameLength = 0;
+                    if (m_nextFrameLength == 0) {
+                        if (readStream().dataAvailable() >= 5) {
+                            read = readStream().getBytes(m_frameHeader);
+                            m_frameHeader.flip();
+                            m_frameHeader.position(3);
+                            m_frameHeader.get(m_twoBytes);
+                            m_nextFrameLength = ((m_twoBytes[0] & 0xff) << 8) | (m_twoBytes[1] & 0xff);
                         } else {
                             break;
                         }
                     }
 
-                    if (m_nextFrameLength == 0) {
-                        read = readStream().getBytes(m_frameHeader);
-                        if (m_frameHeader.hasRemaining()) {
-                            break;
-                        }
-                        m_frameHeader.flip();
-                        m_frameHeader.position(3);
-                        m_frameHeader.get(m_twoBytes);
-                        m_nextFrameLength = ((m_twoBytes[0] & 0xff) << 8) | (m_twoBytes[1] & 0xff);
-                        m_nextFrameCon = DBBPool.allocateDirectAndPool(m_nextFrameLength + 5);
-                        ByteBuffer frame = m_nextFrameCon.b();
+                    if (readStream().dataAvailable() >= m_nextFrameLength) {
+                        DBBPool.BBContainer frameCont = DBBPool.allocateDirectAndPool(m_nextFrameLength + 5);
+                        ByteBuffer frame = frameCont.b();
                         frame.limit(m_nextFrameLength + 5);
                         m_frameHeader.flip();
                         frame.put(m_frameHeader);
                         m_frameHeader.clear();
+                        readStream().getBytes(frame);
+                        m_decCallables.add(new DecryptionCallable(m_sslBufferDecrypter, frameCont, m_dstBuffer));
+                        m_nextFrameLength = 0;
+                    } else {
+                        break;
                     }
                 }
 
-                for (int i = 0; i < frames.size(); i++) {
-                    DBBPool.BBContainer frameCont = frames.get(i);
-                    ByteBuffer frame = frameCont.b();
-
-                    if (decrypt(frame, m_dstBuffer) > 0) {
+                for (int i = 0; i < m_decCallables.size(); i++) {
+                    Callable<ByteBuffer> dc = m_decCallables.get(i);
+                    try {
+                        m_dstBuffer = dc.call();
+                    } catch (Exception e) {
+                        throw new IOException(e);
+                    }
+                    if (m_dstBuffer.hasRemaining()) {
                         ByteBuffer message;
                         while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
                             m_handler.handleMessage(message, this);
                             m_messagesRead++;
                         }
-                        frameCont.discard();
                     }
                 }
-                frames.clear();
+                m_decCallables.clear();
             }
 
             // On readiness selection, optimistically assume that write will succeed,
@@ -139,15 +135,31 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    public int decrypt(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
-        if (srcBuffer.position() > 0) {
-            srcBuffer.flip();
-        } else {
-            // won't be able to decrypt is the src buffer is empty.
-            return 0;
+    private static class DecryptionCallable implements Callable<ByteBuffer> {
+        private final SSLBufferDecrypter m_sslBufferDecrypter;
+        private final DBBPool.BBContainer m_srcCont;
+        private final ByteBuffer m_dstBuffer;
+
+        public DecryptionCallable(SSLBufferDecrypter m_sslBufferDecrypter, DBBPool.BBContainer srcCont, ByteBuffer dstBuffer) {
+            this.m_sslBufferDecrypter = m_sslBufferDecrypter;
+            this.m_srcCont = srcCont;
+            this.m_dstBuffer = dstBuffer;
         }
-        dstBuffer.limit(dstBuffer.capacity());
-        return m_sslBufferDecrypter.unwrap(srcBuffer, dstBuffer);
+
+        @Override
+        public ByteBuffer call() throws IOException {
+            ByteBuffer srcBuffer = m_srcCont.b();
+            if (srcBuffer.position() > 0) {
+                srcBuffer.flip();
+            } else {
+                // won't be able to decrypt is the src buffer is empty.
+                return m_dstBuffer;
+            }
+            m_dstBuffer.limit(m_dstBuffer.capacity());
+            ByteBuffer dstBuffer = m_sslBufferDecrypter.unwrap(srcBuffer, m_dstBuffer);
+            m_srcCont.discard();
+            return dstBuffer;
+        }
     }
 
     protected int getMessageLengthFromHeader(ByteBuffer header) {

@@ -89,8 +89,11 @@ public class MessagingChannel {
         }
         m_encBuffer.flip();
         // there will always be a length, need to have more than four bytes to have a message
-        if (read > 4 && m_sslBufferDescrypter.unwrap(m_encBuffer, m_dstBuffer) > 0) {
-            return m_sslMessageParser.message(m_dstBuffer);
+        if (read > 4) {
+            m_dstBuffer = m_sslBufferDescrypter.unwrap(m_encBuffer, m_dstBuffer);
+            if (m_dstBuffer.hasRemaining()) {
+                return m_sslMessageParser.message(m_dstBuffer);
+            }
         }
         return null;
     }
