@@ -17,13 +17,12 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -126,6 +125,7 @@ public interface Multiset<E> extends Collection<E> {
    *     implementation does not permit null elements. Note that if {@code
    *     occurrences} is zero, the implementation may opt to return normally.
    */
+  @CanIgnoreReturnValue
   int add(@Nullable E element, int occurrences);
 
   /**
@@ -141,6 +141,7 @@ public interface Multiset<E> extends Collection<E> {
    * @return the count of the element before the operation; possibly zero
    * @throws IllegalArgumentException if {@code occurrences} is negative
    */
+  @CanIgnoreReturnValue
   int remove(@Nullable Object element, int occurrences);
 
   /**
@@ -156,6 +157,7 @@ public interface Multiset<E> extends Collection<E> {
    *     implementation does not permit null elements. Note that if {@code
    *     count} is zero, the implementor may optionally return zero instead.
    */
+  @CanIgnoreReturnValue
   int setCount(E element, int count);
 
   /**
@@ -178,6 +180,7 @@ public interface Multiset<E> extends Collection<E> {
    *     oldCount} and {@code newCount} are both zero, the implementor may
    *     optionally return {@code true} instead.
    */
+  @CanIgnoreReturnValue
   boolean setCount(E element, int oldCount, int newCount);
 
   // Views
@@ -392,6 +395,7 @@ public interface Multiset<E> extends Collection<E> {
    * @throws IllegalArgumentException if {@link Integer#MAX_VALUE} occurrences
    *     of {@code element} are already contained in this multiset
    */
+  @CanIgnoreReturnValue
   @Override
   boolean add(E element);
 
@@ -409,6 +413,7 @@ public interface Multiset<E> extends Collection<E> {
    * @param element the element to remove one occurrence of
    * @return {@code true} if an occurrence was found and removed
    */
+  @CanIgnoreReturnValue
   @Override
   boolean remove(@Nullable Object element);
 
@@ -424,6 +429,7 @@ public interface Multiset<E> extends Collection<E> {
    * it <b>may not</b> throw an exception in response to any of {@code elements}
    * being null or of the wrong type. 
    */
+  @CanIgnoreReturnValue
   @Override
   boolean removeAll(Collection<?> c);
 
@@ -441,6 +447,7 @@ public interface Multiset<E> extends Collection<E> {
    * 
    * @see Multisets#retainOccurrences(Multiset, Multiset)
    */
+  @CanIgnoreReturnValue
   @Override
   boolean retainAll(Collection<?> c);
 }

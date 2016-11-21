@@ -17,10 +17,8 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
 import java.util.Collections;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -36,7 +34,6 @@ import java.util.Set;
  * @author Gregory Kick
  * @since 10.0
  */
-@Beta
 @GwtCompatible(emulated = true)
 @SuppressWarnings("rawtypes") // allow ungenerified Comparable types
 public abstract class ContiguousSet<C extends Comparable> extends ImmutableSortedSet<C> {
@@ -93,7 +90,7 @@ public abstract class ContiguousSet<C extends Comparable> extends ImmutableSorte
   /**
    * @since 12.0
    */
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @Override
   public ContiguousSet<C> headSet(C toElement, boolean inclusive) {
     return headSetImpl(checkNotNull(toElement), inclusive);
@@ -110,7 +107,7 @@ public abstract class ContiguousSet<C extends Comparable> extends ImmutableSorte
   /**
    * @since 12.0
    */
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @Override
   public ContiguousSet<C> subSet(
       C fromElement, boolean fromInclusive, C toElement, boolean toInclusive) {
@@ -128,7 +125,7 @@ public abstract class ContiguousSet<C extends Comparable> extends ImmutableSorte
   /**
    * @since 12.0
    */
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @Override
   public ContiguousSet<C> tailSet(C fromElement, boolean inclusive) {
     return tailSetImpl(checkNotNull(fromElement), inclusive);
@@ -138,14 +135,14 @@ public abstract class ContiguousSet<C extends Comparable> extends ImmutableSorte
    * These methods perform most headSet, subSet, and tailSet logic, besides parameter validation.
    */
   // TODO(kevinb): we can probably make these real @Overrides now
-  /*@Override*/
+  /* @Override */
   abstract ContiguousSet<C> headSetImpl(C toElement, boolean inclusive);
 
-  /*@Override*/
+  /* @Override */
   abstract ContiguousSet<C> subSetImpl(
       C fromElement, boolean fromInclusive, C toElement, boolean toInclusive);
 
-  /*@Override*/
+  /* @Override */
   abstract ContiguousSet<C> tailSetImpl(C fromElement, boolean inclusive);
 
   /**

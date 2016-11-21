@@ -19,10 +19,8 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.collect.ImmutableMap.IteratorBasedImmutableMap;
-
 import java.io.Serializable;
 import java.util.EnumMap;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -46,7 +44,7 @@ final class ImmutableEnumMap<K extends Enum<K>, V> extends IteratorBasedImmutabl
     }
   }
 
-  private transient final EnumMap<K, V> delegate;
+  private final transient EnumMap<K, V> delegate;
 
   private ImmutableEnumMap(EnumMap<K, V> delegate) {
     this.delegate = delegate;

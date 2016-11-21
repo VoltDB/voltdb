@@ -21,9 +21,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Objects;
-
 import java.io.Serializable;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
