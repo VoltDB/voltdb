@@ -2523,4 +2523,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return foundPartExpr;
     }
 
+    /**
+     * Gather up all the join expressions.  This happens before planning.
+     * So, all the innerouter and innerinner lists are not yet populated.
+     *
+     * @param checkExpressions
+     */
+    public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
+        // TODO Auto-generated method stub
+        m_joinTree.gatherJoinExpressions(checkExpressions);
+    }
+
 }

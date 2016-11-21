@@ -67,7 +67,6 @@ import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
 
-
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -1216,7 +1215,7 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        m_ex.awaitTermination(365, TimeUnit.DAYS);
 
         m_network.shutdown();
     }
