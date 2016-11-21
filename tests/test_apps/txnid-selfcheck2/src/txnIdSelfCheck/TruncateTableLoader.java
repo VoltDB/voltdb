@@ -41,7 +41,6 @@ import org.voltdb.client.ProcedureCallback;
 
 public class TruncateTableLoader extends BenchmarkThread {
 
-
     final Client client;
     final long targetCount;
     final String tableName;
@@ -51,21 +50,35 @@ public class TruncateTableLoader extends BenchmarkThread {
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final Semaphore m_permits;
     String truncateProcedure = "TruncateTable";
+    String swapProcedure = "SwapTables";
     String scanAggProcedure = "ScanAggTable";
     long insertsTried = 0;
     long rowsLoaded = 0;
     long nTruncates = 0;
+    long nSwaps = 0;
     float mpRatio;
+    float swapRatio;
 
-    TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio) {
+    TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio, float swapRatio) {
+        // TODO: temp. debug:
+        System.out.println("Entered TruncateTableLoader constructor"
+                + "\n  tableName  : " + tableName
+                + "\n  client     : " + client
+                + "\n  targetCount: " + targetCount
+                + "\n  rowSize    : " + rowSize
+                + "\n  batchSize  : " + batchSize
+                + "\n  permits    : " + permits
+                + "\n  mpRatio    : " + mpRatio
+                + "\n  swapRatio  : " + swapRatio);
         setName("TruncateTableLoader");
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
         this.rowSize = rowSize;
         this.batchSize = batchSize;
-        m_permits = permits;
+        this.m_permits = permits;
         this.mpRatio = mpRatio;
+        this.swapRatio = swapRatio;
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
@@ -88,18 +101,7 @@ public class TruncateTableLoader extends BenchmarkThread {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            byte status = clientResponse.getStatus();
-            if (status == ClientResponse.GRACEFUL_FAILURE ||
-                    status == ClientResponse.USER_ABORT) {
-                // log what happened
-                hardStop("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
-            }
-            if (status != ClientResponse.SUCCESS) {
-                // log what happened, we'll retry the op so loglevel warn is ok
-                log.warn("TruncateTableLoader ungracefully failed to insert into table " + tableName);
-                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
-            }
-            else {
+            if (isStatusSuccess(clientResponse, (byte)0, "insert into", tableName)) {
                 Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
@@ -107,8 +109,29 @@ public class TruncateTableLoader extends BenchmarkThread {
         }
     }
 
+    private boolean isStatusSuccess(ClientResponse clientResponse,
+            byte shouldRollback, String truncateOrSwap, String tableName) {
+        byte status = clientResponse.getStatus();
+        if (status == ClientResponse.GRACEFUL_FAILURE ||
+                (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
+            hardStop("TruncateTableLoader gracefully failed to " + truncateOrSwap + " table "
+                + tableName + " and this shoudn't happen. Exiting.", clientResponse);
+        }
+        if (status == ClientResponse.SUCCESS) {
+            return true;
+        } else {
+            // log what happened
+            log.warn("TruncateTableLoader ungracefully failed to " + truncateOrSwap + " table " + tableName);
+            log.warn(((ClientResponseImpl) clientResponse).toJSONString());
+            return false;
+        }
+    }
+
     @Override
     public void run() {
+        // TODO: temp. debug:
+        System.out.println("Entered TruncateTableLoader.run()"
+                + "\n  tableName  : " + tableName);
         byte[] data = new byte[rowSize];
         byte shouldRollback = 0;
         long currentRowCount = 0;
@@ -124,6 +147,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
+                // TODO: temp debug:
+                System.out.println("TruncateTableLoader: Inserting ("+tableName+", "+(tc-currentRowCount)+"; "+currentRowCount+", "+batchSize+", "+tc+")");
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
@@ -163,26 +188,68 @@ public class TruncateTableLoader extends BenchmarkThread {
 
             try {
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
-                shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
-                long p = Math.abs(r.nextLong());
+                long p = 0;
+                ClientResponse clientResponse = null;
                 String tp = this.truncateProcedure;
-                if (tableName == "trup")
+                String sp = this.swapProcedure;
+                if (tableName == "trup") {
                     tp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
-                ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
-                byte status = clientResponse.getStatus();
-                if (status == ClientResponse.GRACEFUL_FAILURE ||
-                        (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
-                    hardStop("TruncateTableLoader gracefully failed to truncate table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
+                    sp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
                 }
-                if (status != ClientResponse.SUCCESS) {
-                    // log what happened
-                    log.warn("TruncateTableLoader ungracefully failed to truncate table " + tableName);
-                    log.warn(((ClientResponseImpl) clientResponse).toJSONString());
+
+                // perhaps swap tables, before truncating
+                if (r.nextInt(100) < swapRatio * 100.) {
+                    shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
+                    // TODO: temp debug:
+                    System.out.println("TruncateTableLoader: Swap Tables, before truncating ("+tableName+", "+shouldRollback+", "+sp+")");
+                    p = Math.abs(r.nextLong());
+                    clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
+                    if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
+                        Benchmark.txnCount.incrementAndGet();
+                        nSwaps++;
+                    }
                 }
-                else {
+
+                // TODO: temp debug: double-check the row count
+                try {
+                    currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+                    System.out.println("TruncateTableLoader: pre-truncate row count ("+tableName+"): "+currentRowCount);
+                } catch (Exception e) {
+                    hardStop("getrowcount exception, before Truncate", e);
+                }
+
+                // truncate the (trur or trup) table
+                shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
+                // TODO: temp debug:
+                System.out.println("TruncateTableLoader: Truncating ("+tableName+", "+shouldRollback+", "+tp+")");
+                p = Math.abs(r.nextLong());
+                clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
+                if (isStatusSuccess(clientResponse, shouldRollback, "truncate", tableName)) {
                     Benchmark.txnCount.incrementAndGet();
                     nTruncates++;
                 }
+
+                // TODO: temp debug: double-check the row count
+                try {
+                    currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+                    System.out.println("TruncateTableLoader: post-truncate row count ("+tableName+"): "+currentRowCount);
+                } catch (Exception e) {
+                    hardStop("getrowcount exception, after Truncate", e);
+                }
+
+                // perhaps swap tables, after truncating
+                if (r.nextInt(100) < swapRatio * 100.) {
+                    shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
+                    // TODO: temp debug:
+                    System.out.println("TruncateTableLoader: Swap Tables, after truncating ("+tableName+", "+shouldRollback+", "+sp+")");
+                    p = Math.abs(r.nextLong());
+                    clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
+                    if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
+                        Benchmark.txnCount.incrementAndGet();
+                        nSwaps++;
+                    }
+                }
+
                 shouldRollback = 0;
             }
             catch (ProcCallException e) {
@@ -192,7 +259,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        hardStop("TruncateTableLoader failed a TruncateTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
+                        hardStop("TruncateTableLoader failed a TruncateTable or SwapTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
                     }
                 }
             }
@@ -220,19 +287,13 @@ public class TruncateTableLoader extends BenchmarkThread {
                 String sp = this.scanAggProcedure;
                 if (tableName == "trup")
                     sp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
+                // TODO: temp debug:
+                System.out.println("TruncateTableLoader: Scanning agg table ("+tableName+", "+shouldRollback+", "+sp+")");
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
-                byte status = clientResponse.getStatus();
-                if (status == ClientResponse.GRACEFUL_FAILURE ||
-                        (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
-                    hardStop("TruncateTableLoader gracefully failed to scan-agg table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
-                }
-                if (status != ClientResponse.SUCCESS) {
-                    // log what happened
-                    log.warn("TruncateTableLoader ungracefully failed to scan-agg table " + tableName);
-                    log.warn(((ClientResponseImpl) clientResponse).toJSONString());
-                }
-                else
+
+                if (isStatusSuccess(clientResponse, shouldRollback, "scan-agg", tableName)) {
                     Benchmark.txnCount.incrementAndGet();
+                }
                 shouldRollback = 0;
             }
             catch (ProcCallException e) {
@@ -255,8 +316,12 @@ public class TruncateTableLoader extends BenchmarkThread {
                 // just need to fall through and get out
                 throw new RuntimeException(e);
             }
+            // TODO: temp. debug (??):
+            log.info("table: " + tableName + " rows sent: " + insertsTried + " inserted: "
+                    + rowsLoaded + " truncates: " + nTruncates + " swaps: " + nSwaps);
         }
-        log.info("TruncateTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);
+        log.info("TruncateTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried
+                + " inserted: " + rowsLoaded + " truncates: " + nTruncates + " swaps: " + nSwaps);
     }
 
 }
