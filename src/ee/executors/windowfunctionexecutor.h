@@ -25,6 +25,7 @@ namespace voltdb {
 class ProgressMonitorProxy;
 class WindowAggregate;
 class WindowAggregateRow;
+class TableWindow;
 /**
  * This is the executor for a WindowFunctionPlanNode.
  */
@@ -41,8 +42,10 @@ public:
         m_pmp(NULL),
         m_orderByKeySchema(NULL),
         m_partitionByKeySchema(NULL),
+        m_inputTable(NULL),
         m_inputSchema(NULL),
-        m_aggregateRow(NULL)
+        m_aggregateRow(NULL),
+        m_tableWindow(NULL)
         {
             dynamic_cast<WindowFunctionPlanNode *>(abstract_node)->collectOutputExpressions(m_outputColumnExpressions);
         }
@@ -114,22 +117,54 @@ public:
                               TempTable* newTempTable = NULL);
 
     /**
-     * Execute a single tuple.
-     */
-    void p_execute_tuple(const TableTuple& nextTuple, bool firstTuple);
-
-    /**
      * Last method to clean up memory or variables.  We may
      * also need to output some last rows, when we have more
      * sophisticated windowing support.
      */
     virtual void p_execute_finish();
 
-private:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    /**
+     * This tuple is the set of partition by keys for the
+     * current row.
+     */
+    TableTuple  & getInProgressPartitionByKeyTuple() {
+        return m_inProgressPartitionByKeyStorage;
+    }
 
-    /** Concrete executor classes implement execution in p_execute() */
-    virtual bool p_execute(const NValueArray& params);
+    /**
+     * This tuple is the set of partition by keys for the last
+     * row.
+     */
+    TableTuple & getLastPartitionByKeyTuple() {
+        return m_lastPartitionByKeyStorage;
+    }
+
+    /**
+     * This tuple is the set of order by keys for the
+     * current row.
+     */
+    TableTuple & getInProgressOrderByKeyTuple() {
+        return m_inProgressOrderByKeyStorage;
+    }
+
+    /**
+     * This tuple is the set of order by keys for the last row.
+     */
+    TableTuple & getLastOrderByKeyTuple() {
+        return m_lastOrderByKeyStorage;
+    }
+
+    /**
+     * Swap the current group by key tuple with the in-progress partition by key tuple.
+     * Return the new partition by key tuple associated with in-progress tuple address.
+     */
+    void swapPartitionByKeyTupleData();
+
+    /**
+     * Swap the current group by key tuple with the in-progress order by key tuple.
+     * Return the new order by key tuple associated with in-progress tuple address.
+     */
+    void swapOrderByKeyTupleData();
 
     /**
      * Evaluate the partition by expressions in
@@ -148,25 +183,44 @@ private:
      * Create all the WindowAggregate objects in aggregateRow.
      * These hold the state of a window function computation.
      */
-    void initAggInstances(WindowAggregateRow *aggregateRow);
+    void initAggInstances();
+
+    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+
+    /** Concrete executor classes implement execution in p_execute() */
+    virtual bool p_execute(const NValueArray& params);
 
     /**
      * Apply the tuple, which is the next input row table,
      * to each of the aggs in aggregateRow.
      */
-    void advanceAggs(const TableTuple& tuple, bool newOrderByGroup);
+    void advanceAggs(const TableTuple& tuple,
+                     bool newOrderByGroup);
+
+    void advanceAggsToOrderByEdge(TableWindow *window);
 
     /**
-     * Swap the current group by key tuple with the in-progress partition by key tuple.
-     * Return the new partition by key tuple associated with in-progress tuple address.
+     * We may be reading the first tuple of the input table,
+     * the the first tuple of a new partition or a new order
+     * by group, a tuple in the last order by group or the end
+     * of the input.  This state is coded in this enum type.
      */
-    void swapPartitionByKeyTupleData();
-
-    /**
-     * Swap the current group by key tuple with the in-progress order by key tuple.
-     * Return the new order by key tuple associated with in-progress tuple address.
-     */
-    void swapOrderByKeyTupleData();
+    enum ScanState {
+        firstTuple,    /**
+                        * The first tuple.
+                        */
+        medialOrderBy, /**
+                        * A tuple in same order by group as the
+                        * last tuple
+                        */
+        firstOrderBy,  /** A tuple in the same partition
+                        *  as the last tuple but a new order by group
+                        */
+        endOfTable     /**
+                        * This is after all tuples have been
+                        * processed.
+                        */
+    };
 
     void insertOutputTuple(WindowAggregateRow* winFunRow);
 
@@ -176,6 +230,10 @@ private:
                       const TableTuple &tuple2) const;
 
     void initWorkingTupleStorage();
+
+    bool findLeadingEdge(TableWindow *window, bool firstRow);
+
+    bool findOrderByEdge(TableWindow *window, bool firstGroup);
 
 private:
      Pool m_memoryPool;
@@ -238,9 +296,6 @@ private:
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressPartitionByKeyStorage;
-    TableTuple  & getInProgressPartitionByKeyTuple() {
-        return m_inProgressPartitionByKeyStorage;
-    }
     /**
      * This holds the evaluations for the next row.
      * Before we evaluate the expressions, on the next tuple,
@@ -257,9 +312,7 @@ private:
      * associated with this executor.
      */
     PoolBackedTupleStorage  m_lastPartitionByKeyStorage;
-    TableTuple & getLastPartitionByKeyTuple() {
-        return m_lastPartitionByKeyStorage;
-    }
+
     /**
      * This holds the evaluations for the current order by expressions.
      * Note that this is essentially a TableTuple, but that it
@@ -267,17 +320,16 @@ private:
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressOrderByKeyStorage;
-    TableTuple & getInProgressOrderByKeyTuple() {
-        return m_inProgressOrderByKeyStorage;
-    }
+
     /**
      * This holds the result of evaluating the order by
      * expressions.
      */
     PoolBackedTupleStorage  m_lastOrderByKeyStorage;
-    TableTuple & getLastOrderByKeyTuple() {
-        return m_lastOrderByKeyStorage;
-    }
+    /**
+     * This is the input table.
+     */
+    const Table * m_inputTable;
     /**
      * This is the schema of the input table.
      */
@@ -288,7 +340,9 @@ private:
      * each aggregate has an element in the array.  There is also
      * a tuple for the values passed through from the input.
      */
-    WindowAggregateRow *m_aggregateRow;
+    WindowAggregateRow * m_aggregateRow;
+
+    TableWindow  * m_tableWindow;
 };
 
 } /* namespace voltdb */
