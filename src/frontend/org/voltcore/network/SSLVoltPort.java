@@ -29,7 +29,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,9 +49,8 @@ public class SSLVoltPort extends VoltPort {
 
     private int m_nextFrameLength = 0;
 
-    // will be a list of futures, for now a list of frames
-    private final List<Future<List<ByteBuffer>>> m_futures = new ArrayList<>();
     private final ExecutorService m_es;
+    private final Queue<Callable<List<ByteBuffer>>> m_callables = new ConcurrentLinkedQueue<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
@@ -106,28 +107,36 @@ public class SSLVoltPort extends VoltPort {
                         frame.put(m_frameHeader);
                         m_frameHeader.clear();
                         readStream().getBytes(frame);
-                        m_futures.add(m_es.submit(new DecryptionCallable(frameCont)));
+                        m_callables.add(new DecryptionCallable(frameCont));
                         m_nextFrameLength = 0;
                     } else {
                         break;
                     }
                 }
 
-                for (int i = 0; i < m_futures.size(); i++) {
-                    Future<List<ByteBuffer>> f = m_futures.remove(0);
+                Callable c = m_callables.poll();
+                if (c != null) {
+                    Future<List<ByteBuffer>> f = m_es.submit(c);
                     List<ByteBuffer> messages;
-                    try {
-                        messages = f.get();
-                    } catch (InterruptedException e) {
-                        // process is exiting
-                        m_es.shutdownNow();
-                        return;
-                    } catch (ExecutionException e) {
-                        throw new IOException(e);
-                    }
-                    for (ByteBuffer message : messages) {
-                        m_handler.handleMessage(message, this);
-                        m_messagesRead++;
+                    while (f != null) {
+                        try {
+                            messages = f.get();
+                            c = m_callables.poll();
+                            f = null;
+                            if (c != null) {
+                                f = m_es.submit(c);
+                            }
+                            for (ByteBuffer message : messages) {
+                                m_handler.handleMessage(message, this);
+                                m_messagesRead++;
+                            }
+                        } catch (InterruptedException e) {
+                            // process is exiting
+                            m_es.shutdownNow();
+                            return;
+                        } catch (ExecutionException e) {
+                            throw new IOException(e);
+                        }
                     }
                 }
             }
