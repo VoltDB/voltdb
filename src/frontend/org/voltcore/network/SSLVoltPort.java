@@ -44,7 +44,7 @@ public class SSLVoltPort extends VoltPort {
     private int m_nextFrameLength = 0;
 
     // will be a list of futures, for now a list of frames
-    private final List<Callable<ByteBuffer>> m_decCallables = new ArrayList<>();
+    private final List<Callable<List<ByteBuffer>>> m_decCallables = new ArrayList<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
@@ -53,6 +53,7 @@ public class SSLVoltPort extends VoltPort {
         m_sslMessageParser = new SSLMessageParser();
         m_frameHeader = ByteBuffer.allocate(5);
 
+        // should be accessed only by the callable, not thread safe otherwise.
         this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
     }
 
@@ -99,7 +100,7 @@ public class SSLVoltPort extends VoltPort {
                         frame.put(m_frameHeader);
                         m_frameHeader.clear();
                         readStream().getBytes(frame);
-                        m_decCallables.add(new DecryptionCallable(m_sslBufferDecrypter, frameCont, m_dstBuffer));
+                        m_decCallables.add(new DecryptionCallable(frameCont));
                         m_nextFrameLength = 0;
                     } else {
                         break;
@@ -107,18 +108,16 @@ public class SSLVoltPort extends VoltPort {
                 }
 
                 for (int i = 0; i < m_decCallables.size(); i++) {
-                    Callable<ByteBuffer> dc = m_decCallables.get(i);
+                    Callable<List<ByteBuffer>> dc = m_decCallables.get(i);
+                    List<ByteBuffer> messages;
                     try {
-                        m_dstBuffer = dc.call();
+                        messages = dc.call();
                     } catch (Exception e) {
                         throw new IOException(e);
                     }
-                    if (m_dstBuffer.hasRemaining()) {
-                        ByteBuffer message;
-                        while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
-                            m_handler.handleMessage(message, this);
-                            m_messagesRead++;
-                        }
+                    for (ByteBuffer message : messages) {
+                        m_handler.handleMessage(message, this);
+                        m_messagesRead++;
                     }
                 }
                 m_decCallables.clear();
@@ -135,30 +134,35 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private static class DecryptionCallable implements Callable<ByteBuffer> {
-        private final SSLBufferDecrypter m_sslBufferDecrypter;
+    private class DecryptionCallable implements Callable<List<ByteBuffer>> {
         private final DBBPool.BBContainer m_srcCont;
-        private final ByteBuffer m_dstBuffer;
 
-        public DecryptionCallable(SSLBufferDecrypter m_sslBufferDecrypter, DBBPool.BBContainer srcCont, ByteBuffer dstBuffer) {
-            this.m_sslBufferDecrypter = m_sslBufferDecrypter;
+        public DecryptionCallable(DBBPool.BBContainer srcCont) {
             this.m_srcCont = srcCont;
-            this.m_dstBuffer = dstBuffer;
         }
 
         @Override
-        public ByteBuffer call() throws IOException {
+        public List<ByteBuffer> call() throws IOException {
+            List<ByteBuffer> messages = new ArrayList<>();
             ByteBuffer srcBuffer = m_srcCont.b();
             if (srcBuffer.position() > 0) {
                 srcBuffer.flip();
             } else {
                 // won't be able to decrypt is the src buffer is empty.
-                return m_dstBuffer;
+                return messages;
             }
             m_dstBuffer.limit(m_dstBuffer.capacity());
             ByteBuffer dstBuffer = m_sslBufferDecrypter.unwrap(srcBuffer, m_dstBuffer);
             m_srcCont.discard();
-            return dstBuffer;
+
+            if (m_dstBuffer.hasRemaining()) {
+                ByteBuffer message;
+                while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
+                    messages.add(message);
+                }
+            }
+
+            return messages;
         }
     }
 
