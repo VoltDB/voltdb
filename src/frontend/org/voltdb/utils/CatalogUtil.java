@@ -143,6 +143,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 
 /**
  *
@@ -673,6 +674,7 @@ public abstract class CatalogUtil {
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
                 setImportInfo(catalog, deployment.getImport());
+                setSnmpInfo(deployment.getSnmp());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -1597,6 +1599,20 @@ public abstract class CatalogUtil {
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    /**
+     * Validate Snmp Configuration.
+     * @param snmpType
+     */
+    private static void setSnmpInfo(SnmpType snmpType) {
+        if (snmpType == null || !snmpType.isEnabled()) {
+            return;
+        }
+        //Validate Snmp Configuration.
+        if (snmpType.getTarget() == null || snmpType.getTarget().trim().length() == 0) {
+            throw new RuntimeException("Target must be specified for SNMP configuration.");
         }
     }
 

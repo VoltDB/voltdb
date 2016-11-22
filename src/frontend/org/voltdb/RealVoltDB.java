@@ -172,6 +172,8 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.snmp.DummySnmpTrapSender;
+import org.voltdb.snmp.SnmpTrapSender;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -372,6 +374,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private long m_recoveryStartTime;
 
     CommandLog m_commandLog;
+    SnmpTrapSender m_snmp;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
@@ -700,6 +703,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
+            m_snmp = new DummySnmpTrapSender();
             m_messenger = null;
             m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = null;
@@ -3045,7 +3049,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
                     logSystemSettingFromCatalogContext();
                 }
-
+                //Before starting resource monitor update any Snmp configuration changes.
+                if (m_snmp != null) {
+                    m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
+                }
                 // restart resource usage monitoring task
                 startResourceUsageMonitor();
 
