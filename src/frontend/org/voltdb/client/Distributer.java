@@ -63,6 +63,7 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
@@ -179,6 +180,9 @@ class Distributer {
      * JAAS Authentication Subject
      */
     private final Subject m_subject;
+
+    // executor service for ssl encryption/decryption, if ssl is enabled.
+    private SSLEncryptionService m_sslEncryptionService;
 
     /**
      * Handles topology updates for client affinity
@@ -954,6 +958,7 @@ class Distributer {
         if (sslContext != null) {
             sslEngine = sslContext.createSSLEngine("client", port);
             sslEngine.setUseClientMode(true);
+            m_sslEncryptionService = SSLEncryptionService.initialize(CoreUtils.availableProcessors());
         }
 
         final Object socketChannelAndInstanceIdAndBuildString[] =
@@ -1230,7 +1235,10 @@ class Distributer {
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
         m_ex.awaitTermination(1, TimeUnit.SECONDS);
-
+        if (m_sslEncryptionService != null) {
+            m_sslEncryptionService.shutdown();
+            m_sslEncryptionService.awaitTermination(1, TimeUnit.SECONDS);
+        }
         m_network.shutdown();
     }
 

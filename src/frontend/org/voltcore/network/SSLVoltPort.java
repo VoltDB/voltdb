@@ -19,6 +19,7 @@ package org.voltcore.network;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltcore.utils.ssl.SSLMessageParser;
 
 import javax.net.ssl.SSLEngine;
@@ -49,7 +50,6 @@ public class SSLVoltPort extends VoltPort {
 
     private int m_nextFrameLength = 0;
 
-    private final ExecutorService m_es;
     private final Queue<Callable<List<ByteBuffer>>> m_callables = new ConcurrentLinkedQueue<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
@@ -61,7 +61,6 @@ public class SSLVoltPort extends VoltPort {
 
         // should be accessed only by the callable, not thread safe otherwise.
         this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
-        this.m_es = Executors.newFixedThreadPool(1);
     }
 
     protected void setKey (SelectionKey key) {
@@ -116,7 +115,7 @@ public class SSLVoltPort extends VoltPort {
 
                 Callable c = m_callables.poll();
                 if (c != null) {
-                    Future<List<ByteBuffer>> f = m_es.submit(c);
+                    Future<List<ByteBuffer>> f = SSLEncryptionService.instance().submit(c);
                     List<ByteBuffer> messages;
                     while (f != null) {
                         try {
@@ -124,7 +123,7 @@ public class SSLVoltPort extends VoltPort {
                             c = m_callables.poll();
                             f = null;
                             if (c != null) {
-                                f = m_es.submit(c);
+                                f = SSLEncryptionService.instance().submit(c);
                             }
                             for (ByteBuffer message : messages) {
                                 m_handler.handleMessage(message, this);
@@ -132,7 +131,6 @@ public class SSLVoltPort extends VoltPort {
                             }
                         } catch (InterruptedException e) {
                             // process is exiting
-                            m_es.shutdownNow();
                             return;
                         } catch (ExecutionException e) {
                             throw new IOException(e);

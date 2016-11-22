@@ -43,7 +43,9 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
@@ -483,6 +485,7 @@ public class Inits {
                     try {
                         m_config.m_sslContextFactory = getSSLContextFactory(sslType);
                         m_config.m_sslContextFactory.start();
+                        m_config.m_sslEncryptionService = SSLEncryptionService.initialize(CoreUtils.availableProcessors());
                         hostLog.info("Enabled HTTPS.");
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
                         hostLog.info("Enabled SSL on admin and client port.");
