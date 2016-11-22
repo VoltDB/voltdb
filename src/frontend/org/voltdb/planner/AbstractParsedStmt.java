@@ -606,15 +606,10 @@ public abstract class AbstractParsedStmt {
                             orderbyDirs.add(sortDir);
                         }
                     }
+                    else {
+                    	aggParams.add(parseExpressionNode(ele));
+                    }
                 }
-            }
-            else if (childEle.name.equals("winargs")) {
-                for (VoltXMLElement ele : childEle.children) {
-                    aggParams.add(parseExpressionNode(ele));
-                }
-            }
-            else {
-                throw new PlanningErrorException("Invalid windowed expression found: " + childEle.name);
             }
         }
 

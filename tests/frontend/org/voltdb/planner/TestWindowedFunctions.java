@@ -100,6 +100,33 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validateWindowedFunctionPlan(windowedQuery, 2, 100, 1);
     }
 
+    public void testCount() {
+        String windowedQuery;
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
+
+        // Altering the position of the rank column does not radically
+        // change the plan structure.
+        windowedQuery = "SELECT COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK, A+B, MOD(A, B), B FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
+        // Try some strange edge case that trivially order by a partition
+        // by column, so they should trivially result in a rank of 1 for
+        // each partition.
+
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, B ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 1, 2);
+
+        // The order in which the PARTITION BY keys are listed should not
+        // radically change the plan structure.
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY B, A ORDER BY B DESC ) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 0, 2);
+
+        // Test that we can read from a subquery.  If the sort desc is 1000, we
+        // will always expect an ascending sort.
+        windowedQuery = "SELECT BBB.B, COUNT(*) OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 100, 1);
+    }
+    
     /**
      * Validate that each similar windowed query in testRank produces a similar
      * plan, with the expected minor variation to its ORDER BY node.

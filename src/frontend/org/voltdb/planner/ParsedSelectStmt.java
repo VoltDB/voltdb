@@ -969,6 +969,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                             "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
                 }
                 break;
+            case AGGREGATE_WINDOWED_COUNT:
+            	break;
             default:
                 {
                     String opName = (exprType == null) ? "NULL" : exprType.symbol();
