@@ -60,16 +60,6 @@ public class TruncateTableLoader extends BenchmarkThread {
     float swapRatio;
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio, float swapRatio) {
-        // TODO: temp. debug:
-        System.out.println("Entered TruncateTableLoader constructor"
-                + "\n  tableName  : " + tableName
-                + "\n  client     : " + client
-                + "\n  targetCount: " + targetCount
-                + "\n  rowSize    : " + rowSize
-                + "\n  batchSize  : " + batchSize
-                + "\n  permits    : " + permits
-                + "\n  mpRatio    : " + mpRatio
-                + "\n  swapRatio  : " + swapRatio);
         setName("TruncateTableLoader");
         this.client = client;
         this.tableName = tableName;
@@ -129,9 +119,6 @@ public class TruncateTableLoader extends BenchmarkThread {
 
     @Override
     public void run() {
-        // TODO: temp. debug:
-        System.out.println("Entered TruncateTableLoader.run()"
-                + "\n  tableName  : " + tableName);
         byte[] data = new byte[rowSize];
         byte shouldRollback = 0;
         long currentRowCount = 0;
@@ -147,8 +134,6 @@ public class TruncateTableLoader extends BenchmarkThread {
             try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
-                // TODO: temp debug:
-                System.out.println("TruncateTableLoader: Inserting ("+tableName+", "+(tc-currentRowCount)+"; "+currentRowCount+", "+batchSize+", "+tc+")");
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
@@ -200,8 +185,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                 // perhaps swap tables, before truncating
                 if (r.nextInt(100) < swapRatio * 100.) {
                     shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
-                    // TODO: temp debug:
-                    System.out.println("TruncateTableLoader: Swap Tables, before truncating ("+tableName+", "+shouldRollback+", "+sp+")");
                     p = Math.abs(r.nextLong());
                     clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
                     if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
@@ -210,18 +193,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                     }
                 }
 
-                // TODO: temp debug: double-check the row count
-                try {
-                    currentRowCount = TxnId2Utils.getRowCount(client, tableName);
-                    System.out.println("TruncateTableLoader: pre-truncate row count ("+tableName+"): "+currentRowCount);
-                } catch (Exception e) {
-                    hardStop("getrowcount exception, before Truncate", e);
-                }
-
                 // truncate the (trur or trup) table
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
-                // TODO: temp debug:
-                System.out.println("TruncateTableLoader: Truncating ("+tableName+", "+shouldRollback+", "+tp+")");
                 p = Math.abs(r.nextLong());
                 clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
                 if (isStatusSuccess(clientResponse, shouldRollback, "truncate", tableName)) {
@@ -229,19 +202,9 @@ public class TruncateTableLoader extends BenchmarkThread {
                     nTruncates++;
                 }
 
-                // TODO: temp debug: double-check the row count
-                try {
-                    currentRowCount = TxnId2Utils.getRowCount(client, tableName);
-                    System.out.println("TruncateTableLoader: post-truncate row count ("+tableName+"): "+currentRowCount);
-                } catch (Exception e) {
-                    hardStop("getrowcount exception, after Truncate", e);
-                }
-
                 // perhaps swap tables, after truncating
                 if (r.nextInt(100) < swapRatio * 100.) {
                     shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
-                    // TODO: temp debug:
-                    System.out.println("TruncateTableLoader: Swap Tables, after truncating ("+tableName+", "+shouldRollback+", "+sp+")");
                     p = Math.abs(r.nextLong());
                     clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
                     if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
@@ -287,8 +250,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                 String sp = this.scanAggProcedure;
                 if (tableName == "trup")
                     sp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
-                // TODO: temp debug:
-                System.out.println("TruncateTableLoader: Scanning agg table ("+tableName+", "+shouldRollback+", "+sp+")");
                 ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + sp, p, shouldRollback);
 
                 if (isStatusSuccess(clientResponse, shouldRollback, "scan-agg", tableName)) {
@@ -316,7 +277,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                 // just need to fall through and get out
                 throw new RuntimeException(e);
             }
-            // TODO: temp. debug (??):
+            // TODO: this seems like useful info, for now, but it could be
+            // removed if it produces too much output
             log.info("table: " + tableName + " rows sent: " + insertsTried + " inserted: "
                     + rowsLoaded + " truncates: " + nTruncates + " swaps: " + nSwaps);
         }

@@ -262,23 +262,6 @@ CREATE TABLE swapp
 );
 PARTITION TABLE swapp ON COLUMN p;
 
--- TODO: remove these, after SWAP TABLES actually works
-CREATE TABLE tempr
-(
-  p          bigint             NOT NULL
-, id         bigint             NOT NULL
-, value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_tempr PRIMARY KEY (p,id)
-);
-CREATE TABLE tempp
-(
-  p          bigint             NOT NULL
-, id         bigint             NOT NULL
-, value      varbinary(1048576) NOT NULL
-, CONSTRAINT PK_id_tempp PRIMARY KEY (p,id)
-);
-PARTITION TABLE tempp ON COLUMN p;
-
 CREATE TABLE capr
 (
   p          bigint             NOT NULL
