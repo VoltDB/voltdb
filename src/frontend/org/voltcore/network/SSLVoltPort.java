@@ -30,6 +30,10 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class SSLVoltPort extends VoltPort {
 
@@ -44,7 +48,8 @@ public class SSLVoltPort extends VoltPort {
     private int m_nextFrameLength = 0;
 
     // will be a list of futures, for now a list of frames
-    private final List<Callable<List<ByteBuffer>>> m_decCallables = new ArrayList<>();
+    private final List<Future<List<ByteBuffer>>> m_futures = new ArrayList<>();
+    private final ExecutorService m_es;
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
@@ -55,6 +60,7 @@ public class SSLVoltPort extends VoltPort {
 
         // should be accessed only by the callable, not thread safe otherwise.
         this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
+        this.m_es = Executors.newFixedThreadPool(1);
     }
 
     protected void setKey (SelectionKey key) {
@@ -100,19 +106,23 @@ public class SSLVoltPort extends VoltPort {
                         frame.put(m_frameHeader);
                         m_frameHeader.clear();
                         readStream().getBytes(frame);
-                        m_decCallables.add(new DecryptionCallable(frameCont));
+                        m_futures.add(m_es.submit(new DecryptionCallable(frameCont)));
                         m_nextFrameLength = 0;
                     } else {
                         break;
                     }
                 }
 
-                for (int i = 0; i < m_decCallables.size(); i++) {
-                    Callable<List<ByteBuffer>> dc = m_decCallables.get(i);
+                for (int i = 0; i < m_futures.size(); i++) {
+                    Future<List<ByteBuffer>> f = m_futures.remove(0);
                     List<ByteBuffer> messages;
                     try {
-                        messages = dc.call();
-                    } catch (Exception e) {
+                        messages = f.get();
+                    } catch (InterruptedException e) {
+                        // process is exiting
+                        m_es.shutdownNow();
+                        return;
+                    } catch (ExecutionException e) {
                         throw new IOException(e);
                     }
                     for (ByteBuffer message : messages) {
@@ -120,7 +130,6 @@ public class SSLVoltPort extends VoltPort {
                         m_messagesRead++;
                     }
                 }
-                m_decCallables.clear();
             }
 
             // On readiness selection, optimistically assume that write will succeed,
