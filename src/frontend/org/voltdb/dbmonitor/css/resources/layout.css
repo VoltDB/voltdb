@@ -4959,6 +4959,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 .queryResultStyle{position: relative;top: 17px;}
 .icon-queryResult {margin-top:13px;}
 .exportType select{margin-top:-3px;}
+#inputQuery{ height:102.8%!important;}
 
 
 }
