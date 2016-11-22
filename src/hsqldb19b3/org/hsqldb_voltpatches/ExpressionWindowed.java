@@ -54,7 +54,7 @@ public class ExpressionWindowed extends Expression {
                        SortAndSlice sortAndSlice,
                        List<Expression> partitionByList) {
         super(ParserBase.getWindowedExpressionType(tokenT));
-        
+
         nodes = aggExprs;
         m_partitionByList = partitionByList;
         m_sortAndSlice = sortAndSlice;
@@ -247,13 +247,6 @@ public class ExpressionWindowed extends Expression {
                 rxe.children.add(orderby);
             }
         }
-
-        if (nodes.length > 0) {
-            for (Expression expr : nodes) {
-                exp.children.add(expr.voltGetXML(context, null));
-            }
-        }
-
         return exp;
     }
 }

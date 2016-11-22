@@ -606,9 +606,12 @@ public abstract class AbstractParsedStmt {
                             orderbyDirs.add(sortDir);
                         }
                     }
-                    else {
-                    	aggParams.add(parseExpressionNode(ele));
-                    }
+                }
+            }
+            else {
+                AbstractExpression aggParam = parseExpressionNode(childEle);
+                if (aggParam != null) {
+                    aggParams.add(aggParam);
                 }
             }
         }

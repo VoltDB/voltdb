@@ -1530,7 +1530,9 @@ public class ParserDQL extends ParserBase {
 
             read();
         }
-
+        if (token.tokenType == Tokens.CLOSEBRACKET) {
+            throw Error.error("Expected an expression here.", "", -1);
+        }
         Expression e = XreadValueExpression();
 
         switch (type) {

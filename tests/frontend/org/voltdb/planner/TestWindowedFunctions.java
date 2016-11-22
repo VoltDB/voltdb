@@ -105,6 +105,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
         windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
         validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
 
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(A+B) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
+
         // Altering the position of the rank column does not radically
         // change the plan structure.
         windowedQuery = "SELECT COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK, A+B, MOD(A, B), B FROM AAA;";
@@ -126,7 +129,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         windowedQuery = "SELECT BBB.B, COUNT(*) OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateWindowedFunctionPlan(windowedQuery, 2, 100, 1);
     }
-    
+
     /**
      * Validate that each similar windowed query in testRank produces a similar
      * plan, with the expected minor variation to its ORDER BY node.

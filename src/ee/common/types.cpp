@@ -624,7 +624,7 @@ string expressionToString(ExpressionType type)
         return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
     }
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
-    	return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
     }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";

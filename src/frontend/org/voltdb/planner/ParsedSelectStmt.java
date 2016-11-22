@@ -970,7 +970,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 break;
             case AGGREGATE_WINDOWED_COUNT:
-            	break;
+                break;
             default:
                 {
                     String opName = (exprType == null) ? "NULL" : exprType.symbol();
