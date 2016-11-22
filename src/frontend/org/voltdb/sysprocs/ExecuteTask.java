@@ -104,7 +104,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                 context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
                 break;
             }
-            case SET_DRID_TRACKER:
+            case SET_DRID_TRACKER_START:
             {
                 result = new VoltTable(STATUS_SCHEMA);
                 try {
@@ -135,6 +135,24 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 context.resetDrAppliedTracker();
+                break;
+            }
+            case SET_MERGED_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+                    context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+                    result.addRow(STATUS_OK);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
                 break;
             }
             default:
