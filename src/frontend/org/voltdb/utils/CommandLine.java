@@ -777,7 +777,7 @@ public class CommandLine extends VoltDB.Configuration
 
         if (m_datasourceClusterId != -1)
         {
-            cmdline.add("datasourcecluster"); cmdline.add(Integer.toString(m_datasourceClusterId));
+            cmdline.add("datasourcecluster"); cmdline.add(Byte.toString(m_datasourceClusterId));
         }
 
         return cmdline;
