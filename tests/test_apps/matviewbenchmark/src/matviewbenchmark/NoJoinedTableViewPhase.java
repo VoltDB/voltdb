@@ -26,8 +26,18 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmkWithView extends MatViewBchmkPhase {
-    public MVBchmkWithView(Client client) {
-        super(client, "w/", "w", "idsWithMatView", false);
+public class NoJoinedTableViewPhase extends BenchmarkPhase {
+
+    public NoJoinedTableViewPhase(Client client) {
+        super(client, "2tables w/o view", "2t wo view", "noJoinedViewSrc1", true);
+    }
+
+    @Override
+    public void insert(int txnid, int grp) throws Exception {
+        m_client.callProcedure(new NullCallback(),
+                               m_insertProcStr,
+                               txnid,
+                               grp, grp,
+                               txnid, txnid, txnid);
     }
 }

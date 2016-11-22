@@ -26,10 +26,10 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmkMultiGroupsMinBestOpt extends MatViewBchmkPhase {
+public class MultiGroupsMinPhase extends BenchmarkPhase {
 
-    public MVBchmkMultiGroupsMinBestOpt(Client client) {
-        super(client, "multi groups min best opt", "2g b opt", "idsWithMultiGroupsMinMatViewBestOpt", true);
+    public MultiGroupsMinPhase(Client client) {
+        super(client, "multi groups min", "2g", "idsWithMultiGroupsMinMatView", true);
     }
 
     @Override

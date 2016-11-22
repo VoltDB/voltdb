@@ -26,18 +26,9 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmk4MinMax extends MatViewBchmkPhase {
+public class OptimizedMinMaxPhase extends BenchmarkPhase {
 
-    public MVBchmk4MinMax(Client client) {
-        super(client, "4mins", "4mins", "idsWith4MinMatView", true);
-    }
-
-    @Override
-    public void insert(int txnid, int grp) throws Exception {
-        m_client.callProcedure(new NullCallback(),
-                               m_insertProcStr,
-                               txnid,
-                               grp,
-                               txnid, -txnid, txnid, -txnid);
+    public OptimizedMinMaxPhase(Client client) {
+        super(client, "w/ min opt", "w min opt", "idsWithMinMatViewOpt", true);
     }
 }

@@ -26,9 +26,9 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmkMinMax extends MatViewBchmkPhase {
+public class MinMaxPhase extends BenchmarkPhase {
 
-    public MVBchmkMinMax(Client client) {
+    public MinMaxPhase(Client client) {
         super(client, "w/ min", "w min", "idsWithMinMatView", true);
     }
 }

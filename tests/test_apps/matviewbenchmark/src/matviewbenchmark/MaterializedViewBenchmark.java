@@ -304,7 +304,7 @@ public class MaterializedViewBenchmark {
      * @param phase Materialized view benchmark phase. fw File writer object to write stats to.
      * @throws Exception if anything unexpected happens.
      */
-    public void runPhase(MatViewBchmkPhase phase, FileWriter fw) throws Exception {
+    public void runPhase(BenchmarkPhase phase, FileWriter fw) throws Exception {
         resetStats();
         // Run the benchmark for the requested duration.
         // -1- Insert data
@@ -389,20 +389,19 @@ public class MaterializedViewBenchmark {
         System.out.println(" Starting Benchmark ");
         System.out.println(HORIZONTAL_RULE);
         benchmarkActive = true;
-        MatViewBchmkPhase[] benchmarkPhases =
+        BenchmarkPhase[] benchmarkPhases =
         {
-            // new MVBchmkWithView(client),
-            // new MVBchmkWithoutView(client),
-            // new MVBchmkMinMax(client),
-            // new MVBchmkMinMaxOpt(client),
-            // new MVBchmk4MinMax(client),
-            // new MVBchmk4MinMaxOpt(client),
-            // new MVBchmkMultiGroupsMin(client),
-            // new MVBchmkMultiGroupsMinOpt(client),
-            // new MVBchmkMultiGroupsMinBestOpt(client),
-            new MVBchmk2TWithoutView(client),
-            new MVBchmk2TViewIdx(client, config, 0),
-            new MVBchmk2TViewIdx(client, config, 1)
+            new WithViewPhase(client),
+            new WithoutViewPhase(client),
+            new MinMaxPhase(client),
+            new OptimizedMinMaxPhase(client),
+            new FourMinMaxPhase(client),
+            new Optimized4MinMaxPhase(client),
+            new MultiGroupsMinPhase(client),
+            new MultiGroupsMinOptPhase(client),
+            new MultiGroupsMinBestOptPhase(client),
+            new NoJoinedTableViewPhase(client),
+            new JoinedTableViewPhase(client, config, 0)
         };
 
         // Run the benchmark loop for the requested warmup time
@@ -420,7 +419,7 @@ public class MaterializedViewBenchmark {
         }
 
         System.out.println("\nRunning benchmark...\n");
-        for (MatViewBchmkPhase phase : benchmarkPhases) {
+        for (BenchmarkPhase phase : benchmarkPhases) {
             runPhase(phase, fw);
         }
 

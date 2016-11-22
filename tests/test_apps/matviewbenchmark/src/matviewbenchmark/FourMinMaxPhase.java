@@ -26,10 +26,10 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmkMultiGroupsMin extends MatViewBchmkPhase {
+public class FourMinMaxPhase extends BenchmarkPhase {
 
-    public MVBchmkMultiGroupsMin(Client client) {
-        super(client, "multi groups min", "2g", "idsWithMultiGroupsMinMatView", true);
+    public FourMinMaxPhase(Client client) {
+        super(client, "4mins", "4mins", "idsWith4MinMatView", true);
     }
 
     @Override
@@ -37,7 +37,7 @@ public class MVBchmkMultiGroupsMin extends MatViewBchmkPhase {
         m_client.callProcedure(new NullCallback(),
                                m_insertProcStr,
                                txnid,
-                               grp, grp,
-                               txnid);
+                               grp,
+                               txnid, -txnid, txnid, -txnid);
     }
 }

@@ -23,13 +23,27 @@
 
 package matviewbenchmark;
 
+import matviewbenchmark.MaterializedViewBenchmark.MatViewConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmk2TWithoutView extends MatViewBchmkPhase {
+public class JoinedTableViewPhase extends BenchmarkPhase {
 
-    public MVBchmk2TWithoutView(Client client) {
-        super(client, "2tables w/o view", "2t wo view", "noJoinViewSrc1", true);
+    static boolean joinedViewSrc2Populated = false;
+    int m_minMaxRecalcFreq;
+
+    public JoinedTableViewPhase(Client client, MatViewConfig config, int minMaxRecalcFreq) throws Exception {
+        super(client, "2tables view freq" + minMaxRecalcFreq,
+                      "2t freq" + minMaxRecalcFreq, "joinedViewSrc1", true);
+        // The number of min/max recalculation out of ten delete operations.
+        m_minMaxRecalcFreq = minMaxRecalcFreq;
+        if (! joinedViewSrc2Populated) {
+            System.out.println("Preparing joinViewIdxSrc2...");
+            for (int i = 1; i <= config.group; i++) {
+                m_client.callProcedure(new NullCallback(), "joinedViewSrc2_insert", i);
+            }
+            joinedViewSrc2Populated = true;
+        }
     }
 
     @Override
@@ -38,6 +52,6 @@ public class MVBchmk2TWithoutView extends MatViewBchmkPhase {
                                m_insertProcStr,
                                txnid,
                                grp, grp,
-                               txnid, txnid, txnid);
+                               txnid, getSkewedMinColValue(txnid, m_minMaxRecalcFreq), txnid);
     }
 }

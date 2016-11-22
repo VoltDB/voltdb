@@ -120,7 +120,7 @@ function matviewbenchmark() {
         matviewbenchmark.MaterializedViewBenchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --txn=1000000 \
+        --txn=10000000 \
         --statsfile=streamview-`date '+%Y-%m-%d'` \
         --warmup=100000 \
         --streamview=$1 \

@@ -26,9 +26,9 @@ package matviewbenchmark;
 import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
-public class MVBchmkMultiGroupsMinOpt extends MatViewBchmkPhase {
+public class MultiGroupsMinOptPhase extends BenchmarkPhase {
 
-    public MVBchmkMultiGroupsMinOpt(Client client) {
+    public MultiGroupsMinOptPhase(Client client) {
         super(client, "multi groups min opt", "2g opt", "idsWithMultiGroupsMinMatViewOpt", true);
     }
 

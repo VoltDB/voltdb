@@ -27,10 +27,12 @@ import org.voltdb.client.Client;
 import org.voltdb.client.NullCallback;
 
 // Defines the calls to finish one phase of the benchmark.
-public abstract class MatViewBchmkPhase {
+public abstract class BenchmarkPhase {
 
+    // Strings used to label the benchmark phase in the report.
     final String m_systemStr;
     final String m_csvStr;
+
     final boolean m_isMinMatViewCase;
     final Client m_client;
 
@@ -39,7 +41,7 @@ public abstract class MatViewBchmkPhase {
     final String m_updateValueProcStr;
     final String m_deleteProcStr;
 
-    public MatViewBchmkPhase(Client client, String systemStr, String csvStr,
+    public BenchmarkPhase(Client client, String systemStr, String csvStr,
                              String procStr, boolean isMinMatViewCase) {
         // apprunner has a file name length limit
         assert (csvStr.length() <= 9);
