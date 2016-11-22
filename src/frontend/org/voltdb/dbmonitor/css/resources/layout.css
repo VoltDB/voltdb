@@ -1883,7 +1883,7 @@ ul.topRightList li a {
     background: #FFFFFF;
     padding: 15px;
 }
-.queryResultStyle {float:left; margin-top:3px;position: relative;top:1px;}
+.queryResultStyle {margin-top:3px;position: relative;top:4px;}
 
 .blockWrapper {
     margin-bottom: 20px;
@@ -1942,7 +1942,7 @@ ul.topRightList li a {
 
 .blockWrapper h1.theHeading {
     margin: 0 0 10px 0 !important;
-    padding: 17px 20px 15px 0;
+    padding: 17px 20px 9px 0;
     background-color: #FFFFFF;
     border-bottom:1px solid #ccc;
     }
@@ -1956,9 +1956,8 @@ ul.topRightList li a {
 }
 
 .queryStatus {
-    padding:4px 0 0 10px;
+    padding:12px 0 0 10px;
     color: #aaa;
-    float:left;
 
 }
 
