@@ -265,6 +265,12 @@ public class VoltProjectBuilder {
     boolean m_sslExternal = false;
     private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
     private static final String DEFAULT_KEYSTORE_PASSWD = "password";
+    private boolean isSslEnable = Boolean.valueOf(System.getenv("Enable_SSL") == null ? "false" : System.getenv("Enable_SSL"));
+    public boolean isSslEnable() { return isSslEnable; };
+    public void setSslEnable(boolean flag) {
+        isSslEnable = flag;
+    };
+
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -835,6 +841,10 @@ public class VoltProjectBuilder {
         assert(deployment == null || deployment.sitesPerHost >= 1);
         assert(deployment == null || deployment.hostCount >= 1);
         assert(deployment == null || (deployment.clusterId >= 0 && deployment.clusterId <= 127));
+
+        if (isSslEnable) {
+            enableSSL();
+        }
 
         String deploymentVoltRoot = voltRoot;
         if (deployment != null) {

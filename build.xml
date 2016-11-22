@@ -1392,6 +1392,12 @@ JAVA COMPILATION
             <include name="**/ssl-config-invalid"/>
         </fileset>
     </copy>
+    <copy flatten='false' todir='${build.prod.dir}'>
+		<fileset dir="${src.gpl.dir}">
+             <include name="**/keystore"/>
+            <include name="**/ssl-config"/>
+        </fileset>
+	</copy>
     <copy flatten='false' todir='${build.testproc.dir}'>
         <fileset dir="${src.testproc.dir}">
             <include name="**/*.sql"/>
