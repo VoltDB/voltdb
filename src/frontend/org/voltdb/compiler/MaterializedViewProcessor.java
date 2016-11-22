@@ -547,6 +547,15 @@ public class MaterializedViewProcessor {
             checkExpressions.add(where);
         }
 
+        /*
+         * Gather up all the join expressions.  The ParsedSelectStatement
+         * has not been analyzed yet, so it's not clear where these are.  But
+         * the stmt knows.
+         */
+        stmt.gatherJoinExpressions(checkExpressions);
+        if (stmt.getHavingPredicate() != null) {
+            checkExpressions.add(stmt.getHavingPredicate());
+        }
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.

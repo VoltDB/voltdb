@@ -25,11 +25,13 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -41,6 +43,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -67,6 +70,7 @@ import org.voltdb.common.Constants;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -139,6 +143,10 @@ class Distributer {
         new HashMap<>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
+
+    private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<ImmutableSet<Integer>>();
+    private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
+    private boolean m_topologyChangeAware;
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
@@ -1192,7 +1200,9 @@ class Distributer {
             }
             cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
         }
-
+        if (m_topologyChangeAware) {
+            createConnectionsUponTopologyChange();
+        }
         return !backpressure;
     }
 
@@ -1205,7 +1215,7 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        m_ex.awaitTermination(365, TimeUnit.DAYS);
 
         m_network.shutdown();
     }
@@ -1213,7 +1223,7 @@ class Distributer {
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
         boolean handledByClient = false;
         for (ClientStatusListenerExt csl : m_listeners) {
-            if (csl instanceof ClientImpl.CSL) {
+            if (csl instanceof ClientImpl.InternalClientStatusListener) {
                 continue;
             }
             try {
@@ -1324,6 +1334,14 @@ class Distributer {
         return Collections.unmodifiableList(addressList);
     }
 
+    public Map<String, Integer> getConnectedHostIPAndPort() {
+        Map<String, Integer> connectedHostIPAndPortMap = Maps.newHashMap();
+        for (NodeConnection conn : m_connections) {
+            connectedHostIPAndPortMap.put(conn.getSocketAddress().getAddress().getHostAddress(), (conn.getSocketAddress().getPort()));
+        }
+        return Collections.unmodifiableMap(connectedHostIPAndPortMap);
+    }
+
     private void updateAffinityTopology(VoltTable tables[]) {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
@@ -1353,6 +1371,7 @@ class Distributer {
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
         // hash to it.  Go ahead and include it in the maps, we can use it at some point to
         // route MP transactions directly to the MPI node.
+        Set<Integer> unconnected = new HashSet<Integer>();
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 
@@ -1362,7 +1381,9 @@ class Distributer {
                 Integer hostId = Integer.valueOf(site.split(":")[0]);
                 if (m_hostIdToConnection.containsKey(hostId)) {
                     connections.add(m_hostIdToConnection.get(hostId));
-                }
+                } else {
+                    unconnected.add(hostId);
+               }
             }
             m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
 
@@ -1371,7 +1392,9 @@ class Distributer {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
         }
-
+        if (m_topologyChangeAware) {
+            m_unconnectedHosts.set(ImmutableSet.copyOf(unconnected));
+        }
         refreshPartitionKeys(true);
     }
 
@@ -1501,5 +1524,41 @@ class Distributer {
             m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
                     "Fails to fetch partition keys from server:" + e.getMessage()));
         }
+    }
+
+    void setTopologyChangeAware(boolean topoAware) {
+        m_topologyChangeAware = topoAware;
+    }
+
+    void createConnectionsUponTopologyChange() {
+
+        if(!m_topologyChangeAware || m_createConnectionUponTopoChangeInProgress.get()) {
+            return;
+        }
+        m_createConnectionUponTopoChangeInProgress.set(true);
+        ImmutableSet<Integer> unconnected = m_unconnectedHosts.get();
+        if (unconnected != null && !unconnected.isEmpty()) {
+            m_unconnectedHosts.compareAndSet(unconnected, ImmutableSet.copyOf(new HashSet<Integer>()));
+            for (Integer host : unconnected) {
+                if (!isHostConnected(host)) {
+                    for (ClientStatusListenerExt csl : m_listeners) {
+                        if (csl instanceof ClientImpl.InternalClientStatusListener) {
+                            ((ClientImpl.InternalClientStatusListener)csl).createConnectionsUponTopologyChange();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        m_createConnectionUponTopoChangeInProgress.set(false);
+    }
+
+    void setCreateConnectionsUponTopologyChangeComplete() throws NoConnectionsException {
+        m_createConnectionUponTopoChangeInProgress.set(false);
+        ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+        queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+    }
+    boolean isHostConnected(Integer hostId) {
+        return m_hostIdToConnection.containsKey(hostId);
     }
 }

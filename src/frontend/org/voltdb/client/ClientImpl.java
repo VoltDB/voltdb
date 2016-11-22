@@ -23,9 +23,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -71,13 +76,17 @@ public final class ClientImpl implements Client {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
-    final CSL m_listener = new CSL();
+    final InternalClientStatusListener m_listener = new InternalClientStatusListener();
+    ClientStatusListenerExt m_clientStatusListener = null;
+
+    private ScheduledExecutorService m_ex = null;
     /*
      * Username and password as set by the constructor.
      */
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
+
 
     /**
      * These threads belong to the network thread pool
@@ -109,6 +118,11 @@ public final class ClientImpl implements Client {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
+
+        if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
+            throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
+        }
+
         m_distributer = new Distributer(
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
@@ -122,6 +136,10 @@ public final class ClientImpl implements Client {
             username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
+        m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
+        if (config.m_topologyChangeAware) {
+            m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+        }
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
@@ -139,7 +157,9 @@ public final class ClientImpl implements Client {
         }
         if (config.m_listener != null) {
             m_distributer.addClientStatusListener(config.m_listener);
+            m_clientStatusListener = config.m_listener;
         }
+
         assert(config.m_maxOutstandingTxns > 0);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
         if (config.m_autoTune) {
@@ -456,7 +476,6 @@ public final class ClientImpl implements Client {
         }
 
         final long nowNanos = System.nanoTime();
-
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         if (m_blockingQueue) {
@@ -601,8 +620,11 @@ public final class ClientImpl implements Client {
             m_reconnectStatusListener.close();
         }
 
+        if (m_ex != null) {
+            m_ex.shutdown();
+            m_ex.awaitTermination(365, TimeUnit.DAYS);
+        }
         m_distributer.shutdown();
-
         ClientFactory.decreaseClientNum();
     }
 
@@ -659,8 +681,34 @@ public final class ClientImpl implements Client {
         return false;
     }
 
-    class CSL extends ClientStatusListenerExt {
+    class HostConfig {
+        String m_ipAddress;
+        String m_hostName;
+        int m_clientPort;
+        int m_adminPort;
+        void setValue(String param, String value) {
+            if ("IPADDRESS".equalsIgnoreCase(param)) {
+                m_ipAddress = value;
+            } else if ("HOSTNAME".equalsIgnoreCase(param)) {
+                m_hostName = value;
+            } else if ("CLIENTPORT".equalsIgnoreCase(param)) {
+                m_clientPort = Integer.parseInt(value);
+            } else if ("ADMINPORT".equalsIgnoreCase(param)) {
+                m_adminPort = Integer.parseInt(value);
+            }
+        }
 
+        int getPort(boolean isAdmin) {
+            return isAdmin ? m_adminPort : m_clientPort;
+        }
+    }
+
+    class InternalClientStatusListener extends ClientStatusListenerExt {
+
+        boolean m_useAdminPort = false;
+        boolean m_adminPortChecked = false;
+        boolean m_connectionSuccess = false;
+        AtomicInteger connectionTaskCount = new AtomicInteger(0);
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -686,6 +734,121 @@ public final class ClientImpl implements Client {
             }
         }
 
+        /**
+         * get a list of hosts which client does not have a connection to
+         * @param vt Results from @SystemInformation
+         * @return a list of hosts which client does not have a connection to
+         */
+        Map<Integer, HostConfig> buildUnconnectedHostConfigMap(VoltTable vt) {
+            Map<Integer, HostConfig> unconnectedMap = new HashMap<Integer, HostConfig>();
+            Map<Integer, HostConfig> connectedMap = new HashMap<Integer, HostConfig>();
+            while (vt.advanceRow()) {
+                Integer hid = (int)vt.getLong("HOST_ID");
+                HostConfig config = null;
+                if (!m_distributer.isHostConnected(hid)) {
+                    config = unconnectedMap.get(hid);
+                    if (config == null) {
+                        config = new HostConfig();
+                        unconnectedMap.put(hid, config);
+                    }
+                } else if (!m_adminPortChecked) {
+                    config = connectedMap.get(hid);
+                    if (config == null) {
+                        config = new HostConfig();
+                        connectedMap.put(hid, config);
+                    }
+                }
+                if (config != null) {
+                    config.setValue(vt.getString("KEY"), vt.getString("VALUE"));
+                }
+            }
+
+            //if all existing connections use admin port, use admin port for connections to the newly discovered nodes
+            if (!m_adminPortChecked) {
+                Map<String, Integer> connectedIpPortPairs = m_distributer.getConnectedHostIPAndPort();
+                int admintPortCount = 0;
+                for (HostConfig config : connectedMap.values()){
+                    Integer connectedPort = connectedIpPortPairs.get(config.m_ipAddress);
+                    if (connectedPort != null && config.m_adminPort == connectedPort) {
+                        admintPortCount++;
+                    }
+                }
+                m_useAdminPort = (admintPortCount == connectedMap.values().size());
+            }
+            m_adminPortChecked = true;
+            return unconnectedMap;
+        }
+
+        /**
+         * notify client upon a connection creation failure.
+         * @param host HostConfig with IP address and port
+         * @param status The status of connection creation
+         */
+        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
+            if (m_clientStatusListener != null) {
+                m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
+                        (host != null) ? host.m_clientPort : -1, status);
+            }
+        }
+        void retryConnectionCreationIfNeeded(int failCount) {
+            if (failCount == 0) {
+                try {
+                    m_distributer.setCreateConnectionsUponTopologyChangeComplete();
+                } catch (Exception e) {
+                    nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                }
+            } else if (connectionTaskCount.get() < 2) {
+                //if there are tasks in the queue, do not need schedule again since all the tasks do the same job
+                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), 10, TimeUnit.SECONDS);
+            }
+        }
+
+        /**
+         * find all the host which have not been connected to the client via @SystemInformation
+         * and make connections
+         */
+        public void createConnectionsUponTopologyChange() {
+            m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
+        }
+    }
+
+    class CreateConnectionTask implements Runnable {
+        final InternalClientStatusListener listener;
+        final AtomicInteger connectionTaskCount;
+        public CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+            this.listener = listener;
+            this.connectionTaskCount = connectionTaskCount;
+            connectionTaskCount.incrementAndGet();
+        }
+        @Override
+        public void run() {
+            int failCount = 0;
+            try {
+                ClientResponse resp = callProcedure("@SystemInformation", "OVERVIEW");
+                if (resp.getStatus() == ClientResponse.SUCCESS) {
+                    Map<Integer, HostConfig> hosts = listener.buildUnconnectedHostConfigMap(resp.getResults()[0]);
+                    for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
+                        HostConfig config = entry.getValue();
+                        try {
+                            createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
+                        } catch (Exception e) {
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            failCount++;
+                        }
+                    }
+                } else {
+                    listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    failCount++;
+                }
+            } catch (Exception e) {
+                listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                failCount++;
+            } finally {
+                connectionTaskCount.decrementAndGet();
+                listener.retryConnectionCreationIfNeeded(failCount);
+            }
+        }
     }
      /****************************************************
                         Implementation

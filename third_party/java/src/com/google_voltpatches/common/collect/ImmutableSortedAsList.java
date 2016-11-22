@@ -16,9 +16,7 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
 import java.util.Comparator;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -47,7 +45,7 @@ final class ImmutableSortedAsList<E> extends RegularImmutableAsList<E>
 
   // Override indexOf() and lastIndexOf() to be O(log N) instead of O(N).
 
-  @GwtIncompatible("ImmutableSortedSet.indexOf")
+  @GwtIncompatible // ImmutableSortedSet.indexOf
   // TODO(cpovirk): consider manual binary search under GWT to preserve O(log N) lookup
   @Override
   public int indexOf(@Nullable Object target) {
@@ -61,7 +59,7 @@ final class ImmutableSortedAsList<E> extends RegularImmutableAsList<E>
     return (index >= 0 && get(index).equals(target)) ? index : -1;
   }
 
-  @GwtIncompatible("ImmutableSortedSet.indexOf")
+  @GwtIncompatible // ImmutableSortedSet.indexOf
   @Override
   public int lastIndexOf(@Nullable Object target) {
     return indexOf(target);
@@ -73,7 +71,7 @@ final class ImmutableSortedAsList<E> extends RegularImmutableAsList<E>
     return indexOf(target) >= 0;
   }
 
-  @GwtIncompatible("super.subListUnchecked does not exist; inherited subList is valid if slow")
+  @GwtIncompatible // super.subListUnchecked does not exist; inherited subList is valid if slow
   /*
    * TODO(cpovirk): if we start to override indexOf/lastIndexOf under GWT, we'll want some way to
    * override subList to return an ImmutableSortedAsList for better performance. Right now, I'm not

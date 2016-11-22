@@ -454,8 +454,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
-    case PLAN_NODE_TYPE_PARTITIONBY: {
-        return "PARTITIONBY";
+    case PLAN_NODE_TYPE_WINDOWFUNCTION: {
+        return "WINDOWFUNCTION";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -509,8 +509,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
-    } else if (str == "PARTITIONBY") {
-        return PLAN_NODE_TYPE_PARTITIONBY;
+    } else if (str == "WINDOWFUNCTION") {
+        return PLAN_NODE_TYPE_WINDOWFUNCTION;
     }
     return PLAN_NODE_TYPE_INVALID;
 }

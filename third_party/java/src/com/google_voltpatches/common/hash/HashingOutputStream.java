@@ -17,12 +17,9 @@ package com.google_voltpatches.common.hash;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
-
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-
-import javax.annotation_voltpatches.CheckReturnValue;
 
 /**
  * An {@link OutputStream} that maintains a hash of the data written to it.
@@ -65,7 +62,6 @@ public final class HashingOutputStream extends FilterOutputStream {
    * Returns the {@link HashCode} based on the data written to this stream. The result is
    * unspecified if this method is called more than once on the same instance.
    */
-  @CheckReturnValue
   public HashCode hash() {
     return hasher.hash();
   }

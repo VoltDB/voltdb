@@ -17,10 +17,8 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.util.Comparator;
 import java.util.SortedSet;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

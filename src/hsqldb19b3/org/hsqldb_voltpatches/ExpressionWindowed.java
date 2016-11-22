@@ -74,7 +74,7 @@ public class ExpressionWindowed extends Expression {
             }
             break;
         default:
-            throw Error.error("Unsupported windowed aggregate " + OpTypes.aggregateName(opType), "", 0);
+            throw Error.error("Unsupported window function " + OpTypes.aggregateName(opType), "", 0);
         }
     }
     @Override

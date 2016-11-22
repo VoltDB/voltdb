@@ -25,7 +25,6 @@ import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.Table.Cell;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,7 +33,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
