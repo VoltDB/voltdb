@@ -17,12 +17,12 @@
 
 package org.voltcore.utils.ssl;
 
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.List;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB

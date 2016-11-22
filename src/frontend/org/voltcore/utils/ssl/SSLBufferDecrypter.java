@@ -17,11 +17,12 @@
 
 package org.voltcore.utils.ssl;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
-import java.io.IOException;
-import java.nio.ByteBuffer;
 
 public class SSLBufferDecrypter {
 
@@ -38,14 +39,14 @@ public class SSLBufferDecrypter {
             SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, dstBuffer.slice());
             switch (result.getStatus()) {
                 case OK:
-                    if (srcBuffer.hasRemaining()) {
-                        srcBuffer.compact();
-                    } else {
-                        srcBuffer.clear();
-                    }
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                    return dstBuffer;
+                    if (result.bytesProduced() > 0) {
+                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
+                        return dstBuffer;
+                        }
+                    else {
+                        continue;
+                    }
                 case BUFFER_OVERFLOW:
                     // the dst buffer holds partial volt messages, so its state needs to
                     // be retained on overflow.
