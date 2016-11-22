@@ -21,7 +21,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Optional;
-
 import java.util.ArrayDeque;
 import java.util.BitSet;
 import java.util.Deque;
@@ -35,9 +34,8 @@ import java.util.Iterator;
  * @since 15.0
  */
 @Beta
-@GwtCompatible(emulated = true)
+@GwtCompatible
 public abstract class BinaryTreeTraverser<T> extends TreeTraverser<T> {
-  // TODO(lowasser): make this GWT-compatible when we've checked in ArrayDeque and BitSet emulation
 
   /**
    * Returns the left child of the specified node, or {@link Optional#absent()} if the specified
@@ -100,7 +98,7 @@ public abstract class BinaryTreeTraverser<T> extends TreeTraverser<T> {
     private final Deque<T> stack;
 
     PreOrderIterator(T root) {
-      this.stack = new ArrayDeque<T>();
+      this.stack = new ArrayDeque<T>(8);
       stack.addLast(root);
     }
 
@@ -136,7 +134,7 @@ public abstract class BinaryTreeTraverser<T> extends TreeTraverser<T> {
     private final BitSet hasExpanded;
 
     PostOrderIterator(T root) {
-      this.stack = new ArrayDeque<T>();
+      this.stack = new ArrayDeque<T>(8);
       stack.addLast(root);
       this.hasExpanded = new BitSet();
     }
@@ -181,7 +179,7 @@ public abstract class BinaryTreeTraverser<T> extends TreeTraverser<T> {
     private final BitSet hasExpandedLeft;
 
     InOrderIterator(T root) {
-      this.stack = new ArrayDeque<T>();
+      this.stack = new ArrayDeque<T>(8);
       this.hasExpandedLeft = new BitSet();
       stack.addLast(root);
     }

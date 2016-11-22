@@ -1,23 +1,22 @@
 /*
  * Copyright (C) 2009 The Guava Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.google_voltpatches.common.util.concurrent;
 
 import com.google_voltpatches.common.annotations.Beta;
-
+import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -29,11 +28,11 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>The normal lifecycle of a service is:
  * <ul>
- *   <li>{@linkplain State#NEW NEW} -&gt;
- *   <li>{@linkplain State#STARTING STARTING} -&gt;
- *   <li>{@linkplain State#RUNNING RUNNING} -&gt;
- *   <li>{@linkplain State#STOPPING STOPPING} -&gt;
- *   <li>{@linkplain State#TERMINATED TERMINATED}
+ * <li>{@linkplain State#NEW NEW} -&gt;
+ * <li>{@linkplain State#STARTING STARTING} -&gt;
+ * <li>{@linkplain State#RUNNING RUNNING} -&gt;
+ * <li>{@linkplain State#STOPPING STOPPING} -&gt;
+ * <li>{@linkplain State#TERMINATED TERMINATED}
  * </ul>
  *
  * <p>There are deviations from this if there are failures or if {@link Service#stopAsync} is called
@@ -52,6 +51,7 @@ import java.util.concurrent.TimeoutException;
  * @since 9.0 (in 1.0 as {@code com.google_voltpatches.common.base.Service})
  */
 @Beta
+@GwtIncompatible
 public interface Service {
   /**
    * If the service state is {@link State#NEW}, this initiates service startup and returns
@@ -62,6 +62,7 @@ public interface Service {
    *
    * @since 15.0
    */
+  @CanIgnoreReturnValue
   Service startAsync();
 
   /**
@@ -84,6 +85,7 @@ public interface Service {
    * @return this
    * @since 15.0
    */
+  @CanIgnoreReturnValue
   Service stopAsync();
 
   /**
@@ -99,8 +101,8 @@ public interface Service {
   void awaitRunning();
 
   /**
-   * Waits for the {@link Service} to reach the {@linkplain State#RUNNING running state} for no 
-   * more than the given time.
+   * Waits for the {@link Service} to reach the {@linkplain State#RUNNING running state} for no more
+   * than the given time.
    *
    * @param timeout the maximum time to wait
    * @param unit the time unit of the timeout argument
@@ -124,9 +126,8 @@ public interface Service {
   void awaitTerminated();
 
   /**
-   * Waits for the {@link Service} to reach a terminal state (either 
-   * {@link Service.State#TERMINATED terminated} or {@link Service.State#FAILED failed}) for no 
-   * more than the given time.
+   * Waits for the {@link Service} to reach a terminal state (either {@link Service.State#TERMINATED
+   * terminated} or {@link Service.State#FAILED failed}) for no more than the given time.
    *
    * @param timeout the maximum time to wait
    * @param unit the time unit of the timeout argument
@@ -147,7 +148,7 @@ public interface Service {
   
   /**
    * Registers a {@link Listener} to be {@linkplain Executor#execute executed} on the given 
-   * executor.  The listener will have the corresponding transition method called whenever the 
+   * executor. The listener will have the corresponding transition method called whenever the
    * service changes state. The listener will not have previous state changes replayed, so it is 
    * suggested that listeners are added before the service starts.
    *
@@ -174,7 +175,7 @@ public interface Service {
    * The lifecycle states of a service.
    * 
    * <p>The ordering of the {@link State} enum is defined such that if there is a state transition
-   * from {@code A -> B} then {@code A.compareTo(B} < 0}.  N.B. The converse is not true, i.e. if
+   * from {@code A -> B} then {@code A.compareTo(B} < 0}. N.B. The converse is not true, i.e. if
    * {@code A.compareTo(B} < 0} then there is <b>not</b> guaranteed to be a valid state transition 
    * {@code A -> B}.
    *
@@ -183,11 +184,11 @@ public interface Service {
   @Beta // should come out of Beta when Service does
   enum State {
     /**
-     * A service in this state is inactive. It does minimal work and consumes
-     * minimal resources.
+     * A service in this state is inactive. It does minimal work and consumes minimal resources.
      */
     NEW {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return false;
       }
     },
@@ -196,7 +197,8 @@ public interface Service {
      * A service in this state is transitioning to {@link #RUNNING}.
      */
     STARTING {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return false;
       }
     },
@@ -205,7 +207,8 @@ public interface Service {
      * A service in this state is operational.
      */
     RUNNING {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return false;
       }
     },
@@ -214,7 +217,8 @@ public interface Service {
      * A service in this state is transitioning to {@link #TERMINATED}.
      */
     STOPPING {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return false;
       }
     },
@@ -224,7 +228,8 @@ public interface Service {
      * minimal resources.
      */
     TERMINATED {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return true;
       }
     },
@@ -234,7 +239,8 @@ public interface Service {
      * started nor stopped.
      */
     FAILED {
-      @Override boolean isTerminal() {
+      @Override
+      boolean isTerminal() {
         return true;
       }
     };
@@ -269,7 +275,7 @@ public interface Service {
     /**
      * Called when the service transitions to the {@linkplain State#STOPPING STOPPING} state. The 
      * only valid values for {@code from} are {@linkplain State#STARTING STARTING} or 
-     * {@linkplain State#RUNNING RUNNING}.  This occurs when {@link Service#stopAsync} is called.
+     * {@linkplain State#RUNNING RUNNING}. This occurs when {@link Service#stopAsync} is called.
      * 
      * @param from The previous state that is being transitioned from.  
      */
@@ -278,10 +284,10 @@ public interface Service {
     /**
      * Called when the service transitions to the {@linkplain State#TERMINATED TERMINATED} state. 
      * The {@linkplain State#TERMINATED TERMINATED} state is a terminal state in the transition
-     * diagram.  Therefore, if this method is called, no other methods will be called on the 
+     * diagram. Therefore, if this method is called, no other methods will be called on the
      * {@link Listener}.
      * 
-     * @param from The previous state that is being transitioned from.  The only valid values for 
+     * @param from The previous state that is being transitioned from. The only valid values for
      *     this are {@linkplain State#NEW NEW}, {@linkplain State#RUNNING RUNNING} or 
      *     {@linkplain State#STOPPING STOPPING}.
      */
@@ -292,9 +298,9 @@ public interface Service {
      * {@linkplain State#FAILED FAILED} state is a terminal state in the transition diagram.  
      * Therefore, if this method is called, no other methods will be called on the {@link Listener}.
      * 
-     * @param from The previous state that is being transitioned from.  Failure can occur in any 
-     *     state with the exception of {@linkplain State#NEW NEW} or 
-     *     {@linkplain State#TERMINATED TERMINATED}.
+     * @param from The previous state that is being transitioned from. Failure can occur in any
+     *     state with the exception of {@linkplain State#NEW NEW} or {@linkplain State#TERMINATED
+     *     TERMINATED}.
      * @param failure The exception that caused the failure.
      */
     public void failed(State from, Throwable failure) {}

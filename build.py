@@ -296,7 +296,7 @@ CTX.INPUT['executors'] = """
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
- partitionbyexecutor.cpp
+ windowfunctionexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
@@ -341,7 +341,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
- partitionbynode.cpp
+ windowfunctionnode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -495,8 +495,8 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    PartitionByExecutorTest
     TestGeneratedPlans
+    TestRank
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -547,7 +547,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     PartitionByPlanNodeTest
+     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
     """
 

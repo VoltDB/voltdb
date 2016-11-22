@@ -164,8 +164,7 @@ public:
         m_postPredicate(NULL),
         m_pmp(NULL),
         m_inputSchema(NULL),
-        m_groupByKeyPartialHashSchema(NULL),
-        m_outputForEachInputRow(false)
+        m_groupByKeyPartialHashSchema(NULL)
     { }
     ~AggregateExecutorBase()
     {
@@ -224,22 +223,7 @@ protected:
      */
     TableTuple& swapWithInprogressGroupByKeyTuple();
 
-    /**
-     * For some queries, an empty input table means an empty output
-     * table.  For others and empty input table causes a single
-     * output row to be synthesized.  For example, in the three
-     * queries below, the number of output rows varies when BBB
-     * is an empty table.
-     *   SELECT SUM(A) FROM BBB;
-     *     This produces a single synthesized row.
-     *   SELECT SUM(A) FRON BBB GROUP BY C;
-     *      This produces no output rows.
-     *   SELECT RANK() OVER (PARTITION BY A ORDER BY B) FROM BBB;
-     *      This produces no output rows.
-     */
-    bool emptyInputMeansEmptyOutput() const;
-
-    /**
+    /*
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
      * aggregation.
@@ -269,18 +253,10 @@ protected:
 
     // used for inline limit for serial/partial aggregate
     CountingPostfilter m_postfilter;
-    bool m_outputForEachInputRow;
 
 private:
     TupleSchema* constructGroupBySchema(bool partial);
 };
-
-inline bool AggregateExecutorBase::emptyInputMeansEmptyOutput() const {
-    // We use m_outputForEachInputRow as a proxy for a
-    // PartitionByPlanNode, which is what we really
-    // want here.
-    return ((m_groupByKeySchema->columnCount() > 0) || m_outputForEachInputRow);
-}
 
 typedef boost::unordered_map<TableTuple,
                              AggregateRow*,

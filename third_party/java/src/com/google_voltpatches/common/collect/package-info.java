@@ -17,7 +17,7 @@
 /**
  * This package contains generic collection interfaces and implementations, and
  * other utilities for working with collections. It is a part of the open-source
- * <a href="http://guava-libraries.googlecode.com">Guava libraries</a>.
+ * <a href="http://github.com/google/guava">Guava</a> library.
  *
  * <h2>Collection Types</h2>
  *
@@ -186,10 +186,6 @@
  * <ul>
  * <li>{@link com.google_voltpatches.common.collect.Interner},
  *     {@link com.google_voltpatches.common.collect.Interners}
- * <li>{@link com.google_voltpatches.common.collect.Constraint},
- *     {@link com.google_voltpatches.common.collect.Constraints}
- * <li>{@link com.google_voltpatches.common.collect.MapConstraint},
- *     {@link com.google_voltpatches.common.collect.MapConstraints}
  * <li>{@link com.google_voltpatches.common.collect.MapDifference},
  *     {@link com.google_voltpatches.common.collect.SortedMapDifference}
  * <li>{@link com.google_voltpatches.common.collect.MinMaxPriorityQueue}
@@ -222,5 +218,9 @@
  * <li>{@link com.google_voltpatches.common.collect.ForwardingTable}
  * </ul>
  */
-@javax.annotation_voltpatches.ParametersAreNonnullByDefault
+@CheckReturnValue
+@ParametersAreNonnullByDefault
 package com.google_voltpatches.common.collect;
+
+import javax.annotation_voltpatches.CheckReturnValue;
+import javax.annotation_voltpatches.ParametersAreNonnullByDefault;

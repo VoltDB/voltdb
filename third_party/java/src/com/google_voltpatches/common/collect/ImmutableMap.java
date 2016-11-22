@@ -22,8 +22,9 @@ import static com.google_voltpatches.common.collect.CollectPreconditions.checkEn
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
+import com.google_voltpatches.errorprone.annotations.concurrent.LazyInit;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,7 +33,6 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.Map;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -192,6 +192,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
      * Associates {@code key} with {@code value} in the built map. Duplicate
      * keys are not allowed, and will cause {@link #build} to fail.
      */
+    @CanIgnoreReturnValue
     public Builder<K, V> put(K key, V value) {
       ensureCapacity(size + 1);
       ImmutableMapEntry<K, V> entry = entryOf(key, value);
@@ -207,6 +208,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
      *
      * @since 11.0
      */
+    @CanIgnoreReturnValue
     public Builder<K, V> put(Entry<? extends K, ? extends V> entry) {
       return put(entry.getKey(), entry.getValue());
     }
@@ -217,6 +219,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
      *
      * @throws NullPointerException if any key or value in {@code map} is null
      */
+    @CanIgnoreReturnValue
     public Builder<K, V> putAll(Map<? extends K, ? extends V> map) {
       return putAll(map.entrySet());
     }
@@ -228,6 +231,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
      * @throws NullPointerException if any key, value, or entry is null
      * @since 19.0
      */
+    @CanIgnoreReturnValue
     @Beta
     public Builder<K, V> putAll(Iterable<? extends Entry<? extends K, ? extends V>> entries) {
       if (entries instanceof Collection) {
@@ -250,6 +254,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
      * @throws IllegalStateException if this method was already called
      * @since 19.0
      */
+    @CanIgnoreReturnValue
     @Beta
     public Builder<K, V> orderEntriesByValue(Comparator<? super V> valueComparator) {
       checkState(this.valueComparator == null, "valueComparator was already set");
@@ -395,6 +400,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public final V put(K k, V v) {
@@ -407,6 +413,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public final V remove(Object o) {
@@ -456,6 +463,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
   @Override
   public abstract V get(@Nullable Object key);
 
+  @LazyInit
   private transient ImmutableSet<Entry<K, V>> entrySet;
 
   /**
@@ -470,6 +478,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
 
   abstract ImmutableSet<Entry<K, V>> createEntrySet();
 
+  @LazyInit
   private transient ImmutableSet<K> keySet;
 
   /**
@@ -501,6 +510,7 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
     };
   }
 
+  @LazyInit
   private transient ImmutableCollection<V> values;
 
   /**
@@ -510,10 +520,15 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
   @Override
   public ImmutableCollection<V> values() {
     ImmutableCollection<V> result = values;
-    return (result == null) ? values = new ImmutableMapValues<K, V>(this) : result;
+    return (result == null) ? values = createValues() : result;
+  }
+
+  ImmutableCollection<V> createValues() {
+    return new ImmutableMapValues<K, V>(this);
   }
 
   // cached so that this.multimapView().inverse() only computes inverse once
+  @LazyInit
   private transient ImmutableSetMultimap<K, V> multimapView;
 
   /**
@@ -521,7 +536,6 @@ public abstract class ImmutableMap<K, V> implements Map<K, V>, Serializable {
    *
    * @since 14.0
    */
-  @Beta
   public ImmutableSetMultimap<K, V> asMultimap() {
     if (isEmpty()) {
       return ImmutableSetMultimap.of();

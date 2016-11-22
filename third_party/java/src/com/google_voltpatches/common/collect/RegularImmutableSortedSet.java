@@ -25,14 +25,12 @@ import static com.google_voltpatches.common.collect.SortedLists.KeyPresentBehavi
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -45,8 +43,10 @@ import javax.annotation_voltpatches.Nullable;
 @GwtCompatible(serializable = true, emulated = true)
 @SuppressWarnings("serial")
 final class RegularImmutableSortedSet<E> extends ImmutableSortedSet<E> {
+  static final RegularImmutableSortedSet<Comparable> NATURAL_EMPTY_SET =
+      new RegularImmutableSortedSet<Comparable>(ImmutableList.<Comparable>of(), Ordering.natural());
 
-  private transient final ImmutableList<E> elements;
+  private final transient ImmutableList<E> elements;
 
   RegularImmutableSortedSet(ImmutableList<E> elements, Comparator<? super E> comparator) {
     super(comparator);
@@ -58,7 +58,7 @@ final class RegularImmutableSortedSet<E> extends ImmutableSortedSet<E> {
     return elements.iterator();
   }
 
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @Override
   public UnmodifiableIterator<E> descendingIterator() {
     return elements.reverse().iterator();
@@ -177,7 +177,7 @@ final class RegularImmutableSortedSet<E> extends ImmutableSortedSet<E> {
         return false; // concurrent change to other set
       }
     }
-    return this.containsAll(that);
+    return containsAll(that);
   }
 
   @Override
@@ -280,8 +280,9 @@ final class RegularImmutableSortedSet<E> extends ImmutableSortedSet<E> {
     }
     int position;
     try {
-      position = SortedLists.binarySearch(
-          elements, target, unsafeComparator(), ANY_PRESENT, INVERTED_INSERTION_INDEX);
+      position =
+          SortedLists.binarySearch(
+              elements, target, unsafeComparator(), ANY_PRESENT, INVERTED_INSERTION_INDEX);
     } catch (ClassCastException e) {
       return -1;
     }

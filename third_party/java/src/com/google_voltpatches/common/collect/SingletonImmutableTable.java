@@ -19,7 +19,6 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.util.Map;
 
 /**
@@ -74,5 +73,10 @@ class SingletonImmutableTable<R, C, V> extends ImmutableTable<R, C, V> {
   @Override
   ImmutableCollection<V> createValues() {
     return ImmutableSet.of(singleValue);
+  }
+
+  @Override
+  SerializedForm createSerializedForm() {
+    return SerializedForm.create(this, new int[] {0}, new int[] {0});
   }
 }

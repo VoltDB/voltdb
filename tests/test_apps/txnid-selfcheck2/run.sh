@@ -26,53 +26,42 @@ fi
 CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
+if [ -f "$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml" ]; then
+    CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
+elif [ -f  $PWD/../../log4j-allconsole.xml ]; then
+    CLIENTLOG4J="$PWD/../../log4j-allconsole.xml"
+fi
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME-alt.jar $APPNAME-noexport.jar voltdbroot
+    rm -rf obj log build debugoutput $APPNAME.jar $APPNAME-alt.jar $APPNAME-noexport.jar voltdbroot
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
-        src/txnIdSelfCheck/*.java \
-        src/txnIdSelfCheck/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    ant clean
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    ant
+}
 
-    # primary catalog
-    $VOLTDB compile --classpath obj -o $APPNAME.jar src/txnIdSelfCheck/ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-
-    # alternate catalog that adds an index
-    $VOLTDB compile --classpath obj -o $APPNAME-alt.jar \
-        src/txnIdSelfCheck/ddl.sql src/txnIdSelfCheck/ddl-annex.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-
-    # primary no-export catalog
-    $VOLTDB compile --classpath obj -o $APPNAME-noexport.jar src/txnIdSelfCheck/ddl-noexport.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e txnid.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB init -C deployment.xml
+    $VOLTDB start -l $LICENSE -H $HOST
 }
 
 # run the client that drives the example
@@ -82,14 +71,14 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function aysnc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
+function async-benchmark-help() {
+    jars-ifneeded
+    java -classpath $CLASSPATH:txnid.jar txnIdSelfCheck.Benchmark --help
 }
 
 function async-benchmark() {
-    # srccompile
-    java -ea -classpath txnid.jar:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    jars-ifneeded
+    java -ea -classpath txnid.jar:$CLASSPATH: -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=100 \
@@ -109,8 +98,13 @@ function async-benchmark() {
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
+function init() {
+    jars-ifneeded
+    sqlcmd < src/txnIdSelfCheck/ddl-nocat.sql
+}
+
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|jars|init|server|async-benchmark|async-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

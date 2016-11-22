@@ -1,28 +1,25 @@
 /*
  * Copyright (C) 2007 The Guava Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.google_voltpatches.common.util.concurrent;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.VisibleForTesting;
-
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import java.util.concurrent.Executor;
+import java.util.logging.Level;
 import org.voltcore.logging.VoltLogger;
-
 import javax.annotation_voltpatches.Nullable;
 import javax.annotation_voltpatches.concurrent.GuardedBy;
 
@@ -42,9 +39,10 @@ import javax.annotation_voltpatches.concurrent.GuardedBy;
  * @author Sven Mawson
  * @since 1.0
  */
+@GwtIncompatible
 public final class ExecutionList {
-  // Logger to log exceptions caught when running runnables.
-  @VisibleForTesting static final VoltLogger voltLog = new VoltLogger("HOST");
+  /** Logger to log exceptions caught when running runnables. */
+  private static final VoltLogger log = new VoltLogger(ExecutionList.class.getName());
 
   /**
    * The runnable, executor pairs to execute.  This acts as a stack threaded through the {@link
@@ -52,6 +50,7 @@ public final class ExecutionList {
    */
   @GuardedBy("this")
   private RunnableExecutorPair runnables;
+
   @GuardedBy("this")
   private boolean executed;
 
@@ -67,12 +66,12 @@ public final class ExecutionList {
    * documentation.
    */
   public void add(Runnable runnable, Executor executor) {
-    // Fail fast on a null.  We throw NPE here because the contract of Executor states that it
-    // throws NPE on null listener, so we propagate that contract up into the add method as well.
+    // Fail fast on a null. We throw NPE here because the contract of Executor states that it throws
+    // NPE on null listener, so we propagate that contract up into the add method as well.
     checkNotNull(runnable, "Runnable was null.");
     checkNotNull(executor, "Executor was null.");
 
-    // Lock while we check state.  We must maintain the lock while adding the new pair so that
+    // Lock while we check state. We must maintain the lock while adding the new pair so that
     // another thread can't run the list out from under us. We only add to the list if we have not
     // yet started execution.
     synchronized (this) {
@@ -82,7 +81,7 @@ public final class ExecutionList {
       }
     }
     // Execute the runnable immediately. Because of scheduling this may end up getting called before
-    // some of the previously added runnables, but we're OK with that.  If we want to change the
+    // some of the previously added runnables, but we're OK with that. If we want to change the
     // contract to guarantee ordering among runnables we'd have to modify the logic here to allow
     // it.
     executeListener(runnable, executor);
@@ -109,14 +108,14 @@ public final class ExecutionList {
       }
       executed = true;
       list = runnables;
-      runnables = null;  // allow GC to free listeners even if this stays around for a while.
+      runnables = null; // allow GC to free listeners even if this stays around for a while.
     }
-    // If we succeeded then list holds all the runnables we to execute.  The pairs in the stack are
+    // If we succeeded then list holds all the runnables we to execute. The pairs in the stack are
     // in the opposite order from how they were added so we need to reverse the list to fulfill our
     // contract.
-    // This is somewhat annoying, but turns out to be very fast in practice.  Alternatively, we
-    // could drop the contract on the method that enforces this queue like behavior since depending
-    // on it is likely to be a bug anyway.
+    // This is somewhat annoying, but turns out to be very fast in practice. Alternatively, we could
+    // drop the contract on the method that enforces this queue like behavior since depending on it
+    // is likely to be a bug anyway.
 
     // N.B. All writes to the list and the next pointers must have happened before the above
     // synchronized block, so we can iterate the list without the lock held here.
@@ -141,11 +140,12 @@ public final class ExecutionList {
     try {
       executor.execute(runnable);
     } catch (RuntimeException e) {
-      // Log it and keep going, bad runnable and/or executor.  Don't punish the other runnables if
-      // we're given a bad one.  We only catch RuntimeException because we want Errors to propagate
+      // Log it and keep going -- bad runnable and/or executor. Don't punish the other runnables if
+      // we're given a bad one. We only catch RuntimeException because we want Errors to propagate
       // up.
-      voltLog.error("RuntimeException while executing runnable "
-          + runnable + " with executor " + executor, e);
+      log.fatal(
+          "RuntimeException while executing runnable " + runnable + " with executor " + executor,
+          e);
     }
   }
 
