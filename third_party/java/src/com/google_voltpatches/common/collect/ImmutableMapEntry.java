@@ -19,7 +19,6 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkEntryNotNull;
 
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -33,7 +32,7 @@ import javax.annotation_voltpatches.Nullable;
  *
  * @author Louis Wasserman
  */
-@GwtIncompatible("unnecessary")
+@GwtIncompatible // unnecessary
 class ImmutableMapEntry<K, V> extends ImmutableEntry<K, V> {
   /**
    * Creates an {@code ImmutableMapEntry} array to hold parameterized entries. The

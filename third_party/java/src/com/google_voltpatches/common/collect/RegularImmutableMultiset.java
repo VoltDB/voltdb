@@ -20,10 +20,9 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.collect.Multisets.ImmutableEntry;
 import com.google_voltpatches.common.primitives.Ints;
+import com.google_voltpatches.errorprone.annotations.concurrent.LazyInit;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.Collection;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -43,6 +42,7 @@ class RegularImmutableMultiset<E> extends ImmutableMultiset<E> {
   private final transient int size;
   private final transient int hashCode;
 
+  @LazyInit
   private transient ImmutableSet<E> elementSet;
 
   RegularImmutableMultiset(Collection<? extends Entry<? extends E>> entries) {

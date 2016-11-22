@@ -17,9 +17,8 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.List;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -46,11 +45,13 @@ public abstract class ForwardingListMultimap<K, V> extends ForwardingMultimap<K,
     return delegate().get(key);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public List<V> removeAll(@Nullable Object key) {
     return delegate().removeAll(key);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public List<V> replaceValues(K key, Iterable<? extends V> values) {
     return delegate().replaceValues(key, values);

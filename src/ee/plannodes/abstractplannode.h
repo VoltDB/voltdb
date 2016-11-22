@@ -207,6 +207,18 @@ public:
                                            std::vector<AbstractExpression*> *sortExprs,
                                            std::vector<SortDirectionType>   *sortDirs);
 
+    // A simple method of managing the lifetime of AbstractExpressions referenced by
+    // a vector that is never mutated once it is loaded.
+    struct OwningExpressionVector : public std::vector<AbstractExpression*> {
+        // Nothing prevents the vector from being set up or even modified
+        // via other vector methods, with this caveat:
+        // The memory management magic provided here simply assumes ownership
+        // of any elements referenced by the _final_ state of the vector.
+        ~OwningExpressionVector();
+        void loadExpressionArrayFromJSONObject(const char* label,
+                                               PlannerDomValue obj);
+    };
+
 protected:
     AbstractPlanNode();
 
@@ -220,18 +232,6 @@ protected:
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
                                                             PlannerDomValue obj);
-
-    // A simple method of managing the lifetime of AbstractExpressions referenced by
-    // a vector that is never mutated once it is loaded.
-    struct OwningExpressionVector : public std::vector<AbstractExpression*> {
-        // Nothing prevents the vector from being set up or even modified
-        // via other vector methods, with this caveat:
-        // The memory management magic provided here simply assumes ownership
-        // of any elements referenced by the _final_ state of the vector.
-        ~OwningExpressionVector();
-        void loadExpressionArrayFromJSONObject(const char* label,
-                                               PlannerDomValue obj);
-    };
 
     // Every PlanNode will have a unique id assigned to it at compile time
     int32_t m_planNodeId;
