@@ -2237,6 +2237,40 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     /**
+     * It's not allowed to have NOW or CURRENT_TIMESTAMP in a
+     * join condition or a where clause.
+     * @throws Exception
+     */
+    public void doTestMVFailedCase(String sql, String pattern) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = null;
+        client.callProcedure("@AdHoc", "drop view mv if exists");
+        String msg = null;
+        boolean success;
+        try {
+            cr = client.callProcedure("@AdHoc", sql);
+            success = true;
+        } catch (Exception ex) {
+            success = false;
+            msg = ex.getMessage();
+        }
+        client.callProcedure("@AdHoc", "drop view mv if exists");
+        assertFalse("Unexpected compilation success", success);
+        assertTrue("Did not find pattern \"" + pattern + "\" in error message.",
+                   msg.contains(pattern));
+    }
+
+    public void testNowFailed() throws Exception {
+        String sql;
+        sql = "CREATE VIEW MV AS SELECT L.ID, COUNT(*) FROM ENG11495 AS L JOIN ENG11495 AS R ON L.TS = NOW GROUP BY L.ID";
+        doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
+        sql = "CREATE VIEW MV AS SELECT L.ID, COUNT(*) FROM ENG11495 AS L JOIN ENG11495 AS R ON L.TS = R.TS WHERE L.TS < NOW GROUP BY L.ID";
+        doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
+        sql = "CREATE VIEW MV AS SELECT L.ID, COUNT(*), MAX(NOW)  FROM ENG11495 AS L JOIN ENG11495 AS R ON L.TS = R.TS GROUP BY L.ID";
+        doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
+    }
+
+    /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both

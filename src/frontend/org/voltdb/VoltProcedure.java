@@ -80,13 +80,32 @@ public abstract class VoltProcedure {
     private boolean m_initialized;
 
     /**
-     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
-     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     * <p>Allow VoltProcedures access to a unique ID generated for each transaction.</p>
      *
-     * Allow VoltProcedures access to a unique ID generated for each transaction.
+     * <p>Note that calling it repeatedly within a single transaction will return the same
+     * number.</p>
      *
-     * The id consists of a time based component in the most significant bits followed
-     * by a counter, and then a generator id to allow parallel unique number generation
+     * <p>The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a partition id to allow parallel unique number generation.</p>
+     *
+     * <p>Currently, if the host clock moves backwards this call may block while the clock
+     * catches up to its previous max. Running NTP with the -x option will prevent this in
+     * most cases. It may not be sufficient to 100% avoid this, especially in managed and/or
+     * virtualized environments (like AWS). The value will always be unique, but clocks moving
+     * backwards may affect system throughput.</p>
+     *
+     * <p>Since this number is initially based on the wall clock time (UTC), it is not
+     * guaranteed to be unique across different clusters of VoltDB. If you snapshot, then
+     * move time back by 1HR, then load that snapshot into a new VoltDB cluster, you might
+     * see duplicate ids for up to 1HR. Since the wall clocks VoltDB uses are UTC, and it
+     * takes some amount of time to snapshot and restore, this is a pretty easy corner case
+     * to avoid. Note that failure and recovery from disk using command logs will preserve
+     * unique id continuity even if the clock shifts.</p>
+     *
+     * <p>In many cases it may make sense to generate unique ids on the client-side and pass
+     * them to the server. Please reach out to VoltDB if you have questions about when using
+     * this method is appropriate.</p>
+     *
      * @return An ID that is unique to this transaction
      */
     public long getUniqueId() {
