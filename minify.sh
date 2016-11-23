@@ -32,7 +32,7 @@ java -jar yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery.co
 echo '.'
 java -jar yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery.dataTables.js -o src/frontend/org/voltdb/dbmonitor/js-min/jquery.dataTables.min.js
 echo '.'
-java -jar yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery.popup.js -o src/frontend/org/voltdb/dbmonitor/js-min/jquery.popupp.min.js
+java -jar yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery.popup.js -o src/frontend/org/voltdb/dbmonitor/js-min/jquery.popup.min.js
 echo '.'
 java -jar yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery.tablesorter.js -o src/frontend/org/voltdb/dbmonitor/js-min/jquery.tablesorter.min.js
 echo '.'
