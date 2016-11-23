@@ -497,6 +497,7 @@ if whichtests in ("${eetestsuite}", "executors"):
     MergeReceiveExecutorTest
     TestGeneratedPlans
     TestRank
+    TestCount
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

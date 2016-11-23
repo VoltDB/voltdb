@@ -121,7 +121,7 @@ public:
      * also need to output some last rows, when we have more
      * sophisticated windowing support.
      */
-    virtual void p_execute_finish();
+    virtual void p_execute_finish(TableWindow *window);
 
     /**
      * This tuple is the set of partition by keys for the
@@ -199,29 +199,6 @@ public:
 
     void advanceAggsToOrderByEdge(TableWindow *window);
 
-    /**
-     * We may be reading the first tuple of the input table,
-     * the the first tuple of a new partition or a new order
-     * by group, a tuple in the last order by group or the end
-     * of the input.  This state is coded in this enum type.
-     */
-    enum ScanState {
-        firstTuple,    /**
-                        * The first tuple.
-                        */
-        medialOrderBy, /**
-                        * A tuple in same order by group as the
-                        * last tuple
-                        */
-        firstOrderBy,  /** A tuple in the same partition
-                        *  as the last tuple but a new order by group
-                        */
-        endOfTable     /**
-                        * This is after all tuples have been
-                        * processed.
-                        */
-    };
-
     void insertOutputTuple(WindowAggregateRow* winFunRow);
 
     TupleSchema* constructSchemaFromExpressionVector(const AbstractPlanNode::OwningExpressionVector &exprs);
@@ -231,9 +208,9 @@ public:
 
     void initWorkingTupleStorage();
 
-    bool findLeadingEdge(TableWindow *window, bool firstRow);
+    bool findLeadingEdge(TableWindow *window);
 
-    bool findOrderByEdge(TableWindow *window, bool firstGroup);
+    bool findOrderByEdge(TableWindow *window);
 
 private:
      Pool m_memoryPool;
@@ -342,7 +319,15 @@ private:
      */
     WindowAggregateRow * m_aggregateRow;
 
+    /**
+     * As we iterate through the input table, we iterate
+     * through partitions, and each partition may be
+     * grouped in order by groups.  A TableWindow keeps track
+     * of all the iterators.
+     */
     TableWindow  * m_tableWindow;
+
+    void processOneRow(TableWindow* window);
 };
 
 } /* namespace voltdb */
