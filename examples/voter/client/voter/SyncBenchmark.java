@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -122,6 +123,9 @@ public class SyncBenchmark {
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
 
+        @Option(desc = "SSL configuration file.")
+        String ssl = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -158,6 +162,15 @@ public class SyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+
+        if (config.ssl != null && !config.ssl.isEmpty()) {
+            try {
+                clientConfig.enableSSL();
+            } catch (Exception e) {
+                System.err.println("Failed to configure ssl, exiting");
+                System.exit(-1);
+            }
+        }
 
         client = ClientFactory.createClient(clientConfig);
 
