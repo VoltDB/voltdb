@@ -24,14 +24,17 @@ A more complex version of this app might populate the base table with billions o
 
 Quickstart
 ---------------------------
-VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It is very readable and when executed, shows what is precisely being run to accomplish a given task..
+Open a shell and go to the examples/contentionmark directory, then execute the following commands to start the database:
 
-1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
-3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-4. Type "./run.sh client" to run the client code.
+    voltdb init
+    voltdb start
 
-You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.
+Wait until you see "Server completed initialization."  Then open a new shell in the same directory and run the following to load the schema, preload some data, and run the demo client:
+
+    sqlcmd < ddl.sql
+    ./run.sh client
+
+You can stop the server or running client at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
 Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 

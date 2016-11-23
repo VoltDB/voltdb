@@ -39,12 +39,17 @@ This example makes use of the built-in stored procedures that are automatically 
 
 Quickstart
 -----------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+Open a shell and go to the examples/voltkv directory, then execute the following commands to start the database:
 
-1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create --force" to start an empty, single-node VoltDB server.
-3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-4. Type "./run.sh client" to run the client code.
+    voltdb init
+    voltdb start
+
+Wait until you see "Server completed initialization."  Then open a new shell in the same directory and run the following to load the schema, preload some data, and run the demo client:
+
+    sqlcmd < ddl.sql
+    ./run.sh client
+
+You can stop the server or running client at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
 run.sh actions described
 ---------------------
@@ -58,4 +63,3 @@ run.sh actions described
 - *run.sh jdbc-benchmark* : start the JDBC client benchmark
 - *run.sh clean* : remove compiled and other runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the included client jarfile
-
