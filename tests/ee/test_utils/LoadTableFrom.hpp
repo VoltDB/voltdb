@@ -48,6 +48,13 @@
 #include "common/TupleSchemaBuilder.h"
 
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "common/debuglog.h"
+
+#ifdef VOLT_TRACE_ENABLED
+#define IF_VOLT_TRACE(x) x
+#else
+#define IF_VOLT_TRACE(x)
+#endif
 
 namespace voltdb {
 /**
@@ -61,7 +68,6 @@ namespace voltdb {
  * The caller owns the table object, and is responsible for
  * deleting it.
  */
-bool debug_print = false;
 TempTable *loadTableFrom(const char *buffer,
                          size_t size,
                          Pool * pool= NULL,
@@ -69,25 +75,29 @@ TempTable *loadTableFrom(const char *buffer,
                          bool shouldDRStreamRows = false)
 {
     ReferenceSerializeInputBE result(buffer, size);
-    int32_t msg_size         = result.readInt();  // message length.
-    int8_t  status           = result.readByte(); // status
-    int32_t icl              = result.readInt();  // inter cluster latency
-    int32_t serialized_exp   = result.readInt();  // serialized exception
-    int32_t tbl_len          = result.readInt();  // table length
-    int32_t tbl_metadata_len = result.readInt();  // table metadata length
-    int8_t  tbl_status       = result.readByte();
-    int16_t column_count     = result.readShort();
-    if (debug_print) {
-        printf("\n");
-        printf("  msg size:              %d\n",   msg_size);
-        printf("  status:                %hhd\n", status);
-        printf("  inter cluster latency: %d\n",   icl);
-        printf("  serialized exception:  %d\n",   serialized_exp);
-        printf("  table length:          %d\n",   tbl_len);
-        printf("  table metadata length: %d\n",   tbl_metadata_len);
-        printf("  table_status:          %hhd\n", tbl_status);
-        printf("  column count:          %d\n",   column_count);
-    }
+    // These varaibles are only used if
+    // VOLT_TRACE is defined.  But their
+    // values need to be calculated, because the
+    // calculations have side effects.  If we
+    // define the variables but don't use them the
+    // compiler will complain.
+    IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
+    IF_VOLT_TRACE(int8_t  status           = ) result.readByte(); // status
+    IF_VOLT_TRACE(int32_t icl              = ) result.readInt();  // inter cluster latency
+    IF_VOLT_TRACE(int32_t serialized_exp   = ) result.readInt();  // serialized exception
+    IF_VOLT_TRACE(int32_t tbl_len          = ) result.readInt();  // table length
+    IF_VOLT_TRACE(int32_t tbl_metadata_len = ) result.readInt();  // table metadata length
+    IF_VOLT_TRACE(int8_t  tbl_status       = ) result.readByte();
+    int16_t column_count = result.readShort();
+    VOLT_TRACE("\n");
+    VOLT_TRACE("  msg size:              %d\n",   msg_size);
+    VOLT_TRACE("  status:                %hhd\n", status);
+    VOLT_TRACE("  inter cluster latency: %d\n",   icl);
+    VOLT_TRACE("  serialized exception:  %d\n",   serialized_exp);
+    VOLT_TRACE("  table length:          %d\n",   tbl_len);
+    VOLT_TRACE("  table metadata length: %d\n",   tbl_metadata_len);
+    VOLT_TRACE("  table_status:          %hhd\n", tbl_status);
+    VOLT_TRACE("  column count:          %d\n",   column_count);
     /*
      * Read the schema information.
      */
@@ -95,22 +105,18 @@ TempTable *loadTableFrom(const char *buffer,
     voltdb::TupleSchemaBuilder builder(column_count);
     for (int idx = 0; idx < column_count; idx += 1) {
         ValueType colType = static_cast<ValueType>(result.readByte());
-        if (debug_print) {
-            printf("  column %02d type:         %hd\n",
-                   idx,
-                   column_count);
-        }
+        VOLT_TRACE("  column %02d type:         %hd\n",
+                    idx,
+                    column_count);
         assert(colType != VALUE_TYPE_ARRAY);
         builder.setColumnAtIndex(idx, colType);
     }
     TupleSchema *schema = builder.build();
     for (int idx = 0; idx < column_count; idx += 1) {
         columnNames.push_back(result.readTextString());
-        if (debug_print) {
-            printf("  column %02d name:         %s\n",
-                   idx,
-                   columnNames[idx].c_str());
-        }
+        VOLT_TRACE("  column %02d name:         %s\n",
+                    idx,
+                    columnNames[idx].c_str());
     }
     TempTable *table;
     table = TableFactory::getTempTable(0,

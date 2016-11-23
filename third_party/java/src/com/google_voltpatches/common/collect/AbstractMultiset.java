@@ -20,13 +20,12 @@ import static com.google_voltpatches.common.collect.Multisets.setCountImpl;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -79,33 +78,38 @@ abstract class AbstractMultiset<E> extends AbstractCollection<E> implements Mult
   }
 
   // Modification Operations
-
+  @CanIgnoreReturnValue
   @Override
   public boolean add(@Nullable E element) {
     add(element, 1);
     return true;
   }
 
+  @CanIgnoreReturnValue
   @Override
   public int add(@Nullable E element, int occurrences) {
     throw new UnsupportedOperationException();
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean remove(@Nullable Object element) {
     return remove(element, 1) > 0;
   }
 
+  @CanIgnoreReturnValue
   @Override
   public int remove(@Nullable Object element, int occurrences) {
     throw new UnsupportedOperationException();
   }
 
+  @CanIgnoreReturnValue
   @Override
   public int setCount(@Nullable E element, int count) {
     return setCountImpl(this, element, count);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean setCount(@Nullable E element, int oldCount, int newCount) {
     return setCountImpl(this, element, oldCount, newCount);
@@ -119,16 +123,19 @@ abstract class AbstractMultiset<E> extends AbstractCollection<E> implements Mult
    * <p>This implementation is highly efficient when {@code elementsToAdd}
    * is itself a {@link Multiset}.
    */
+  @CanIgnoreReturnValue
   @Override
   public boolean addAll(Collection<? extends E> elementsToAdd) {
     return Multisets.addAllImpl(this, elementsToAdd);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean removeAll(Collection<?> elementsToRemove) {
     return Multisets.removeAllImpl(this, elementsToRemove);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean retainAll(Collection<?> elementsToRetain) {
     return Multisets.retainAllImpl(this, elementsToRetain);

@@ -43,7 +43,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -254,9 +254,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // If we have seen any windowed expressions we will have
-        // saved them in m_windowedExpressions by now.  We need to
+        // saved them in m_windowFunctionExpressions by now.  We need to
         // verify their validity.
-        verifyWindowedExpressions();
+        verifyWindowFunctionExpressions();
 
         /*
          * Calculate the content determinism message before we place the TVEs in
@@ -931,10 +931,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *
      * @return
      */
-    private void verifyWindowedExpressions() {
+    private void verifyWindowFunctionExpressions() {
         // Check for windowed expressions.
-        if (m_windowedExpressions.size() > 0) {
-            if (m_windowedExpressions.size() > 1) {
+        if (m_windowFunctionExpressions.size() > 0) {
+            if (m_windowFunctionExpressions.size() > 1) {
                 throw new PlanningErrorException(
                         "Only one windowed function call may appear in a selection list.");
             }
@@ -944,10 +944,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // leave this as a pattern in case we decide to implement more
             // legality conditions for other windowed operators.
             //
-            WindowedExpression windowedExpression = m_windowedExpressions.get(0);
+            WindowFunctionExpression windowFunctionExpression = m_windowFunctionExpressions.get(0);
             List<AbstractExpression> orderByExpressions =
-                    windowedExpression.getOrderByExpressions();
-            ExpressionType exprType = windowedExpression.getExpressionType();
+                    windowFunctionExpression.getOrderByExpressions();
+            ExpressionType exprType = windowFunctionExpression.getExpressionType();
             switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
             case AGGREGATE_WINDOWED_DENSE_RANK:
@@ -980,7 +980,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
-        if (hasWindowedExpression()) {
+        if (hasWindowFunctionExpression()) {
             throw new PlanningErrorException(
                     "Use of both a windowed function call and GROUP BY in a single query is not supported.");
         }
@@ -1757,8 +1757,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
-    public boolean hasWindowedExpression() {
-        return m_windowedExpressions.size() > 0;
+    public boolean hasWindowFunctionExpression() {
+        return m_windowFunctionExpressions.size() > 0;
     }
 
     public boolean hasAggregateExpression() {
@@ -1811,8 +1811,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *
      * @return
      */
-    public boolean hasPartitionColumnInWindowedExpression() {
-        if (getWindowedExpressions().size() == 0) {
+    public boolean hasPartitionColumnInWindowFunctionExpression() {
+        if (getWindowFunctionExpressions().size() == 0) {
             return true;
         }
         return m_hasPartitionColumnsInWindowedAggregates;
@@ -2483,13 +2483,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @return
      */
     public boolean isPartitionColumnInWindowedAggregatePartitionByList() {
-        if (getWindowedExpressions().size() == 0) {
+        if (getWindowFunctionExpressions().size() == 0) {
             return false;
         }
         // We can't really have more than one Windowed Aggregate Expression.
         // If we ever do, this should fail gracelessly.
-        assert(getWindowedExpressions().size() == 1);
-        WindowedExpression we = getWindowedExpressions().get(0);
+        assert(getWindowFunctionExpressions().size() == 1);
+        WindowFunctionExpression we = getWindowFunctionExpressions().get(0);
         List<AbstractExpression> partitionByExprs = we.getPartitionByExpressions();
         boolean foundPartExpr = false;
         for (AbstractExpression ae : partitionByExprs) {
@@ -2521,6 +2521,17 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         return foundPartExpr;
+    }
+
+    /**
+     * Gather up all the join expressions.  This happens before planning.
+     * So, all the innerouter and innerinner lists are not yet populated.
+     *
+     * @param checkExpressions
+     */
+    public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
+        // TODO Auto-generated method stub
+        m_joinTree.gatherJoinExpressions(checkExpressions);
     }
 
 }

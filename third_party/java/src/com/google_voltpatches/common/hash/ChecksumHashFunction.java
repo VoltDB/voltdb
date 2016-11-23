@@ -18,7 +18,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.base.Supplier;
-
 import java.io.Serializable;
 import java.util.zip.Checksum;
 

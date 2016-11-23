@@ -757,7 +757,7 @@ public class CatalogDiffEngine {
                         : ""),
                 (singleTable
                         ? "the table already contains data"
-                        : "all of the tables already contain data"));
+                        : "none of the source tables are empty"));
     }
 
     /**

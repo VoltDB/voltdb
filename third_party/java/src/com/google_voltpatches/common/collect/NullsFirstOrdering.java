@@ -17,9 +17,7 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.io.Serializable;
-
 import javax.annotation_voltpatches.Nullable;
 
 /** An ordering that treats {@code null} as less than all other values. */

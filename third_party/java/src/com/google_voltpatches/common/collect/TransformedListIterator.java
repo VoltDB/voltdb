@@ -18,7 +18,6 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Function;
-
 import java.util.ListIterator;
 
 /**

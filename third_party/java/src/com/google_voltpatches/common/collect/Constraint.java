@@ -17,6 +17,7 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
  * A constraint that an element must satisfy in order to be added to a
@@ -51,6 +52,7 @@ interface Constraint<E> {
    * @param element the element to check
    * @return the provided element
    */
+  @CanIgnoreReturnValue
   E checkElement(E element);
 
   /**

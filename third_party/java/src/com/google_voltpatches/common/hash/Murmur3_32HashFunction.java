@@ -30,15 +30,13 @@ import static com.google_voltpatches.common.primitives.UnsignedBytes.toInt;
 import com.google_voltpatches.common.primitives.Chars;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
-
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
- * See http://smhasher.googlecode.com/svn/trunk/MurmurHash3.cpp
- * MurmurHash3_x86_32
+ * See MurmurHash3_x86_32 in <a href="http://smhasher.googlecode.com/svn/trunk/MurmurHash3.cpp">the
+ * C++ implementation</a>.
  *
  * @author Austin Appleby
  * @author Dimitris Andreou

@@ -31,8 +31,8 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
 import com.google_voltpatches.common.collect.Maps.ViewCachingAbstractMap;
 import com.google_voltpatches.common.collect.Sets.ImprovedAbstractSet;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Iterator;
@@ -40,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -140,6 +139,7 @@ class StandardTable<R, C, V> extends AbstractTable<R, C, V> implements Serializa
     return map;
   }
 
+  @CanIgnoreReturnValue
   @Override
   public V put(R rowKey, C columnKey, V value) {
     checkNotNull(rowKey);
@@ -148,6 +148,7 @@ class StandardTable<R, C, V> extends AbstractTable<R, C, V> implements Serializa
     return getOrCreate(rowKey).put(columnKey, value);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public V remove(@Nullable Object rowKey, @Nullable Object columnKey) {
     if ((rowKey == null) || (columnKey == null)) {
@@ -164,6 +165,7 @@ class StandardTable<R, C, V> extends AbstractTable<R, C, V> implements Serializa
     return value;
   }
 
+  @CanIgnoreReturnValue
   private Map<R, V> removeColumn(Object column) {
     Map<R, V> output = new LinkedHashMap<R, V>();
     Iterator<Entry<R, Map<C, V>>> iterator = backingMap.entrySet().iterator();
@@ -427,6 +429,7 @@ class StandardTable<R, C, V> extends AbstractTable<R, C, V> implements Serializa
      * Removes all {@code Column} mappings whose row key and value satisfy the
      * given predicate.
      */
+    @CanIgnoreReturnValue
     boolean removeFromColumnIf(Predicate<? super Entry<R, V>> predicate) {
       boolean changed = false;
       Iterator<Entry<R, Map<C, V>>> iterator = backingMap.entrySet().iterator();

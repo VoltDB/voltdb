@@ -46,7 +46,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -68,7 +68,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.PartitionByPlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -1095,7 +1095,7 @@ public class PlanAssembler {
 
         // If we have a windowed expression in the display list we want to
         // add a PartitionByPlanNode here.
-        if (m_parsedSelect.hasWindowedExpression()) {
+        if (m_parsedSelect.hasWindowFunctionExpression()) {
             root = handleWindowedOperators(root);
         }
 
@@ -2207,14 +2207,14 @@ public class PlanAssembler {
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
-        WindowedExpression winExpr = m_parsedSelect.getWindowedExpressions().get(0);
+        WindowFunctionExpression winExpr = m_parsedSelect.getWindowFunctionExpressions().get(0);
         assert(winExpr != null);
 
         // This will set the output schema to contain the
         // windowed schema column only.  In generateOutputSchema
         // we will add the input columns.
-        PartitionByPlanNode pnode = new PartitionByPlanNode();
-        pnode.setWindowedExpression(winExpr);
+        WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
+        pnode.setWindowFunctionExpression(winExpr);
         OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.
         // to construct the output schema.
