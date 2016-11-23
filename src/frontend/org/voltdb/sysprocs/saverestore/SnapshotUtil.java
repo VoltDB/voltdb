@@ -937,7 +937,7 @@ public class SnapshotUtil {
         pw.println(indentString + "TxnId: " + snapshotTxnId);
         pw.println(indentString + "Date: " +
                 new Date(
-                        org.voltdb.TransactionIdManager.getTimestampFromTransactionId(snapshotTxnId)));
+                        org.voltcore.TransactionIdManager.getTimestampFromTransactionId(snapshotTxnId)));
 
         pw.println(indentString + "Digests:");
         indentString = "\t";

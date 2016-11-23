@@ -46,13 +46,13 @@ def shutdown(runner):
                 runner.abort('The cluster has failed to be quiesce with status: %d' % status)
             checkstats.check_clients(runner)
             checkstats.check_importer(runner)
-            checkstats.check_dr_consumer(runner)
             checkstats.check_command_log(runner)
             runner.info('All transactions have been made durable.')
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
                #save option, check more stats
+               checkstats.check_dr_consumer(runner)
                runner.info('Starting resolution of external commitments...')
                checkstats.check_exporter(runner)
                checkstats.check_dr_producer(runner)
