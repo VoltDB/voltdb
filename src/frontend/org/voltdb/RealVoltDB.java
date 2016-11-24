@@ -3595,6 +3595,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                  m_catalogContext.database.getIsactiveactivedred()) {
             String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
+            final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
             if (m_catalogContext.cluster.getDrconsumerenabled() &&
                     (drProducerHost == null || drProducerHost.isEmpty())) {
                 VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
@@ -3608,13 +3609,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         ClientInterface.class,
                         Cartographer.class,
                         HostMessenger.class,
-                        byte.class);
+                        byte.class,
+                        String.class,
+                        int.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                         drProducerHost,
                         m_clientInterface,
                         m_cartographer,
                         m_messenger,
-                        drConsumerClusterId);
+                        drConsumerClusterId,
+                        drIfAndPort.getFirst(),
+                        drIfAndPort.getSecond());
                 m_globalServiceElector.registerService(m_consumerDRGateway);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
